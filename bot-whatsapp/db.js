@@ -25,7 +25,17 @@ CREATE TABLE IF NOT EXISTS orders (
   status        TEXT NOT NULL DEFAULT 'confirmed',
   export_status TEXT NOT NULL DEFAULT 'pending',
   exported_at   TEXT,
+  export_id     INTEGER REFERENCES exports(id),
   created_at    TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS exports (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at  TEXT NOT NULL,
+  format      TEXT NOT NULL,
+  file_name   TEXT NOT NULL UNIQUE,
+  sha256      TEXT NOT NULL,
+  order_count INTEGER NOT NULL,
+  line_count  INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS order_lines (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,6 +57,10 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   db.exec(SCHEMA);
+  // Bases creadas antes de existir las exportaciones: añadir la columna que falta
+  if (!db.prepare("PRAGMA table_info(orders)").all().some((c) => c.name === "export_id")) {
+    db.exec("ALTER TABLE orders ADD COLUMN export_id INTEGER REFERENCES exports(id)");
+  }
 
   const insertOrder = db.prepare(
     `INSERT OR IGNORE INTO orders (key, customer_id, phone, name, address, text, note, total, review, created_at)
@@ -97,6 +111,51 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
         ? db.prepare("SELECT * FROM orders WHERE export_status = ? ORDER BY id DESC LIMIT ?").all(exportStatus, limit)
         : db.prepare("SELECT * FROM orders ORDER BY id DESC LIMIT ?").all(limit);
       return rows.map(withLines);
+    },
+
+    /**
+     * Exporta de forma atómica los pedidos confirmados y pendientes.
+     * build(orders) debe generar y guardar el fichero y devolver { format, fileName, sha256, lineCount, discard() }.
+     * Si algo falla (generar el fichero o anotar la exportación), no se marca ningún pedido y el fichero se descarta:
+     * los pedidos siguen pendientes y se reintentan en la siguiente exportación.
+     * Un pedido solo se exporta si es seguro: con código de cliente, con líneas y sin marca de "revisar".
+     * Devuelve { export, held }: export es null si no había nada que exportar; held, cuántos pedidos pendientes
+     * quedan retenidos esperando revisión.
+     */
+    exportPending(build, now = new Date().toISOString()) {
+      db.exec("BEGIN IMMEDIATE");
+      let built;
+      try {
+        const pending = db.prepare("SELECT * FROM orders WHERE export_status = 'pending' AND status = 'confirmed' ORDER BY id").all().map(withLines);
+        const ready = pending.filter((o) => !o.review && o.customer_id && o.items.length);
+        const held = pending.length - ready.length;
+        if (!ready.length) {
+          db.exec("COMMIT");
+          return { export: null, held };
+        }
+        built = build(ready);
+        const r = db
+          .prepare("INSERT INTO exports (created_at, format, file_name, sha256, order_count, line_count) VALUES (?, ?, ?, ?, ?, ?)")
+          .run(now, built.format, built.fileName, built.sha256, ready.length, built.lineCount);
+        const exportId = Number(r.lastInsertRowid);
+        const mark = db.prepare("UPDATE orders SET export_status = 'exported', exported_at = ?, export_id = ? WHERE id = ? AND export_status = 'pending'");
+        for (const o of ready) if (mark.run(now, exportId, o.id).changes !== 1) throw new Error(`El pedido ${o.ref} ya no estaba pendiente`);
+        db.exec("COMMIT");
+        return { export: { id: exportId, ...db.prepare("SELECT * FROM exports WHERE id = ?").get(exportId) }, held };
+      } catch (err) {
+        db.exec("ROLLBACK");
+        built?.discard?.();
+        throw err;
+      }
+    },
+
+    listExports: (limit = 100) => db.prepare("SELECT * FROM exports ORDER BY id DESC LIMIT ?").all(limit),
+    getExport: (id) => db.prepare("SELECT * FROM exports WHERE id = ?").get(id) ?? null,
+    exportedOrders: (exportId) => db.prepare("SELECT * FROM orders WHERE export_id = ? ORDER BY id").all(exportId).map(withLines),
+
+    /** Un responsable da por revisado un pedido retenido (marcado "revisar"), para que entre en la siguiente exportación. */
+    approveOrder(ref) {
+      return db.prepare("UPDATE orders SET review = 0 WHERE ref = ? AND export_status = 'pending'").run(ref).changes === 1;
     },
 
     close: () => db.close(),

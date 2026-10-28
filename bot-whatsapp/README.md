@@ -14,6 +14,14 @@ Los pedidos confirmados se guardan en `pedidos.sqlite` (ruta configurable con `D
 - El guardado es atómico (cabecera y líneas juntas o nada). Si falla, el pedido no se da por registrado.
 - **Hosting:** el fichero debe estar en un disco persistente (en Render gratis se pierde en cada despliegue; usa un disco de pago o un VPS) y conviene hacer copia periódica.
 
+## 1a-bis. Exportación diaria a Excel
+- Cada día a partir de las `EXPORT_TIME` (21:00 hora de Madrid por defecto) el servidor genera un `.xlsx` en `EXPORT_DIR` (`exportaciones/`) con los pedidos confirmados y pendientes, y los marca como exportados. Si el servidor estaba apagado a esa hora, exporta al arrancar.
+- **Una fila por línea de pedido.** Nunca se exporta dos veces el mismo pedido ni se sobrescribe un fichero anterior. Cada exportación queda en el historial (fecha, nº de pedidos y líneas, nombre de fichero y huella SHA-256).
+- **Todo o nada:** si falla la generación del fichero o el registro, ningún pedido se marca y se reintenta en la siguiente ejecución.
+- **Pedidos retenidos:** no se exportan los de cliente desconocido (sin código de ERP), sin líneas, o con la marca *revisar* (interpretación dudosa). Se avisa en el log. Para liberar uno ya revisado: `node exportar.js --aprobar VM-2026-000123`.
+- Manual: `node exportar.js` (exporta ahora) · `node exportar.js --lista` (historial).
+- ⚠️ El formato de columnas de `export-format.js` es **provisional**. Cuando tengamos la plantilla de importación real del ERP solo hay que cambiar ese fichero.
+
 ## 1b. Copia de pedidos en hoja de Google (opcional)
 Cada pedido confirmado se añade como una fila nueva: fecha, teléfono, nombre, dirección, lo que escribió el cliente, lo que el bot ha interpretado, total y estado.
 1. Crea una hoja nueva en https://sheets.google.com (ponle "Pedidos").

@@ -5,6 +5,7 @@ import { handleMessage, newSession, setCatalog, getCatalog as catalogNow, habitu
 import { getCatalog, getCustomerByPhone, createOrder, listCustomers } from "./erp.js";
 import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
+import { scheduleDailyExport } from "./exporter.js";
 import { BUSINESS } from "./config.js";
 
 setCatalog(await getCatalog()); // catálogo del ERP; si no hay, se usa el de config.js
@@ -285,4 +286,8 @@ http
     }
     res.writeHead(405).end();
   })
-  .listen(PORT, () => console.log(`Bot escuchando en http://localhost:${PORT}`));
+  .listen(PORT, () => {
+    console.log(`Bot escuchando en http://localhost:${PORT}`);
+    // Exportación diaria a Excel (EXPORT_TIME, por defecto 21:00 hora de Madrid). En modo demo no se programa.
+    if (process.env.DEMO !== "1") scheduleDailyExport(getDb());
+  });
