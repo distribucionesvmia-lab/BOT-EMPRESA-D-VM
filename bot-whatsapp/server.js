@@ -1,12 +1,19 @@
 import http from "node:http";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
 import { handleMessage, newSession, setCatalog, getCatalog as catalogNow, habitualProducts } from "./bot.js";
 import { getCatalog, getCustomerByPhone, createOrder, listCustomers } from "./erp.js";
 import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
-import { scheduleDailyExport } from "./exporter.js";
+import { scheduleDailyExport, runExport } from "./exporter.js";
 import { BUSINESS } from "./config.js";
+
+if (process.env.DEMO === "1") {
+  // La demo usa su propia base de datos y carpeta, para no mezclarse con pedidos reales
+  process.env.DB_PATH ??= "demo.sqlite";
+  process.env.EXPORT_DIR ??= "exportaciones-demo";
+}
 
 setCatalog(await getCatalog()); // catálogo del ERP; si no hay, se usa el de config.js
 
@@ -127,6 +134,25 @@ function demoRoutes(req, res, url) {
       ...listCustomers().map((c) => ({ name: c.name, phone: c.phone.replace(/\D/g, "") })),
       { name: "Número desconocido (cliente nuevo)", phone: "34699000000" },
     ]);
+  }
+  if (url.pathname === "/demo/exportar" && req.method === "POST") {
+    // Lanza ahora la exportación que en producción se hace cada noche
+    try {
+      const r = runExport(getDb());
+      return json(res, { export: r.export, held: r.held });
+    } catch (err) {
+      console.error(err);
+      return json(res, { error: err.message }, 500);
+    }
+  }
+  if (url.pathname === "/demo/exportaciones" && req.method === "GET") return json(res, getDb().listExports(10));
+  const dl = /^\/demo\/descargar\/(\d+)$/.exec(url.pathname);
+  if (dl && req.method === "GET") {
+    const e = getDb().getExport(Number(dl[1]));
+    const file = e && path.join(process.env.EXPORT_DIR ?? "exportaciones", e.file_name);
+    if (!file || !fs.existsSync(file)) return res.writeHead(404).end();
+    res.writeHead(200, { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${e.file_name}"` });
+    return res.end(fs.readFileSync(file));
   }
   if (url.pathname === "/demo/reset" && req.method === "POST") {
     readBody(req).then(({ phone }) => {

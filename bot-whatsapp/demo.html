@@ -21,6 +21,10 @@
   form { display:flex; gap:8px; padding:10px; background:#f0f2f5; }
   input { flex:1; border:0; border-radius:20px; padding:11px 16px; font-size:15px; outline:none; }
   button { border:0; background:#25d366; color:#fff; border-radius:50%; width:44px; height:44px; font-size:18px; cursor:pointer; }
+  .exp { display:flex; gap:12px; align-items:center; margin-bottom:12px; font-size:14px; }
+  .btn { width:auto; height:auto; border-radius:8px; padding:9px 14px; font-size:14px; }
+  .exp a { color:#128c7e; font-weight:600; }
+  .badge.pend { background:#fff3cd; color:#7a5b00; } .badge.hecho { background:#d1f2dd; color:#14532d; }
   .panel { background:#fff; border-radius:12px; padding:20px; box-shadow:0 2px 12px rgba(0,0,0,.08); align-self:start; }
   table { width:100%; border-collapse:collapse; font-size:14px; margin-top:12px; }
   th { text-align:left; color:var(--gris); font-weight:600; padding:8px 10px; border-bottom:2px solid #eee; font-size:12px; text-transform:uppercase; }
@@ -67,8 +71,9 @@
     <h2>Lo que ve el negocio · Base de datos de pedidos</h2>
     <div class="panel">
       <div id="resumen" class="vacio">Aún no hay pedidos. Haz uno desde el chat.</div>
+      <div class="exp"><button type="button" id="exportar" class="btn">Exportar a Excel ahora</button><span id="expmsg"></span></div>
       <table id="tabla" hidden>
-        <thead><tr><th>Hora</th><th>Cliente</th><th>Pedido</th><th>Dirección</th><th>Total</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Ref. / Hora</th><th>Cliente</th><th>Pedido</th><th>Dirección</th><th>Total</th><th>Exportación</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -155,8 +160,8 @@ async function cargar() {
     const tr = document.createElement("tr");
     if (i === 0 && pedidos.length > vistos) tr.className = "nuevo";
     const total = p.total == null ? "por revisar" : p.total.toFixed(2) + " €";
-    tr.innerHTML = `<td>${new Date(p.at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</td>
-      <td><b></b><br><small>${p.customerId ? p.customerId + " · " : "Cliente nuevo · "}+${p.phone}</small></td><td></td><td></td><td>${total}</td><td><span class="badge">Nuevo</span></td>`;
+    tr.innerHTML = `<td><b>${p.ref}</b><br><small>${new Date(p.at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</small></td>
+      <td><b></b><br><small>${p.customerId ? p.customerId + " · " : "Cliente nuevo · "}+${p.phone}</small></td><td></td><td></td><td>${total}</td><td><span class="badge ${p.export_status === "exported" ? "hecho" : "pend"}">${p.export_status === "exported" ? "Exportado" : p.review || !p.customerId ? "Retenido (revisar)" : "Pendiente"}</span></td>`;
     tr.children[1].querySelector("b").textContent = p.name;
     tr.children[2].textContent = p.text; tr.children[3].textContent = p.address;
     tbody.appendChild(tr);
@@ -164,6 +169,14 @@ async function cargar() {
   vistos = pedidos.length;
   tabla.hidden = !pedidos.length; resumen.hidden = !!pedidos.length;
 }
+document.getElementById("exportar").onclick = async () => {
+  const r = await (await fetch("/demo/exportar", { method:"POST" })).json();
+  const m = document.getElementById("expmsg");
+  if (r.error) m.textContent = "Error: " + r.error;
+  else if (r.export) { m.innerHTML = `${r.export.order_count} pedidos exportados · <a href="/demo/descargar/${r.export.id}">Descargar Excel</a>` + (r.held ? ` · ${r.held} retenidos` : ""); }
+  else m.textContent = "No hay pedidos pendientes de exportar" + (r.held ? ` (${r.held} retenidos para revisar)` : "") + ".";
+  cargar();
+};
 f.addEventListener("submit", e => { e.preventDefault(); const v = t.value.trim(); if (v) { t.value = ""; enviar(v); } });
 const who = document.getElementById("who");
 who.addEventListener("change", async () => {

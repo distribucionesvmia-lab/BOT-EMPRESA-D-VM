@@ -20,8 +20,13 @@ const last9 = (p) => String(p).replace(/\D/g, "").slice(-9);
 // Cliente: { id, name, phone, address, orders: [{ doc, date, lines: [{ productId, qty }] }], frequent: [{ productId, qty }] }
 const DATA_FILE = new URL("./historial-demo.json", import.meta.url);
 let data;
-const load = () =>
-  (data ??= fs.existsSync(DATA_FILE) ? JSON.parse(fs.readFileSync(DATA_FILE, "utf8")) : { products: null, customers: [] });
+// En modo demo, si no hay historial real, se usan datos FICTICIOS de ejemplo/
+const EXAMPLE_FILE = new URL("./ejemplo/historial-ficticio.json", import.meta.url);
+const load = () => {
+  if (data) return data;
+  const file = fs.existsSync(DATA_FILE) ? DATA_FILE : process.env.DEMO === "1" && fs.existsSync(EXAMPLE_FILE) ? EXAMPLE_FILE : null;
+  return (data = file ? JSON.parse(fs.readFileSync(file, "utf8")) : { products: null, customers: [] });
+};
 
 export const listCustomers = () => load().customers;
 

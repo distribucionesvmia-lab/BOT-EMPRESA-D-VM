@@ -1,0 +1,267 @@
+{
+ "products": [
+  {
+   "id": "1001",
+   "name": "AGUA MINERAL 1,5 L (PACK 6)",
+   "price": 2.1
+  },
+  {
+   "id": "1002",
+   "name": "REFRESCO COLA LATA 33 CL (PACK 24)",
+   "price": 11.4
+  },
+  {
+   "id": "1003",
+   "name": "CERVEZA RUBIA LATA 33 CL (PACK 24)",
+   "price": 14.2
+  },
+  {
+   "id": "1004",
+   "name": "VINO TINTO CRIANZA 75 CL (CAJA 6)",
+   "price": 27.5
+  },
+  {
+   "id": "1005",
+   "name": "VINO BLANCO VERDEJO 75 CL (CAJA 6)",
+   "price": 21.0
+  },
+  {
+   "id": "1006",
+   "name": "ZUMO NARANJA 1 L (PACK 6)",
+   "price": 6.9
+  },
+  {
+   "id": "1007",
+   "name": "LECHE ENTERA 1 L (PACK 6)",
+   "price": 5.4
+  },
+  {
+   "id": "1008",
+   "name": "ACEITE OLIVA VIRGEN EXTRA 1 L",
+   "price": 8.95
+  },
+  {
+   "id": "1009",
+   "name": "CAFE MOLIDO NATURAL 250 GR",
+   "price": 3.8
+  },
+  {
+   "id": "1010",
+   "name": "AZUCAR 1 KG",
+   "price": 1.15
+  },
+  {
+   "id": "1011",
+   "name": "PATATAS FRITAS 150 GR",
+   "price": 1.6
+  },
+  {
+   "id": "1012",
+   "name": "ANCHOAS ACEITE OLIVA LATA 50 GR",
+   "price": 3.25
+  },
+  {
+   "id": "1013",
+   "name": "ATUN CLARO ACEITE PACK 3",
+   "price": 4.1
+  },
+  {
+   "id": "1014",
+   "name": "TOMATE FRITO 400 GR",
+   "price": 1.05
+  },
+  {
+   "id": "1015",
+   "name": "SALMOREJO 1 L",
+   "price": 2.6
+  }
+ ],
+ "customers": [
+  {
+   "id": "9001",
+   "name": "Bar El Ejemplo (ficticio)",
+   "phone": "+34 600 000 001",
+   "address": "Calle Inventada 1",
+   "orders": [
+    {
+     "doc": "F900",
+     "date": "2026-10-20",
+     "lines": [
+      {
+       "productId": "1002",
+       "qty": 4
+      },
+      {
+       "productId": "1003",
+       "qty": 6
+      },
+      {
+       "productId": "1001",
+       "qty": 10
+      },
+      {
+       "productId": "1011",
+       "qty": 12
+      }
+     ]
+    },
+    {
+     "doc": "F901",
+     "date": "2026-10-06",
+     "lines": [
+      {
+       "productId": "1002",
+       "qty": 3
+      },
+      {
+       "productId": "1003",
+       "qty": 5
+      },
+      {
+       "productId": "1006",
+       "qty": 4
+      }
+     ]
+    },
+    {
+     "doc": "F902",
+     "date": "2026-09-22",
+     "lines": [
+      {
+       "productId": "1004",
+       "qty": 2
+      },
+      {
+       "productId": "1005",
+       "qty": 2
+      },
+      {
+       "productId": "1002",
+       "qty": 4
+      }
+     ]
+    },
+    {
+     "doc": "F903",
+     "date": "2026-09-08",
+     "lines": [
+      {
+       "productId": "1002",
+       "qty": 4
+      },
+      {
+       "productId": "1003",
+       "qty": 6
+      },
+      {
+       "productId": "1001",
+       "qty": 10
+      },
+      {
+       "productId": "1011",
+       "qty": 12
+      }
+     ]
+    }
+   ],
+   "frequent": []
+  },
+  {
+   "id": "9002",
+   "name": "Tienda Ficticia",
+   "phone": "+34 600 000 002",
+   "address": "Plaza Imaginaria 2",
+   "orders": [
+    {
+     "doc": "F900",
+     "date": "2026-10-20",
+     "lines": [
+      {
+       "productId": "1008",
+       "qty": 6
+      },
+      {
+       "productId": "1009",
+       "qty": 8
+      },
+      {
+       "productId": "1010",
+       "qty": 10
+      },
+      {
+       "productId": "1007",
+       "qty": 12
+      }
+     ]
+    },
+    {
+     "doc": "F901",
+     "date": "2026-10-06",
+     "lines": [
+      {
+       "productId": "1008",
+       "qty": 4
+      },
+      {
+       "productId": "1009",
+       "qty": 6
+      },
+      {
+       "productId": "1014",
+       "qty": 12
+      },
+      {
+       "productId": "1015",
+       "qty": 6
+      }
+     ]
+    },
+    {
+     "doc": "F902",
+     "date": "2026-09-22",
+     "lines": [
+      {
+       "productId": "1008",
+       "qty": 6
+      },
+      {
+       "productId": "1009",
+       "qty": 8
+      },
+      {
+       "productId": "1010",
+       "qty": 10
+      },
+      {
+       "productId": "1007",
+       "qty": 12
+      }
+     ]
+    },
+    {
+     "doc": "F903",
+     "date": "2026-09-08",
+     "lines": [
+      {
+       "productId": "1008",
+       "qty": 4
+      },
+      {
+       "productId": "1009",
+       "qty": 6
+      },
+      {
+       "productId": "1014",
+       "qty": 12
+      },
+      {
+       "productId": "1015",
+       "qty": 6
+      }
+     ]
+    }
+   ],
+   "frequent": []
+  }
+ ]
+}

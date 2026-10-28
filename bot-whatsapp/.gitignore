@@ -7,3 +7,5 @@ node_modules
 *.sqlite-wal
 *.sqlite-shm
 exportaciones
+demo.sqlite*
+exportaciones-demo

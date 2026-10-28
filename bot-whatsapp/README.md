@@ -57,8 +57,10 @@ A los clientes conocidos el bot les envía un botón **Hacer pedido** con un **e
 ## 2. Probar sin WhatsApp
 ```bash
 npm test
+npm run demo  # abre http://localhost:3000/demo: chat simulado + pedidos + botón «Exportar a Excel ahora»
 npm run dev   # sin credenciales imprime las respuestas por consola
 ```
+La demo usa **clientes y productos ficticios** (`ejemplo/historial-ficticio.json`) salvo que exista un `historial-demo.json` propio, y guarda todo en `demo.sqlite` y `exportaciones-demo/`, sin tocar los datos reales.
 
 ## 3. Crear la app en Meta (gratis)
 1. Entra en https://developers.facebook.com con tu cuenta de Facebook → **Crear app** → tipo **Empresa** → añade el producto **WhatsApp**.
