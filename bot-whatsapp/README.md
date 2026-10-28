@@ -1,13 +1,20 @@
 # Bot de ventas para WhatsApp (gratis)
 
-Bot por menú sobre la API oficial de WhatsApp (Meta Cloud API). Sin dependencias: solo Node 20.6+.
+Bot por menú sobre la API oficial de WhatsApp (Meta Cloud API). Sin dependencias: solo Node 22.13+ (usa el SQLite integrado).
 
-Flujo: menú → productos → cantidad → carrito → nombre y dirección → confirmar. El pedido se guarda en `orders.jsonl` y (opcional) te llega por WhatsApp.
+Flujo: menú → productos → cantidad → carrito → nombre y dirección → confirmar. El pedido se guarda en la base de datos SQLite `pedidos.sqlite` y (opcional) te llega por WhatsApp.
 
 ## 1. Personalizar
 Edita `config.js` con el nombre, horarios y tus productos/precios.
 
-## 1b. Base de datos de pedidos (hoja de Google, gratis)
+## 1a. Base de datos de pedidos (SQLite)
+Los pedidos confirmados se guardan en `pedidos.sqlite` (ruta configurable con `DB_PATH`), separados de los datos del ERP.
+- Cada pedido recibe un **número correlativo y una referencia** (`VM-2026-000123`), el código de cliente, las líneas exactas (referencia, nombre, precio, unidades) y la fecha/hora. Nace como `confirmed` y `export_status = pending` (pendiente de exportar a Excel).
+- **Sin duplicados:** cada pedido lleva una clave única (`wa:<id del mensaje de WhatsApp>` o `web:<id del enlace>`). Si Meta reenvía el mensaje, el cliente pulsa dos veces o abre dos pestañas, no se crea un segundo pedido. Los ids de mensaje ya procesados también se guardan, así que sobrevive a reinicios.
+- El guardado es atómico (cabecera y líneas juntas o nada). Si falla, el pedido no se da por registrado.
+- **Hosting:** el fichero debe estar en un disco persistente (en Render gratis se pierde en cada despliegue; usa un disco de pago o un VPS) y conviene hacer copia periódica.
+
+## 1b. Copia de pedidos en hoja de Google (opcional)
 Cada pedido confirmado se añade como una fila nueva: fecha, teléfono, nombre, dirección, lo que escribió el cliente, lo que el bot ha interpretado, total y estado.
 1. Crea una hoja nueva en https://sheets.google.com (ponle "Pedidos").
 2. Menú **Extensiones → Apps Script**. Borra lo que haya y pega el contenido de `google-sheets.gs`.
@@ -15,12 +22,12 @@ Cada pedido confirmado se añade como una fila nueva: fecha, teléfono, nombre, 
 4. **Implementar → Nueva implementación → Tipo: Aplicación web** → Ejecutar como: *Yo* → Quién tiene acceso: *Cualquier usuario* → Implementar. Autoriza los permisos y copia la **URL de la aplicación web**.
 5. En `.env`: `SHEET_WEBHOOK_URL=` esa URL y `SHEET_SECRET=` la misma clave del paso 3.
 
-Si la hoja falla, el pedido no se pierde: queda también en `orders.jsonl` del servidor.
+Si la hoja falla, el pedido no se pierde: ya está en la base de datos.
 
 ## 1c. Reconocer al cliente y su historial (ERP)
 El bot identifica al cliente por su teléfono, le saluda por su nombre y le deja **repetir un pedido anterior** o escribir lo que quiere. Los datos vienen de `erp.js`:
 - `getCustomerByPhone(phone)` busca al cliente y su historial.
-- `createOrder(order)` graba el pedido (ahora: `orders.jsonl` + hoja de Google).
+- `createOrder(order)` graba el pedido (ahora: SQLite + hoja de Google opcional).
 
 Mientras no haya API del ERP, el historial se carga desde una exportación de Excel con las líneas de venta (columnas: Artículo, Descripción, Unidades, Fecha, Precio, Nº Documento, Cliente):
 ```bash
@@ -66,6 +73,6 @@ Escribe "hola" al número de WhatsApp y debería responder.
 
 ## Costes y reglas a tener en cuenta
 - Los mensajes que respondes dentro de las 24 h posteriores al mensaje del cliente son **gratuitos**. Escribir tú primero (plantillas) sí se cobra.
-- Los avisos a `OWNER_PHONE` solo llegan si tú escribiste al bot en las últimas 24 h. Si no, mira `orders.jsonl` o los logs.
-- Las sesiones están en memoria: si el servidor se reinicia, los clientes a mitad de pedido vuelven al menú. En Render gratis, `orders.jsonl` se borra en cada despliegue; para algo duradero conviene enviar los pedidos a una hoja de Google o a un email (puedo añadirlo).
+- Los avisos a `OWNER_PHONE` solo llegan si tú escribiste al bot en las últimas 24 h. Si no, mira la base de datos o los logs.
+- Las sesiones están en memoria: si el servidor se reinicia, los clientes a mitad de pedido vuelven al menú. En Render gratis, `pedidos.sqlite` se borra en cada despliegue; usa un disco persistente.
 - No uses librerías no oficiales con tu número de negocio: pueden bloquearlo.

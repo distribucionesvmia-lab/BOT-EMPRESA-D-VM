@@ -4,11 +4,12 @@
 //   getCustomerByPhone(phone) -> { id, name, phone, address, usual: [{ productId, qty }] } | null
 //   createOrder(order)        -> graba el pedido
 //
-// AHORA: datos de ejemplo (clientes-demo.json) y los pedidos van a orders.jsonl + hoja de Google.
+// AHORA: datos de ejemplo (historial-demo.json) y los pedidos van a SQLite (db.js) + hoja de Google (opcional).
 // DESPUÉS: para conectar con el ERP real (a3ERP u otro) solo hay que cambiar el interior de
 // estas dos funciones; el resto del bot no se toca.
 
 import fs from "node:fs";
+import { getDb } from "./db.js";
 
 const { SHEET_WEBHOOK_URL, SHEET_SECRET } = process.env;
 
@@ -33,19 +34,29 @@ export async function getCustomerByPhone(phone) {
   return load().customers.find((c) => last9(c.phone) === last9(phone)) ?? null;
 }
 
+/**
+ * Guarda el pedido en la base de datos propia (SQLite). Si la clave de idempotencia (order.key) ya existe,
+ * no crea otro pedido y devuelve el original con duplicate=true.
+ * La copia a la hoja de Google es opcional y solo se envía para pedidos nuevos.
+ */
 export async function createOrder(order) {
-  fs.appendFileSync("orders.jsonl", JSON.stringify(order) + "\n"); // copia de seguridad local
-  console.log("NUEVO PEDIDO:", order);
-  if (!SHEET_WEBHOOK_URL) return;
+  const result = getDb().createOrder(order); // si falla, el error se propaga: el pedido NO se da por registrado
+  if (result.duplicate) {
+    console.log("Pedido duplicado ignorado:", order.key, "->", result.order.ref);
+    return result;
+  }
+  console.log("NUEVO PEDIDO:", result.order.ref, order);
+  if (!SHEET_WEBHOOK_URL) return result;
   try {
     const res = await fetch(SHEET_WEBHOOK_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify({ secret: SHEET_SECRET, ...order }),
+      body: JSON.stringify({ secret: SHEET_SECRET, ...order, ref: result.order.ref }),
     });
     const body = await res.text();
     if (!res.ok || body.trim() !== "ok") console.error("Error guardando en la hoja:", res.status, body.slice(0, 200));
   } catch (err) {
-    console.error("No se pudo guardar en la hoja (el pedido sigue en orders.jsonl):", err.message);
+    console.error("No se pudo copiar a la hoja (el pedido sigue en la base de datos):", err.message);
   }
+  return result;
 }

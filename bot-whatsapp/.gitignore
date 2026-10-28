@@ -3,3 +3,6 @@ orders.jsonl
 historial-demo.json
 node_modules
 .DS_Store
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

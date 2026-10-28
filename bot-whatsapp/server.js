@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { handleMessage, newSession, setCatalog, getCatalog as catalogNow, habitualProducts } from "./bot.js";
 import { getCatalog, getCustomerByPhone, createOrder, listCustomers } from "./erp.js";
 import { makeToken, readToken } from "./links.js";
+import { getDb } from "./db.js";
 import { BUSINESS } from "./config.js";
 
 setCatalog(await getCatalog()); // catálogo del ERP; si no hay, se usa el de config.js
@@ -15,7 +16,6 @@ const SESSION_TTL = 24 * 60 * 60 * 1000;
 const PUBLIC_URL = (process.env.PUBLIC_URL ?? `http://localhost:${PORT}`).replace(/\/$/, "");
 
 const sessions = new Map(); // teléfono -> { session, last }
-const seen = new Set(); // ids de mensajes ya procesados (Meta a veces reenvía)
 
 const hasCredentials = () => WHATSAPP_TOKEN && PHONE_NUMBER_ID;
 
@@ -53,7 +53,7 @@ async function sendOut(to, out) {
 }
 
 // Pasa un mensaje por el bot: reconoce al cliente por su teléfono, guarda el pedido si lo hay y devuelve el resultado
-async function handleIncoming(from, text) {
+async function handleIncoming(from, text, msgId = null) {
   const entry = sessions.get(from);
   let current = entry && Date.now() - entry.last < SESSION_TTL ? entry.session : null;
   if (!current) {
@@ -70,23 +70,22 @@ async function handleIncoming(from, text) {
   sessions.set(from, { session: out.session, last: Date.now() });
 
   if (out.order) {
-    out.order = { at: new Date().toISOString(), phone: from, ...out.order };
+    // La clave hace el pedido idempotente: el mismo mensaje de confirmación nunca crea dos pedidos
+    out.order = { at: new Date().toISOString(), phone: from, key: msgId ? `wa:${msgId}` : `demo:${crypto.randomUUID()}`, ...out.order };
     await createOrder(out.order);
   }
   return out;
 }
 
 async function onMessage(msg) {
-  if (seen.has(msg.id)) return;
-  seen.add(msg.id);
-  if (seen.size > 5000) seen.delete(seen.values().next().value);
+  if (!getDb().markMessage(msg.id)) return; // Meta reenvía mensajes; este ya se procesó (también tras reiniciar)
 
   const from = msg.from;
   // El cliente escribe un texto, o pulsa una fila de lista / un botón (llega su id)
   const supported = msg.type === "text" || msg.type === "interactive";
   const text =
     msg.type === "text" ? msg.text.body : msg.type === "interactive" ? (msg.interactive?.list_reply?.id ?? msg.interactive?.button_reply?.id ?? "") : "";
-  const out = await handleIncoming(from, text);
+  const out = await handleIncoming(from, text, msg.id);
 
   await sendOut(from, supported ? out : { ...out, reply: "Solo entiendo texto y botones 🙂\n\n" + out.reply });
 
@@ -101,10 +100,7 @@ async function onMessage(msg) {
 }
 
 // Modo demo (npm run demo): chat simulado en el navegador, sin WhatsApp ni Meta
-const readOrders = () =>
-  fs.existsSync("orders.jsonl")
-    ? fs.readFileSync("orders.jsonl", "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l))
-    : [];
+const readOrders = () => getDb().listOrders().reverse().map((o) => ({ ...o, at: o.created_at, customerId: o.customer_id })); // el demo las pinta de más antiguo a más reciente
 
 const json = (res, data, code = 200) =>
   res.writeHead(code, { "Content-Type": "application/json" }).end(JSON.stringify(data));
@@ -154,7 +150,8 @@ function demoRoutes(req, res, url) {
 }
 
 // Mini-aplicación de pedido (catálogo estilo app) que se abre desde el enlace personal de WhatsApp
-const usedLinks = new Set(); // cada enlace sirve para enviar un solo pedido
+// Cada enlace sirve para enviar un solo pedido: se controla en la base de datos (clave "web:<id del enlace>")
+const linkKey = (link) => `web:${link.n}`;
 
 function readJson(req, max = 100_000) {
   return new Promise((resolve) => {
@@ -193,13 +190,13 @@ function webOrderRoutes(req, res, url) {
         business: BUSINESS.name,
         priceNote: BUSINESS.priceNote,
         customer: { name: customer.name, address: customer.address },
-        used: usedLinks.has(link.n),
+        used: getDb().hasOrderKey(linkKey(link)),
         products,
       });
     }
 
     if (req.method === "POST" && !m[2]) {
-      if (usedLinks.has(link.n)) return json(res, { error: "Este pedido ya se envió" }, 409);
+      if (getDb().hasOrderKey(linkKey(link))) return json(res, { error: "Este pedido ya se envió" }, 409);
       const body = await readJson(req);
       const catalog = new Map(catalogNow().map((p) => [String(p.id), p]));
       const merged = new Map();
@@ -214,6 +211,7 @@ function webOrderRoutes(req, res, url) {
       const note = typeof body.note === "string" ? body.note.trim().slice(0, 200) : "";
       const order = {
         at: new Date().toISOString(),
+        key: linkKey(link),
         phone: link.p,
         customerId: customer.id,
         name: customer.name,
@@ -224,8 +222,8 @@ function webOrderRoutes(req, res, url) {
         review: false,
         note,
       };
-      usedLinks.add(link.n);
-      await createOrder(order);
+      const { duplicate } = await createOrder(order);
+      if (duplicate) return json(res, { error: "Este pedido ya se envió" }, 409); // doble clic o dos pestañas
       const message = `🎉 ¡Pedido recibido, ${customer.name}! ${items.length} artículos, total aprox. ${order.total.toFixed(2)}${BUSINESS.currency}.\n\n${BUSINESS.payment}`;
       if (process.env.DEMO !== "1") {
         await send(link.p, message);

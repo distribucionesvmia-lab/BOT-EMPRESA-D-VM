@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "engines": { "node": ">=20.6" },
+  "engines": { "node": ">=22.13" },
   "scripts": {
     "start": "node server.js",
     "dev": "node --env-file=.env server.js",
