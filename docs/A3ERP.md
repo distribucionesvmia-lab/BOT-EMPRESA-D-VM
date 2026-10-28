@@ -24,6 +24,12 @@ Versión y modalidad (local/nube): **pendiente de confirmar**.
 
 **Líneas**: Artículo (código), **Cajas**, Descripción, **Unidades**, Precio (6 decimales), Desc. 1 (%), Uds. servidas, Base, Tipo de IVA/IGIC (21 % / 10 %), Uds. pendientes.
 
+## Pie del pedido (observado)
+Pestañas del pie: Resumen · Detalle impuestos · Otros datos. Todo lo que contiene **lo calcula a3ERP**: descuento/recargo financiero (pronto pago, recargo), portes/embalajes (base e IVA de portes), totales (base de líneas, base imponible, cuota IVA/IGIC, recargo de equivalencia, base de retención, % y retención, no sujeto, total documento) y el botón «Generar anticipo». **El Excel no exporta nada de esto.**
+
+## Columnas del Excel (borrador `a3erp-borrador-v1`)
+Serie · Referencia · Código cliente · Cliente (informativo) · Fecha · Fecha entrega (vacía, pendiente) · Artículo · Descripción (informativa) · Cajas (vacía, pendiente) · Unidades · Observaciones. Una fila por línea.
+
 ## Consecuencias para el diseño
 
 1. **Cajas y unidades.** Un artículo se pide en cajas y el ERP calcula las unidades (ej.: 2 cajas = 12 uds, 1 caja = 4 uds, 1 caja = 6 uds). El catálogo necesita el dato **«unidades por caja»** y el bot debe aclarar si el cliente pide cajas o unidades.

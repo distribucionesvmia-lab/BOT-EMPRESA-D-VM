@@ -20,7 +20,7 @@ Los pedidos confirmados se guardan en `pedidos.sqlite` (ruta configurable con `D
 - **Todo o nada:** si falla la generación del fichero o el registro, ningún pedido se marca y se reintenta en la siguiente ejecución.
 - **Pedidos retenidos:** no se exportan los de cliente desconocido (sin código de ERP), sin líneas, o con la marca *revisar* (interpretación dudosa). Se avisa en el log. Para liberar uno ya revisado: `node exportar.js --aprobar VM-2026-000123`.
 - Manual: `node exportar.js` (exporta ahora) · `node exportar.js --lista` (historial).
-- ⚠️ El formato de columnas de `export-format.js` es **provisional**. Cuando tengamos la plantilla de importación real del ERP solo hay que cambiar ese fichero.
+- ⚠️ El formato de columnas de `export-format.js` es un **borrador basado en la ventana «Pedido de venta» de a3ERP** (Serie, Referencia, Código cliente, Cliente, Fecha, Fecha entrega, Artículo, Descripción, Cajas, Unidades, Observaciones). No exporta precios, IVA, totales ni almacén/tarifa/forma de pago: los pone a3ERP. Cuando tengamos la plantilla de importación real solo hay que cambiar ese fichero (ver `docs/A3ERP.md`).
 
 ## 1b. Copia de pedidos en hoja de Google (opcional)
 Cada pedido confirmado se añade como una fila nueva: fecha, teléfono, nombre, dirección, lo que escribió el cliente, lo que el bot ha interpretado, total y estado.

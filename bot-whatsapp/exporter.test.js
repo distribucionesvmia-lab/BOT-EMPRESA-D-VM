@@ -77,7 +77,9 @@ test("el Excel contiene una fila por línea con los códigos exactos", () => {
   const sheet = unzip(fs.readFileSync(r.filePath))["xl/worksheets/sheet1.xml"];
   assert.match(sheet, />00123</);
   assert.match(sheet, />VM-2026-000001</);
-  assert.match(sheet, />2026-10-28 11:00</); // 10:00 UTC = 11:00 en Madrid (ya en horario de invierno)
+  assert.match(sheet, />28\/10\/2026</); // fecha en formato a3ERP
+  assert.match(sheet, />PD1</);
+  assert.doesNotMatch(sheet, />1\.5</); // el precio no se exporta: lo pone a3ERP
   assert.equal((sheet.match(/<row /g) ?? []).length, 3); // cabecera + 2 líneas
 });
 
@@ -116,6 +118,14 @@ test("si falla anotar la exportación, se revierte y se descarta el fichero", ()
   assert.equal(descartado, true);
   assert.equal(db.listOrders({ exportStatus: "pending" }).length, 1); // k2 sigue pendiente
   assert.equal(db.listExports().length, 1);
+});
+
+test("las columnas siguen el orden y los nombres de a3ERP", async () => {
+  const { FORMAT, toRows } = await import("./export-format.js");
+  const rows = toRows([{ ref: "VM-2026-000001", customer_id: "1952", name: "X", created_at: "2026-10-28T10:00:00Z", note: "", items: [{ id: "111921", name: "Y", price: 3.46, qty: 12 }] }]);
+  assert.deepEqual(rows[0], ["Serie", "Referencia", "Código cliente", "Cliente", "Fecha", "Fecha entrega", "Artículo", "Descripción", "Cajas", "Unidades", "Observaciones"]);
+  assert.deepEqual(rows[1], ["PD1", "VM-2026-000001", "1952", "X", "28/10/2026", null, "111921", "Y", null, 12, ""]);
+  assert.equal(FORMAT.name, "a3erp-borrador-v1");
 });
 
 test("madrid(): hora local con cambio de horario", () => {
