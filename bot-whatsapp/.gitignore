@@ -1,0 +1,5 @@
+.env
+orders.jsonl
+historial-demo.json
+node_modules
+.DS_Store

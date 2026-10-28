@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Demo bot de pedidos</title>
+<style>
+  :root { --verde:#075e54; --burbuja-in:#fff; --burbuja-out:#d9fdd3; --fondo:#efeae2; --texto:#111b21; --gris:#667781; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; background:#f0f2f5; color:var(--texto); }
+  .wrap { display:grid; grid-template-columns: 400px 1fr; gap:24px; max-width:1200px; margin:0 auto; padding:24px 16px; min-height:100vh; }
+  h2 { margin:0 0 4px; font-size:15px; color:var(--gris); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .phone { background:var(--fondo); border-radius:18px; overflow:hidden; display:flex; flex-direction:column; height:calc(100vh - 80px); min-height:520px; box-shadow:0 8px 30px rgba(0,0,0,.15); }
+  .bar { background:var(--verde); color:#fff; padding:14px 16px; display:flex; align-items:center; gap:12px; }
+  .avatar { width:38px; height:38px; border-radius:50%; background:#25d366; display:grid; place-items:center; font-weight:700; }
+  .bar small { display:block; opacity:.8; font-size:12px; }
+  #chat { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:6px; }
+  .m { max-width:82%; padding:7px 10px; border-radius:8px; white-space:pre-wrap; word-wrap:break-word; font-size:14.5px; line-height:1.35; box-shadow:0 1px 1px rgba(0,0,0,.1); }
+  .in { background:var(--burbuja-in); align-self:flex-start; border-top-left-radius:2px; }
+  .out { background:var(--burbuja-out); align-self:flex-end; border-top-right-radius:2px; }
+  form { display:flex; gap:8px; padding:10px; background:#f0f2f5; }
+  input { flex:1; border:0; border-radius:20px; padding:11px 16px; font-size:15px; outline:none; }
+  button { border:0; background:#25d366; color:#fff; border-radius:50%; width:44px; height:44px; font-size:18px; cursor:pointer; }
+  .panel { background:#fff; border-radius:12px; padding:20px; box-shadow:0 2px 12px rgba(0,0,0,.08); align-self:start; }
+  table { width:100%; border-collapse:collapse; font-size:14px; margin-top:12px; }
+  th { text-align:left; color:var(--gris); font-weight:600; padding:8px 10px; border-bottom:2px solid #eee; font-size:12px; text-transform:uppercase; }
+  td { padding:10px; border-bottom:1px solid #f0f0f0; vertical-align:top; }
+  tr.nuevo td { animation: flash 2.5s ease-out; }
+  @keyframes flash { from { background:#fff7c2; } to { background:transparent; } }
+  .phone { position:relative; }
+  .ui { align-self:flex-start; display:flex; flex-direction:column; gap:4px; width:82%; }
+  .pill { background:#fff; color:#0b7bbd; border:0; border-radius:8px; padding:9px 12px; font-size:14.5px; font-weight:600; width:100%; height:auto; text-align:center; box-shadow:0 1px 1px rgba(0,0,0,.12); cursor:pointer; }
+  .ui.usado { opacity:.45; pointer-events:none; }
+  .sheet { position:absolute; left:0; right:0; bottom:0; max-height:70%; overflow-y:auto; background:#fff; border-radius:16px 16px 0 0; box-shadow:0 -6px 20px rgba(0,0,0,.2); z-index:5; }
+  .sheet[hidden] { display:none; }
+  .sheet-h { position:sticky; top:0; background:#fff; padding:14px 16px; font-weight:700; border-bottom:1px solid #eee; display:flex; justify-content:space-between; }
+  .sheet-h span { cursor:pointer; color:var(--gris); }
+  .sheet .row { padding:10px 16px; border-bottom:1px solid #f2f2f2; cursor:pointer; display:flex; flex-direction:column; }
+  .sheet .row:hover { background:#f5f9f7; }
+  .sheet .row small { color:var(--gris); font-size:12px; margin-top:2px; }
+  .web { position:absolute; inset:0; z-index:10; background:#fff; display:flex; flex-direction:column; }
+  .web[hidden] { display:none; }
+  .web-h { background:#333; color:#ddd; font-size:12px; padding:8px 12px; display:flex; gap:12px; align-items:center; }
+  .web-h span { cursor:pointer; color:#fff; font-weight:600; }
+  .web iframe { flex:1; border:0; width:100%; }
+  .quien { display:block; margin:0 0 10px; font-size:13px; color:var(--gris); }
+  .quien select { font-size:14px; padding:6px 8px; border-radius:8px; border:1px solid #ccd; margin-left:4px; }
+  .vacio { color:var(--gris); padding:30px 0; text-align:center; }
+  .badge { background:#e7f8ee; color:#137a3a; padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600; }
+  @media (max-width: 900px) { .wrap { grid-template-columns:1fr; } .phone { height:70vh; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h2>Lo que ve el cliente</h2>
+    <label class="quien">Escribe desde el móvil de: <select id="who"></select></label>
+    <div class="phone">
+      <div class="bar"><div class="avatar">D</div><div>DistribucionesVM<small>bot de pedidos</small></div></div>
+      <div id="chat"></div>
+      <div id="sheet" class="sheet" hidden></div>
+      <div id="web" class="web" hidden></div>
+      <form id="f"><input id="t" autocomplete="off" placeholder="Escribe un mensaje" autofocus><button>➤</button></form>
+    </div>
+  </div>
+  <div>
+    <h2>Lo que ve el negocio · Base de datos de pedidos</h2>
+    <div class="panel">
+      <div id="resumen" class="vacio">Aún no hay pedidos. Haz uno desde el chat.</div>
+      <table id="tabla" hidden>
+        <thead><tr><th>Hora</th><th>Cliente</th><th>Pedido</th><th>Dirección</th><th>Total</th><th>Estado</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<script>
+const chat = document.getElementById("chat"), f = document.getElementById("f"), t = document.getElementById("t");
+const tbody = document.querySelector("tbody"), tabla = document.getElementById("tabla"), resumen = document.getElementById("resumen");
+let vistos = 0;
+
+function burbuja(texto, clase) {
+  const d = document.createElement("div");
+  d.className = "m " + clase;
+  // *negrita* y _cursiva_ estilo WhatsApp
+  d.innerHTML = texto.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]))
+    .replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/_([^_\n]+)_/g, "<i>$1</i>");
+  chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
+}
+const sheet = document.getElementById("sheet");
+const web = document.getElementById("web");
+// El enlace del bot abre la mini-aplicación de pedido (en el móvil real se abre desde WhatsApp)
+function abrirWeb(url) {
+  web.innerHTML = "";
+  const bar = document.createElement("div"); bar.className = "web-h";
+  const x = document.createElement("span"); x.textContent = "✕ Cerrar"; x.onclick = () => (web.hidden = true);
+  bar.append(x, document.createTextNode("Enlace abierto desde WhatsApp"));
+  const fr = document.createElement("iframe"); fr.src = url;
+  web.append(bar, fr); web.hidden = false;
+}
+window.addEventListener("message", e => {
+  if (e.data?.tipo !== "pedido") return;
+  setTimeout(() => { web.hidden = true; burbuja(e.data.mensaje, "in"); cargar(); }, 1400);
+});
+// texto = lo que recibe el bot (texto libre o id de fila/botón); etiqueta = lo que ve el cliente en su burbuja
+async function enviar(texto, etiqueta) {
+  document.querySelectorAll(".ui").forEach(u => u.classList.add("usado"));
+  sheet.hidden = true;
+  burbuja(etiqueta ?? texto, "out");
+  const r = await fetch("/demo/mensaje", { method:"POST", body: JSON.stringify({ phone: who.value, text: texto }) });
+  const { reply, ui } = await r.json();
+  setTimeout(() => { burbuja(reply, "in"); if (ui) interactivo(ui); cargar(); }, 450);
+}
+// Lo mismo que verá el cliente en WhatsApp: un botón "Ver artículos" que abre la lista, o hasta 3 botones de respuesta
+function interactivo(ui) {
+  const box = document.createElement("div");
+  box.className = "ui";
+  if (ui.type === "link") {
+    const el = document.createElement("button");
+    el.type = "button"; el.className = "pill"; el.textContent = "🔗 " + ui.title;
+    el.onclick = () => abrirWeb(ui.url);
+    box.appendChild(el);
+  } else if (ui.type === "buttons") {
+    ui.buttons.forEach(b => {
+      const el = document.createElement("button");
+      el.type = "button"; el.className = "pill"; el.textContent = b.title;
+      el.onclick = () => enviar(b.id, b.title);
+      box.appendChild(el);
+    });
+  } else {
+    const el = document.createElement("button");
+    el.type = "button"; el.className = "pill"; el.textContent = "☰ " + ui.button;
+    el.onclick = () => {
+      sheet.innerHTML = "";
+      const h = document.createElement("div"); h.className = "sheet-h"; h.textContent = ui.section;
+      const x = document.createElement("span"); x.textContent = "✕"; x.onclick = () => (sheet.hidden = true); h.appendChild(x);
+      sheet.appendChild(h);
+      ui.rows.forEach(r => {
+        const row = document.createElement("div"); row.className = "row";
+        const a = document.createElement("b"); a.textContent = r.title;
+        const d = document.createElement("small"); d.textContent = r.description;
+        row.append(a, d); row.onclick = () => enviar(r.id, r.title);
+        sheet.appendChild(row);
+      });
+      sheet.hidden = false;
+    };
+    box.appendChild(el);
+  }
+  chat.appendChild(box); chat.scrollTop = chat.scrollHeight;
+}
+async function cargar() {
+  const pedidos = await (await fetch("/demo/pedidos")).json();
+  tbody.innerHTML = "";
+  pedidos.forEach((p, i) => {
+    const tr = document.createElement("tr");
+    if (i === 0 && pedidos.length > vistos) tr.className = "nuevo";
+    const total = p.total == null ? "por revisar" : p.total.toFixed(2) + " €";
+    tr.innerHTML = `<td>${new Date(p.at).toLocaleTimeString("es-ES",{hour:"2-digit",minute:"2-digit"})}</td>
+      <td><b></b><br><small>${p.customerId ? p.customerId + " · " : "Cliente nuevo · "}+${p.phone}</small></td><td></td><td></td><td>${total}</td><td><span class="badge">Nuevo</span></td>`;
+    tr.children[1].querySelector("b").textContent = p.name;
+    tr.children[2].textContent = p.text; tr.children[3].textContent = p.address;
+    tbody.appendChild(tr);
+  });
+  vistos = pedidos.length;
+  tabla.hidden = !pedidos.length; resumen.hidden = !!pedidos.length;
+}
+f.addEventListener("submit", e => { e.preventDefault(); const v = t.value.trim(); if (v) { t.value = ""; enviar(v); } });
+const who = document.getElementById("who");
+who.addEventListener("change", async () => {
+  chat.innerHTML = "";
+  await fetch("/demo/reset", { method:"POST", body: JSON.stringify({ phone: who.value }) });
+  enviar("hola");
+});
+(async () => {
+  const clientes = await (await fetch("/demo/clientes")).json();
+  who.innerHTML = clientes.map(c => `<option value="${c.phone}">${c.name}</option>`).join("");
+  await fetch("/demo/reset", { method:"POST", body: JSON.stringify({ phone: who.value }) });
+  enviar("hola"); cargar();
+})();
+</script>
+</body>
+</html>
