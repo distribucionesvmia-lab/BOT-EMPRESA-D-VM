@@ -3,77 +3,122 @@
   {
    "id": "1001",
    "name": "AGUA MINERAL 1,5 L (PACK 6)",
-   "price": 2.1
+   "price": 2.1,
+   "unitsPerBox": 6,
+   "vat": 10,
+   "discount": 0
   },
   {
    "id": "1002",
    "name": "REFRESCO COLA LATA 33 CL (PACK 24)",
-   "price": 11.4
+   "price": 11.4,
+   "unitsPerBox": 1,
+   "vat": 10,
+   "discount": 0
   },
   {
    "id": "1003",
    "name": "CERVEZA RUBIA LATA 33 CL (PACK 24)",
-   "price": 14.2
+   "price": 14.2,
+   "unitsPerBox": 1,
+   "vat": 21,
+   "discount": 5
   },
   {
    "id": "1004",
    "name": "VINO TINTO CRIANZA 75 CL (CAJA 6)",
-   "price": 27.5
+   "price": 27.5,
+   "unitsPerBox": 6,
+   "vat": 21,
+   "discount": 0
   },
   {
    "id": "1005",
    "name": "VINO BLANCO VERDEJO 75 CL (CAJA 6)",
-   "price": 21.0
+   "price": 21.0,
+   "unitsPerBox": 6,
+   "vat": 21,
+   "discount": 0
   },
   {
    "id": "1006",
    "name": "ZUMO NARANJA 1 L (PACK 6)",
-   "price": 6.9
+   "price": 6.9,
+   "unitsPerBox": 6,
+   "vat": 10,
+   "discount": 0
   },
   {
    "id": "1007",
    "name": "LECHE ENTERA 1 L (PACK 6)",
-   "price": 5.4
+   "price": 5.4,
+   "unitsPerBox": 6,
+   "vat": 10,
+   "discount": 0
   },
   {
    "id": "1008",
    "name": "ACEITE OLIVA VIRGEN EXTRA 1 L",
-   "price": 8.95
+   "price": 8.95,
+   "unitsPerBox": 1,
+   "vat": 10,
+   "discount": 0
   },
   {
    "id": "1009",
    "name": "CAFE MOLIDO NATURAL 250 GR",
-   "price": 3.8
+   "price": 3.8,
+   "unitsPerBox": 12,
+   "vat": 10,
+   "discount": 0
   },
   {
    "id": "1010",
    "name": "AZUCAR 1 KG",
-   "price": 1.15
+   "price": 1.15,
+   "unitsPerBox": 10,
+   "vat": 10,
+   "discount": 0
   },
   {
    "id": "1011",
    "name": "PATATAS FRITAS 150 GR",
-   "price": 1.6
+   "price": 1.6,
+   "unitsPerBox": 12,
+   "vat": 10,
+   "discount": 0
   },
   {
    "id": "1012",
    "name": "ANCHOAS ACEITE OLIVA LATA 50 GR",
-   "price": 3.25
+   "price": 3.25,
+   "unitsPerBox": 1,
+   "vat": 10,
+   "discount": 0
   },
   {
    "id": "1013",
    "name": "ATUN CLARO ACEITE PACK 3",
-   "price": 4.1
+   "price": 4.1,
+   "unitsPerBox": 1,
+   "vat": 10,
+   "discount": 0
   },
   {
    "id": "1014",
    "name": "TOMATE FRITO 400 GR",
-   "price": 1.05
+   "price": 1.05,
+   "unitsPerBox": 12,
+   "vat": 10,
+   "discount": 0
   },
   {
    "id": "1015",
    "name": "SALMOREJO 1 L",
-   "price": 2.6
+   "price": 2.6,
+   "unitsPerBox": 6,
+   "vat": 10,
+   "discount": 0
   }
  ],
  "customers": [
@@ -164,7 +209,14 @@
      ]
     }
    ],
-   "frequent": []
+   "frequent": [],
+   "specialPrices": {
+    "1002": 10.9
+   },
+   "discounts": {
+    "1004": 8
+   },
+   "recargoEquivalencia": false
   },
   {
    "id": "9002",
@@ -261,7 +313,9 @@
      ]
     }
    ],
-   "frequent": []
+   "frequent": [],
+   "recargoEquivalencia": true
   }
- ]
+ ],
+ "_aviso": "DATOS FICTICIOS de ejemplo. Los reales (unidades por caja, IVA, precios y descuentos) vendrán de las fichas de a3ERP."
 }

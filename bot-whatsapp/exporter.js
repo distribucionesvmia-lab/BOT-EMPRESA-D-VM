@@ -2,8 +2,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { buildXlsx } from "./xlsx.js";
-import { FORMAT, toRows, madrid } from "./export-format.js";
+import { buildWorkbook } from "./xlsx.js";
+import { FORMAT, madrid } from "./export-format.js";
 
 const EXPORT_DIR = () => process.env.EXPORT_DIR ?? "exportaciones";
 
@@ -15,8 +15,8 @@ export function runExport(db, { dir = EXPORT_DIR(), now = new Date(), format = F
   fs.mkdirSync(dir, { recursive: true });
   let filePath;
   const result = db.exportPending((orders) => {
-    const rows = toRows(orders, format);
-    const buf = buildXlsx(rows, { sheetName: format.sheetName, widths: format.columns.map((c) => c.width) });
+    const { sheets, lineCount } = format.build(orders);
+    const buf = buildWorkbook(sheets);
     const stamp = madrid(now.toISOString()).replace(/[-: ]/g, "").replace(/^(\d{8})/, "$1-");
     const fileName = `pedidos-${stamp}-${crypto.randomBytes(2).toString("hex")}.xlsx`;
     filePath = path.join(dir, fileName);
@@ -25,7 +25,7 @@ export function runExport(db, { dir = EXPORT_DIR(), now = new Date(), format = F
       format: format.name,
       fileName,
       sha256: crypto.createHash("sha256").update(buf).digest("hex"),
-      lineCount: rows.length - 1,
+      lineCount,
       discard: () => fs.rmSync(filePath, { force: true }),
     };
   }, now.toISOString());

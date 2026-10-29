@@ -27,8 +27,9 @@ Versión y modalidad (local/nube): **pendiente de confirmar**.
 ## Pie del pedido (observado)
 Pestañas del pie: Resumen · Detalle impuestos · Otros datos. Todo lo que contiene **lo calcula a3ERP**: descuento/recargo financiero (pronto pago, recargo), portes/embalajes (base e IVA de portes), totales (base de líneas, base imponible, cuota IVA/IGIC, recargo de equivalencia, base de retención, % y retención, no sujeto, total documento) y el botón «Generar anticipo». **El Excel no exporta nada de esto.**
 
-## Columnas del Excel (borrador `a3erp-borrador-v1`)
-Serie · Referencia · Código cliente · Cliente (informativo) · Fecha · Fecha entrega (vacía, pendiente) · Artículo · Descripción (informativa) · Cajas (vacía, pendiente) · Unidades · Observaciones. Una fila por línea.
+## Excel de pedidos (formato `pedidos-v2`, para introducirlos a mano en a3ERP)
+Hoja «Pedidos», un bloque por pedido: **cabecera** (Nº pedido, Código cliente, Nombre comercial, Fecha recepción, Hora pedido) · **líneas** (Código artículo, Cajas, Descripción, Unidades, Precio, Dto. %, Importe, IVA %, Observaciones línea) · **pie** (Total base imponible, Total IVA, Total R.E., Total pedido, Observaciones del cliente). Hoja «Líneas»: lo mismo en plano.
+Los totales se calculan por tipo de IVA y reproducen el pedido real de la captura (base 84,12 · IVA 15,26 · total 99,38).
 
 ## Consecuencias para el diseño
 

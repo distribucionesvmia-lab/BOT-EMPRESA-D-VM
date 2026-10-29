@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS orders (
   note          TEXT,
   total         REAL,
   review        INTEGER NOT NULL DEFAULT 0,
+  re            INTEGER NOT NULL DEFAULT 0,
   status        TEXT NOT NULL DEFAULT 'confirmed',
   export_status TEXT NOT NULL DEFAULT 'pending',
   exported_at   TEXT,
@@ -43,7 +44,14 @@ CREATE TABLE IF NOT EXISTS order_lines (
   product_id TEXT NOT NULL,
   name       TEXT,
   price      REAL,
-  qty        INTEGER NOT NULL
+  qty        INTEGER NOT NULL,
+  unit       TEXT NOT NULL DEFAULT 'ud',
+  boxes      INTEGER,
+  units      INTEGER,
+  discount   REAL NOT NULL DEFAULT 0,
+  vat_rate   REAL,
+  amount     REAL,
+  note       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_orders_export ON orders(export_status, created_at);
 CREATE INDEX IF NOT EXISTS idx_lines_order ON order_lines(order_id);
@@ -57,22 +65,31 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   db.exec(SCHEMA);
-  // Bases creadas antes de existir las exportaciones: añadir la columna que falta
-  if (!db.prepare("PRAGMA table_info(orders)").all().some((c) => c.name === "export_id")) {
-    db.exec("ALTER TABLE orders ADD COLUMN export_id INTEGER REFERENCES exports(id)");
+  // Bases creadas con versiones anteriores: añadir las columnas que falten
+  const addColumn = (table, column, ddl) => {
+    if (!db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl}`);
+  };
+  addColumn("orders", "export_id", "INTEGER REFERENCES exports(id)");
+  addColumn("orders", "re", "INTEGER NOT NULL DEFAULT 0");
+  for (const [c, ddl] of [["unit", "TEXT NOT NULL DEFAULT 'ud'"], ["boxes", "INTEGER"], ["units", "INTEGER"], ["discount", "REAL NOT NULL DEFAULT 0"], ["vat_rate", "REAL"], ["amount", "REAL"], ["note", "TEXT"]]) {
+    addColumn("order_lines", c, ddl);
   }
 
   const insertOrder = db.prepare(
-    `INSERT OR IGNORE INTO orders (key, customer_id, phone, name, address, text, note, total, review, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO orders (key, customer_id, phone, name, address, text, note, total, review, re, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const setRef = db.prepare("UPDATE orders SET ref = ? WHERE id = ?");
-  const insertLine = db.prepare("INSERT INTO order_lines (order_id, product_id, name, price, qty) VALUES (?, ?, ?, ?, ?)");
+  const insertLine = db.prepare(
+    "INSERT INTO order_lines (order_id, product_id, name, price, qty, unit, boxes, units, discount, vat_rate, amount, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+  );
   const byKey = db.prepare("SELECT * FROM orders WHERE key = ?");
-  const linesOf = db.prepare("SELECT product_id AS id, name, price, qty FROM order_lines WHERE order_id = ? ORDER BY id");
+  const linesOf = db.prepare(
+    "SELECT product_id AS id, name, price, qty, unit, boxes, units, discount, vat_rate, amount, note FROM order_lines WHERE order_id = ? ORDER BY id",
+  );
   const insertMsg = db.prepare("INSERT OR IGNORE INTO processed_messages (id, at) VALUES (?, ?)");
 
-  const withLines = (row) => row && { ...row, review: !!row.review, items: linesOf.all(row.id) };
+  const withLines = (row) => row && { ...row, review: !!row.review, re: !!row.re, items: linesOf.all(row.id) };
 
   return {
     /**
@@ -85,14 +102,16 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
       const at = o.at ?? new Date().toISOString();
       db.exec("BEGIN IMMEDIATE");
       try {
-        const r = insertOrder.run(o.key, o.customerId ?? null, String(o.phone), o.name ?? null, o.address ?? null, o.text ?? null, o.note || null, o.total ?? null, o.review ? 1 : 0, at);
+        const r = insertOrder.run(o.key, o.customerId ?? null, String(o.phone), o.name ?? null, o.address ?? null, o.text ?? null, o.note || null, o.total ?? null, o.review ? 1 : 0, o.re ? 1 : 0, at);
         if (r.changes === 0) {
           db.exec("COMMIT");
           return { order: withLines(byKey.get(o.key)), duplicate: true };
         }
         const id = Number(r.lastInsertRowid);
         setRef.run(`VM-${at.slice(0, 4)}-${String(id).padStart(6, "0")}`, id);
-        for (const i of o.items ?? []) insertLine.run(id, String(i.id), i.name ?? null, i.price ?? null, i.qty);
+        for (const i of o.items ?? []) {
+          insertLine.run(id, String(i.id), i.name ?? null, i.price ?? null, i.qty, i.unit ?? "ud", i.boxes ?? null, i.units ?? i.qty, i.discount ?? 0, i.vat ?? null, i.amount ?? null, i.note ?? null);
+        }
         db.exec("COMMIT");
         return { order: withLines(byKey.get(o.key)), duplicate: false };
       } catch (err) {

@@ -1,55 +1,90 @@
-// Formato del Excel que se entrega a a3ERP.
+// Formato del Excel de pedidos para que una persona los pase a a3ERP.
 //
-// ⚠️ BORRADOR: construido a partir de la ventana «Pedido de venta» de a3ERP (capturas de pantalla), no de la
-// plantilla de importación real, que aún no tenemos. Cuando se conozca, SOLO hay que cambiar este fichero.
+// Hoja «Pedidos»: un bloque por pedido, con tres partes:
+//   CABECERA  Nº pedido · Código cliente · Nombre comercial · Fecha recepción · Hora pedido
+//   LÍNEAS    Código artículo · Cajas · Descripción · Unidades · Precio · Dto. % · Importe · IVA % · Observaciones línea
+//   PIE       Total base imponible · Total IVA · Total R.E. · TOTAL PEDIDO · Observaciones del cliente
+// Hoja «Líneas»: lo mismo en formato plano (una fila por línea), pensada para filtrar o para una importación futura.
 //
-// Qué se exporta y qué no:
-//  - Se exporta lo que el cliente decide: cliente, artículos y cantidades, más la referencia para trazabilidad.
-//  - NO se exporta lo que calcula o asigna a3ERP: número de pedido, precio, descuento, IVA/IGIC, bases, cuotas,
-//    totales, pronto pago, portes, retención, almacén, tarifa, forma de pago, transportista, representante.
-//    Salen de la ficha del cliente y de las tarifas del ERP; si el bot los mandara, podría pisarlos con datos erróneos.
-//  - Una fila por línea de pedido; la cabecera se repite en cada fila.
+// Precio, descuento, cajas/unidades e impuestos vienen ya calculados y guardados en cada línea (ver pricing.js).
+// Si en el futuro a3ERP exige una plantilla de importación concreta, solo hay que cambiar este fichero.
 
-const SERIE = process.env.EXPORT_SERIE ?? "PD1"; // serie de pedidos de venta en a3ERP (ver ventana: 1/PD1/34143)
+import { STYLE } from "./xlsx.js";
+import { round2, totals } from "./pricing.js";
 
-export const FORMAT = {
-  name: "a3erp-borrador-v1",
-  sheetName: "Pedidos",
-  columns: [
-    { header: "Serie", width: 8, value: () => SERIE },
-    { header: "Referencia", width: 18, value: (o) => o.ref }, // campo «Referencia» de a3ERP: guarda nuestro VM-AAAA-NNNNNN
-    { header: "Código cliente", width: 15, value: (o) => o.customer_id },
-    { header: "Cliente", width: 30, value: (o) => o.name }, // solo para que una persona compruebe el fichero
-    { header: "Fecha", width: 12, value: (o) => madridDate(o.created_at) },
-    { header: "Fecha entrega", width: 14, value: () => null }, // pendiente: ¿la elige el cliente o la empresa?
-    { header: "Artículo", width: 12, value: (o, l) => l.id },
-    { header: "Descripción", width: 44, value: (o, l) => l.name }, // solo informativa
-    { header: "Cajas", width: 8, value: () => null }, // pendiente: unidades por caja de cada artículo (ver docs/A3ERP.md)
-    { header: "Unidades", width: 10, value: (o, l) => l.qty },
-    { header: "Observaciones", width: 36, value: (o) => o.note },
-  ],
-};
-
-// Fecha local de la empresa en formato a3ERP: "28/10/2026"
-export function madridDate(iso) {
-  const [d, t] = madrid(iso).split(" ");
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y}`;
-}
-
-// Fecha y hora local de la empresa (Medina del Campo): "2026-10-28 17:45"
-export function madrid(iso) {
+export const madrid = (iso) => {
   const p = Object.fromEntries(
     new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
       .formatToParts(new Date(iso))
       .map((x) => [x.type, x.value]),
   );
   return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
+};
+
+// Fecha local de la empresa en formato a3ERP: "28/10/2026"
+export function madridDate(iso) {
+  const [y, m, d] = madrid(iso).split(" ")[0].split("-");
+  return `${d}/${m}/${y}`;
+}
+export const madridTime = (iso) => madrid(iso).split(" ")[1];
+
+// Importe de la línea; si el pedido es anterior al cálculo de precios, se calcula con lo que haya guardado
+const amountOf = (l) => l.amount ?? round2((l.units ?? l.qty) * (l.price ?? 0) * (1 - (l.discount ?? 0) / 100));
+const linesOf = (o) => o.items.map((l) => ({ ...l, amount: amountOf(l) }));
+
+const HEAD = ["Nº pedido", "Código cliente", "Nombre comercial", "Fecha recepción", "Hora pedido"];
+const LINE_HEAD = ["Código artículo", "Cajas", "Descripción", "Unidades", "Precio", "Dto. %", "Importe", "IVA %", "Observaciones línea"];
+const WIDTHS = [18, 16, 46, 16, 12, 10, 12, 8, 40];
+const COLS = LINE_HEAD.length;
+
+const hdr = (cells) => cells.map((v) => ({ v, s: STYLE.header }));
+const pad = (cells, style) => [...cells, ...Array(COLS - cells.length).fill({ v: null, s: style })];
+const lineRow = (l) => [l.id, l.boxes ?? null, l.name, l.units ?? l.qty, { v: l.price ?? null, s: STYLE.price }, l.discount || null, { v: l.amount, s: STYLE.money }, l.vat_rate ?? null, l.note ?? null];
+
+function orderBlock(o) {
+  const lines = linesOf(o);
+  const t = totals(lines.map((l) => ({ ...l, vat: l.vat_rate })), o.re);
+  const label = (text, value, strong = false) => {
+    const row = Array(COLS).fill(null);
+    row[2] = { v: text, s: STYLE.bold };
+    row[6] = { v: value, s: strong ? STYLE.boldMoney : STYLE.money };
+    return row;
+  };
+  const obs = Array(COLS).fill(null);
+  obs[0] = { v: "Observaciones del cliente", s: STYLE.bold };
+  obs[2] = o.note || null;
+  return [
+    pad([{ v: `PEDIDO ${o.ref}`, s: STYLE.title }], STYLE.title),
+    hdr(HEAD),
+    [o.ref, o.customer_id, o.name, madridDate(o.created_at), madridTime(o.created_at)],
+    hdr(LINE_HEAD),
+    ...lines.map(lineRow),
+    label("Total base imponible", t.base),
+    label("Total IVA", t.iva),
+    label("Total R.E.", t.re),
+    label("TOTAL PEDIDO", t.total, true),
+    obs,
+    [], // línea en blanco entre pedidos
+  ];
 }
 
-/** Convierte pedidos en filas de hoja: cabecera + una fila por línea de pedido. */
-export function toRows(orders, format = FORMAT) {
-  const rows = [format.columns.map((c) => c.header)];
-  for (const o of orders) for (const l of o.items) rows.push(format.columns.map((c) => c.value(o, l) ?? null));
-  return rows;
-}
+export const FORMAT = {
+  name: "pedidos-v2",
+  /** orders -> { sheets: [{ name, widths, rows }], lineCount } */
+  build(orders) {
+    const blocks = orders.flatMap(orderBlock);
+    const flat = [
+      [...HEAD, ...LINE_HEAD, "Observaciones del pedido"].map((v) => ({ v, s: STYLE.bold })),
+      ...orders.flatMap((o) =>
+        linesOf(o).map((l) => [o.ref, o.customer_id, o.name, madridDate(o.created_at), madridTime(o.created_at), ...lineRow(l), o.note || null]),
+      ),
+    ];
+    return {
+      sheets: [
+        { name: "Pedidos", widths: WIDTHS, rows: blocks },
+        { name: "Líneas", widths: [18, 14, 30, 16, 12, 16, 8, 46, 10, 11, 8, 12, 8, 40, 30], rows: flat },
+      ],
+      lineCount: flat.length - 1,
+    };
+  },
+};

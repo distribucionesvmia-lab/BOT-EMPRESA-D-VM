@@ -6,6 +6,7 @@ import { handleMessage, newSession, setCatalog, getCatalog as catalogNow, habitu
 import { getCatalog, getCustomerByPhone, createOrder, listCustomers } from "./erp.js";
 import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
+import { priceOrder } from "./pricing.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { BUSINESS } from "./config.js";
 
@@ -80,6 +81,8 @@ async function handleIncoming(from, text, msgId = null) {
   if (out.order) {
     // La clave hace el pedido idempotente: el mismo mensaje de confirmación nunca crea dos pedidos
     out.order = { at: new Date().toISOString(), phone: from, key: msgId ? `wa:${msgId}` : `demo:${crypto.randomUUID()}`, ...out.order };
+    // Precio de tarifa/especial, descuento, cajas/unidades e IVA según las fichas (ver pricing.js)
+    out.order = priceOrder(out.order, current.customer ?? null, catalogNow());
     await createOrder(out.order);
   }
   return out;
@@ -249,7 +252,7 @@ function webOrderRoutes(req, res, url) {
         review: false,
         note,
       };
-      const { duplicate } = await createOrder(order);
+      const { duplicate } = await createOrder(priceOrder(order, customer, catalogNow()));
       if (duplicate) return json(res, { error: "Este pedido ya se envió" }, 409); // doble clic o dos pestañas
       const message = `🎉 ¡Pedido recibido, ${customer.name}! ${items.length} artículos, total aprox. ${order.total.toFixed(2)}${BUSINESS.currency}.\n\n${BUSINESS.payment}`;
       if (process.env.DEMO !== "1") {
