@@ -7,6 +7,7 @@ import { getCatalog, getCustomerByPhone, createOrder, listCustomers } from "./er
 import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder } from "./pricing.js";
+import { webProducts, webOrderFromBody } from "./weborder.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { BUSINESS } from "./config.js";
 
@@ -212,10 +213,7 @@ function webOrderRoutes(req, res, url) {
     if (!customer) return json(res, { error: "Enlace no válido o caducado" }, 410);
 
     if (req.method === "GET") {
-      const habit = new Map(habitualProducts(customer).map((p) => [p.id, p]));
-      const products = catalogNow()
-        .map((p) => ({ id: String(p.id), name: p.name, price: p.price, unitsPerBox: Number.isInteger(p.unitsPerBox) && p.unitsPerBox > 1 ? p.unitsPerBox : null, lastQty: habit.get(p.id)?.lastQty ?? null, count: habit.get(p.id)?.count ?? 0 }))
-        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+      const products = webProducts(customer, catalogNow(), habitualProducts);
       return json(res, {
         business: BUSINESS.name,
         priceNote: BUSINESS.priceNote,
@@ -228,37 +226,10 @@ function webOrderRoutes(req, res, url) {
     if (req.method === "POST" && !m[2]) {
       if (getDb().hasOrderKey(linkKey(link))) return json(res, { error: "Este pedido ya se envió" }, 409);
       const body = await readJson(req);
-      const catalog = new Map(catalogNow().map((p) => [String(p.id), p]));
-      const merged = new Map();
-      for (const l of Array.isArray(body?.lines) ? body.lines : []) {
-        const p = catalog.get(String(l?.id));
-        const qty = Math.floor(Number(l?.qty));
-        // Unidades o cajas; las cajas solo valen para artículos que se venden en cajas
-        const unit = l?.unit === "caja" && Number.isInteger(p?.unitsPerBox) && p.unitsPerBox > 1 ? "caja" : "ud";
-        const lineNote = typeof l?.note === "string" ? l.note.trim().slice(0, 120) : "";
-        if (p && qty >= 1 && qty <= 999) {
-          const key = `${p.id}|${unit}`;
-          const prev = merged.get(key);
-          merged.set(key, { id: p.id, name: p.name, price: p.price, qty: (prev?.qty ?? 0) + qty, unit, ...((lineNote || prev?.note) && { note: lineNote || prev.note }) });
-        }
-      }
-      const items = [...merged.values()];
-      if (!items.length) return json(res, { error: "El pedido está vacío" }, 400);
-
-      const note = typeof body.note === "string" ? body.note.trim().slice(0, 200) : "";
-      const order = {
-        at: new Date().toISOString(),
-        key: linkKey(link),
-        phone: link.p,
-        customerId: customer.id,
-        name: customer.name,
-        address: customer.address,
-        text: items.map((i) => `${i.qty} ${i.unit === "caja" ? "cajas de " : ""}${i.name}`).join(" + ") + (note ? ` · Nota: ${note}` : ""),
-        items,
-        total: null, // lo calcula priceOrder (cajas × unidades por caja, precios especiales, descuentos)
-        review: false,
-        note,
-      };
+      const built = webOrderFromBody(body, customer, { key: linkKey(link), phone: link.p }, catalogNow());
+      if (built.error) return json(res, { error: built.error }, 400);
+      const order = built.order;
+      const { items } = order;
       const priced = priceOrder(order, customer, catalogNow());
       const { duplicate } = await createOrder(priced);
       if (duplicate) return json(res, { error: "Este pedido ya se envió" }, 409); // doble clic o dos pestañas

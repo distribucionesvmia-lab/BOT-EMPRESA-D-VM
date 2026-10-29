@@ -66,6 +66,12 @@ npm run dev   # sin credenciales imprime las respuestas por consola
 ```
 La demo usa **clientes y productos ficticios** (`ejemplo/historial-ficticio.json`) salvo que exista un `historial-demo.json` propio, y guarda todo en `demo.sqlite` y `exportaciones-demo/`, sin tocar los datos reales.
 
+## 2b. Demo en línea (sin servidor)
+`demo-web/` contiene una versión de la demo que funciona **entera en el navegador** (mismo bot, mismos cálculos y mismo Excel, con datos ficticios): no se duerme, no hay datos que perder ni nada que mantener.
+- Reconstruir: `node demo-web/build.mjs` (descarga esbuild con `npx` la primera vez). Genera `demo-web/dist/demo-online.html`.
+- Compartir gratis: sube `demo-online.html` a cualquier alojamiento estático (GitHub Pages, Netlify, Cloudflare Pages) o ábrelo directamente en el navegador.
+- Es solo una demostración: los pedidos viven en la memoria del navegador y se pierden al recargar.
+
 ## 3. Crear la app en Meta (gratis)
 1. Entra en https://developers.facebook.com con tu cuenta de Facebook → **Crear app** → tipo **Empresa** → añade el producto **WhatsApp**.
 2. En **WhatsApp → API Setup** verás un **número de prueba**, el `Phone number ID` y un token temporal (24 h). Añade tu móvil como destinatario de prueba.

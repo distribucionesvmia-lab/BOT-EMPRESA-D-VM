@@ -9,7 +9,7 @@
 // Precio, descuento, cajas/unidades e impuestos vienen ya calculados y guardados en cada línea (ver pricing.js).
 // Si en el futuro a3ERP exige una plantilla de importación concreta, solo hay que cambiar este fichero.
 
-import { STYLE } from "./xlsx.js";
+import { STYLE } from "./xlsx-files.js";
 import { round2, totals } from "./pricing.js";
 
 export const madrid = (iso) => {

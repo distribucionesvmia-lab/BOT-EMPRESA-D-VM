@@ -1,0 +1,413 @@
+<title>Pedidos por WhatsApp</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Distribución: móvil de WhatsApp a la izquierda, lo que ve la empresa a la derecha (tabla de pedidos y Excel). */
+  :root {
+    --bg: #eef1ee; --panel: #ffffff; --fg: #17211c; --muted: #5d6b63; --line: #dbe2dd;
+    --accent: #0f7a4d; --accent-soft: #e0f1e8; --accent-fg: #ffffff;
+    --chat-bg: #e9e3da; --bubble-in: #ffffff; --bubble-out: #d6f0cf; --bar: #0b5b43;
+    --warn: #8a5a00; --warn-soft: #fbefcf; --ok: #14532d; --ok-soft: #d7f0e0; --hold: #8a2c2c; --hold-soft: #f8dcdc;
+    --head: #dce6f4; --title: #b9cbe6; --shadow: 0 6px 24px rgba(20, 40, 30, .12);
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1512; --panel: #18211d; --fg: #e6ede8; --muted: #93a39a; --line: #2a3630;
+      --accent: #37c382; --accent-soft: #173b2c; --accent-fg: #07251a;
+      --chat-bg: #0d1411; --bubble-in: #1e2924; --bubble-out: #1c4a37; --bar: #123c2e;
+      --warn: #f0c66a; --warn-soft: #3a2f10; --ok: #8fe0b4; --ok-soft: #153a29; --hold: #f1a1a1; --hold-soft: #40201f;
+      --head: #243349; --title: #31466a; --shadow: 0 6px 24px rgba(0, 0, 0, .45); color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1512; --panel: #18211d; --fg: #e6ede8; --muted: #93a39a; --line: #2a3630;
+    --accent: #37c382; --accent-soft: #173b2c; --accent-fg: #07251a;
+    --chat-bg: #0d1411; --bubble-in: #1e2924; --bubble-out: #1c4a37; --bar: #123c2e;
+    --warn: #f0c66a; --warn-soft: #3a2f10; --ok: #8fe0b4; --ok-soft: #153a29; --hold: #f1a1a1; --hold-soft: #40201f;
+    --head: #243349; --title: #31466a; --shadow: 0 6px 24px rgba(0, 0, 0, .45); color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 14px; line-height: 1.4; padding-block: 20px 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .shell { max-width: 1160px; margin: 0 auto; }
+  header.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; margin-bottom: 18px; }
+  h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: minmax(300px, 390px) minmax(0, 1fr); gap: 24px; align-items: start; }
+  @media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  h2 { margin: 0 0 8px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  label.who { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  select { font: inherit; font-size: 14px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .phone { position: relative; background: var(--chat-bg); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; height: min(640px, calc(100vh - 150px)); min-height: 480px; box-shadow: var(--shadow); border: 1px solid var(--line); }
+  .bar { background: var(--bar); color: #fff; padding: 12px 14px; display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: #25d366; color: #06301d; display: grid; place-items: center; font-weight: 600; flex: none; }
+  .bar b { display: block; font-weight: 600; } .bar small { opacity: .8; font-size: 12px; }
+  #chat { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .m { max-width: 84%; padding: 7px 10px; border-radius: 9px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.35; box-shadow: 0 1px 1px rgba(0, 0, 0, .12); }
+  .m.in { background: var(--bubble-in); align-self: flex-start; border-top-left-radius: 2px; }
+  .m.out { background: var(--bubble-out); align-self: flex-end; border-top-right-radius: 2px; }
+  .ui { display: flex; flex-direction: column; gap: 5px; align-self: flex-start; width: min(84%, 290px); }
+  .ui.usado { opacity: .45; pointer-events: none; }
+  .pill { border: 0; background: var(--bubble-in); color: #1769b3; font: inherit; font-weight: 600; font-size: 14px; padding: 9px 12px; border-radius: 9px; cursor: pointer; box-shadow: 0 1px 1px rgba(0, 0, 0, .12); }
+  :root[data-theme="dark"] .pill { color: #7dc0ff; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pill { color: #7dc0ff; } }
+  .pill:hover { filter: brightness(.97); }
+  form.send { display: flex; gap: 8px; padding: 8px 10px; background: var(--panel); border-top: 1px solid var(--line); }
+  form.send input { flex: 1; min-width: 0; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 20px; padding: 9px 14px; outline: none; }
+  form.send input:focus-visible, select:focus-visible, .btn:focus-visible, .pill:focus-visible, .tab:focus-visible, form.send button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  form.send button { border: 0; background: var(--accent); color: var(--accent-fg); width: 40px; height: 40px; border-radius: 50%; font-size: 16px; cursor: pointer; }
+  .sheet, .web { position: absolute; inset: 0; background: var(--panel); display: flex; flex-direction: column; z-index: 5; }
+  .sheet { top: auto; max-height: 70%; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgba(0, 0, 0, .25); overflow-y: auto; }
+  .sheet-h { padding: 12px 14px; font-weight: 600; display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); }
+  .sheet-h span { cursor: pointer; }
+  .row { padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+  .row small { color: var(--muted); }
+  .web-h { background: var(--bar); color: #fff; padding: 10px 14px; display: flex; gap: 12px; align-items: center; font-size: 13px; }
+  .web-h span { cursor: pointer; font-weight: 600; }
+  .web iframe { flex: 1; border: 0; width: 100%; background: #fff; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
+  .panel + .panel { margin-top: 16px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .btn { font: inherit; font-weight: 600; font-size: 14px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 9px; padding: 9px 14px; cursor: pointer; }
+  .btn.main { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .msg { color: var(--muted); font-size: 13px; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  .ref { font-family: var(--mono); font-size: 12px; }
+  .badge { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .badge.pendiente { background: var(--warn-soft); color: var(--warn); } .badge.exportado { background: var(--ok-soft); color: var(--ok); } .badge.retenido { background: var(--hold-soft); color: var(--hold); }
+  .vacio { padding: 22px 8px; color: var(--muted); }
+  .tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
+  .tab { font: inherit; font-size: 13px; font-weight: 600; border: 1px solid var(--line); background: var(--panel); color: var(--muted); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .tab[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .xl { font-family: var(--sans); font-size: 12.5px; border: 1px solid var(--line); }
+  .xl td { border: 1px solid var(--line); padding: 3px 7px; white-space: nowrap; }
+  .xl .s1 { font-weight: 600; } .xl .s4 { background: var(--head); font-weight: 600; } .xl .s6 { background: var(--title); font-weight: 600; } .xl .s3 { font-weight: 600; }
+  .xl .n { text-align: right; }
+  .file { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .note { color: var(--muted); font-size: 12.5px; margin: 14px 0 0; max-width: 70ch; }
+  @media (prefers-reduced-motion: no-preference) { .m { animation: pop .18s ease-out; } @keyframes pop { from { transform: translateY(4px); opacity: 0; } } }
+</style>
+
+<div class="shell">
+  <header class="top">
+    <h1>Pedidos por WhatsApp · Distribuciones VM</h1>
+    <span class="sub">Demo con clientes y artículos ficticios. Funciona entera en tu navegador.</span>
+  </header>
+
+  <div class="grid">
+    <section aria-label="Lo que ve el cliente">
+      <h2>Lo que ve el cliente</h2>
+      <label class="who">Escribe desde el móvil de
+        <select id="who"></select>
+      </label>
+      <div class="phone">
+        <div class="bar"><div class="avatar">D</div><div><b>DistribucionesVM</b><small>bot de pedidos</small></div></div>
+        <div id="chat" role="log" aria-live="polite"></div>
+        <div id="sheet" class="sheet" hidden></div>
+        <div id="web" class="web" hidden></div>
+        <form class="send" id="f"><input id="t" autocomplete="off" placeholder="Escribe un mensaje" aria-label="Mensaje"><button aria-label="Enviar">➤</button></form>
+      </div>
+    </section>
+
+    <section aria-label="Lo que ve la empresa">
+      <h2>Lo que ve la empresa</h2>
+      <div class="panel">
+        <div class="actions">
+          <button class="btn main" id="exportar" type="button">Exportar a Excel</button>
+          <button class="btn" id="reiniciar" type="button">Reiniciar demo</button>
+          <span class="msg" id="expmsg"></span>
+        </div>
+        <div class="scroll">
+          <table id="tabla" hidden>
+            <thead><tr><th>Pedido</th><th>Hora</th><th>Cliente</th><th>Artículos</th><th class="num">Total</th><th>Estado</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="vacio" id="vacio">Todavía no hay pedidos. Haz uno desde el móvil: escribe «repetir» o pulsa «Hacer pedido».</div>
+      </div>
+
+      <div class="panel" id="xlpanel" hidden>
+        <h2>Excel generado</h2>
+        <div class="actions">
+          <span class="file" id="xlfile"></span>
+          <button class="btn" id="descargar" type="button">Descargar .xlsx</button>
+          <span class="msg" id="dlmsg"></span>
+        </div>
+        <div class="tabs" role="tablist" id="xltabs"></div>
+        <div class="scroll"><table class="xl" id="xl"></table></div>
+      </div>
+      <p class="note">Los totales se calculan como en a3ERP: unidades por caja, precios especiales, descuentos, IVA y recargo de equivalencia. En producción, clientes, precios y unidades por caja llegarían desde las fichas de a3ERP. Los pedidos de clientes sin código de ERP o con una interpretación dudosa se retienen hasta que alguien los revise.</p>
+    </section>
+  </div>
+</div>
+
+<script>(()=>{var g={name:"DistribucionesVM",currency:"\u20AC",info:`\u{1F4CD} Calle Ejemplo 123
+\u{1F558} Lunes a viernes, 9:00\u201318:00
+\u{1F69A} Env\xEDos a toda la ciudad en 24\u201348 h`,priceNote:"Importes orientativos, sin IVA ni descuentos; los confirmamos al preparar el pedido.",payment:"Te enviaremos el enlace o los datos de pago cuando confirmemos tu pedido."},ne=[{id:1,name:"Agua",price:1,aliases:["agua"]},{id:2,name:"Cerveza Estrella Galicia",price:.8,aliases:["cerveza","estrella","galicia"]},{id:3,name:"Refresco de cola",price:1.2,aliases:["cola","refresco","coca"]},{id:4,name:"Vino tinto Rioja",price:6.5,aliases:["vino","rioja"]}];var E=e=>`${e.toFixed(2)}${g.currency}`,P=e=>e.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim(),Q=e=>P(e).split(/[^a-z0-9]+/).filter(Boolean),z=(e,n)=>e.length<=n?e:e.slice(0,n-1).trimEnd()+"\u2026",le=e=>Number.isInteger(e?.unitsPerBox)&&e.unitsPerBox>1?e.unitsPerBox:null,G=(e,n,o="ud",t={})=>({id:e.id,name:e.name,price:e.price,qty:n,unit:o,upb:le(e),...t}),ue=e=>e.unit==="caja"?e.qty*(e.upb??1):e.qty,de=e=>e.unit==="caja"?`${e.qty} ${e.qty===1?"caja":"cajas"}${e.upb?` (${e.qty*e.upb} uds)`:""}`:`${e.qty}`,I=ne,me=e=>{e?.length&&(I=e)},S=()=>I,M=new WeakMap,pe=e=>(M.has(e)||M.set(e,Q(`${e.name} ${(e.aliases??[]).join(" ")}`)),M.get(e)),oe={un:1,una:1,uno:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,doce:12,veinte:20,treinta:30},fe=new Set("de del la el los las y e un una uno unos unas con para por me mas otro otra tambien gracias hola buenas quiero quisiera necesito necesitamos ponme pon dame mandame manda pedido favor ud uds unidad unidades caja cajas lata latas botella botellas pack packs bandeja bandejas litro litros que a al en lo".split(" ")),Oe=new Set(["cl","ml","l","gr","g","kg","lt"]),Ue=["como siempre","lo de siempre","lo habitual","lo mismo","repetir","repetir pedido","ultimo","ultimo pedido"],ye=(e,n)=>e===n||e.length>=3&&n.startsWith(e)||n.length>=4&&e.startsWith(n);function H(e,n=null){let o=new Set((n?.orders??[]).flatMap(r=>r.lines.map(s=>s.productId)).concat((n?.usual??[]).map(r=>r.productId))),t=new Map;for(let r of P(e).split(/\s*(?:,|;|\+|\n|\by\b|\be\b)\s*/)){let s=Q(r),a=1,c=s.findIndex((d,v)=>(/^\d+$/.test(d)||d in oe)&&!Oe.has(s[v+1]));c>=0&&(a=oe[s[c]]??Number(s[c]),s.splice(c,1));let i=s.includes("caja")||s.includes("cajas"),u=s.some(d=>["ud","uds","unidad","unidades"].includes(d)),l=i&&!u?"caja":"ud",m=s.filter(d=>!fe.has(d));if(!m.length||a<1||a>999)continue;let p=[];for(let d of I){let v=pe(d),R=m.filter(_e=>v.some(Ne=>ye(_e,Ne))).length;R&&R/m.length>=.5&&p.push({p:d,matched:R,known:o.has(d.id)?1:0,len:v.length})}if(!p.length)continue;p.sort((d,v)=>v.matched-d.matched||v.known-d.known||d.len-v.len);let y=p[0],h=p.filter(d=>d.matched===y.matched&&d.known===y.known).length>1,f=`${y.p.id}|${l}`,x=t.get(f);t.set(f,G(y.p,(x?.qty??0)+a,l,{unsure:h||x?.unsure}))}return[...t.values()]}var re=e=>e.map(n=>{let o=I.find(t=>t.id===n.productId);return o&&G(o,n.qty)}).filter(Boolean),K=e=>e.reduce((n,o)=>n+ue(o)*o.price,0),W=e=>e.map(n=>`\u2022 ${de(n)} \xD7 ${n.name} = ${E(ue(n)*n.price)}${n.unsure?" \u26A0\uFE0F":""}${n.note?`
+   \u{1F4DD} ${n.note}`:""}`).join(`
+`)+`
+*Total: ${E(K(e))}*`+(e.some(n=>n.unsure)?`
+\u26A0\uFE0F _No estoy seguro de este art\xEDculo: escribe la marca o el formato exacto._`:""),Be=e=>e.slice(8,10)+"/"+e.slice(5,7);function De(e){let n=[],o=re(e?.frequent??e?.usual??[]);o.length&&n.push({label:`Lo que sueles pedir (${o.length} art\xEDculos)`,items:o});for(let t of(e?.orders??[]).slice(0,3)){let r=re(t.lines);r.length&&n.push({label:`Pedido del ${Be(t.date)} (${r.length} art\xEDculos \xB7 ${E(K(r))})`,items:r})}return n.slice(0,5)}function F(e){let n=new Map;for(let o of e?.orders??[])for(let t of o.lines){let r=n.get(t.productId)??{count:0,lastDate:"",lastQty:t.qty};r.count++,o.date>=r.lastDate&&Object.assign(r,{lastDate:o.date,lastQty:t.qty}),n.set(t.productId,r)}for(let o of e?.usual??[])n.has(o.productId)||n.set(o.productId,{count:1,lastDate:"",lastQty:o.qty});return[...n].map(([o,t])=>{let r=I.find(s=>s.id===o);return r&&{...r,...t}}).filter(Boolean).sort((o,t)=>t.count-o.count||t.lastDate.localeCompare(o.lastDate))}var w=9,T=(...e)=>({type:"buttons",buttons:e.map(([n,o])=>({id:n,title:z(o,20)}))});function he(e,n=0){let o=F(e.customer),t=n*w,r=o.slice(t,t+w).map(s=>({id:`p:${s.id}`,title:z(s.name,24),description:z(`${s.name} \xB7 \xFAltima vez: ${s.lastQty} uds`,72)}));if(r.length)return t+w<o.length&&r.push({id:`more:${n+1}`,title:"Ver m\xE1s art\xEDculos",description:`Quedan ${o.length-t-w} por ver`}),{type:"list",button:"Ver art\xEDculos",section:"Tus art\xEDculos habituales",rows:r}}var Le=`\u{1F44B} \xA1Hola! Bienvenido a *${g.name}*.
+
+\u270D\uFE0F *Escribe directamente lo que quieres pedir*, por ejemplo:
+_"2 aguas y una cerveza"_
+
+O elige:
+1\uFE0F\u20E3 Ver productos y precios
+2\uFE0F\u20E3 Horarios y env\xEDos
+3\uFE0F\u20E3 Hablar con una persona
+
+En cualquier momento: *menu* o *cancelar*.`,V=e=>{if(!e.customer)return{reply:Le};let n=`\u{1F44B} \xA1Hola, *${e.customer.name}*! Soy el asistente de *${g.name}*.
+
+`;return e.link?{reply:n+`\u{1F6D2} Pulsa *Hacer pedido* para abrir tu cat\xE1logo con tus art\xEDculos habituales, elegir las unidades y confirmar.
+
+Tambi\xE9n puedes escribirlo aqu\xED (_"6 verdejo y 2 coca cola zero"_), decir *repetir* para repetir tu \xFAltimo pedido, *lista* para elegir en el chat, o pedir *horarios* o *persona*.`,ui:{type:"link",title:"Hacer pedido",url:e.link}}:{reply:n+`\u{1F6D2} Pulsa *Ver art\xEDculos* para elegir lo que quieres pedir (te ense\xF1o lo que sueles comprar).
+
+Tambi\xE9n puedes escribirlo (_"6 verdejo y 2 coca cola zero"_), decir *repetir* para repetir tu \xFAltimo pedido, o pedir *productos*, *horarios* o *persona*.`,ui:he(e)}},se=()=>{let e=I.slice(0,25);return`\u{1F6CD}\uFE0F *Productos*
+
+`+e.map(n=>`\u2022 ${n.name} \u2014 ${E(n.price)}`).join(`
+`)+(I.length>e.length?`
+\u2026 y ${I.length-e.length} m\xE1s. Escribe el nombre de lo que buscas.`:"")+`
+
+\u270D\uFE0F Escribe lo que quieres, por ejemplo: _"2 aguas y una cerveza"_`},X=(e=null,n=null)=>({state:"menu",link:n,orderText:"",items:null,cart:[],pick:null,name:e?.name??"",address:e?.address??"",note:"",customer:e}),J=e=>e.items??H(e.orderText,e.customer),ae=e=>{let n=J(e);return n.length?`Lo que he entendido:
+${W(n)}
+
+Si falta o sobra algo, nuestro equipo lo revisar\xE1 contigo.`:"Lo he anotado tal cual y nuestro equipo lo revisar\xE1 contigo."},A=e=>{let n=J(e),o=`Revisa tu pedido:
+
+${n.length?W(n):`_"${e.orderText.replace(/\n/g," + ")}"_`}
+
+`+(g.priceNote?`_${g.priceNote}_
+
+`:"")+(e.note?`\u{1F4DD} Observaciones: ${e.note}
+`:"")+`\u{1F464} ${e.name}
+\u{1F4CD} Entrega en: ${e.address}
+
+`;return e.customer?{reply:o+`Pulsa un bot\xF3n, o escribe los cambios (por ejemplo _"6 verdejo y 2 coca cola zero"_) y lo rehago.
+
+_\xBFAlguna observaci\xF3n? Escribe *nota: servir el jueves*, o *nota jam\xF3n: pieza grande* para un art\xEDculo._`,ui:T(["c:ok","Confirmar"],["c:edit","Cambiar"],["c:cancel","Cancelar"])}:{reply:o+`1\uFE0F\u20E3 Confirmar
+2\uFE0F\u20E3 Cancelar`}},q=(e,n=0,o="Elige un art\xEDculo:")=>(e.state="menu",{reply:o,session:e,ui:he(e,n)}),j=(e,n="")=>(e.state="cart",{reply:`${n}\u{1F6D2} *Tu pedido hasta ahora:*
+${W(e.cart)}
+
+\xBFQu\xE9 quieres hacer?`,session:e,ui:T(["act:add","A\xF1adir otro"],["act:done","Finalizar"],["act:clear","Vaciar pedido"])});function C(e,n){e.cart=n.map(o=>({...o})),e.items=e.cart,e.orderText=e.cart.map(o=>`${o.qty} ${o.unit==="caja"?"cajas de ":""}${o.name}`).join(", ")}function Re(e,n){return n?(C(e,n.items),e.state="confirm",{...A(e),session:e}):{reply:'No encuentro pedidos anteriores tuyos. Escribe lo que quieres pedir, por ejemplo _"2 aguas y una cerveza"_.',session:e}}function Me(e,n){let o=e.pick;e.pick=null;let t=e.cart.find(a=>a.id===o.id),r=e.cart.filter(a=>a.id!==o.id),s=G(o,n,o.unit??"ud",t?.note?{note:t.note}:{});return n>0&&r.push(s),e.cart=r,e.cart.length?j(e,n>0?`\u2705 ${de(s)} \xD7 ${o.name}
+
+`:""):q(e,0,"He quitado ese art\xEDculo. Elige otro:")}function ie(e){let n=e.pick;if(n.unit==="caja")return{reply:`*${n.name}*
+\xBFCu\xE1ntas *cajas* quieres? Pulsa un bot\xF3n o escribe el n\xFAmero.`,ui:T(["q:1","1 caja"],["q:2","2 cajas"],["q:0","No lo quiero"])};let o=n.lastQty??1;return{reply:`*${n.name}*
+${E(n.price)} por unidad${n.lastQty?` \xB7 \xFAltima vez: ${o} uds`:""}.
+
+\xBFCu\xE1ntas unidades quieres? Pulsa un bot\xF3n o escribe el n\xFAmero.`,ui:T([`q:${o}`,`${o} uds (igual)`],[`q:${o*2}`,`${o*2} uds (doble)`],["q:0","No lo quiero"])}}var ce="\u{1F464} Avisamos a una persona del equipo, te responder\xE1 en cuanto pueda. Mientras tanto, escribe *menu* si necesitas algo m\xE1s.";function ge(e,n){let o=P(n||""),t={...e,cart:[...e.cart??[]]},r=()=>X(t.customer,t.link);if(["menu","inicio","hola","buenas","hi","empezar"].includes(o)){let a=r();return{...V(a),session:a}}if(["cancelar","salir","c:cancel"].includes(o))return{reply:"Pedido cancelado. Escribe *menu* cuando quieras volver a empezar.",session:r()};if(["asesor","humano","persona"].includes(o))return{reply:ce,session:t,handoff:!0};if(t.customer&&Ue.includes(o)&&["menu","items","cart"].includes(t.state))return Re(t,De(t.customer)[0]);let s=/^\s*(?:nota|notas|observaci[oó]n|observaciones)\b[\s:]*(?:de[l]?\s+)?(.*)$/is.exec(n||"");if(s&&["menu","cart","items","confirm"].includes(t.state)){let a=s[1].trim().slice(0,200),c=a.indexOf(":"),i=t.customer?t.state==="confirm"?t.items??t.cart:t.cart:[];if(!a)return{reply:"Escribe la observaci\xF3n, por ejemplo: *nota: servir el jueves* o *nota jam\xF3n: pieza de peso grande*.",session:t};let u;if(c>0&&i.length){let l=Q(P(a.slice(0,c))).filter(h=>!fe.has(h)),m=i.filter(h=>l.length&&l.every(f=>pe(h).some(x=>ye(f,x)))),p=a.slice(c+1).trim();if(m.length!==1||!p)return{reply:m.length>1?"Hay varios art\xEDculos que coinciden. Escribe una palabra m\xE1s del nombre.":"No encuentro ese art\xEDculo en tu pedido. Prueba con *nota: \u2026* para todo el pedido.",session:t};let y=i.map(h=>h===m[0]?{...h,note:p}:h);t.state==="confirm"?C(t,y):t.cart=y,u=`\u{1F4DD} Anotado para ${m[0].name}: _${p}_
+
+`}else t.note=(c>0?a.slice(c+1):a).trim(),u=`\u{1F4DD} Observaci\xF3n anotada: _${t.note}_
+
+`;if(t.state==="confirm"){let l=A(t);return{...l,reply:u+l.reply,session:t}}return t.cart.length?j(t,u):{reply:u+"Ahora dime qu\xE9 quieres pedir.",session:t}}if(t.customer){if(o==="lista"&&["menu","cart"].includes(t.state))return q(t,0,"Elige un art\xEDculo:");let a=/^p:(.+)$/.exec(o);if(a&&["menu","cart","qty"].includes(t.state)){let i=l=>String(l.id).toLowerCase()===a[1],u=F(t.customer).find(i)??I.find(i);if(u){let l=u.lastQty??1,m=le(u);return t.pick={id:u.id,name:u.name,price:u.price,unitsPerBox:u.unitsPerBox,lastQty:l,unit:m?null:"ud"},t.state="qty",m?{reply:`*${u.name}*
+${E(u.price)} por unidad \xB7 caja de ${m} uds (${E(u.price*m)}).
+
+\xBFLo quieres en *cajas* o en *unidades*?`,session:t,ui:T(["u:caja","Cajas"],["u:ud","Unidades"],["q:0","No lo quiero"])}:{...ie(t),session:t}}}let c=/^more:(\d+)$/.exec(o);if(c&&t.state==="menu")return q(t,Number(c[1]),"M\xE1s art\xEDculos:");if(t.state==="qty"&&t.pick){let i=/^u:(caja|ud)$/.exec(o);if(i)return t.pick={...t.pick,unit:i[1]},{...ie(t),session:t};let u=/^q:(\d+)$/.exec(o)??/^(\d{1,3})\s*(cajas?|uds?|unidades?)?$/.exec(o);if(u){let l=u[2];return l&&(t.pick={...t.pick,unit:l.startsWith("caja")?"caja":"ud"}),!t.pick.unit&&Number(u[1])>0?{reply:"Primero dime si lo quieres en *cajas* o en *unidades*.",session:t,ui:T(["u:caja","Cajas"],["u:ud","Unidades"],["q:0","No lo quiero"])}:Me(t,Number(u[1]))}return{reply:"Escribe solo el n\xFAmero (por ejemplo 6), o \xAB3 cajas\xBB / \xAB12 uds\xBB, o pulsa un bot\xF3n.",session:t}}if(["menu","cart"].includes(t.state)){if(o==="act:add")return q(t);if(o==="act:clear")return t.cart=[],q(t,0,"He vaciado tu pedido. Elige un art\xEDculo:");if(o==="act:done")return t.cart.length?(C(t,t.cart),t.state="confirm",{...A(t),session:t}):q(t,0,"A\xFAn no has a\xF1adido nada. Elige un art\xEDculo:")}if(t.state==="confirm"&&o==="c:edit")return t.items=null,j(t,`De acuerdo, cambia lo que quieras.
+
+`)}switch(t.state){case"menu":case"cart":{if(["productos","catalogo","precios"].includes(o))return{reply:se(),session:t};if(["horarios","horario","envios","info"].includes(o))return{reply:`${g.info}
+
+Escribe *menu* para volver.`,session:t};if(!t.customer){if(o==="1")return{reply:se(),session:t};if(o==="2")return{reply:`${g.info}
+
+Escribe *menu* para volver.`,session:t};if(o==="3")return{reply:ce,session:t,handoff:!0}}if(!o)return{...V(t),session:t};if(t.customer){let a=H(n,t.customer);if(a.length){for(let c of a){let i=t.cart.find(u=>u.id===c.id&&u.unit===c.unit);i?i.qty+=c.qty:t.cart.push(c)}return j(t,`Anotado \u2705
+
+`)}return q(t,0,'No he reconocido ese art\xEDculo. Elige de la lista, o escr\xEDbelo de otra forma (por ejemplo _"6 verdejo"_):')}return t.orderText=n.trim().slice(0,500),t.items=null,t.state="items",{reply:`\u{1F4DD} Anotado: _"${t.orderText}"_
+
+${ae(t)}
+
+Escribe *1* para continuar, o escribe m\xE1s cosas para a\xF1adirlas.`,session:t}}case"items":return o==="1"?t.customer?(t.state="confirm",{...A(t),session:t}):(t.state="name",{reply:"Perfecto. \xBFA qu\xE9 *nombre* pongo el pedido?",session:t}):(t.orderText=`${t.orderText}
+${n.trim()}`.slice(0,800),{reply:`\u{1F4DD} Pedido actual: _"${t.orderText.replace(/\n/g," + ")}"_
+
+${ae(t)}
+
+Escribe *1* para continuar, o escribe m\xE1s cosas para a\xF1adirlas.`,session:t});case"name":return o.length<2?{reply:"Escribe tu nombre, por favor.",session:t}:(t.name=n.trim().slice(0,80),t.state="address",{reply:`Gracias, ${t.name}. \xBFCu\xE1l es la *direcci\xF3n de entrega* (o escribe "recoger" si pasar\xE1s a buscarlo)?`,session:t});case"address":return o.length<3?{reply:'Escribe la direcci\xF3n o "recoger".',session:t}:(t.address=n.trim().slice(0,200),t.state="confirm",{...A(t),session:t});case"confirm":if(o==="1"||o==="c:ok"){let a=J(t),c={customerId:t.customer?.id??null,name:t.name,address:t.address,text:t.orderText.replace(/\n/g," + "),note:t.note||"",items:a.map(({unsure:i,upb:u,...l})=>l),total:a.length?K(a):null,review:a.some(i=>i.unsure)||!a.length};return{reply:`\u{1F389} \xA1Pedido recibido, ${t.name}!
+
+${g.payment}
+
+Escribe *menu* si necesitas algo m\xE1s.`,session:r(),order:c}}if(o==="2")return{reply:"Pedido cancelado. Escribe *menu* para empezar de nuevo.",session:r()};if(t.customer&&o){let a=H(n,t.customer);return a.length?C(t,a):(t.orderText=n.trim().slice(0,500),t.items=null),{...A(t),session:t}}return{reply:"Escribe *1* para confirmar o *2* para cancelar.",session:t};default:return{...V(r()),session:r()}}}var Ve={21:5.2,10:1.4,4:.5},$=e=>Math.round((e+Number.EPSILON)*100)/100;function ze(e,n,o){let t=String(e.id),r=e.qty,s=Number.isInteger(n?.unitsPerBox)&&n.unitsPerBox>=1?n.unitsPerBox:null,a=e.unit==="caja",c=o?.specialPrices?.[t]??n?.price??e.price??0,i=o?.discounts?.[t]??n?.discount??0,u=a?r*(s??1):r;return{unit:a?"caja":"ud",boxes:a?r:null,units:u,price:c,discount:i,vat:n?.vat??21,amount:$(u*c*(1-i/100)),unsureBox:a&&!s}}function be(e,n,o){let t=new Map((o??[]).map(c=>[String(c.id),c])),r=!!e.review,s=(e.items??[]).map(c=>{let i=ze(c,t.get(String(c.id)),n);i.unsureBox&&(r=!0);let{unsureBox:u,...l}=i;return{...c,...l}}),a=$(s.reduce((c,i)=>c+i.amount,0));return{...e,items:s,review:r,re:!!n?.recargoEquivalencia,total:s.length?a:e.total}}function k(e,n=!1){let o=new Map;for(let i of e)o.set(i.vat_rate??i.vat??21,(o.get(i.vat_rate??i.vat??21)??0)+(i.amount??0));let t=[...o].sort((i,u)=>u[0]-i[0]).map(([i,u])=>{let l=$(u);return{vat:i,base:l,iva:$(l*i/100),re:n?$(l*(Ve[i]??0)/100):0}}),r=i=>$(t.reduce((u,l)=>u+l[i],0)),s=r("base"),a=r("iva"),c=r("re");return{groups:t,base:s,iva:a,re:c,total:$(s+a+c)}}function xe(e,n,o){let t=new Map(o(e).map(r=>[r.id,r]));return n.map(r=>({id:String(r.id),name:r.name,price:r.price,unitsPerBox:Number.isInteger(r.unitsPerBox)&&r.unitsPerBox>1?r.unitsPerBox:null,lastQty:t.get(r.id)?.lastQty??null,count:t.get(r.id)?.count??0})).sort((r,s)=>s.count-r.count||r.name.localeCompare(s.name))}function Ie(e,n,{key:o,phone:t,at:r=new Date().toISOString()},s){let a=new Map(s.map(l=>[String(l.id),l])),c=new Map;for(let l of Array.isArray(e?.lines)?e.lines:[]){let m=a.get(String(l?.id)),p=Math.floor(Number(l?.qty)),y=l?.unit==="caja"&&Number.isInteger(m?.unitsPerBox)&&m.unitsPerBox>1?"caja":"ud",h=typeof l?.note=="string"?l.note.trim().slice(0,120):"";if(m&&p>=1&&p<=999){let f=`${m.id}|${y}`,x=c.get(f);c.set(f,{id:m.id,name:m.name,price:m.price,qty:(x?.qty??0)+p,unit:y,...(h||x?.note)&&{note:h||x.note}})}}let i=[...c.values()];if(!i.length)return{error:"El pedido est\xE1 vac\xEDo"};let u=typeof e?.note=="string"?e.note.trim().slice(0,200):"";return{order:{at:r,key:o,phone:t,customerId:n.id,name:n.name,address:n.address,text:i.map(l=>`${l.qty} ${l.unit==="caja"?"cajas de ":""}${l.name}`).join(" + ")+(u?` \xB7 Nota: ${u}`:""),items:i,total:null,review:!1,note:u}}}var $e=e=>String(e).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");function He(e){let n="";for(e++;e>0;e=Math.floor((e-1)/26))n=String.fromCharCode(65+(e-1)%26)+n;return n}var b={normal:0,bold:1,money:2,boldMoney:3,header:4,price:5,title:6};function Qe(e,n,o,t=0){let r=t;e!==null&&typeof e=="object"&&(r=e.s??t,e=e.v);let s=`${He(o)}${n+1}`,a=r?` s="${r}"`:"";if(e==null||e==="")return`<c r="${s}"${a}/>`;if(typeof e=="number"){if(!Number.isFinite(e))throw new Error(`N\xFAmero no v\xE1lido en ${s}`);return`<c r="${s}"${a}><v>${e}</v></c>`}return`<c r="${s}"${a} t="inlineStr"><is><t xml:space="preserve">${$e(e)}</t></is></c>`}function ve(e){if(!e.length)throw new Error("El libro necesita al menos una hoja");let n=({rows:s,widths:a=[]})=>{let c=a.length?`<cols>${a.map((u,l)=>`<col min="${l+1}" max="${l+1}" width="${u}" customWidth="1"/>`).join("")}</cols>`:"",i=s.map((u,l)=>`<row r="${l+1}">${u.map((m,p)=>Qe(m,l,p)).join("")}</row>`).join("");return`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${c}<sheetData>${i}</sheetData></worksheet>`},o=e.length,t=s=>Array.from({length:o},(a,c)=>s(c+1)).join(""),r={"[Content_Types].xml":`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>${t(s=>`<Override PartName="/xl/worksheets/sheet${s}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`)}<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,"_rels/.rels":'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',"xl/workbook.xml":`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${e.map((s,a)=>`<sheet name="${$e(s.name.slice(0,31))}" sheetId="${a+1}" r:id="rId${a+1}"/>`).join("")}</sheets></workbook>`,"xl/_rels/workbook.xml.rels":`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${t(s=>`<Relationship Id="rId${s}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${s}.xml"/>`)}<Relationship Id="rId${o+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,"xl/styles.xml":'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0.00####"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9E2F3"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFB4C6E7"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="4" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="3" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'};return e.forEach((s,a)=>r[`xl/worksheets/sheet${a+1}.xml`]=n(s)),r}var _=e=>{let n=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Madrid",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date(e)).map(o=>[o.type,o.value]));return`${n.year}-${n.month}-${n.day} ${n.hour}:${n.minute}`};function N(e){let[n,o,t]=_(e).split(" ")[0].split("-");return`${t}/${o}/${n}`}var O=e=>_(e).split(" ")[1],Ge=e=>e.amount??$((e.units??e.qty)*(e.price??0)*(1-(e.discount??0)/100)),Ee=e=>e.items.map(n=>({...n,amount:Ge(n)})),Ae=["N\xBA pedido","C\xF3digo cliente","Nombre comercial","Fecha recepci\xF3n","Hora pedido"],Y=["C\xF3digo art\xEDculo","Cajas","Descripci\xF3n","Unidades","Precio","Dto. %","Importe","IVA %","Observaciones l\xEDnea"],Ke=[18,16,46,16,12,10,12,8,40],Z=Y.length,qe=e=>e.map(n=>({v:n,s:b.header})),We=(e,n)=>[...e,...Array(Z-e.length).fill({v:null,s:n})],Te=e=>[e.id,e.boxes??null,e.name,e.units??e.qty,{v:e.price??null,s:b.price},e.discount||null,{v:e.amount,s:b.money},e.vat_rate??null,e.note??null];function Xe(e){let n=Ee(e),o=k(n.map(s=>({...s,vat:s.vat_rate})),e.re),t=(s,a,c=!1)=>{let i=Array(Z).fill(null);return i[2]={v:s,s:b.bold},i[6]={v:a,s:c?b.boldMoney:b.money},i},r=Array(Z).fill(null);return r[0]={v:"Observaciones del cliente",s:b.bold},r[2]=e.note||null,[We([{v:`PEDIDO ${e.ref}`,s:b.title}],b.title),qe(Ae),[e.ref,e.customer_id,e.name,N(e.created_at),O(e.created_at)],qe(Y),...n.map(Te),t("Total base imponible",o.base),t("Total IVA",o.iva),t("Total R.E.",o.re),t("TOTAL PEDIDO",o.total,!0),r,[]]}var we={name:"pedidos-v2",build(e){let n=e.flatMap(Xe),o=[[...Ae,...Y,"Observaciones del pedido"].map(t=>({v:t,s:b.bold})),...e.flatMap(t=>Ee(t).map(r=>[t.ref,t.customer_id,t.name,N(t.created_at),O(t.created_at),...Te(r),t.note||null]))];return{sheets:[{name:"Pedidos",widths:Ke,rows:n},{name:"L\xEDneas",widths:[18,14,30,16,12,16,8,46,10,11,8,12,8,40,30],rows:o}],lineCount:o.length-1}}};var Je=new Uint32Array(256).map((e,n)=>{let o=n;for(let t=0;t<8;t++)o=o&1?3988292384^o>>>1:o>>>1;return o>>>0}),Ze=e=>{let n=4294967295;for(let o of e)n=Je[(n^o)&255]^n>>>8;return(n^4294967295)>>>0};function je(e){let n=new TextEncoder,o=[],t=[],r=0,s=l=>(o.push(l),r+=l.length);for(let[l,m]of Object.entries(e)){let p=n.encode(l),y=n.encode(m),h=Ze(y),f=new DataView(new ArrayBuffer(30));f.setUint32(0,67324752,!0),f.setUint16(4,20,!0),f.setUint16(6,2048,!0),f.setUint16(8,0,!0),f.setUint16(12,33,!0),f.setUint32(14,h,!0),f.setUint32(18,y.length,!0),f.setUint32(22,y.length,!0),f.setUint16(26,p.length,!0);let x=r;s(new Uint8Array(f.buffer)),s(p),s(y);let d=new DataView(new ArrayBuffer(46));d.setUint32(0,33639248,!0),d.setUint16(4,20,!0),d.setUint16(6,20,!0),d.setUint16(8,2048,!0),d.setUint16(14,33,!0),d.setUint32(16,h,!0),d.setUint32(20,y.length,!0),d.setUint32(24,y.length,!0),d.setUint16(28,p.length,!0),d.setUint32(42,x,!0),t.push(new Uint8Array(d.buffer),p)}let a=r;for(let l of t)s(l);let c=new DataView(new ArrayBuffer(22));c.setUint32(0,101010256,!0),c.setUint16(8,Object.keys(e).length,!0),c.setUint16(10,Object.keys(e).length,!0),c.setUint32(12,r-a,!0),c.setUint32(16,a,!0),s(new Uint8Array(c.buffer));let i=new Uint8Array(r),u=0;for(let l of o)i.set(l,u),u+=l.length;return i}var U={products:[{id:"1001",name:"AGUA MINERAL 1,5 L (PACK 6)",price:2.1,unitsPerBox:6,vat:10,discount:0},{id:"1002",name:"REFRESCO COLA LATA 33 CL (PACK 24)",price:11.4,unitsPerBox:1,vat:10,discount:0},{id:"1003",name:"CERVEZA RUBIA LATA 33 CL (PACK 24)",price:14.2,unitsPerBox:1,vat:21,discount:5},{id:"1004",name:"VINO TINTO CRIANZA 75 CL (CAJA 6)",price:27.5,unitsPerBox:6,vat:21,discount:0},{id:"1005",name:"VINO BLANCO VERDEJO 75 CL (CAJA 6)",price:21,unitsPerBox:6,vat:21,discount:0},{id:"1006",name:"ZUMO NARANJA 1 L (PACK 6)",price:6.9,unitsPerBox:6,vat:10,discount:0},{id:"1007",name:"LECHE ENTERA 1 L (PACK 6)",price:5.4,unitsPerBox:6,vat:10,discount:0},{id:"1008",name:"ACEITE OLIVA VIRGEN EXTRA 1 L",price:8.95,unitsPerBox:1,vat:10,discount:0},{id:"1009",name:"CAFE MOLIDO NATURAL 250 GR",price:3.8,unitsPerBox:12,vat:10,discount:0},{id:"1010",name:"AZUCAR 1 KG",price:1.15,unitsPerBox:10,vat:10,discount:0},{id:"1011",name:"PATATAS FRITAS 150 GR",price:1.6,unitsPerBox:12,vat:10,discount:0},{id:"1012",name:"ANCHOAS ACEITE OLIVA LATA 50 GR",price:3.25,unitsPerBox:1,vat:10,discount:0},{id:"1013",name:"ATUN CLARO ACEITE PACK 3",price:4.1,unitsPerBox:1,vat:10,discount:0},{id:"1014",name:"TOMATE FRITO 400 GR",price:1.05,unitsPerBox:12,vat:10,discount:0},{id:"1015",name:"SALMOREJO 1 L",price:2.6,unitsPerBox:6,vat:10,discount:0}],customers:[{id:"9001",name:"Bar El Ejemplo (ficticio)",phone:"+34 600 000 001",address:"Calle Inventada 1",orders:[{doc:"F900",date:"2026-10-20",lines:[{productId:"1002",qty:4},{productId:"1003",qty:6},{productId:"1001",qty:10},{productId:"1011",qty:12}]},{doc:"F901",date:"2026-10-06",lines:[{productId:"1002",qty:3},{productId:"1003",qty:5},{productId:"1006",qty:4}]},{doc:"F902",date:"2026-09-22",lines:[{productId:"1004",qty:2},{productId:"1005",qty:2},{productId:"1002",qty:4}]},{doc:"F903",date:"2026-09-08",lines:[{productId:"1002",qty:4},{productId:"1003",qty:6},{productId:"1001",qty:10},{productId:"1011",qty:12}]}],frequent:[],specialPrices:{"1002":10.9},discounts:{"1004":8},recargoEquivalencia:!1},{id:"9002",name:"Tienda Ficticia",phone:"+34 600 000 002",address:"Plaza Imaginaria 2",orders:[{doc:"F900",date:"2026-10-20",lines:[{productId:"1008",qty:6},{productId:"1009",qty:8},{productId:"1010",qty:10},{productId:"1007",qty:12}]},{doc:"F901",date:"2026-10-06",lines:[{productId:"1008",qty:4},{productId:"1009",qty:6},{productId:"1014",qty:12},{productId:"1015",qty:6}]},{doc:"F902",date:"2026-09-22",lines:[{productId:"1008",qty:6},{productId:"1009",qty:8},{productId:"1010",qty:10},{productId:"1007",qty:12}]},{doc:"F903",date:"2026-09-08",lines:[{productId:"1008",qty:4},{productId:"1009",qty:6},{productId:"1014",qty:12},{productId:"1015",qty:6}]}],frequent:[],recargoEquivalencia:!0}],_aviso:"DATOS FICTICIOS de ejemplo. Los reales (unidades por caja, IVA, precios y descuentos) vendr\xE1n de las fichas de a3ERP."};me(U.products);var et={name:"N\xFAmero desconocido (cliente nuevo)",phone:"34699000000"},Ce=e=>String(e).replace(/\D/g,"").slice(-9),ee=e=>U.customers.find(n=>Ce(n.phone)===Ce(e))??null,B,L,te,Fe,D,ke=()=>{B=new Map,L=[],te=[],Fe=1,D=new Set};ke();var Pe=()=>Math.random().toString(36).slice(2,10);function Se(e,n){let o=be(e,n,S()),t=Fe++,r={id:t,ref:`VM-${o.at.slice(0,4)}-${String(t).padStart(6,"0")}`,customer_id:o.customerId??null,phone:o.phone,name:o.name,address:o.address,text:o.text,note:o.note||null,total:o.total,review:!!o.review,re:!!o.re,export_status:"pending",created_at:o.at,items:o.items.map(s=>({id:String(s.id),name:s.name,price:s.price,qty:s.qty,unit:s.unit??"ud",boxes:s.boxes??null,units:s.units??s.qty,discount:s.discount??0,vat_rate:s.vat??null,amount:s.amount??null,note:s.note??null}))};return L.push(r),r}var tt=e=>k(e.items.map(n=>({...n,vat:n.vat_rate})),e.re);window.VMDemo={business:g.name,customers:()=>[...U.customers.map(e=>({name:e.name,phone:e.phone.replace(/\D/g,"")})),et],reset:ke,resetChat:e=>B.delete(String(e)),send(e,n){e=String(e);let o=B.get(e);if(!o){let r=ee(e);o=X(r,r?"#mini":null)}let t=ge(o,String(n??"").slice(0,1e3));return B.set(e,t.session),t.order&&Se({at:new Date().toISOString(),phone:e,key:`demo:${Pe()}`,...t.order},o.customer??null),{reply:t.reply,ui:t.ui,handoff:!!t.handoff}},miniOpen:()=>Pe(),miniData(e,n){let o=ee(e);return o?{business:g.name,priceNote:g.priceNote,customer:{name:o.name,address:o.address},used:D.has(n),products:xe(o,S(),F)}:{error:"Enlace no v\xE1lido o caducado"}},miniSubmit(e,n,o){let t=ee(e);if(!t)return{status:410,json:{error:"Enlace no v\xE1lido o caducado"}};if(D.has(n))return{status:409,json:{error:"Este pedido ya se envi\xF3"}};let r=Ie(o,t,{key:`web:${n}`,phone:String(e).replace(/\D/g,"")},S());if(r.error)return{status:400,json:{error:r.error}};D.add(n);let s=Se(r.order,t);return{status:200,json:{ok:!0,message:`\u{1F389} \xA1Pedido recibido, ${t.name}! ${s.items.length} art\xEDculos, total aprox. ${s.total.toFixed(2)}${g.currency}.
+
+${g.payment}`}}},orders:()=>L.map(e=>({ref:e.ref,hora:O(e.created_at),cliente:e.name,codigo:e.customer_id,lineas:e.items.length,resumen:e.items.map(n=>`${n.boxes??n.units} ${n.boxes?"caja"+(n.boxes>1?"s":""):"ud"} ${n.name}`).join(" \xB7 "),total:tt(e).total,estado:e.export_status==="exported"?"exportado":e.review||!e.customer_id?"retenido":"pendiente",motivo:e.customer_id?e.review?"Interpretaci\xF3n dudosa":"":"Cliente sin c\xF3digo de ERP"})),exportNow(){let e=L.filter(i=>i.export_status==="pending"),n=e.filter(i=>!i.review&&i.customer_id&&i.items.length),o=e.length-n.length;if(!n.length)return{export:null,held:o};let{sheets:t,lineCount:r}=we.build(n),s=je(ve(t)),a=_(new Date().toISOString()).replace(/[-: ]/g,"").replace(/^(\d{8})/,"$1-"),c={id:te.length+1,fileName:`pedidos-${a}.xlsx`,orderCount:n.length,lineCount:r,bytes:s,sheets:t};for(let i of n)i.export_status="exported";return te.push(c),{export:c,held:o}},madridDate:N};})();
+</script>
+<script>
+const MINI_HTML = "<!doctype html>\n<html lang=\"es\">\n<head><script>(()=>{const w=new Map();let n=0;\nwindow.fetch=(url,o)=>new Promise(r=>{const id=++n;w.set(id,r);parent.postMessage({vmApi:id,url:String(url),method:(o&&o.method)||\"GET\",body:(o&&o.body)||null},\"*\")});\naddEventListener(\"message\",e=>{const d=e.data;if(d&&d.vmApiRes){const r=w.get(d.vmApiRes);w.delete(d.vmApiRes);r({ok:d.status<400,status:d.status,json:async()=>d.json})}});\nparent.postMessage({vmReady:true},\"*\");})();<\/script>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, viewport-fit=cover\">\n<title>Hacer pedido</title>\n<style>\n  :root { --verde:#1a9c5b; --verde-oscuro:#127a46; --fondo:#f4f5f4; --texto:#1c2420; --gris:#7a857f; --linea:#e7eae8; --chip:#fde3e3; --chip-t:#c43b3b; }\n  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }\n  html, body { margin:0; height:100%; }\n  body { font-family:-apple-system,\"Segoe UI\",Roboto,sans-serif; background:var(--fondo); color:var(--texto); display:flex; justify-content:center; }\n  .app { width:100%; max-width:520px; height:100%; background:#fff; display:flex; flex-direction:column; position:relative; }\n  header { display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid var(--linea); }\n  .logo { width:38px; height:38px; border-radius:10px; background:var(--verde); color:#fff; display:grid; place-items:center; font-weight:700; flex:none; }\n  .ttl { flex:1; min-width:0; }\n  .ttl b { display:block; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }\n  .ttl small { color:var(--gris); font-size:13px; }\n  .cartbtn { border:0; background:none; font-size:15px; font-weight:600; display:flex; align-items:center; gap:4px; cursor:pointer; color:var(--texto); }\n  nav { display:flex; gap:8px; padding:10px 14px; border-bottom:1px solid var(--linea); align-items:center; }\n  nav button.tab { border:0; background:var(--fondo); padding:9px 12px; border-radius:10px; font-size:14px; font-weight:600; color:var(--gris); cursor:pointer; white-space:nowrap; }\n  nav button.tab.on { background:#e5f5ec; color:var(--verde-oscuro); }\n  nav input { flex:1; min-width:0; border:1px solid var(--linea); border-radius:10px; padding:9px 12px; font-size:14px; outline:none; }\n  main { flex:1; overflow-y:auto; padding-bottom:84px; }\n  .p { display:flex; gap:12px; padding:12px 14px; border-bottom:1px solid var(--linea); align-items:center; }\n  .av { width:52px; height:52px; border-radius:10px; flex:none; display:grid; place-items:center; color:#fff; font-weight:700; font-size:16px; }\n  .info { flex:1; min-width:0; }\n  .info .n { font-weight:600; font-size:15px; line-height:1.25; }\n  .info .c { color:var(--gris); font-size:12px; margin-top:2px; }\n  .info .pr { display:flex; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap; }\n  .pr b { font-size:16px; }\n  .chip { background:var(--chip); color:var(--chip-t); border:0; border-radius:6px; font-size:11.5px; font-weight:700; padding:3px 7px; cursor:pointer; }\n  .ctl { flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:6px; }\n  .add { width:42px; height:36px; border:0; border-radius:10px; background:var(--verde); color:#fff; font-size:22px; line-height:1; cursor:pointer; }\n  .step { display:flex; align-items:center; border:1px solid var(--linea); border-radius:10px; overflow:hidden; }\n  .step button { width:34px; height:36px; border:0; background:#fff; font-size:20px; color:var(--verde-oscuro); cursor:pointer; }\n  .step input { width:44px; height:36px; border:0; border-left:1px solid var(--linea); border-right:1px solid var(--linea); text-align:center; font-size:15px; font-weight:700; outline:none; -moz-appearance:textfield; }\n  .step input::-webkit-outer-spin-button, .step input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }\n  .ud { display:flex; border:1px solid var(--linea); border-radius:8px; overflow:hidden; font-size:12px; }\n  .ud button { border:0; background:#fff; padding:4px 8px; cursor:pointer; color:var(--gris); font-weight:600; }\n  .ud button.on { background:#e5f5ec; color:var(--verde-oscuro); }\n  .lnote { width:calc(100% - 28px); margin:0 14px 10px; border:1px solid var(--linea); border-radius:8px; padding:8px 10px; font:inherit; font-size:13px; }\n  .vacio { padding:40px 20px; text-align:center; color:var(--gris); }\n  footer { position:absolute; left:0; right:0; bottom:0; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(transparent, #fff 30%); }\n  .big { width:100%; border:0; border-radius:12px; background:var(--verde); color:#fff; font-size:16px; font-weight:700; padding:15px; cursor:pointer; }\n  .big:disabled { background:#b9c4be; cursor:default; }\n  .big.sec { background:#fff; color:var(--verde-oscuro); border:1px solid var(--verde); margin-top:8px; }\n  .screen { position:absolute; inset:0; background:#fff; display:flex; flex-direction:column; z-index:5; }\n  .screen[hidden] { display:none; }\n  .screen h2 { margin:0; font-size:17px; }\n  .screen .head { padding:14px; display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--linea); }\n  .screen .head button { border:0; background:none; font-size:22px; cursor:pointer; }\n  .screen .body { flex:1; overflow-y:auto; }\n  .tot { display:flex; justify-content:space-between; padding:14px; font-size:17px; border-top:1px solid var(--linea); }\n  .box { padding:14px; }\n  .box textarea { width:100%; border:1px solid var(--linea); border-radius:10px; padding:10px; font:inherit; font-size:14px; resize:none; min-height:60px; }\n  .nota { color:var(--gris); font-size:12px; padding:0 14px 10px; }\n  .ok { text-align:center; padding:50px 24px; }\n  .ok .tick { width:72px; height:72px; border-radius:50%; background:var(--verde); color:#fff; font-size:38px; display:grid; place-items:center; margin:0 auto 16px; }\n  .err { color:#c43b3b; padding:0 14px 8px; font-size:14px; }\n</style>\n</head>\n<body>\n<div class=\"app\">\n  <header>\n    <div class=\"logo\" id=\"logo\">·</div>\n    <div class=\"ttl\"><b id=\"ttl\">Cargando…</b><small id=\"sub\"></small></div>\n    <button class=\"cartbtn\" id=\"cartIcon\" type=\"button\">🛒 <span id=\"cnt\">0</span></button>\n  </header>\n  <nav>\n    <button class=\"tab on\" data-t=\"hab\" type=\"button\">★ Habituales</button>\n    <button class=\"tab\" data-t=\"all\" type=\"button\">☰ Catálogo</button>\n    <input id=\"q\" type=\"search\" placeholder=\"Buscar\" autocomplete=\"off\">\n  </nav>\n  <main id=\"list\"></main>\n  <footer><button class=\"big\" id=\"verCarrito\" type=\"button\" disabled>Ver carrito (0)</button></footer>\n\n  <section class=\"screen\" id=\"cart\" hidden>\n    <div class=\"head\"><button id=\"back\" type=\"button\">←</button><h2>Tu pedido</h2></div>\n    <div class=\"body\">\n      <div id=\"cartLines\"></div>\n      <div class=\"box\"><div id=\"addr\" style=\"font-size:14px;color:var(--gris)\"></div></div>\n      <div class=\"box\" style=\"padding-top:0\"><textarea id=\"note\" placeholder=\"Nota para el pedido (opcional)\" maxlength=\"200\"></textarea></div>\n      <div class=\"nota\" id=\"priceNote\"></div>\n      <div class=\"err\" id=\"err\"></div>\n    </div>\n    <div class=\"tot\"><span>Total aprox.</span><b id=\"total\">0,00 €</b></div>\n    <div class=\"box\"><button class=\"big\" id=\"confirm\" type=\"button\">Confirmar pedido</button><button class=\"big sec\" id=\"keep\" type=\"button\">Seguir añadiendo</button></div>\n  </section>\n\n  <section class=\"screen\" id=\"done\" hidden>\n    <div class=\"ok\"><div class=\"tick\">✓</div><h2 id=\"doneT\">¡Pedido recibido!</h2><p id=\"doneP\" style=\"color:var(--gris)\"></p></div>\n  </section>\n</div>\n\n<script>\nconst token = location.pathname.split(\"/\")[2];\nconst $ = id => document.getElementById(id);\nconst COLORS = [\"#2f8f6b\", \"#c0763a\", \"#5b7bd5\", \"#a1507c\", \"#8a8f2b\", \"#3c8fa6\", \"#b8523f\", \"#6c5ba8\"];\nconst eur = n => n.toFixed(2).replace(\".\", \",\") + \" €\";\nlet data = null, tab = \"hab\", query = \"\";\nconst qty = new Map(); // id -> cantidad (en cajas o en unidades, según unitOf)\nconst unitOf = new Map(); // id -> \"ud\" | \"caja\"\nconst notes = new Map(); // id -> observación de la línea\nconst unit = id => unitOf.get(id) || \"ud\";\nconst uds = l => l.qty * (unit(l.id) === \"caja\" ? (l.unitsPerBox || 1) : 1);\n\nconst norm = s => s.toLowerCase().normalize(\"NFD\").replace(/[̀-ͯ]/g, \"\");\nconst hue = s => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];\nconst initials = n => n.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9 ]/g, \"\").split(/\\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join(\"\").toUpperCase();\nconst lines = () => data.products.filter(p => qty.get(p.id) > 0).map(p => ({ ...p, qty: qty.get(p.id) }));\nconst count = () => lines().length;\nconst total = () => lines().reduce((t, l) => t + uds(l) * l.price, 0);\n\nfunction setQty(id, n) {\n  n = Math.max(0, Math.min(999, Math.floor(Number(n) || 0)));\n  if (n) qty.set(id, n); else { qty.delete(id); unitOf.delete(id); notes.delete(id); }\n  refresh();\n}\n\nfunction control(p) {\n  const q = qty.get(p.id) || 0, box = document.createElement(\"div\");\n  box.className = \"ctl\";\n  if (!q) {\n    const b = document.createElement(\"button\");\n    b.className = \"add\"; b.type = \"button\"; b.textContent = \"+\"; b.setAttribute(\"aria-label\", \"Añadir \" + p.name);\n    b.onclick = () => setQty(p.id, 1);\n    box.appendChild(b);\n    return box;\n  }\n  const st = document.createElement(\"div\"); st.className = \"step\";\n  const minus = document.createElement(\"button\"); minus.type = \"button\"; minus.textContent = \"−\"; minus.onclick = () => setQty(p.id, q - 1);\n  const inp = document.createElement(\"input\"); inp.type = \"number\"; inp.inputMode = \"numeric\"; inp.min = 0; inp.value = q;\n  inp.onchange = () => setQty(p.id, inp.value);\n  const plus = document.createElement(\"button\"); plus.type = \"button\"; plus.textContent = \"+\"; plus.onclick = () => setQty(p.id, q + 1);\n  st.append(minus, inp, plus); box.appendChild(st);\n  if (p.unitsPerBox) {\n    const sel = document.createElement(\"div\"); sel.className = \"ud\";\n    for (const [u, t] of [[\"ud\", \"Uds\"], [\"caja\", \"Cajas\"]]) {\n      const b = document.createElement(\"button\"); b.type = \"button\"; b.textContent = t; b.className = unit(p.id) === u ? \"on\" : \"\";\n      b.onclick = () => { unitOf.set(p.id, u); refresh(); };\n      sel.appendChild(b);\n    }\n    box.appendChild(sel);\n  }\n  return box;\n}\n\nfunction row(p) {\n  const el = document.createElement(\"div\"); el.className = \"p\";\n  const av = document.createElement(\"div\"); av.className = \"av\"; av.style.background = hue(p.name); av.textContent = initials(p.name);\n  const info = document.createElement(\"div\"); info.className = \"info\";\n  const n = document.createElement(\"div\"); n.className = \"n\"; n.textContent = p.name;\n  const c = document.createElement(\"div\"); c.className = \"c\"; c.textContent = \"Cód. \" + p.id;\n  const pr = document.createElement(\"div\"); pr.className = \"pr\";\n  const price = document.createElement(\"b\"); price.textContent = eur(p.price); pr.appendChild(price);\n  if (p.lastQty) {\n    const chip = document.createElement(\"button\"); chip.type = \"button\"; chip.className = \"chip\";\n    chip.textContent = \"Última vez: \" + p.lastQty + \" uds\"; chip.title = \"Pedir las mismas unidades\";\n    chip.onclick = () => { unitOf.set(p.id, \"ud\"); setQty(p.id, p.lastQty); }; // las de la última vez son unidades\n    pr.appendChild(chip);\n  }\n  if (p.unitsPerBox) c.textContent += \" · caja de \" + p.unitsPerBox + \" uds\" + (unit(p.id) === \"caja\" && qty.get(p.id) ? \" → \" + qty.get(p.id) * p.unitsPerBox + \" uds\" : \"\");\n  info.append(n, c, pr);\n  el.append(av, info, control(p));\n  return el;\n}\n\nfunction renderList() {\n  const list = $(\"list\"); list.innerHTML = \"\";\n  const q = norm(query.trim());\n  let items = data.products.filter(p => (tab === \"all\" || p.count > 0 || q) && (!q || norm(p.name).includes(q) || p.id.includes(q)));\n  if (!items.length) {\n    const d = document.createElement(\"div\"); d.className = \"vacio\";\n    d.textContent = tab === \"hab\" && !q ? \"Aún no tienes artículos habituales. Mira el catálogo.\" : \"No hay resultados.\";\n    list.appendChild(d); return;\n  }\n  items.slice(0, 150).forEach(p => list.appendChild(row(p)));\n}\n\nfunction renderCart() {\n  const box = $(\"cartLines\"); box.innerHTML = \"\";\n  lines().forEach(l => {\n    box.appendChild(row(l));\n    const ta = document.createElement(\"input\"); ta.className = \"lnote\"; ta.maxLength = 120;\n    ta.placeholder = \"Observación para este artículo (opcional)\"; ta.value = notes.get(l.id) || \"\";\n    ta.oninput = () => notes.set(l.id, ta.value);\n    box.appendChild(ta);\n  });\n  $(\"total\").textContent = eur(total());\n  if (!count()) showCart(false);\n}\n\nfunction refresh() {\n  const n = count();\n  $(\"cnt\").textContent = n;\n  $(\"verCarrito\").textContent = n ? `Ver carrito (${n}) · ${eur(total())}` : \"Ver carrito (0)\";\n  $(\"verCarrito\").disabled = !n;\n  const scroll = $(\"list\").scrollTop;\n  renderList(); $(\"list\").scrollTop = scroll;\n  if (!$(\"cart\").hidden) renderCart();\n}\nfunction showCart(on) { $(\"cart\").hidden = !on; if (on) { $(\"err\").textContent = \"\"; renderCart(); } }\n\ndocument.querySelectorAll(\".tab\").forEach(b => b.onclick = () => {\n  tab = b.dataset.t;\n  document.querySelectorAll(\".tab\").forEach(x => x.classList.toggle(\"on\", x === b));\n  renderList();\n});\n$(\"q\").oninput = e => { query = e.target.value; renderList(); };\n$(\"verCarrito\").onclick = $(\"cartIcon\").onclick = () => count() && showCart(true);\n$(\"back\").onclick = $(\"keep\").onclick = () => showCart(false);\n\n$(\"confirm\").onclick = async () => {\n  const btn = $(\"confirm\"); btn.disabled = true; $(\"err\").textContent = \"\";\n  try {\n    const r = await fetch(location.pathname, { method: \"POST\", body: JSON.stringify({ lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || \"\").trim() })), note: $(\"note\").value }) });\n    const j = await r.json();\n    if (!r.ok) throw new Error(j.error || \"No se ha podido enviar el pedido\");\n    $(\"doneP\").textContent = j.message; $(\"done\").hidden = false;\n    if (parent !== window) parent.postMessage({ tipo: \"pedido\", mensaje: j.message }, \"*\");\n  } catch (e) { $(\"err\").textContent = e.message; btn.disabled = false; }\n};\n\n(async () => {\n  const r = await fetch(location.pathname + \"/datos\");\n  if (!r.ok) { $(\"ttl\").textContent = \"Enlace caducado\"; $(\"sub\").textContent = \"Escribe «hola» en WhatsApp para recibir uno nuevo.\"; $(\"list\").innerHTML = \"\"; $(\"verCarrito\").hidden = true; return; }\n  data = await r.json();\n  document.title = \"Pedido a \" + data.business;\n  $(\"ttl\").textContent = \"Pedido a \" + data.business;\n  $(\"sub\").textContent = data.customer.name;\n  $(\"logo\").textContent = initials(data.business);\n  $(\"addr\").textContent = \"📍 Entrega en: \" + (data.customer.address || \"—\");\n  $(\"priceNote\").textContent = data.priceNote || \"\";\n  if (data.used) { $(\"doneT\").textContent = \"Este pedido ya se envió\"; $(\"doneP\").textContent = \"Escribe «hola» en WhatsApp para hacer otro.\"; $(\"done\").hidden = false; return; }\n  if (!data.products.some(p => p.count > 0)) { tab = \"all\"; document.querySelectorAll(\".tab\").forEach(x => x.classList.toggle(\"on\", x.dataset.t === \"all\")); }\n  refresh();\n})();\n<\/script>\n</body>\n</html>\n";
+const $ = (id) => document.getElementById(id);
+const chat = $("chat"), sheet = $("sheet"), web = $("web"), who = $("who"), t = $("t");
+let lastExport = null, miniState = null;
+
+function burbuja(texto, clase) {
+  const d = document.createElement("div");
+  d.className = "m " + clase;
+  const esc = texto.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  d.innerHTML = esc.replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/_([^_\n]+)_/g, "<i>$1</i>");
+  chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
+}
+
+function enviar(texto, etiqueta) {
+  document.querySelectorAll(".ui").forEach((u) => u.classList.add("usado"));
+  sheet.hidden = true;
+  burbuja(etiqueta ?? texto, "out");
+  const r = VMDemo.send(who.value, texto);
+  setTimeout(() => { burbuja(r.reply, "in"); if (r.ui) interactivo(r.ui); cargar(); }, 350);
+}
+
+function pill(texto, onclick) {
+  const el = document.createElement("button");
+  el.type = "button"; el.className = "pill"; el.textContent = texto; el.onclick = onclick;
+  return el;
+}
+
+function interactivo(ui) {
+  const box = document.createElement("div"); box.className = "ui";
+  if (ui.type === "link") box.appendChild(pill("🔗 " + ui.title, abrirMini));
+  else if (ui.type === "buttons") ui.buttons.forEach((b) => box.appendChild(pill(b.title, () => enviar(b.id, b.title))));
+  else box.appendChild(pill("☰ " + ui.button, () => {
+    sheet.innerHTML = "";
+    const h = document.createElement("div"); h.className = "sheet-h";
+    const tt = document.createElement("span"); tt.textContent = ui.section;
+    const x = document.createElement("span"); x.textContent = "✕"; x.onclick = () => (sheet.hidden = true);
+    h.append(tt, x); sheet.appendChild(h);
+    ui.rows.forEach((r) => {
+      const row = document.createElement("div"); row.className = "row";
+      const a = document.createElement("b"); a.textContent = r.title;
+      const d = document.createElement("small"); d.textContent = r.description;
+      row.append(a, d); row.onclick = () => enviar(r.id, r.title);
+      sheet.appendChild(row);
+    });
+    sheet.hidden = false;
+  }));
+  chat.appendChild(box); chat.scrollTop = chat.scrollHeight;
+}
+
+// ---- Mini-aplicación de pedido: la misma página que usa el servidor, con su API conectada a esta demo ----
+function abrirMini() {
+  const link = VMDemo.miniOpen();
+  miniState = { phone: who.value, link, ready: false };
+  web.innerHTML = "";
+  const bar = document.createElement("div"); bar.className = "web-h";
+  const x = document.createElement("span"); x.textContent = "✕ Cerrar"; x.onclick = () => (web.hidden = true);
+  bar.append(x, document.createTextNode("Enlace abierto desde WhatsApp"));
+  const fr = document.createElement("iframe"); fr.title = "Mini-aplicación de pedido"; fr.srcdoc = MINI_HTML;
+  web.append(bar, fr); web.hidden = false;
+  setTimeout(() => {
+    if (miniState && !miniState.ready) {
+      fr.remove();
+      const p = document.createElement("p"); p.style.cssText = "padding:16px;color:var(--muted)";
+      p.textContent = "Este visor no permite abrir la mini-aplicación. Puedes pedir escribiendo en el chat, por ejemplo «repetir».";
+      web.appendChild(p);
+    }
+  }, 2500);
+}
+window.addEventListener("message", (e) => {
+  const d = e.data;
+  if (!d || !miniState) return;
+  if (d.vmReady) { miniState.ready = true; return; }
+  if (d.tipo === "pedido") { // el cliente confirmó su pedido en la mini-aplicación
+    setTimeout(() => { web.hidden = true; burbuja(d.mensaje, "in"); cargar(); }, 1300);
+    return;
+  }
+  if (d.vmApi) {
+    const { phone, link } = miniState;
+    let status = 200, json;
+    if (d.method === "POST") ({ status, json } = VMDemo.miniSubmit(phone, link, JSON.parse(d.body || "{}")));
+    else { json = VMDemo.miniData(phone, link); if (json.error) status = 410; }
+    e.source?.postMessage({ vmApiRes: d.vmApi, status, json }, "*");
+  }
+});
+
+// ---- Panel de la empresa ----
+const eur = (n) => n.toFixed(2).replace(".", ",") + " €";
+function cargar() {
+  const list = VMDemo.orders().reverse();
+  const tb = document.querySelector("#tabla tbody"); tb.innerHTML = "";
+  for (const o of list) {
+    const tr = document.createElement("tr");
+    const cells = [o.ref, o.hora, null, o.resumen, eur(o.total), null];
+    cells.forEach((v, i) => {
+      const td = document.createElement("td");
+      if (i === 0) td.className = "ref"; if (i === 4) td.className = "num";
+      if (i === 2) { const b = document.createElement("b"); b.textContent = o.cliente; td.appendChild(b); const s = document.createElement("div"); s.className = "sub"; s.textContent = o.codigo ? "Cód. " + o.codigo : "Cliente nuevo"; td.appendChild(s); }
+      else if (i === 5) { const b = document.createElement("span"); b.className = "badge " + o.estado; b.textContent = o.estado[0].toUpperCase() + o.estado.slice(1); if (o.motivo) b.title = o.motivo; td.appendChild(b); if (o.motivo) { const s = document.createElement("div"); s.className = "sub"; s.textContent = o.motivo; td.appendChild(s); } }
+      else td.textContent = v;
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  }
+  $("tabla").hidden = !list.length; $("vacio").hidden = !!list.length;
+}
+
+function pintarHoja(i) {
+  const sh = lastExport.sheets[i];
+  const tbl = $("xl"); tbl.innerHTML = "";
+  for (const row of sh.rows) {
+    const tr = document.createElement("tr");
+    const n = Math.max(row.length, 1);
+    for (let c = 0; c < n; c++) {
+      let v = row[c], s = 0;
+      if (v && typeof v === "object") { s = v.s ?? 0; v = v.v; }
+      const td = document.createElement("td");
+      if (s) td.className = "s" + s;
+      if (typeof v === "number") { td.className += " n"; td.textContent = Number.isInteger(v) ? String(v) : v.toFixed(2).replace(".", ","); }
+      else td.textContent = v ?? "";
+      tr.appendChild(td);
+    }
+    tbl.appendChild(tr);
+  }
+  document.querySelectorAll(".tab").forEach((b, k) => b.setAttribute("aria-selected", String(k === i)));
+}
+
+function mostrarExcel(exp) {
+  lastExport = exp;
+  $("xlpanel").hidden = false;
+  $("xlfile").textContent = `${exp.fileName} · ${exp.orderCount} pedidos · ${exp.lineCount} líneas`;
+  const tabs = $("xltabs"); tabs.innerHTML = "";
+  exp.sheets.forEach((s, i) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "tab"; b.setAttribute("role", "tab"); b.textContent = `Hoja «${s.name}»`;
+    b.onclick = () => pintarHoja(i); tabs.appendChild(b);
+  });
+  pintarHoja(0);
+  $("dlmsg").textContent = "";
+}
+
+$("exportar").onclick = () => {
+  const r = VMDemo.exportNow();
+  $("expmsg").textContent = r.export
+    ? `${r.export.orderCount} pedidos exportados.` + (r.held ? ` ${r.held} retenidos para revisar.` : "")
+    : "No hay pedidos pendientes de exportar." + (r.held ? ` (${r.held} retenidos para revisar)` : "");
+  if (r.export) mostrarExcel(r.export);
+  cargar();
+};
+
+$("descargar").onclick = async () => {
+  if (!lastExport) return;
+  const { fileName, bytes } = lastExport, msg = $("dlmsg");
+  let dl = null;
+  try { dl = await window.claude?.use?.("downloads"); } catch {}
+  if (dl) {
+    try { await dl.save({ filename: fileName, data: bytes }); msg.textContent = "Guardado."; }
+    catch (e) { msg.textContent = e?.code === "declined" ? "Descarga cancelada." : "No se pudo guardar el archivo."; }
+    return;
+  }
+  const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const a = document.createElement("a"); a.href = url; a.download = fileName; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+};
+
+function empezar() {
+  chat.innerHTML = ""; sheet.hidden = true; web.hidden = true;
+  VMDemo.resetChat(who.value);
+  enviar("hola");
+}
+who.onchange = empezar;
+$("f").addEventListener("submit", (e) => { e.preventDefault(); const v = t.value.trim(); if (v) { t.value = ""; enviar(v); } });
+$("reiniciar").onclick = () => {
+  VMDemo.reset(); lastExport = null; $("xlpanel").hidden = true; $("expmsg").textContent = ""; empezar(); cargar();
+};
+
+who.innerHTML = VMDemo.customers().map((c) => `<option value="${c.phone}">${c.name}</option>`).join("");
+empezar(); cargar();
+</script>
