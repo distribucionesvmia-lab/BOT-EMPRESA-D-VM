@@ -1,49 +1,55 @@
-// Capa de conexión con el ERP/CRM del cliente.
-//
-// El bot solo usa estas dos funciones:
-//   getCustomerByPhone(phone) -> { id, name, phone, address, usual: [{ productId, qty }] } | null
-//   createOrder(order)        -> graba el pedido
-//
-// AHORA: datos de ejemplo (historial-demo.json) y los pedidos van a SQLite (db.js) + hoja de Google (opcional).
-// DESPUÉS: para conectar con el ERP real (a3ERP u otro) solo hay que cambiar el interior de
-// estas dos funciones; el resto del bot no se toca.
+// Capa de datos del bot: productos, clientes y pedidos.
+//   getCatalog() / catalogVersion()   productos (base catalogo.sqlite)
+//   getCustomerByPhone / ById / findCustomers   clientes e historial (base clientes.sqlite)
+//   createOrder(order)                graba el pedido (base pedidos.sqlite + hoja de Google opcional)
+// Las dos primeras bases las alimenta el ERP (hoy, datos.js; después, la sincronización con a3ERP): el bot solo las lee.
 
 import fs from "node:fs";
 import { getDb } from "./db.js";
+import { importData } from "./seed.js";
+import { openCatalogDb } from "./catalogo-db.js";
+import { openCustomersDb } from "./clientes-db.js";
 
 const { SHEET_WEBHOOK_URL, SHEET_SECRET } = process.env;
 
-// Compara teléfonos por sus 9 últimos dígitos (WhatsApp envía "34600111222", el ERP guarda "+34 600 111 222")
-const last9 = (p) => String(p).replace(/\D/g, "").slice(-9);
-
-// historial-demo.json lo genera importar_historial.py a partir de una exportación del ERP (Excel).
-// Cliente: { id, name, phone, address, orders: [{ doc, date, lines: [{ productId, qty }] }], frequent: [{ productId, qty }] }
-const DATA_FILE = new URL("./historial-demo.json", import.meta.url);
-let data;
-// En modo demo, si no hay historial real, se usan datos FICTICIOS de ejemplo/
+// Dos bases de datos de solo lectura para el bot (se actualizan con datos.js o con una sincronización):
+//   catalogo.sqlite  productos y precios      clientes.sqlite  clientes, descuentos e historial de compras
+// La primera vez, si están vacías, se cargan de historial-demo.json (generado por importar_historial.py) o,
+// en modo demo, de datos FICTICIOS de ejemplo/.
+const SEED_FILE = new URL("./historial-demo.json", import.meta.url);
 const EXAMPLE_FILE = new URL("./ejemplo/historial-ficticio.json", import.meta.url);
-const load = () => {
-  if (data) return data;
-  const file = fs.existsSync(DATA_FILE) ? DATA_FILE : process.env.DEMO === "1" && fs.existsSync(EXAMPLE_FILE) ? EXAMPLE_FILE : null;
-  return (data = file ? JSON.parse(fs.readFileSync(file, "utf8")) : { products: null, customers: [] });
-};
-
-export const listCustomers = () => load().customers;
-
-/** Catálogo de productos del ERP ([{ id, name, price }]) o null si no hay datos (el bot usa config.js). */
-export async function getCatalog() {
-  return load().products;
+let catalogDb, customersDb;
+function dbs() {
+  if (!catalogDb) {
+    catalogDb = openCatalogDb();
+    customersDb = openCustomersDb();
+    if (!catalogDb.count() && !customersDb.count()) {
+      const file = fs.existsSync(SEED_FILE) ? SEED_FILE : process.env.DEMO === "1" && fs.existsSync(EXAMPLE_FILE) ? EXAMPLE_FILE : null;
+      if (file) importData(JSON.parse(fs.readFileSync(file, "utf8")), catalogDb, customersDb);
+    }
+  }
+  return { catalogDb, customersDb };
 }
+
+export const listCustomers = () => dbs().customersDb.list();
+
+/** Catálogo de productos activos ([{ id, name, price, unitsPerBox?, vat, discount }]) o null si no hay datos (el bot usa config.js). */
+export async function getCatalog() {
+  const list = dbs().catalogDb.list();
+  return list.length ? list : null;
+}
+/** Cambia cuando se actualiza el catálogo: el servidor recarga los precios sin reiniciar. */
+export const catalogVersion = () => dbs().catalogDb.version();
 
 export async function getCustomerByPhone(phone) {
-  return load().customers.find((c) => last9(c.phone) === last9(phone)) ?? null;
+  return dbs().customersDb.getByPhone(phone);
 }
+export async function getCustomerById(id) {
+  return dbs().customersDb.getById(id);
+}
+/** Clientes que encajan con el nombre o código que escribe el cliente. */
+export const findCustomers = (query) => dbs().customersDb.find(query);
 
-/**
- * Guarda el pedido en la base de datos propia (SQLite). Si la clave de idempotencia (order.key) ya existe,
- * no crea otro pedido y devuelve el original con duplicate=true.
- * La copia a la hoja de Google es opcional y solo se envía para pedidos nuevos.
- */
 export async function createOrder(order) {
   const result = getDb().createOrder(order); // si falla, el error se propaga: el pedido NO se da por registrado
   if (result.duplicate) {

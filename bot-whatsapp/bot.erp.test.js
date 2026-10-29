@@ -177,3 +177,71 @@ test("chat: se puede contestar «unidades» escribiendo, y «no lo quiero» lo d
   assert.match(r.reply, /1 × JAMON SERRANO/);
   assert.doesNotMatch(r.reply, /AGUA/);
 });
+
+// ---- Identificación por nombre ----
+import { setCustomerFinder, setLinkMaker } from "./bot.js";
+import { findCustomers } from "./identify.js";
+
+const baseClientes = [
+  { id: "9001", name: "Bar El Ejemplo", phone: "+34 600 000 001", address: "Calle 1", orders: [{ doc: "X", date: "2026-10-01", lines: [{ productId: "A1", qty: 12 }, { productId: "J1", qty: 1 }] }] },
+  { id: "9002", name: "Bar El Cruce", phone: "+34 600 000 002", address: "Calle 2", orders: [] },
+  { id: "9003", name: "Bar El Cruce Centro", phone: "+34 600 000 003", address: "Calle 3", orders: [] },
+];
+const conIdentificacion = (opts = { identify: true, phone: "34611111111" }) => {
+  setCatalog(catalogoCajas);
+  setCustomerFinder((q) => findCustomers(baseClientes, q));
+  setLinkMaker((c) => `https://x/pedido/${c.id}`);
+  return newSession(null, null, opts);
+};
+
+test("identificación: «hola» pregunta quién es, busca el nombre y muestra sus habituales", () => {
+  let r = handleMessage(conIdentificacion(), "hola");
+  assert.match(r.reply, /nombre de tu negocio/);
+  r = handleMessage(r.session, "Bar El Ejemplo");
+  assert.match(r.reply, /Identificado! Eres \*Bar El Ejemplo\* \(cód\. 9001\)/);
+  assert.match(r.reply, /Tus productos habituales/);
+  assert.match(r.reply, /AGUA GAS LIMON VIDRIO 250 — última vez: 12 uds/);
+  assert.equal(r.ui.type, "link");
+  assert.equal(r.ui.url, "https://x/pedido/9001");
+  assert.equal(r.session.customer.id, "9001");
+});
+
+test("identificación: nombre desconocido, reintentos y derivación a una persona", () => {
+  let r = handleMessage(conIdentificacion(), "Bar Inexistente");
+  assert.match(r.reply, /No encuentro ese nombre/);
+  r = handleMessage(r.session, "Otro Bar");
+  r = handleMessage(r.session, "Tampoco");
+  assert.equal(r.handoff, true);
+  assert.match(r.reply, /No consigo identificarte/);
+});
+
+test("identificación: si varios encajan, pide el código y solo vale el de uno de ellos", () => {
+  let r = handleMessage(conIdentificacion(), "Bar Cruce");
+  assert.match(r.reply, /código de cliente/);
+  assert.equal(r.session.state, "who2");
+  r = handleMessage(r.session, "9001"); // existe, pero no era uno de los candidatos
+  assert.match(r.reply, /no corresponde/);
+  r = handleMessage(r.session, "9003");
+  assert.match(r.reply, /Eres \*Bar El Cruce Centro\*/);
+});
+
+test("identificación: «nuevo» sigue el flujo de cliente nuevo y no vuelve a preguntar", () => {
+  let r = handleMessage(conIdentificacion(), "nuevo");
+  assert.match(r.reply, /Bienvenido/);
+  r = handleMessage(r.session, "hola");
+  assert.match(r.reply, /Bienvenido/);
+});
+
+test("identificación: un pedido de quien se identificó por nombre con otro teléfono queda retenido", () => {
+  const flujo = (opts) => {
+    let r = handleMessage(conIdentificacion(opts), "Bar El Ejemplo");
+    r = handleMessage(r.session, "p:A1");
+    r = handleMessage(r.session, "u:ud");
+    r = handleMessage(r.session, "q:6");
+    r = handleMessage(r.session, "act:done");
+    return handleMessage(r.session, "c:ok");
+  };
+  assert.equal(flujo({ identify: true, phone: "34611111111", holdUnverified: true }).order.review, true);
+  assert.equal(flujo({ identify: true, phone: "34600000001", holdUnverified: true }).order.review, false); // su teléfono: verificado
+  assert.equal(flujo({ identify: true, phone: "34611111111", holdUnverified: false }).order.review, false); // regla desactivada (demo)
+});

@@ -22,6 +22,10 @@ services:
         value: /var/data/pedidos.sqlite
       - key: EXPORT_DIR
         value: /var/data/exportaciones
+      - key: CATALOG_DB
+        value: /var/data/catalogo.sqlite
+      - key: CUSTOMERS_DB
+        value: /var/data/clientes.sqlite
       - key: BACKUP_DIR
         value: /var/data/respaldos
     disk:

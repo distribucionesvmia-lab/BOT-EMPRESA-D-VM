@@ -20,6 +20,14 @@ export const setCatalog = (products) => {
   if (products?.length) CATALOG = products;
 };
 export const getCatalog = () => CATALOG;
+
+// Buscador de clientes por nombre y generador del enlace personal: los pone el servidor (o la demo del navegador)
+let CUSTOMER_FINDER = () => [];
+let LINK_MAKER = () => null;
+export const setCustomerFinder = (fn) => (CUSTOMER_FINDER = fn);
+export const setLinkMaker = (fn) => (LINK_MAKER = fn);
+const last9 = (p) => String(p ?? "").replace(/\D/g, "").slice(-9);
+const MAX_ATTEMPTS = 3;
 const productTokens = new WeakMap();
 const tokensOf = (p) => {
   if (!productTokens.has(p)) productTokens.set(p, tokenize(`${p.name} ${(p.aliases ?? []).join(" ")}`));
@@ -155,9 +163,23 @@ const GENERIC_MENU =
   `3️⃣ Hablar con una persona\n\n` +
   `En cualquier momento: *menu* o *cancelar*.`;
 
-const greeting = (s) => {
-  if (!s.customer) return { reply: GENERIC_MENU };
-  const hi = `👋 ¡Hola, *${s.customer.name}*! Soy el asistente de *${BUSINESS.name}*.\n\n`;
+const WHO_PROMPT =
+  `👋 ¡Hola! Soy el asistente de *${BUSINESS.name}*.\n\n` +
+  `Para atenderte, dime el *nombre de tu negocio* tal y como nos compras (por ejemplo: _Bar El Ejemplo_) o tu *código de cliente*.\n\n` +
+  `Si eres cliente nuevo, escribe *nuevo*.`;
+
+// Tras identificar al cliente: confirmación + sus productos habituales (los que más y más recientemente compra)
+const identifiedIntro = (s) => {
+  const top = habitualProducts(s.customer).slice(0, 6);
+  const list = top.length
+    ? `⭐ *Tus productos habituales* (según tus últimos pedidos):\n` + top.map((p) => `• ${p.name} — última vez: ${p.lastQty} uds`).join("\n") + `\n\n`
+    : `Todavía no tengo pedidos tuyos anteriores.\n\n`;
+  return `✅ ¡Identificado! Eres *${s.customer.name}* (cód. ${s.customer.id}).\n\n${list}`;
+};
+
+const greeting = (s, justIdentified = false) => {
+  if (!s.customer) return { reply: s.opts?.identify && s.state === "who" ? WHO_PROMPT : GENERIC_MENU };
+  const hi = justIdentified ? identifiedIntro(s) : `👋 ¡Hola, *${s.customer.name}*! Soy el asistente de *${BUSINESS.name}*.\n\n`;
   // Con enlace personal: se abre el catálogo de pedido. Sin él: lista y botones dentro del chat
   if (s.link) {
     return {
@@ -189,8 +211,13 @@ const catalog = () => {
   );
 };
 
-export const newSession = (customer = null, link = null) => ({
-  state: "menu",
+export const newSession = (customer = null, link = null, opts = {}) => ({
+  // opts: { identify: preguntar quién es el cliente, phone, holdUnverified: retener pedidos de quien se identificó solo por nombre }
+  state: !customer && opts.identify ? "who" : "menu",
+  opts,
+  attempts: 0, // intentos fallidos de identificación
+  candidates: null, // varios clientes encajan: se pide el código para distinguirlos
+  byName: false, // identificado escribiendo su nombre (no por su teléfono)
   link, // enlace personal a la mini-aplicación de pedido (lo pone el servidor)
   orderText: "",
   items: null, // líneas explícitas; si es null se interpreta orderText
@@ -309,7 +336,7 @@ const HUMAN_REPLY =
 export function handleMessage(session, rawText) {
   const text = norm(rawText || "");
   const s = { ...session, cart: [...(session.cart ?? [])] };
-  const fresh = () => newSession(s.customer, s.link);
+  const fresh = () => ({ ...newSession(s.customer, s.link, s.opts), byName: s.byName });
 
   // Comandos globales
   if (["menu", "inicio", "hola", "buenas", "hi", "empezar"].includes(text)) {
@@ -324,6 +351,41 @@ export function handleMessage(session, rawText) {
   }
   if (s.customer && REPEAT_PHRASES.includes(text) && ["menu", "items", "cart"].includes(s.state)) {
     return repeatOrder(s, repeatOptions(s.customer)[0]);
+  }
+
+  // Identificación: el cliente dice quién es y se busca en la base de datos de clientes
+  if ((s.state === "who" || s.state === "who2") && text) {
+    if (text === "nuevo") {
+      s.opts = { ...s.opts, identify: false };
+      s.state = "menu";
+      return { ...greeting(s), session: s };
+    }
+    const fail = (msg) => {
+      s.attempts = (s.attempts ?? 0) + 1;
+      if (s.attempts >= MAX_ATTEMPTS) {
+        s.attempts = 0;
+        s.state = "who";
+        s.candidates = null;
+        return { reply: `No consigo identificarte 😕. Aviso a una persona del equipo para que te atienda.\n\n${HUMAN_REPLY}`, session: s, handoff: true };
+      }
+      return { reply: msg, session: s };
+    };
+    let hit;
+    const found = CUSTOMER_FINDER(rawText) ?? [];
+    if (s.state === "who2") {
+      // Varios clientes encajaban con el nombre: solo vale el código de uno de ellos
+      hit = found.length === 1 && (s.candidates ?? []).includes(String(found[0].id)) ? found[0] : null;
+      if (!hit) return fail("Ese código no corresponde. Escríbelo otra vez, o escribe *menu* para empezar de nuevo.");
+    } else if (found.length > 1) {
+      s.candidates = found.map((c) => String(c.id));
+      s.state = "who2";
+      return { reply: "Hay varios clientes con un nombre parecido. Para distinguirte, escribe tu *código de cliente*.", session: s };
+    } else if (!found.length) {
+      return fail("No encuentro ese nombre 🤔. Escríbelo otra vez como figura en tus facturas, o escribe tu código de cliente. Si eres cliente nuevo, escribe *nuevo*.");
+    } else hit = found[0];
+    Object.assign(s, { customer: hit, name: hit.name, address: hit.address ?? "", byName: true, attempts: 0, candidates: null, state: "menu" });
+    s.link = LINK_MAKER(hit, s) ?? null;
+    return { ...greeting(s, true), session: s };
   }
 
   // Observaciones: "nota: servir el jueves" (todo el pedido) o "nota jamón: pieza grande" (un artículo)
@@ -506,7 +568,8 @@ export function handleMessage(session, rawText) {
           note: s.note || "",
           items: items.map(({ unsure, upb, unitStated, ...i }) => i),
           total: items.length ? total(items) : null,
-          review: items.some((i) => i.unsure) || !items.length,
+          // Quien se identificó solo por su nombre (el teléfono no es el del cliente) queda retenido hasta que lo revise una persona
+          review: items.some((i) => i.unsure) || !items.length || !!(s.opts?.holdUnverified && s.byName && last9(s.opts?.phone) !== last9(s.customer?.phone)),
         };
         return {
           reply: `🎉 ¡Pedido recibido, ${s.name}!\n\n${BUSINESS.payment}\n\nEscribe *menu* si necesitas algo más.`,

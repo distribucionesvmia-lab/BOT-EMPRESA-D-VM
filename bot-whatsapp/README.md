@@ -51,6 +51,19 @@ Cuando haya API del ERP, solo hay que cambiar el interior de las funciones de `e
 
 **Cuestionario interactivo (cliente conocido):** el bot envía una *lista desplegable* con los artículos que el cliente suele comprar (ordenados por frecuencia, con las unidades de la última vez) y *botones* para las unidades, para añadir otro artículo, finalizar y confirmar. Usa los mensajes interactivos de la API de WhatsApp, que **solo se pueden enviar dentro de las 24 h posteriores al último mensaje del cliente** (el cliente siempre escribe primero, así que no es problema). Límites de WhatsApp: la lista admite 10 filas (el bot pagina con "Ver más artículos"), los botones 3, el título de una fila 24 caracteres y el de un botón 20. Estos mensajes no se han probado todavía con WhatsApp real (a falta del número de prueba de Meta); en la demo se simulan igual que los vería el cliente. Como mejora futura existe *WhatsApp Flows* (formulario completo dentro de WhatsApp).
 
+## 1c-bis. Identificación por nombre y las dos bases de datos (productos y clientes)
+**Flujo:** el cliente escribe «hola» → el bot pregunta *el nombre de su negocio* (o su código de cliente) → lo busca en la base de clientes → si lo encuentra, dice **«¡Identificado!»** y le muestra sus **productos habituales** (según sus últimos pedidos) con el botón «Hacer pedido». Si no lo encuentra, deja reintentar y, tras 3 fallos, avisa a una persona. «nuevo» sigue el flujo de cliente nuevo. Si varios clientes encajan con el nombre, pide el *código de cliente* para distinguirlos (nunca enseña nombres de otros clientes).
+- Reglas del buscador (`identify.js`): coincidencia exacta del nombre o del código, o todas las palabras escritas dentro del nombre cubriendo al menos el 60 %; sin tildes ni mayúsculas. «bar» a secas no identifica a nadie.
+- En el modo demo **siempre** se pregunta quién es. En producción, si el teléfono ya está en la base de clientes (y no lo comparten varios), se le reconoce sin preguntar; si no, se pregunta el nombre. **Quien se identifica solo por nombre desde un teléfono que no es el del cliente tiene su pedido retenido** hasta que una persona lo revise (`node exportar.js --aprobar …`).
+
+**Dos bases de datos** (aparte de la de pedidos), solo de lectura para el bot:
+| Base | Fichero (variable) | Contiene |
+|---|---|---|
+| Productos | `catalogo.sqlite` (`CATALOG_DB`) | código, nombre, precio, unidades por caja, IVA, descuento general, alta/baja y **registro de cada cambio** |
+| Clientes | `clientes.sqlite` (`CUSTOMERS_DB`) | ficha (nombre, teléfono, dirección, recargo de equivalencia), precios especiales, descuentos personalizados e **historial de compras** |
+
+Se gestionan con `node datos.js`: `importar <fichero.json>` (crea o actualiza; solo se tocan y se registran los campos que cambian), `ejemplo` (datos ficticios), `productos`, `clientes`, `precio <código> <precio>`, `historial <código>` y `buscar <nombre>`. Si cambian los productos o precios, el bot los usa **sin reiniciar**. La primera vez, si las bases están vacías, se cargan de `historial-demo.json` (el que genera `importar_historial.py`) o, en la demo, de `ejemplo/`. Más adelante la sincronización con a3ERP alimentará estas mismas bases.
+
 ## 1d. Mini-aplicación de pedido (catálogo estilo app)
 A los clientes conocidos el bot les envía un botón **Hacer pedido** con un **enlace personal** a `/pedido/<token>`: una página para móvil con sus artículos habituales (precio, "Última vez: N uds", botón "+" y contador de unidades), buscador, catálogo completo, carrito, nota y confirmación. Al confirmar, el pedido se graba igual que los del chat (con código de cliente y de artículo) y el cliente recibe la confirmación por WhatsApp.
 - El enlace va **firmado y caduca a las 24 h**, solo sirve para ese cliente y **para enviar un solo pedido**. Los artículos y precios se validan en el servidor.

@@ -1,27 +1,30 @@
 // Demo del sistema que funciona entera en el navegador: mismo bot, mismos cálculos y mismo Excel que el servidor,
 // con clientes y artículos FICTICIOS. No hay servidor ni base de datos: los pedidos viven en memoria.
-import { handleMessage, newSession, setCatalog, getCatalog, habitualProducts } from "../bot.js";
+import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog, habitualProducts } from "../bot.js";
 import { priceOrder, totals } from "../pricing.js";
 import { webProducts, webOrderFromBody } from "../weborder.js";
 import { FORMAT, madrid, madridDate, madridTime } from "../export-format.js";
 import { workbookFiles } from "../xlsx-files.js";
 import { zipStore } from "./zip-browser.js";
 import { BUSINESS } from "../config.js";
+import { productStore, customerStore } from "./stores.js";
 import data from "../ejemplo/historial-ficticio.json";
 
-setCatalog(data.products);
-const UNKNOWN = { name: "Número desconocido (cliente nuevo)", phone: "34699000000" };
-const last9 = (p) => String(p).replace(/\D/g, "").slice(-9);
-const customerByPhone = (phone) => data.customers.find((c) => last9(c.phone) === last9(phone)) ?? null;
-
-let sessions, orders, exports_, nextId, usedLinks;
+// El móvil de prueba no está en ninguna ficha: el bot pregunta quién es y busca el nombre en la base de clientes
+const PHONE = "34600999999";
+let products, customers, sessions, orders, exports_, nextId, links;
 const reset = () => {
+  products = productStore(data.products); // base de productos
+  customers = customerStore(data.customers); // base de clientes
+  setCatalog(products.list());
   sessions = new Map();
   orders = [];
   exports_ = [];
   nextId = 1;
-  usedLinks = new Set();
+  links = new Map(); // enlace de mini-app -> { cliente, usado }
 };
+setCustomerFinder((query) => customers.find(query));
+setLinkMaker(() => "#mini");
 reset();
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -57,7 +60,7 @@ const rowTotals = (o) => totals(o.items.map((i) => ({ ...i, vat: i.vat_rate })),
 
 window.VMDemo = {
   business: BUSINESS.name,
-  customers: () => [...data.customers.map((c) => ({ name: c.name, phone: c.phone.replace(/\D/g, "") })), UNKNOWN],
+  phone: PHONE,
   reset,
   resetChat: (phone) => sessions.delete(String(phone)),
 
@@ -65,10 +68,7 @@ window.VMDemo = {
   send(phone, text) {
     phone = String(phone);
     let cur = sessions.get(phone);
-    if (!cur) {
-      const customer = customerByPhone(phone);
-      cur = newSession(customer, customer ? "#mini" : null);
-    }
+    if (!cur) cur = newSession(null, null, { identify: true, phone, holdUnverified: false });
     const out = handleMessage(cur, String(text ?? "").slice(0, 1000));
     sessions.set(phone, out.session);
     if (out.order) saveOrder({ at: new Date().toISOString(), phone, key: `demo:${uid()}`, ...out.order }, cur.customer ?? null);
@@ -76,29 +76,44 @@ window.VMDemo = {
   },
 
   // ---- Mini-aplicación de pedido (lo que abre «Hacer pedido») ----
-  miniOpen: () => uid(),
+  miniOpen(phone) {
+    const id = uid();
+    links.set(id, { customer: sessions.get(String(phone))?.customer ?? null, used: false });
+    return id;
+  },
   miniData(phone, link) {
-    const customer = customerByPhone(phone);
+    const customer = links.get(link)?.customer;
     if (!customer) return { error: "Enlace no válido o caducado" };
     return {
       business: BUSINESS.name,
       priceNote: BUSINESS.priceNote,
       customer: { name: customer.name, address: customer.address },
-      used: usedLinks.has(link),
+      used: links.get(link).used,
       products: webProducts(customer, getCatalog(), habitualProducts),
     };
   },
   miniSubmit(phone, link, body) {
-    const customer = customerByPhone(phone);
+    const customer = links.get(link)?.customer;
     if (!customer) return { status: 410, json: { error: "Enlace no válido o caducado" } };
-    if (usedLinks.has(link)) return { status: 409, json: { error: "Este pedido ya se envió" } };
+    if (links.get(link).used) return { status: 409, json: { error: "Este pedido ya se envió" } };
     const built = webOrderFromBody(body, customer, { key: `web:${link}`, phone: String(phone).replace(/\D/g, "") }, getCatalog());
     if (built.error) return { status: 400, json: { error: built.error } };
-    usedLinks.add(link);
+    links.get(link).used = true;
     const row = saveOrder(built.order, customer);
     const message = `🎉 ¡Pedido recibido, ${customer.name}! ${row.items.length} artículos, total aprox. ${row.total.toFixed(2)}${BUSINESS.currency}.\n\n${BUSINESS.payment}`;
     return { status: 200, json: { ok: true, message } };
   },
+
+  // ---- Bases de datos (lo que consulta el bot) ----
+  products: () =>
+    products.rows().map((p) => ({ id: p.id, name: p.name, price: p.price, unitsPerBox: p.unitsPerBox ?? null, vat: p.vat, updatedAt: p.updatedAt, last: p.changes[0] ?? null })),
+  /** Actualiza un producto: el bot usa el precio nuevo desde el siguiente mensaje. */
+  updateProduct(id, fields) {
+    const changed = products.update(id, fields);
+    setCatalog(products.list());
+    return changed;
+  },
+  customers: () => customers.rows(),
 
   // ---- Panel de la empresa ----
   orders: () =>

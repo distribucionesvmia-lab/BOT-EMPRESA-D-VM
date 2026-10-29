@@ -8,8 +8,9 @@ const TTL = 24 * 60 * 60 * 1000;
 
 const sign = (data) => crypto.createHmac("sha256", SECRET).update(data).digest("base64url");
 
-export function makeToken(phone, customerId, now = Date.now()) {
-  const payload = { p: String(phone), c: customerId ?? null, e: now + TTL, n: crypto.randomBytes(6).toString("hex") };
+/** flags: datos extra firmados, p. ej. { u: 1 } = cliente identificado solo por nombre (su pedido se retiene para revisar). */
+export function makeToken(phone, customerId, now = Date.now(), flags = {}) {
+  const payload = { p: String(phone), c: customerId ?? null, e: now + TTL, n: crypto.randomBytes(6).toString("hex"), ...flags };
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
   return `${data}.${sign(data)}`;
 }

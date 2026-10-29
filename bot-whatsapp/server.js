@@ -2,8 +2,8 @@ import http from "node:http";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { handleMessage, newSession, setCatalog, getCatalog as catalogNow, habitualProducts } from "./bot.js";
-import { getCatalog, getCustomerByPhone, createOrder, listCustomers } from "./erp.js";
+import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog as catalogNow, habitualProducts } from "./bot.js";
+import { getCatalog, catalogVersion, getCustomerByPhone, getCustomerById, findCustomers, createOrder } from "./erp.js";
 import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder } from "./pricing.js";
@@ -14,10 +14,21 @@ import { BUSINESS } from "./config.js";
 if (process.env.DEMO === "1") {
   // La demo usa su propia base de datos y carpeta, para no mezclarse con pedidos reales
   process.env.DB_PATH ??= "demo.sqlite";
+  process.env.CATALOG_DB ??= "catalogo-demo.sqlite";
+  process.env.CUSTOMERS_DB ??= "clientes-demo.sqlite";
   process.env.EXPORT_DIR ??= "exportaciones-demo";
 }
 
-setCatalog(await getCatalog()); // catálogo del ERP; si no hay, se usa el de config.js
+setCatalog(await getCatalog()); // catálogo (base de productos); si no hay, se usa el de config.js
+let catalogSeen = catalogVersion();
+// Si se actualizan los productos o precios, el bot los usa sin reiniciar
+async function refreshCatalog() {
+  const v = catalogVersion();
+  if (v !== catalogSeen) {
+    catalogSeen = v;
+    setCatalog(await getCatalog());
+  }
+}
 
 const { PORT = 3000, VERIFY_TOKEN, WHATSAPP_TOKEN, PHONE_NUMBER_ID, APP_SECRET, OWNER_PHONE } = process.env;
 const API = process.env.WHATSAPP_API_URL ?? `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`; // la variable solo sirve para pruebas
@@ -28,6 +39,15 @@ const PUBLIC_URL = (process.env.PUBLIC_URL ?? `http://localhost:${PORT}`).replac
 const sessions = new Map(); // teléfono -> { session, last }
 
 const hasCredentials = () => WHATSAPP_TOKEN && PHONE_NUMBER_ID;
+
+// Enlace personal (caduca en 24 h) para abrir el catálogo de pedido del cliente
+const linkFor = (customer, phone, flags = {}) => `${PUBLIC_URL}/pedido/${makeToken(phone, customer.id, Date.now(), flags)}`;
+const digits9 = (p) => String(p ?? "").replace(/\D/g, "").slice(-9);
+setCustomerFinder((query) => findCustomers(query));
+// Quien se identifica por nombre desde un teléfono que no es el del cliente: su pedido de la mini-app queda retenido
+setLinkMaker((customer, session) =>
+  linkFor(customer, session.opts?.phone ?? "", session.opts?.holdUnverified && digits9(session.opts?.phone) !== digits9(customer.phone) ? { u: 1 } : {}),
+);
 
 async function post(payload) {
   const res = await fetch(API, {
@@ -64,6 +84,7 @@ async function sendOut(to, out) {
 
 // Pasa un mensaje por el bot: reconoce al cliente por su teléfono, guarda el pedido si lo hay y devuelve el resultado
 async function handleIncoming(from, text, msgId = null) {
+  await refreshCatalog();
   const entry = sessions.get(from);
   let current = entry && Date.now() - entry.last < SESSION_TTL ? entry.session : null;
   if (!current) {
@@ -71,10 +92,16 @@ async function handleIncoming(from, text, msgId = null) {
     try {
       customer = await getCustomerByPhone(from);
     } catch (err) {
-      console.error("No se pudo consultar el ERP; se atiende como cliente nuevo:", err.message);
+      console.error("No se pudo consultar la base de clientes; se pregunta quién es:", err.message);
     }
-    // Cliente conocido: enlace personal (caduca en 24 h) para abrir su catálogo de pedido
-    current = newSession(customer, customer ? `${PUBLIC_URL}/pedido/${makeToken(from, customer.id)}` : null);
+    // En la demo siempre se pregunta quién es. Con un teléfono que no está (o lo comparten varios clientes) también:
+    // el cliente escribe su nombre y se busca en la base de clientes. Su pedido queda retenido hasta que alguien lo revise.
+    const identify = process.env.DEMO === "1" || !customer;
+    current = newSession(identify ? null : customer, identify ? null : linkFor(customer, from), {
+      identify,
+      phone: from,
+      holdUnverified: process.env.DEMO !== "1",
+    });
   }
   const out = handleMessage(current, text);
   sessions.set(from, { session: out.session, last: Date.now() });
@@ -134,10 +161,8 @@ function demoRoutes(req, res, url) {
   }
   if (url.pathname === "/demo/pedidos" && req.method === "GET") return json(res, readOrders().reverse());
   if (url.pathname === "/demo/clientes" && req.method === "GET") {
-    return json(res, [
-      ...listCustomers().map((c) => ({ name: c.name, phone: c.phone.replace(/\D/g, "") })),
-      { name: "Número desconocido (cliente nuevo)", phone: "34699000000" },
-    ]);
+    // El cliente ya no se elige: lo identifica el bot por el nombre que escribe
+    return json(res, [{ name: "Móvil de prueba (sin identificar)", phone: "34600999999" }]);
   }
   if (url.pathname === "/demo/exportar" && req.method === "POST") {
     // Lanza ahora la exportación que en producción se hace cada noche
@@ -209,7 +234,7 @@ function webOrderRoutes(req, res, url) {
 
   (async () => {
     const link = readToken(token);
-    const customer = link && (await getCustomerByPhone(link.p));
+    const customer = link && ((link.c && (await getCustomerById(link.c))) || (await getCustomerByPhone(link.p)));
     if (!customer) return json(res, { error: "Enlace no válido o caducado" }, 410);
 
     if (req.method === "GET") {
@@ -229,6 +254,7 @@ function webOrderRoutes(req, res, url) {
       const built = webOrderFromBody(body, customer, { key: linkKey(link), phone: link.p }, catalogNow());
       if (built.error) return json(res, { error: built.error }, 400);
       const order = built.order;
+      if (link.u) order.review = true; // identificado solo por nombre: lo revisa una persona antes de exportarlo
       const { items } = order;
       const priced = priceOrder(order, customer, catalogNow());
       const { duplicate } = await createOrder(priced);
