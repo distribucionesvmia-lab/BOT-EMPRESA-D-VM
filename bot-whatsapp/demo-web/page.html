@@ -93,17 +93,48 @@
   .file { font-family: var(--mono); font-size: 12px; color: var(--muted); }
   .note { color: var(--muted); font-size: 12.5px; margin: 14px 0 0; max-width: 70ch; }
   @media (prefers-reduced-motion: no-preference) { .m { animation: pop .18s ease-out; } @keyframes pop { from { transform: translateY(4px); opacity: 0; } } }
+
+  .view[hidden] { display: none !important; }
+  .nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; }
+  .nav a, .back { color: var(--accent); font-weight: 600; text-decoration: none; font-size: 13.5px; }
+  .nav a:hover { text-decoration: underline; }
+  .badge.modo { background: var(--accent-soft); color: var(--accent); }
+  .badge.aviso { background: var(--warn-soft); color: var(--warn); white-space: normal; }
+  .home { max-width: 760px; margin: 6vh auto 0; }
+  .home p { color: var(--muted); max-width: 62ch; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 22px 0 16px; }
+  a.card { display: flex; flex-direction: column; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; text-decoration: none; color: var(--fg); box-shadow: var(--shadow); }
+  a.card:hover { border-color: var(--accent); }
+  a.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a.card b { font-size: 17px; } a.card span { color: var(--muted); font-size: 13.5px; } a.card em { color: var(--accent); font-style: normal; font-weight: 600; font-size: 13.5px; margin-top: 4px; }
+  .client { max-width: 410px; margin: 0 auto; }
+  .banner { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 9px 12px; font-size: 13px; margin: 0 0 12px; }
+  .nuevo td { animation: flash 2.4s ease-out; } @keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
+  .hist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+  .hist li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .hist .file { flex: 1; min-width: 180px; }
+  .dis-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; max-width: 1060px; margin: 0 auto; }
+  .dis-grid .panel + .panel { margin-top: 0; }
+  .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 9px 14px; border-radius: 10px; font-size: 13px; z-index: 50; max-width: 90vw; }
 </style>
-
 <div class="shell">
-  <header class="top">
-    <h1>Pedidos por WhatsApp · Distribuciones VM</h1>
-    <span class="sub">Demo con clientes y artículos ficticios. Funciona entera en tu navegador.</span>
-  </header>
 
-  <div class="grid">
-    <section aria-label="Lo que ve el cliente">
-      <h2>Lo que ve el cliente</h2>
+  <!-- Inicio: elegir vista -->
+  <section class="view home" id="v-inicio" aria-label="Elegir vista">
+    <h1>Pedidos por WhatsApp · Distribuciones VM</h1>
+    <p>Demo con clientes y artículos ficticios. Son dos pantallas separadas: la del cliente que hace el pedido y la del distribuidor que lo recibe. Cada una tiene su propio enlace y se pueden abrir en dispositivos distintos.</p>
+    <div class="cards">
+      <a class="card" href="#cliente"><b>Vista del cliente</b><span>El chat de WhatsApp. El bot pregunta quién es, lo identifica por su nombre y le muestra sus productos habituales para pedir.</span><em>Abrir como cliente →</em></a>
+      <a class="card" href="#distribuidor"><b>Vista del distribuidor</b><span>Los pedidos que llegan en directo, la exportación a Excel y las bases de datos de productos y clientes.</span><em>Abrir como distribuidor →</em></a>
+    </div>
+    <p class="msg" id="estado-modo"></p>
+  </section>
+
+  <!-- Vista del cliente -->
+  <section class="view" id="v-cliente" aria-label="Vista del cliente" hidden>
+    <div class="client">
+      <div class="nav"><a class="back" href="#">← Cambiar de vista</a><span class="sub">Vista del cliente</span></div>
+      <div class="banner" id="aviso-cliente" hidden></div>
       <div class="who">
         <button class="btn" id="nuevochat" type="button">Nuevo chat</button>
         <span class="msg">Prueba: «Tienda Ficticia», «Bar El Ejemplo» o un nombre que no exista.</span>
@@ -115,14 +146,19 @@
         <div id="web" class="web" hidden></div>
         <form class="send" id="f"><input id="t" autocomplete="off" placeholder="Escribe un mensaje" aria-label="Mensaje"><button aria-label="Enviar">➤</button></form>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section aria-label="Lo que ve la empresa">
-      <h2>Lo que ve la empresa</h2>
+  <!-- Vista del distribuidor -->
+  <section class="view" id="v-distribuidor" aria-label="Vista del distribuidor" hidden>
+    <div class="nav"><a class="back" href="#">← Cambiar de vista</a><span class="sub">Vista del distribuidor</span><span class="badge modo" id="modo"></span></div>
+    <div class="dis-grid">
+      <div class="banner" id="aviso-dis" hidden></div>
       <div class="panel">
+        <h2>Pedidos recibidos</h2>
         <div class="actions">
           <button class="btn main" id="exportar" type="button">Exportar a Excel</button>
-          <button class="btn" id="reiniciar" type="button">Reiniciar demo</button>
+          <button class="btn" id="reiniciar" type="button">Restaurar datos de ejemplo</button>
           <span class="msg" id="expmsg"></span>
         </div>
         <div class="scroll">
@@ -131,7 +167,7 @@
             <tbody></tbody>
           </table>
         </div>
-        <div class="vacio" id="vacio">Todavía no hay pedidos. Haz uno desde el móvil: escribe «repetir» o pulsa «Hacer pedido».</div>
+        <div class="vacio" id="vacio">Todavía no hay pedidos. Cuando un cliente pida desde su vista, aparecerá aquí al instante.</div>
       </div>
 
       <div class="panel" id="xlpanel" hidden>
@@ -144,29 +180,68 @@
         <div class="tabs" role="tablist" id="xltabs"></div>
         <div class="scroll"><table class="xl" id="xl"></table></div>
       </div>
+
+      <div class="panel" id="histpanel" hidden>
+        <h2>Historial de exportaciones</h2>
+        <ul class="hist" id="hist"></ul>
+      </div>
+
       <div class="panel">
         <h2>Bases de datos que consulta el bot</h2>
         <div class="tabs" role="tablist">
           <button class="tab dbtab" type="button" role="tab" data-db="productos" aria-selected="true">Productos</button>
           <button class="tab dbtab" type="button" role="tab" data-db="clientes" aria-selected="false">Clientes</button>
         </div>
-        <p class="msg" id="dbmsg">Cambia un precio y vuelve a pedir en el chat: el bot usa el precio nuevo al instante.</p>
+        <p class="msg" id="dbmsg"></p>
         <div class="scroll"><table id="dbtabla"></table></div>
       </div>
       <p class="note">Los totales se calculan como en a3ERP: unidades por caja, precios especiales, descuentos, IVA y recargo de equivalencia. En producción, clientes, precios y unidades por caja llegarían desde las fichas de a3ERP. Los pedidos de clientes sin código de ERP o con una interpretación dudosa se retienen hasta que alguien los revise.</p>
-    </section>
-  </div>
+    </div>
+  </section>
 </div>
+<div class="toast" id="toast" role="status" hidden></div>
 
 <script>/*__BUNDLE__*/</script>
 <script>
 const MINI_HTML = /*__MINI__*/;
 const $ = (id) => document.getElementById(id);
 const chat = $("chat"), sheet = $("sheet"), web = $("web"), t = $("t");
-const PHONE = VMDemo.phone;
-let dbTab = "productos";
-let lastExport = null, miniState = null;
+let lastExport = null, miniState = null, dbTab = "productos", chatStarted = false, seenOrders = null;
+const eur = (n) => Number(n).toFixed(2).replace(".", ",") + " €";
+const num = (n) => Number(n).toFixed(2).replace(".", ",");
+function toast(msg) { const el = $("toast"); el.textContent = msg; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 4200); }
 
+// ---- Rutas: cada vista tiene su propio enlace (#cliente, #distribuidor) ----
+function route() {
+  const h = location.hash.slice(1);
+  const v = h === "cliente" || h === "distribuidor" ? h : "inicio";
+  for (const id of ["inicio", "cliente", "distribuidor"]) $("v-" + id).hidden = id !== v;
+  document.title = v === "cliente" ? "Pedidos por WhatsApp · Cliente" : v === "distribuidor" ? "Pedidos por WhatsApp · Distribuidor" : "Pedidos por WhatsApp";
+  if (v === "cliente" && !chatStarted) empezar();
+  if (v === "distribuidor") pintarTodo();
+  avisos();
+}
+window.addEventListener("hashchange", route);
+
+function avisos() {
+  const i = VM.info();
+  $("estado-modo").textContent = i.mode === "shared"
+    ? "Los datos son compartidos y se guardan: lo que pide un cliente aparece al instante en la vista del distribuidor, también desde otro dispositivo."
+    : "Los datos se guardan en este navegador. Si abres esta página con tu cuenta de Claude, se compartirán entre dispositivos.";
+  $("modo").textContent = i.mode === "shared" ? "Datos compartidos" : "Datos en este navegador";
+  const ac = $("aviso-cliente");
+  const vacia = !VM.customers().length;
+  ac.hidden = !vacia && !(i.mode === "shared" && !i.canWrite);
+  ac.textContent = vacia
+    ? "La base de datos está vacía. Abre la vista del distribuidor con acceso de Editor y pulsa «Restaurar datos de ejemplo»."
+    : "Solo lectura: puedes probar el chat, pero tus pedidos no se guardan para el distribuidor. Pide acceso de Colaborador para poder pedir.";
+  const ad = $("aviso-dis");
+  ad.hidden = !(i.mode === "shared" && !i.isAdmin);
+  ad.textContent = "Estás en modo lectura: ves los pedidos y las bases de datos, pero para exportar a Excel o cambiar precios necesitas acceso de Editor.";
+  $("exportar").disabled = !i.isAdmin; $("reiniciar").disabled = !i.isAdmin;
+}
+
+// ---- Vista del cliente: chat ----
 function burbuja(texto, clase) {
   const d = document.createElement("div");
   d.className = "m " + clase;
@@ -174,21 +249,21 @@ function burbuja(texto, clase) {
   d.innerHTML = esc.replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/_([^_\n]+)_/g, "<i>$1</i>");
   chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
 }
-
 function enviar(texto, etiqueta) {
   document.querySelectorAll(".ui").forEach((u) => u.classList.add("usado"));
   sheet.hidden = true;
   burbuja(etiqueta ?? texto, "out");
-  const r = VMDemo.send(PHONE, texto);
-  setTimeout(() => { burbuja(r.reply, "in"); if (r.ui) interactivo(r.ui); cargar(); }, 350);
+  const r = VM.send(texto);
+  setTimeout(() => {
+    burbuja(r.reply, "in"); if (r.ui) interactivo(r.ui);
+    if (r.saved === false) toast("Pedido no guardado: tu acceso es de solo lectura.");
+  }, 350);
 }
-
 function pill(texto, onclick) {
   const el = document.createElement("button");
   el.type = "button"; el.className = "pill"; el.textContent = texto; el.onclick = onclick;
   return el;
 }
-
 function interactivo(ui) {
   const box = document.createElement("div"); box.className = "ui";
   if (ui.type === "link") box.appendChild(pill("🔗 " + ui.title, abrirMini));
@@ -211,10 +286,10 @@ function interactivo(ui) {
   chat.appendChild(box); chat.scrollTop = chat.scrollHeight;
 }
 
-// ---- Mini-aplicación de pedido: la misma página que usa el servidor, con su API conectada a esta demo ----
+// La mini-aplicación de pedido es la misma página que usa el servidor, con su API conectada a esta demo
 function abrirMini() {
-  const link = VMDemo.miniOpen(PHONE);
-  miniState = { phone: PHONE, link, ready: false };
+  const link = VM.miniOpen();
+  miniState = { link, ready: false };
   web.innerHTML = "";
   const bar = document.createElement("div"); bar.className = "web-h";
   const x = document.createElement("span"); x.textContent = "✕ Cerrar"; x.onclick = () => (web.hidden = true);
@@ -225,7 +300,7 @@ function abrirMini() {
     if (miniState && !miniState.ready) {
       fr.remove();
       const p = document.createElement("p"); p.style.cssText = "padding:16px;color:var(--muted)";
-      p.textContent = "Este visor no permite abrir la mini-aplicación. Puedes pedir escribiendo en el chat, por ejemplo «repetir».";
+      p.textContent = "Este visor no permite abrir la mini-aplicación. Puedes pedir escribiendo en el chat, por ejemplo «2 aguas».";
       web.appendChild(p);
     }
   }, 2500);
@@ -234,26 +309,34 @@ window.addEventListener("message", (e) => {
   const d = e.data;
   if (!d || !miniState) return;
   if (d.vmReady) { miniState.ready = true; return; }
-  if (d.tipo === "pedido") { // el cliente confirmó su pedido en la mini-aplicación
-    setTimeout(() => { web.hidden = true; burbuja(d.mensaje, "in"); cargar(); }, 1300);
-    return;
-  }
+  if (d.tipo === "pedido") { setTimeout(() => { web.hidden = true; burbuja(d.mensaje, "in"); }, 1300); return; }
   if (d.vmApi) {
-    const { phone, link } = miniState;
     let status = 200, json;
-    if (d.method === "POST") ({ status, json } = VMDemo.miniSubmit(phone, link, JSON.parse(d.body || "{}")));
-    else { json = VMDemo.miniData(phone, link); if (json.error) status = 410; }
+    if (d.method === "POST") ({ status, json } = VM.miniSubmit(miniState.link, JSON.parse(d.body || "{}")));
+    else { json = VM.miniData(miniState.link); if (json.error) status = 410; }
     e.source?.postMessage({ vmApiRes: d.vmApi, status, json }, "*");
   }
 });
+function empezar() {
+  chatStarted = true;
+  chat.innerHTML = ""; sheet.hidden = true; web.hidden = true;
+  VM.resetChat();
+  enviar("hola");
+}
+$("nuevochat").onclick = empezar;
+$("f").addEventListener("submit", (e) => { e.preventDefault(); const v = t.value.trim(); if (v) { t.value = ""; enviar(v); } });
 
-// ---- Panel de la empresa ----
-const eur = (n) => n.toFixed(2).replace(".", ",") + " €";
-function cargar() {
-  const list = VMDemo.orders().reverse();
+// ---- Vista del distribuidor ----
+function pintarPedidos() {
+  const list = VM.orders();
   const tb = document.querySelector("#tabla tbody"); tb.innerHTML = "";
+  const first = seenOrders === null;
+  $("expmsg").title = "";
+  seenOrders ??= new Set();
   for (const o of list) {
     const tr = document.createElement("tr");
+    if (!first && !seenOrders.has(o.id)) tr.className = "nuevo";
+    seenOrders.add(o.id);
     const cells = [o.ref, o.hora, null, o.resumen, eur(o.total), null];
     cells.forEach((v, i) => {
       const td = document.createElement("td");
@@ -279,19 +362,18 @@ function pintarHoja(i) {
       if (v && typeof v === "object") { s = v.s ?? 0; v = v.v; }
       const td = document.createElement("td");
       if (s) td.className = "s" + s;
-      if (typeof v === "number") { td.className += " n"; td.textContent = Number.isInteger(v) ? String(v) : v.toFixed(2).replace(".", ","); }
+      if (typeof v === "number") { td.className += " n"; td.textContent = Number.isInteger(v) ? String(v) : num(v); }
       else td.textContent = v ?? "";
       tr.appendChild(td);
     }
     tbl.appendChild(tr);
   }
-  document.querySelectorAll(".tab").forEach((b, k) => b.setAttribute("aria-selected", String(k === i)));
+  document.querySelectorAll("#xltabs .tab").forEach((b, k) => b.setAttribute("aria-selected", String(k === i)));
 }
-
 function mostrarExcel(exp) {
   lastExport = exp;
   $("xlpanel").hidden = false;
-  $("xlfile").textContent = `${exp.fileName} · ${exp.orderCount} pedidos · ${exp.lineCount} líneas`;
+  $("xlfile").textContent = `${exp.fileName} · ${exp.orderCount} pedido${exp.orderCount === 1 ? "" : "s"} · ${exp.lineCount} línea${exp.lineCount === 1 ? "" : "s"}`;
   const tabs = $("xltabs"); tabs.innerHTML = "";
   exp.sheets.forEach((s, i) => {
     const b = document.createElement("button"); b.type = "button"; b.className = "tab"; b.setAttribute("role", "tab"); b.textContent = `Hoja «${s.name}»`;
@@ -301,75 +383,94 @@ function mostrarExcel(exp) {
   $("dlmsg").textContent = "";
 }
 
-$("exportar").onclick = () => {
-  const r = VMDemo.exportNow();
-  $("expmsg").textContent = r.export
-    ? `${r.export.orderCount} pedidos exportados.` + (r.held ? ` ${r.held} retenidos para revisar.` : "")
-    : "No hay pedidos pendientes de exportar." + (r.held ? ` (${r.held} retenidos para revisar)` : "");
-  if (r.export) mostrarExcel(r.export);
-  cargar();
-};
-
-$("descargar").onclick = async () => {
-  if (!lastExport) return;
-  const { fileName, bytes } = lastExport, msg = $("dlmsg");
+async function descargar(exp, msg) {
   let dl = null;
   try { dl = await window.claude?.use?.("downloads"); } catch {}
   if (dl) {
-    try { await dl.save({ filename: fileName, data: bytes }); msg.textContent = "Guardado."; }
+    try { await dl.save({ filename: exp.fileName, data: exp.bytes }); msg.textContent = "Guardado."; }
     catch (e) { msg.textContent = e?.code === "declined" ? "Descarga cancelada." : "No se pudo guardar el archivo."; }
     return;
   }
-  const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-  const a = document.createElement("a"); a.href = url; a.download = fileName; a.click();
+  const url = URL.createObjectURL(new Blob([exp.bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  const a = document.createElement("a"); a.href = url; a.download = exp.fileName; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1500);
-};
-
-function empezar() {
-  chat.innerHTML = ""; sheet.hidden = true; web.hidden = true;
-  VMDemo.resetChat(PHONE);
-  enviar("hola");
 }
-$("nuevochat").onclick = empezar;
-$("f").addEventListener("submit", (e) => { e.preventDefault(); const v = t.value.trim(); if (v) { t.value = ""; enviar(v); } });
-$("reiniciar").onclick = () => {
-  VMDemo.reset(); lastExport = null; $("xlpanel").hidden = true; $("expmsg").textContent = ""; empezar(); cargar(); pintarBd();
+$("descargar").onclick = () => lastExport && descargar(lastExport, $("dlmsg"));
+
+function pintarHistorial() {
+  const list = VM.exports();
+  $("histpanel").hidden = !list.length;
+  const ul = $("hist"); ul.innerHTML = "";
+  for (const e of list.slice(0, 8)) {
+    const li = document.createElement("li");
+    const f = document.createElement("span"); f.className = "file"; f.textContent = `${e.fileName} · ${e.orderCount} pedido${e.orderCount === 1 ? "" : "s"} · ${e.lineCount} línea${e.lineCount === 1 ? "" : "s"}`;
+    const ver = document.createElement("button"); ver.type = "button"; ver.className = "btn"; ver.textContent = "Ver";
+    ver.onclick = () => { const x = VM.regenerate(e.id); if (x) mostrarExcel(x); };
+    const dl = document.createElement("button"); dl.type = "button"; dl.className = "btn"; dl.textContent = "Descargar";
+    dl.onclick = () => { const x = VM.regenerate(e.id); if (x) descargar(x, $("expmsg")); };
+    li.append(f, ver, dl); ul.appendChild(li);
+  }
+}
+
+$("exportar").onclick = async () => {
+  try {
+    const r = await VM.exportNow();
+    $("expmsg").textContent = r.export
+      ? `${r.export.orderCount} pedido${r.export.orderCount === 1 ? "" : "s"} exportado${r.export.orderCount === 1 ? "" : "s"}.` + (r.held ? ` ${r.held} retenidos para revisar.` : "")
+      : "No hay pedidos pendientes de exportar." + (r.held ? ` (${r.held} retenidos para revisar)` : "");
+    if (r.export) mostrarExcel(r.export);
+  } catch (e) { $("expmsg").textContent = e.message; }
+};
+let confirmReset = null;
+$("reiniciar").onclick = async () => {
+  const b = $("reiniciar");
+  if (!confirmReset) { b.textContent = "¿Seguro? Borra pedidos y exportaciones"; confirmReset = setTimeout(() => { confirmReset = null; b.textContent = "Restaurar datos de ejemplo"; }, 4000); return; }
+  clearTimeout(confirmReset); confirmReset = null; b.textContent = "Restaurar datos de ejemplo";
+  try { await VM.resetData(); lastExport = null; seenOrders = null; $("xlpanel").hidden = true; $("expmsg").textContent = "Datos de ejemplo restaurados."; chatStarted = false; }
+  catch (e) { $("expmsg").textContent = e.message; }
 };
 
-// ---- Bases de datos: productos (con precios editables) y clientes ----
-const num = (n) => Number(n).toFixed(2).replace(".", ",");
 function pintarBd() {
   const tbl = $("dbtabla"); tbl.innerHTML = "";
+  const isAdmin = VM.info().isAdmin;
+  $("dbmsg").textContent = dbTab === "productos"
+    ? (isAdmin ? "Cambia un precio: queda guardado y registrado, y el bot lo usa al instante en la vista del cliente." : "Precios y unidades por caja que usa el bot. Para cambiarlos necesitas acceso de Editor.")
+    : "El bot busca aquí el nombre que escribe el cliente y de aquí saca sus productos habituales.";
   const head = (cols) => { const tr = document.createElement("tr"); cols.forEach(([c, cls]) => { const th = document.createElement("th"); th.textContent = c; if (cls) th.className = cls; tr.appendChild(th); }); const th = document.createElement("thead"); th.appendChild(tr); tbl.appendChild(th); };
   const body = document.createElement("tbody"); tbl.appendChild(body);
   const add = (cells) => { const tr = document.createElement("tr"); cells.forEach((c) => { const td = document.createElement("td"); if (c instanceof Node) td.appendChild(c); else if (c && typeof c === "object") { td.textContent = c.t; td.className = c.cls || ""; } else td.textContent = c ?? ""; tr.appendChild(td); }); body.appendChild(tr); };
   if (dbTab === "productos") {
     head([["Código"], ["Producto"], ["Precio €", "num"], ["Uds/caja", "num"], ["IVA %", "num"], ["Último cambio"]]);
-    for (const p of VMDemo.products()) {
-      const inp = document.createElement("input");
-      inp.type = "number"; inp.step = "0.01"; inp.min = "0"; inp.value = p.price; inp.setAttribute("aria-label", "Precio de " + p.name);
-      inp.style.cssText = "width:84px;text-align:right;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 6px";
-      inp.onchange = () => {
-        const v = Number(inp.value);
-        if (!Number.isFinite(v) || v < 0) { inp.value = p.price; return; }
-        VMDemo.updateProduct(p.id, { price: v });
-        $("dbmsg").textContent = `Precio de «${p.name}» actualizado a ${num(v)} €. El siguiente pedido ya lo usa.`;
-        pintarBd();
-      };
+    for (const p of VM.products()) {
+      let precio;
+      if (isAdmin) {
+        precio = document.createElement("input");
+        precio.type = "number"; precio.step = "0.01"; precio.min = "0"; precio.value = p.price; precio.setAttribute("aria-label", "Precio de " + p.name);
+        precio.style.cssText = "width:84px;text-align:right;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 6px";
+        precio.onchange = async () => {
+          const v = Number(precio.value);
+          if (!Number.isFinite(v) || v < 0) { precio.value = p.price; return; }
+          try { if (await VM.updateProduct(p.id, { price: v })) toast(`Precio de «${p.name}» actualizado a ${num(v)} €`); } catch (e) { toast(e.message); }
+        };
+      } else precio = { t: num(p.price), cls: "num" };
       const ult = p.last ? `${p.last.field === "price" ? "precio" : p.last.field}: ${num(p.last.from)} → ${num(p.last.to)}` : "—";
-      add([{ t: p.id, cls: "ref" }, p.name, inp, { t: p.unitsPerBox ?? "—", cls: "num" }, { t: p.vat, cls: "num" }, ult]);
+      add([{ t: p.id, cls: "ref" }, p.name, precio, { t: p.unitsPerBox ?? "—", cls: "num" }, { t: p.vat, cls: "num" }, ult]);
     }
   } else {
     head([["Código"], ["Cliente"], ["Teléfono"], ["R.E."], ["Pedidos", "num"], ["Último pedido"]]);
-    for (const c of VMDemo.customers()) add([{ t: c.id, cls: "ref" }, c.name, c.phone, c.recargoEquivalencia ? "Sí" : "No", { t: c.orders, cls: "num" }, c.lastOrder ?? "—"]);
+    for (const c of VM.customers()) add([{ t: c.id, cls: "ref" }, c.name, c.phone, c.recargoEquivalencia ? "Sí" : "No", { t: c.orders, cls: "num" }, c.lastOrder ?? "—"]);
   }
 }
 document.querySelectorAll(".dbtab").forEach((b) => (b.onclick = () => {
   dbTab = b.dataset.db;
   document.querySelectorAll(".dbtab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-  $("dbmsg").textContent = dbTab === "productos" ? "Cambia un precio y vuelve a pedir en el chat: el bot usa el precio nuevo al instante." : "El bot busca aquí el nombre que escribe el cliente y de aquí saca sus productos habituales.";
   pintarBd();
 }));
 
-empezar(); cargar(); pintarBd();
+let pending = false;
+function pintarTodo() { if ($("v-distribuidor").hidden) return; pintarPedidos(); pintarHistorial(); pintarBd(); }
+VM.onChange(() => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; avisos(); pintarTodo(); }); });
+VM.onError((e) => toast("No se pudo guardar: " + (e?.message || e?.code || "error")));
+
+VM.ready().then(route);
 </script>
