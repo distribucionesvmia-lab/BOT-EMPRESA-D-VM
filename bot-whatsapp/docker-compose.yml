@@ -1,0 +1,13 @@
+# Servidor propio:  docker compose up -d
+# Los datos quedan en el volumen «datos» y sobreviven a reinicios y actualizaciones.
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file: .env        # copia .env.example a .env y rellénalo
+    volumes:
+      - datos:/data
+volumes:
+  datos:

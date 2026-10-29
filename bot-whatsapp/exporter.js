@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { buildWorkbook } from "./xlsx.js";
 import { FORMAT, madrid } from "./export-format.js";
+import { backupDb } from "./backup.js";
 
 const EXPORT_DIR = () => process.env.EXPORT_DIR ?? "exportaciones";
 
@@ -52,6 +53,11 @@ export function scheduleDailyExport(db, { at = process.env.EXPORT_TIME ?? "21:00
       if (r.export) log.log(`Exportación #${r.export.id}: ${r.export.order_count} pedidos, ${r.export.line_count} líneas -> ${r.filePath}`);
       else log.log("Exportación diaria: no había pedidos pendientes.");
       if (r.held) log.warn(`Hay ${r.held} pedido(s) retenidos pendientes de revisión (no se han exportado).`);
+      try {
+        log.log(`Copia de seguridad de la base de datos: ${backupDb(db)}`);
+      } catch (err) {
+        log.error("No se pudo hacer la copia de seguridad de la base de datos:", err.message);
+      }
     } catch (err) {
       log.error("Falló la exportación diaria (los pedidos siguen pendientes; se reintenta en 1 min):", err.message);
     }

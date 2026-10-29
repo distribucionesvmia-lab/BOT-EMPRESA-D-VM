@@ -1,0 +1,30 @@
+# Despliegue en Render con disco persistente y sin suspensión.
+# ⚠️ Usa el plan «starter» (de pago): el plan gratuito se suspende y no admite disco persistente.
+services:
+  - type: web
+    name: bot-pedidos-vm
+    runtime: node
+    rootDir: bot-whatsapp
+    plan: starter
+    buildCommand: "echo sin dependencias"
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DEMO              # quita esta variable cuando se use con clientes reales
+        value: "1"
+      - key: LINK_SECRET
+        generateValue: true
+      - key: PUBLIC_URL        # pon aquí la dirección https que te asigne Render
+        sync: false
+      - key: DB_PATH
+        value: /var/data/pedidos.sqlite
+      - key: EXPORT_DIR
+        value: /var/data/exportaciones
+      - key: BACKUP_DIR
+        value: /var/data/respaldos
+    disk:
+      name: datos
+      mountPath: /var/data
+      sizeGB: 1

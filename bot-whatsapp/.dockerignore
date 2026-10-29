@@ -1,0 +1,8 @@
+node_modules
+.env
+*.sqlite*
+exportaciones*
+respaldos
+historial-demo.json
+orders.jsonl
+.git

@@ -288,6 +288,14 @@ http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://x");
     if (url.pathname === "/") return res.end("Bot activo");
+    if (url.pathname === "/health") {
+      // Para vigilar el servicio (UptimeRobot, Render…): responde 200 solo si la base de datos funciona
+      try {
+        return getDb().ping() ? res.writeHead(200, { "Content-Type": "application/json" }).end('{"ok":true}') : res.writeHead(503).end('{"ok":false}');
+      } catch {
+        return res.writeHead(503).end('{"ok":false}');
+      }
+    }
     if (process.env.DEMO === "1" && url.pathname.startsWith("/demo") && demoRoutes(req, res, url) !== false) return;
     if (url.pathname.startsWith("/pedido/") && webOrderRoutes(req, res, url) !== false) return;
     if (url.pathname !== "/webhook") return res.writeHead(404).end();

@@ -177,6 +177,14 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
       return db.prepare("UPDATE orders SET review = 0 WHERE ref = ? AND export_status = 'pending'").run(ref).changes === 1;
     },
 
+    /** Copia consistente de toda la base de datos en un fichero nuevo (sin parar el servicio). */
+    backupTo(file) {
+      db.prepare("VACUUM INTO ?").run(file);
+    },
+
+    /** Comprobación de salud: la base de datos responde. */
+    ping: () => db.prepare("SELECT 1 AS ok").get().ok === 1,
+
     close: () => db.close(),
   };
 }

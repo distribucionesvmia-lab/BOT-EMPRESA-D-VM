@@ -77,6 +77,19 @@ Meta necesita una URL pública HTTPS.
 - **Pruebas rápidas:** `npm run dev` y, en otra terminal, `npx cloudflared tunnel --url http://localhost:3000` (te da una URL https temporal).
 - **Producción gratis:** sube esta carpeta a GitHub y despliégala en Render (Web Service, Build: vacío, Start: `npm start`), poniendo las variables del `.env` en su panel. Nota: el plan gratis de Render se duerme tras 15 min sin tráfico y el primer mensaje puede tardar ~1 min; un ping gratuito (UptimeRobot a la URL cada 5 min) lo evita.
 
+## 4b. Siempre encendido y sin perder datos
+Las dos limitaciones del plan gratuito de Render (se suspende a los 15 min y los datos se borran al reiniciar) no se pueden quitar con código: son del plan. Opciones:
+
+| Opción | Suspensión | Datos | Coste aprox. (verificar) |
+|---|---|---|---|
+| Render **starter** + disco (`render.yaml`) | No | Persistentes | ≈ 7 $/mes + ≈ 0,25 $/GB |
+| Servidor propio (VPS) con Docker (`docker compose up -d`) | No | Persistentes (volumen) | ≈ 4–6 €/mes |
+| Render gratis + UptimeRobot (ping a `/health` cada 5 min) | Casi no (puede seguir reiniciando) | **Se pierden** al reiniciar; copia de los pedidos en la hoja de Google (sección 1b) | 0 € |
+
+- `GET /health` responde 200 solo si la base de datos funciona: úsalo para vigilar el servicio.
+- Cada noche, tras la exportación, se guarda una **copia de seguridad** de `pedidos.sqlite` en `BACKUP_DIR` (se conservan las 14 últimas). Si el disco no es persistente, estas copias se pierden igual: en producción usa un disco/volumen y descarga copias fuera del servidor.
+- En producción quita `DEMO=1`.
+
 ## 5. Conectar el webhook
 En Meta: **WhatsApp → Configuration → Webhook**
 - Callback URL: `https://TU-URL/webhook`
