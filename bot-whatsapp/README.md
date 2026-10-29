@@ -23,7 +23,8 @@ Los pedidos confirmados se guardan en `pedidos.sqlite` (ruta configurable con `D
 - **Todo o nada:** si falla la generación del fichero o el registro, ningún pedido se marca y se reintenta en la siguiente ejecución.
 - **Pedidos retenidos:** no se exportan los de cliente desconocido (sin código de ERP), sin líneas, o con la marca *revisar*. Se avisa en el log. Para liberar uno ya revisado: `node exportar.js --aprobar VM-2026-000123`.
 - Manual: `node exportar.js` (exporta ahora) · `node exportar.js --lista` (historial).
-- ⚠️ Las **observaciones por línea** ya tienen columna, pero el bot todavía no las recoge (solo la nota general del pedido). Tampoco permite todavía elegir *cajas* en el chat: hoy todo se pide en unidades.
+- **Cajas y unidades (ambas):** el cliente elige. En el chat, al elegir un artículo que se vende en cajas, el bot pregunta *cajas o unidades* (también vale escribir «3 cajas», «12 uds» o «2 cajas de agua»). En la mini-app hay un selector *Uds | Cajas* en cada artículo con caja. Si no se conocen las unidades por caja, el pedido queda retenido para revisar.
+- **Observaciones:** en el chat, `nota: servir el jueves` (todo el pedido) o `nota jamón: pieza de peso grande` (un artículo). En la mini-app hay un cuadro para el pedido y otro por artículo. Salen en el Excel (*Observaciones del cliente* y *Observaciones línea*).
 
 ## 1b. Copia de pedidos en hoja de Google (opcional)
 Cada pedido confirmado se añade como una fila nueva: fecha, teléfono, nombre, dirección, lo que escribió el cliente, lo que el bot ha interpretado, total y estado.

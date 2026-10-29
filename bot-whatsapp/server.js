@@ -214,7 +214,7 @@ function webOrderRoutes(req, res, url) {
     if (req.method === "GET") {
       const habit = new Map(habitualProducts(customer).map((p) => [p.id, p]));
       const products = catalogNow()
-        .map((p) => ({ id: String(p.id), name: p.name, price: p.price, lastQty: habit.get(p.id)?.lastQty ?? null, count: habit.get(p.id)?.count ?? 0 }))
+        .map((p) => ({ id: String(p.id), name: p.name, price: p.price, unitsPerBox: Number.isInteger(p.unitsPerBox) && p.unitsPerBox > 1 ? p.unitsPerBox : null, lastQty: habit.get(p.id)?.lastQty ?? null, count: habit.get(p.id)?.count ?? 0 }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
       return json(res, {
         business: BUSINESS.name,
@@ -233,7 +233,14 @@ function webOrderRoutes(req, res, url) {
       for (const l of Array.isArray(body?.lines) ? body.lines : []) {
         const p = catalog.get(String(l?.id));
         const qty = Math.floor(Number(l?.qty));
-        if (p && qty >= 1 && qty <= 999) merged.set(p.id, { id: p.id, name: p.name, price: p.price, qty: (merged.get(p.id)?.qty ?? 0) + qty });
+        // Unidades o cajas; las cajas solo valen para artículos que se venden en cajas
+        const unit = l?.unit === "caja" && Number.isInteger(p?.unitsPerBox) && p.unitsPerBox > 1 ? "caja" : "ud";
+        const lineNote = typeof l?.note === "string" ? l.note.trim().slice(0, 120) : "";
+        if (p && qty >= 1 && qty <= 999) {
+          const key = `${p.id}|${unit}`;
+          const prev = merged.get(key);
+          merged.set(key, { id: p.id, name: p.name, price: p.price, qty: (prev?.qty ?? 0) + qty, unit, ...((lineNote || prev?.note) && { note: lineNote || prev.note }) });
+        }
       }
       const items = [...merged.values()];
       if (!items.length) return json(res, { error: "El pedido está vacío" }, 400);
@@ -246,18 +253,19 @@ function webOrderRoutes(req, res, url) {
         customerId: customer.id,
         name: customer.name,
         address: customer.address,
-        text: items.map((i) => `${i.qty} ${i.name}`).join(" + ") + (note ? ` · Nota: ${note}` : ""),
+        text: items.map((i) => `${i.qty} ${i.unit === "caja" ? "cajas de " : ""}${i.name}`).join(" + ") + (note ? ` · Nota: ${note}` : ""),
         items,
-        total: items.reduce((t, i) => t + i.qty * i.price, 0),
+        total: null, // lo calcula priceOrder (cajas × unidades por caja, precios especiales, descuentos)
         review: false,
         note,
       };
-      const { duplicate } = await createOrder(priceOrder(order, customer, catalogNow()));
+      const priced = priceOrder(order, customer, catalogNow());
+      const { duplicate } = await createOrder(priced);
       if (duplicate) return json(res, { error: "Este pedido ya se envió" }, 409); // doble clic o dos pestañas
-      const message = `🎉 ¡Pedido recibido, ${customer.name}! ${items.length} artículos, total aprox. ${order.total.toFixed(2)}${BUSINESS.currency}.\n\n${BUSINESS.payment}`;
+      const message = `🎉 ¡Pedido recibido, ${customer.name}! ${items.length} artículos, total aprox. ${priced.total.toFixed(2)}${BUSINESS.currency}.\n\n${BUSINESS.payment}`;
       if (process.env.DEMO !== "1") {
         await send(link.p, message);
-        if (OWNER_PHONE) await send(OWNER_PHONE, `🛒 Nuevo pedido de ${customer.name} (+${link.p})\n${order.text}\nTotal: ${order.total.toFixed(2)}\n📍 ${customer.address}`);
+        if (OWNER_PHONE) await send(OWNER_PHONE, `🛒 Nuevo pedido de ${customer.name} (+${link.p})\n${order.text}\nTotal: ${priced.total.toFixed(2)}\n📍 ${customer.address}`);
       }
       return json(res, { ok: true, message });
     }

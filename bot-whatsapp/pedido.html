@@ -35,6 +35,10 @@
   .step button { width:34px; height:36px; border:0; background:#fff; font-size:20px; color:var(--verde-oscuro); cursor:pointer; }
   .step input { width:44px; height:36px; border:0; border-left:1px solid var(--linea); border-right:1px solid var(--linea); text-align:center; font-size:15px; font-weight:700; outline:none; -moz-appearance:textfield; }
   .step input::-webkit-outer-spin-button, .step input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  .ud { display:flex; border:1px solid var(--linea); border-radius:8px; overflow:hidden; font-size:12px; }
+  .ud button { border:0; background:#fff; padding:4px 8px; cursor:pointer; color:var(--gris); font-weight:600; }
+  .ud button.on { background:#e5f5ec; color:var(--verde-oscuro); }
+  .lnote { width:calc(100% - 28px); margin:0 14px 10px; border:1px solid var(--linea); border-radius:8px; padding:8px 10px; font:inherit; font-size:13px; }
   .vacio { padding:40px 20px; text-align:center; color:var(--gris); }
   footer { position:absolute; left:0; right:0; bottom:0; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(transparent, #fff 30%); }
   .big { width:100%; border:0; border-radius:12px; background:var(--verde); color:#fff; font-size:16px; font-weight:700; padding:15px; cursor:pointer; }
@@ -94,18 +98,22 @@ const $ = id => document.getElementById(id);
 const COLORS = ["#2f8f6b", "#c0763a", "#5b7bd5", "#a1507c", "#8a8f2b", "#3c8fa6", "#b8523f", "#6c5ba8"];
 const eur = n => n.toFixed(2).replace(".", ",") + " €";
 let data = null, tab = "hab", query = "";
-const qty = new Map(); // id -> unidades
+const qty = new Map(); // id -> cantidad (en cajas o en unidades, según unitOf)
+const unitOf = new Map(); // id -> "ud" | "caja"
+const notes = new Map(); // id -> observación de la línea
+const unit = id => unitOf.get(id) || "ud";
+const uds = l => l.qty * (unit(l.id) === "caja" ? (l.unitsPerBox || 1) : 1);
 
 const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const hue = s => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
 const initials = n => n.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9 ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
 const lines = () => data.products.filter(p => qty.get(p.id) > 0).map(p => ({ ...p, qty: qty.get(p.id) }));
-const count = () => lines().reduce((t, l) => t + l.qty, 0);
-const total = () => lines().reduce((t, l) => t + l.qty * l.price, 0);
+const count = () => lines().length;
+const total = () => lines().reduce((t, l) => t + uds(l) * l.price, 0);
 
 function setQty(id, n) {
   n = Math.max(0, Math.min(999, Math.floor(Number(n) || 0)));
-  if (n) qty.set(id, n); else qty.delete(id);
+  if (n) qty.set(id, n); else { qty.delete(id); unitOf.delete(id); notes.delete(id); }
   refresh();
 }
 
@@ -125,6 +133,15 @@ function control(p) {
   inp.onchange = () => setQty(p.id, inp.value);
   const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.onclick = () => setQty(p.id, q + 1);
   st.append(minus, inp, plus); box.appendChild(st);
+  if (p.unitsPerBox) {
+    const sel = document.createElement("div"); sel.className = "ud";
+    for (const [u, t] of [["ud", "Uds"], ["caja", "Cajas"]]) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.className = unit(p.id) === u ? "on" : "";
+      b.onclick = () => { unitOf.set(p.id, u); refresh(); };
+      sel.appendChild(b);
+    }
+    box.appendChild(sel);
+  }
   return box;
 }
 
@@ -139,9 +156,10 @@ function row(p) {
   if (p.lastQty) {
     const chip = document.createElement("button"); chip.type = "button"; chip.className = "chip";
     chip.textContent = "Última vez: " + p.lastQty + " uds"; chip.title = "Pedir las mismas unidades";
-    chip.onclick = () => setQty(p.id, p.lastQty);
+    chip.onclick = () => { unitOf.set(p.id, "ud"); setQty(p.id, p.lastQty); }; // las de la última vez son unidades
     pr.appendChild(chip);
   }
+  if (p.unitsPerBox) c.textContent += " · caja de " + p.unitsPerBox + " uds" + (unit(p.id) === "caja" && qty.get(p.id) ? " → " + qty.get(p.id) * p.unitsPerBox + " uds" : "");
   info.append(n, c, pr);
   el.append(av, info, control(p));
   return el;
@@ -161,7 +179,13 @@ function renderList() {
 
 function renderCart() {
   const box = $("cartLines"); box.innerHTML = "";
-  lines().forEach(l => box.appendChild(row(l)));
+  lines().forEach(l => {
+    box.appendChild(row(l));
+    const ta = document.createElement("input"); ta.className = "lnote"; ta.maxLength = 120;
+    ta.placeholder = "Observación para este artículo (opcional)"; ta.value = notes.get(l.id) || "";
+    ta.oninput = () => notes.set(l.id, ta.value);
+    box.appendChild(ta);
+  });
   $("total").textContent = eur(total());
   if (!count()) showCart(false);
 }
@@ -189,7 +213,7 @@ $("back").onclick = $("keep").onclick = () => showCart(false);
 $("confirm").onclick = async () => {
   const btn = $("confirm"); btn.disabled = true; $("err").textContent = "";
   try {
-    const r = await fetch(location.pathname, { method: "POST", body: JSON.stringify({ lines: lines().map(l => ({ id: l.id, qty: l.qty })), note: $("note").value }) });
+    const r = await fetch(location.pathname, { method: "POST", body: JSON.stringify({ lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "No se ha podido enviar el pedido");
     $("doneP").textContent = j.message; $("done").hidden = false;

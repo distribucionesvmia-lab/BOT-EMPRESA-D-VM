@@ -66,7 +66,7 @@ test("cliente con historial: elige de la lista y se graba con código de cliente
   assert.match(r.reply, /4 × COCA-COLA ZERO/);
   r = handleMessage(r.session, "c:ok");
   assert.equal(r.order.customerId, "5900");
-  assert.deepEqual(r.order.items, [{ id: "19800", name: "COCA-COLA ZERO Lata 33 CL PACK.(1X12)", price: 7.79, qty: 4 }]);
+  assert.deepEqual(r.order.items, [{ id: "19800", name: "COCA-COLA ZERO Lata 33 CL PACK.(1X12)", price: 7.79, qty: 4, unit: "ud" }]);
   assert.equal(r.order.review, false);
 });
 
@@ -77,4 +77,68 @@ test("pedido con duda queda marcado para revisión", () => {
   r = handleMessage(r.session, "recoger");
   r = handleMessage(r.session, "1");
   assert.equal(r.order.review, true);
+});
+
+// ---- Cajas y unidades, observaciones ----
+const catalogoCajas = [
+  { id: "A1", name: "AGUA GAS LIMON VIDRIO 250", price: 3.46, unitsPerBox: 6 },
+  { id: "J1", name: "JAMON SERRANO PIEZA", price: 90 },
+  { id: "J2", name: "JAMON IBERICO PIEZA", price: 150 },
+];
+const conCajas = () => {
+  setCatalog(catalogoCajas);
+  return { id: "7", name: "Bar Prueba", address: "Calle 1", orders: [{ doc: "X", date: "2026-10-01", lines: [{ productId: "A1", qty: 6 }, { productId: "J1", qty: 1 }, { productId: "J2", qty: 1 }] }] };
+};
+
+test("texto libre: «2 cajas de agua» y «12 uds de agua» son líneas distintas", () => {
+  setCatalog(catalogoCajas);
+  const r = parseItems("2 cajas de agua gas y 3 uds de agua gas");
+  assert.deepEqual(r.map((i) => [i.id, i.qty, i.unit, i.upb]), [["A1", 2, "caja", 6], ["A1", 3, "ud", 6]]);
+  assert.deepEqual(parseItems("4 agua gas").map((i) => i.unit), ["ud"]);
+});
+
+test("chat: artículo en cajas pregunta cajas o unidades y calcula las unidades", () => {
+  const c = conCajas();
+  let r = handleMessage(newSession(c), "p:A1");
+  assert.match(r.reply, /caja de 6 uds/);
+  assert.deepEqual(r.ui.buttons.map((b) => b.id), ["u:caja", "u:ud", "q:0"]);
+  r = handleMessage(r.session, "u:caja");
+  assert.match(r.reply, /Cuántas \*cajas\*/);
+  r = handleMessage(r.session, "q:2");
+  assert.match(r.reply, /2 cajas \(12 uds\) × AGUA GAS LIMON VIDRIO 250 = 41\.52/);
+  r = handleMessage(r.session, "act:done");
+  r = handleMessage(r.session, "c:ok");
+  assert.deepEqual(r.order.items.map((i) => [i.id, i.qty, i.unit]), [["A1", 2, "caja"]]);
+});
+
+test("chat: se puede escribir «3 cajas» o «12 uds» al preguntar la cantidad", () => {
+  const c = conCajas();
+  let r = handleMessage(newSession(c), "p:A1");
+  r = handleMessage(r.session, "q:3"); // sin elegir unidad todavía: se vuelve a preguntar
+  assert.match(r.reply, /cajas\* o en \*unidades/);
+  r = handleMessage(r.session, "3 cajas");
+  assert.match(r.reply, /3 cajas \(18 uds\)/);
+});
+
+test("chat: observación general y observación por artículo", () => {
+  const c = conCajas();
+  let r = handleMessage(newSession(c), "1 jamon serrano y 1 jamon iberico");
+  r = handleMessage(r.session, "act:done");
+  r = handleMessage(r.session, "nota: servir el jueves, los demás días estoy cerrado");
+  assert.match(r.reply, /Observaciones: servir el jueves/);
+  r = handleMessage(r.session, "nota serrano: quiero piezas de peso grande, no de poco peso");
+  assert.match(r.reply, /Anotado para JAMON SERRANO PIEZA/);
+  assert.match(r.reply, /📝 quiero piezas de peso grande/);
+  r = handleMessage(r.session, "nota jamon: otra cosa"); // dos jamones coinciden
+  assert.match(r.reply, /varios artículos/);
+  r = handleMessage(r.session, "c:ok");
+  assert.equal(r.order.note, "servir el jueves, los demás días estoy cerrado");
+  assert.equal(r.order.items.find((i) => i.id === "J1").note, "quiero piezas de peso grande, no de poco peso");
+  assert.equal(r.order.items.find((i) => i.id === "J2").note, undefined);
+});
+
+test("chat: cliente nuevo también puede dejar una observación general", () => {
+  let r = handleMessage(newSession(), "2 aguas");
+  r = handleMessage(r.session, "nota: llamadme antes de venir");
+  assert.match(r.reply, /Observación anotada/);
 });
