@@ -1,4 +1,10 @@
-# a3ERP — lo que sabemos (confirmado con capturas de pantalla, 28/10/2026)
+# a3ERP — lo que sabemos
+
+## Confirmado por la empresa (29/10/2026)
+- a3ERP está **instalado en un servidor físico propio, en la oficina** (no está en la nube).
+- Pendiente de confirmar: que SQL Server esté en ese mismo servidor, la versión de a3ERP y de Windows, la DLL/SDK para crear pedidos y la salida a internet del servidor (ver `docs/INFORME_SERVIDOR.md`).
+
+ (confirmado con capturas de pantalla, 28/10/2026)
 
 **ERP confirmado:** a3ERP, de Wolters Kluwer Tax and Accounting, S.L. (la ficha "Datos del fabricante" del propio programa).
 Versión y modalidad (local/nube): **pendiente de confirmar**.
