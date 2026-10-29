@@ -74,7 +74,7 @@ export function parseItems(rawText, customer = null) {
     const unsure = scored.filter((s) => s.matched === best.matched && s.known === best.known).length > 1;
     const key = `${best.p.id}|${unit}`;
     const prev = items.get(key);
-    items.set(key, mkItem(best.p, (prev?.qty ?? 0) + qty, unit, { unsure: unsure || prev?.unsure }));
+    items.set(key, mkItem(best.p, (prev?.qty ?? 0) + qty, unit, { unsure: unsure || prev?.unsure, unitStated: byBox || byUnit || prev?.unitStated }));
   }
   return [...items.values()];
 }
@@ -264,6 +264,25 @@ function chooseQty(s, n) {
   return showCart(s, n > 0 ? `✅ ${qtyLabel(item)} × ${p.name}\n\n` : "");
 }
 
+// Suma una línea al pedido en construcción (mismo artículo y misma unidad: se acumulan)
+function addToCart(s, f) {
+  const prev = s.cart.find((i) => i.id === f.id && i.unit === f.unit);
+  if (prev) prev.qty += f.qty;
+  else s.cart.push(f);
+}
+
+// El cliente escribió «2 aguas» sin decir cajas o unidades y el artículo se vende en cajas: se le pregunta
+function askUnitReply(s, lead = "") {
+  s.state = "unitq";
+  const f = s.askUnit[0];
+  const cajas = `${f.qty} ${f.qty === 1 ? "caja" : "cajas"} (${f.qty * f.upb} uds)`;
+  return {
+    reply: `${lead}*${f.name}*\nEscribiste ${f.qty}. Este artículo se vende en cajas de ${f.upb} unidades: ¿lo quieres en *cajas* o en *unidades*?`,
+    session: s,
+    ui: buttons(["ui:caja", cajas], ["ui:ud", `${f.qty} uds`], ["ui:no", "No lo quiero"]),
+  };
+}
+
 // Pregunta la cantidad del artículo elegido, según lo quiera en cajas o en unidades
 function askQty(s) {
   const p = s.pick;
@@ -365,6 +384,15 @@ export function handleMessage(session, rawText) {
     const more = /^more:(\d+)$/.exec(text);
     if (more && s.state === "menu") return showList(s, Number(more[1]), "Más artículos:");
 
+    if (s.state === "unitq" && s.askUnit?.length) {
+      const m = /^ui:(caja|ud|no)$/.exec(text) ?? (text.startsWith("caja") ? [null, "caja"] : /^(ud|uds|unidad|unidades)$/.test(text) ? [null, "ud"] : null);
+      if (!m) return askUnitReply(s, "Pulsa un botón o escribe *cajas* o *unidades*.\n\n");
+      const [f, ...rest] = s.askUnit;
+      s.askUnit = rest;
+      if (m[1] !== "no") addToCart(s, { ...f, unit: m[1] });
+      if (rest.length) return askUnitReply(s);
+      return showCart(s, m[1] === "no" && !s.cart.length ? "" : "Anotado ✅\n\n");
+    }
     if (s.state === "qty" && s.pick) {
       const u = /^u:(caja|ud)$/.exec(text);
       if (u) {
@@ -417,10 +445,14 @@ export function handleMessage(session, rawText) {
         // Cliente conocido que escribe lo que quiere: se suma al pedido
         const found = parseItems(rawText, s.customer);
         if (found.length) {
-          for (const f of found) {
-            const prev = s.cart.find((i) => i.id === f.id && i.unit === f.unit);
-            if (prev) prev.qty += f.qty;
-            else s.cart.push(f);
+          const ask = [];
+          for (const { unitStated, ...f } of found) {
+            if (f.upb && !unitStated) ask.push(f);
+            else addToCart(s, f);
+          }
+          if (ask.length) {
+            s.askUnit = ask;
+            return askUnitReply(s, "Anotado ✅\n\n");
           }
           return showCart(s, "Anotado ✅\n\n");
         }
@@ -472,7 +504,7 @@ export function handleMessage(session, rawText) {
           address: s.address,
           text: s.orderText.replace(/\n/g, " + "),
           note: s.note || "",
-          items: items.map(({ unsure, upb, ...i }) => i),
+          items: items.map(({ unsure, upb, unitStated, ...i }) => i),
           total: items.length ? total(items) : null,
           review: items.some((i) => i.unsure) || !items.length,
         };

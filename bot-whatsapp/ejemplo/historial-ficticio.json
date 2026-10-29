@@ -2,25 +2,25 @@
  "products": [
   {
    "id": "1001",
-   "name": "AGUA MINERAL 1,5 L (PACK 6)",
-   "price": 2.1,
+   "name": "AGUA MINERAL 1,5 L",
+   "price": 0.42,
    "unitsPerBox": 6,
    "vat": 10,
    "discount": 0
   },
   {
    "id": "1002",
-   "name": "REFRESCO COLA LATA 33 CL (PACK 24)",
-   "price": 11.4,
-   "unitsPerBox": 1,
+   "name": "REFRESCO COLA LATA 33 CL",
+   "price": 0.55,
+   "unitsPerBox": 24,
    "vat": 10,
    "discount": 0
   },
   {
    "id": "1003",
-   "name": "CERVEZA RUBIA LATA 33 CL (PACK 24)",
-   "price": 14.2,
-   "unitsPerBox": 1,
+   "name": "CERVEZA RUBIA LATA 33 CL",
+   "price": 0.62,
+   "unitsPerBox": 24,
    "vat": 21,
    "discount": 5
   },
@@ -42,16 +42,16 @@
   },
   {
    "id": "1006",
-   "name": "ZUMO NARANJA 1 L (PACK 6)",
-   "price": 6.9,
+   "name": "ZUMO NARANJA 1 L",
+   "price": 1.15,
    "unitsPerBox": 6,
    "vat": 10,
    "discount": 0
   },
   {
    "id": "1007",
-   "name": "LECHE ENTERA 1 L (PACK 6)",
-   "price": 5.4,
+   "name": "LECHE ENTERA 1 L",
+   "price": 0.9,
    "unitsPerBox": 6,
    "vat": 10,
    "discount": 0
@@ -134,15 +134,15 @@
      "lines": [
       {
        "productId": "1002",
-       "qty": 4
+       "qty": 96
       },
       {
        "productId": "1003",
-       "qty": 6
+       "qty": 144
       },
       {
        "productId": "1001",
-       "qty": 10
+       "qty": 60
       },
       {
        "productId": "1011",
@@ -156,15 +156,15 @@
      "lines": [
       {
        "productId": "1002",
-       "qty": 3
+       "qty": 72
       },
       {
        "productId": "1003",
-       "qty": 5
+       "qty": 120
       },
       {
        "productId": "1006",
-       "qty": 4
+       "qty": 24
       }
      ]
     },
@@ -182,7 +182,7 @@
       },
       {
        "productId": "1002",
-       "qty": 4
+       "qty": 96
       }
      ]
     },
@@ -192,15 +192,15 @@
      "lines": [
       {
        "productId": "1002",
-       "qty": 4
+       "qty": 96
       },
       {
        "productId": "1003",
-       "qty": 6
+       "qty": 144
       },
       {
        "productId": "1001",
-       "qty": 10
+       "qty": 60
       },
       {
        "productId": "1011",
@@ -211,7 +211,7 @@
    ],
    "frequent": [],
    "specialPrices": {
-    "1002": 10.9
+    "1002": 0.5
    },
    "discounts": {
     "1004": 8
@@ -242,7 +242,7 @@
       },
       {
        "productId": "1007",
-       "qty": 12
+       "qty": 72
       }
      ]
     },
@@ -286,7 +286,7 @@
       },
       {
        "productId": "1007",
-       "qty": 12
+       "qty": 72
       }
      ]
     },

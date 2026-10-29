@@ -120,6 +120,16 @@ function setQty(id, n) {
 function control(p) {
   const q = qty.get(p.id) || 0, box = document.createElement("div");
   box.className = "ctl";
+  // Artículos que se venden en cajas: el cliente elige Uds o Cajas desde el principio, antes de añadirlos
+  if (p.unitsPerBox) {
+    const sel = document.createElement("div"); sel.className = "ud"; sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Pedir en");
+    for (const [u, t] of [["ud", "Uds"], ["caja", "Cajas"]]) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.className = unit(p.id) === u ? "on" : "";
+      b.onclick = () => { unitOf.set(p.id, u); refresh(); };
+      sel.appendChild(b);
+    }
+    box.appendChild(sel);
+  }
   if (!q) {
     const b = document.createElement("button");
     b.className = "add"; b.type = "button"; b.textContent = "+"; b.setAttribute("aria-label", "Añadir " + p.name);
@@ -133,15 +143,6 @@ function control(p) {
   inp.onchange = () => setQty(p.id, inp.value);
   const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.onclick = () => setQty(p.id, q + 1);
   st.append(minus, inp, plus); box.appendChild(st);
-  if (p.unitsPerBox) {
-    const sel = document.createElement("div"); sel.className = "ud";
-    for (const [u, t] of [["ud", "Uds"], ["caja", "Cajas"]]) {
-      const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.className = unit(p.id) === u ? "on" : "";
-      b.onclick = () => { unitOf.set(p.id, u); refresh(); };
-      sel.appendChild(b);
-    }
-    box.appendChild(sel);
-  }
   return box;
 }
 

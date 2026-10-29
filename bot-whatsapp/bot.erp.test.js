@@ -142,3 +142,38 @@ test("chat: cliente nuevo también puede dejar una observación general", () => 
   r = handleMessage(r.session, "nota: llamadme antes de venir");
   assert.match(r.reply, /Observación anotada/);
 });
+
+test("chat: «2 aguas» sin indicar unidad pregunta cajas o unidades si el artículo se vende en cajas", () => {
+  const c = conCajas();
+  let r = handleMessage(newSession(c), "2 agua gas");
+  assert.match(r.reply, /cajas de 6 unidades/);
+  assert.deepEqual(r.ui.buttons.map((b) => b.id), ["ui:caja", "ui:ud", "ui:no"]);
+  assert.equal(r.ui.buttons[0].title, "2 cajas (12 uds)");
+  r = handleMessage(r.session, "ui:caja");
+  assert.match(r.reply, /2 cajas \(12 uds\) × AGUA GAS LIMON/);
+  r = handleMessage(r.session, "act:done");
+  r = handleMessage(r.session, "c:ok");
+  assert.deepEqual(r.order.items.map((i) => [i.id, i.qty, i.unit]), [["A1", 2, "caja"]]);
+});
+
+test("chat: si ya dice «cajas» o «uds» no se le pregunta; si es un artículo sin caja, tampoco", () => {
+  const c = conCajas();
+  let r = handleMessage(newSession(c), "2 cajas de agua gas");
+  assert.match(r.reply, /2 cajas \(12 uds\)/);
+  r = handleMessage(newSession(c), "5 uds de agua gas");
+  assert.match(r.reply, /5 × AGUA GAS/);
+  r = handleMessage(newSession(c), "1 jamon serrano");
+  assert.match(r.reply, /1 × JAMON SERRANO/);
+});
+
+test("chat: se puede contestar «unidades» escribiendo, y «no lo quiero» lo descarta", () => {
+  const c = conCajas();
+  let r = handleMessage(newSession(c), "3 agua gas");
+  r = handleMessage(r.session, "unidades");
+  assert.match(r.reply, /3 × AGUA GAS/);
+  r = handleMessage(newSession(c), "3 agua gas y 1 jamon serrano");
+  assert.equal(r.session.state, "unitq");
+  r = handleMessage(r.session, "ui:no");
+  assert.match(r.reply, /1 × JAMON SERRANO/);
+  assert.doesNotMatch(r.reply, /AGUA/);
+});
