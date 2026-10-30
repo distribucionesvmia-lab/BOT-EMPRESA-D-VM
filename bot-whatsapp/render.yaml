@@ -32,6 +32,13 @@ services:
         generateValue: true
       - key: TRUST_PROXY
         value: "1"
+      # Sincronización automática con la carpeta «datos» de Google Drive (docs/GOOGLE_DRIVE.md). Solo funciona sin DEMO.
+      - key: DRIVE_FOLDER_ID
+        sync: false
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: SYNC_MINUTES
+        value: "15"
       - key: BACKUP_DIR
         value: /var/data/respaldos
     disk:

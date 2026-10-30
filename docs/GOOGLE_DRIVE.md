@@ -1,4 +1,29 @@
-# Clientes y productos sincronizados solos con Google Drive
+# Clientes, productos e historial sincronizados solos con Google Drive
+
+## Cómo encaja con las copias de a3ERP (el bot en internet, a3 en la oficina)
+
+```
+SERVIDOR DE LA OFICINA                     GOOGLE DRIVE                         BOT EN INTERNET (nube)
+a3ERP ──► script de copia ──► carpeta «copias»  (PRIVADA, copias pesadas)      (no la ve)
+              │
+              └─► paso de extracción ──► carpeta «datos» ──────────────────────► lee cada 15 min
+                  (lee la copia SOLO en        clientes.xlsx · productos.xlsx       (cuenta de servicio con permiso
+                   lectura y saca solo lo      historial-ventas.xlsx                 de Lector SOLO sobre «datos»)
+                   necesario)
+```
+
+- **Las copias pesadas de a3 nunca las lee el bot.** Se quedan en una carpeta «copias» que **no se comparte con la cuenta de servicio**. El bot solo ve la carpeta «datos», con tres Excel pequeños: así no baja gigas cada 15 minutos y, si alguien entrara en el bot, no tendría acceso a la contabilidad.
+- El **paso de extracción** (en el servidor de la oficina, después de la copia) abre la copia en modo solo lectura y deja esos tres Excel. Se prepara aparte, cuando se conozca el formato de la copia y las tablas de a3.
+- Si el bot está en internet, usa la **Opción A** de abajo (cuenta de servicio). La opción B (carpeta local) es para cuando el bot corre en el mismo servidor.
+
+## Los tres Excel que lee el bot (carpeta «datos»)
+| Fichero (el nombre debe contener…) | Columnas (por su cabecera) | Para qué |
+|---|---|---|
+| `clientes` | Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto | Clientes y sus cuentas (acceso con los 6 últimos del NIF) |
+| `productos` (o «artículos», «tarifa», «catálogo») | Código · Descripción · Precio · Uds. por caja · % IVA · Dto. · Categoría o Familia · Subcategoría o Subfamilia · Bloqueado | Catálogo, precios y categorías |
+| `historial` (o «compras», «ventas», «albarán») | Cód. cliente · Fecha · Documento · Cód. artículo · Cantidad | La pestaña «Histórico» de cada cliente (lo que suele comprar) |
+
+El historial guarda los **30 últimos pedidos de cada cliente**; conviene que el paso de extracción mande solo los últimos 12 meses y solo líneas de venta (los abonos, con cantidad negativa, se ignoran). El historial se importa **después** de los clientes y de los productos, y se rechaza si ninguno de sus clientes existe en la base.
 
 La empresa deja en **una carpeta de Google Drive** los Excel que exporta a3ERP (o los edita como Hoja de Google) y el servidor los **lee cada 15 minutos**: si han cambiado, actualiza las bases de datos de clientes y de productos. Nadie tiene que importar nada a mano.
 

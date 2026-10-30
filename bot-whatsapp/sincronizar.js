@@ -9,18 +9,22 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { parseProductosXlsx } from "./productos-import.js";
+import { parseHistorialXlsx } from "./historial-import.js";
 
 export const MIN_RATIO = 0.7; // un fichero con menos del 70 % de los clientes ya cargados se considera incompleto
 
-// El nombre del fichero dice de qué es: «clientes…», «productos…»/«artículos…»/«tarifa…»
-const KINDS = { clientes: /client/i, productos: /product|articul|tarifa|catalogo/i };
+// El nombre del fichero dice de qué es: «clientes…», «productos…»/«artículos…»/«tarifa…», «historial…»/«compras…»/«ventas…»
+const HIST = /historial|compra|venta|albaran/i;
+const KINDS = {
+  clientes: (n) => /client/i.test(n) && !HIST.test(n) && !/product|articul|tarifa|catalogo/i.test(n),
+  productos: (n) => /product|articul|tarifa|catalogo/i.test(n) && !HIST.test(n),
+  historial: (n) => HIST.test(n),
+};
 
-/** El fichero más reciente de cada tipo: { clientes, productos } (undefined si no hay). */
+/** El fichero más reciente de cada tipo: { clientes, productos, historial } (undefined si no hay). */
 export function pickFiles(files) {
   const out = {};
-  for (const [kind, re] of Object.entries(KINDS)) {
-    out[kind] = files.filter((f) => re.test(f.name) && !(kind === "clientes" && KINDS.productos.test(f.name))).sort((a, b) => (a.modified < b.modified ? 1 : -1))[0];
-  }
+  for (const [kind, match] of Object.entries(KINDS)) out[kind] = files.filter((f) => match(f.name)).sort((a, b) => (a.modified < b.modified ? 1 : -1))[0];
   return out;
 }
 
@@ -47,9 +51,9 @@ export async function sincronizar({ source, state, catalogDb, customersDb, accou
     resultados.push({ tipo: "carpeta", estado: "error", detalle: e.message });
     return fin(st, state, resultados, now);
   }
-  for (const tipo of ["clientes", "productos"]) {
+  for (const tipo of ["clientes", "productos", "historial"]) {
     const f = picked[tipo];
-    if (!f) { resultados.push({ tipo, estado: "sin fichero", detalle: `No hay ningún Excel de ${tipo} en la carpeta (el nombre debe contener «${tipo === "clientes" ? "clientes" : "productos"}»).` }); continue; }
+    if (!f) { resultados.push({ tipo, estado: "sin fichero", detalle: `No hay ningún Excel de ${tipo} en la carpeta (el nombre debe contener «${tipo}»).` }); continue; }
     if (st.files[tipo]?.sig === f.sig) { resultados.push({ tipo, fichero: f.name, estado: "sin cambios" }); continue; }
     try {
       const buf = await source.read(f);
@@ -62,6 +66,12 @@ export async function sincronizar({ source, state, catalogDb, customersDb, accou
         const r = customersDb.upsertCustomers(customers);
         const cuentas = accountsDb.ensureMany(customers.filter((c) => c.active !== false).map((c) => c.id));
         detalle = `${stats.importados} clientes (${r.added} nuevos, ${r.updated} actualizados), ${cuentas} cuentas nuevas`;
+      } else if (tipo === "historial") {
+        const { byCustomer, stats } = parseHistorialXlsx(buf);
+        if (!byCustomer.size) throw new Error("El Excel del historial no tiene líneas válidas.");
+        const r = customersDb.setPurchases(byCustomer);
+        if (!r.clientes) throw new Error("Ningún cliente del historial existe en la base: ¿se importó antes el Excel de clientes?");
+        detalle = `historial de ${r.clientes} clientes (${r.lineas} líneas)` + (r.desconocidos ? `; ${r.desconocidos} clientes desconocidos, ignorados` : "") + (stats.sinFecha ? `; ${stats.sinFecha} líneas sin fecha` : "");
       } else {
         const { products, stats } = parseProductosXlsx(buf);
         if (!products.length) throw new Error("El Excel no tiene productos con precio.");

@@ -151,6 +151,29 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       db.prepare("SELECT id, nif_keys FROM customers WHERE active = 1 AND nif_keys IS NOT NULL").all().filter((r) => nifMatches(r.id, typed, JSON.parse(r.nif_keys))).map((r) => r.id),
     withNif: () => db.prepare("SELECT COUNT(*) AS n FROM customers WHERE nif_keys IS NOT NULL").get().n,
 
+    /**
+     * Sustituye el historial de compras de los clientes indicados (Map cliente → [{ doc, date, lines:[{ productId, qty }] }]).
+     * Los clientes que no existen en la base se ignoran. Todo o nada. Devuelve { clientes, lineas, desconocidos }.
+     */
+    setPurchases(byCustomer) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const out = { clientes: 0, lineas: 0, desconocidos: 0 };
+        for (const [cid, orders] of byCustomer) {
+          const id = String(cid).trim();
+          if (!byId.get(id)) { out.desconocidos++; continue; }
+          db.prepare("DELETE FROM purchases WHERE customer_id = ?").run(id);
+          for (const o of orders) for (const l of o.lines) { db.prepare("INSERT INTO purchases (customer_id, doc, date, product_id, qty) VALUES (?, ?, ?, ?, ?)").run(id, String(o.doc), String(o.date), String(l.productId), Math.floor(Number(l.qty))); out.lineas++; }
+          out.clientes++;
+        }
+        db.exec("COMMIT");
+        return out;
+      } catch (err) {
+        db.exec("ROLLBACK");
+        throw err;
+      }
+    },
+
     getById: (id) => (byId.get(String(id)) ? full(byId.get(String(id))) : null),
     /** Cliente cuyo teléfono coincide (9 últimos dígitos). Si lo comparten varios, null: se identificará por nombre. */
     getByPhone(phone) {

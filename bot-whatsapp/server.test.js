@@ -438,13 +438,13 @@ test("SINCRONIZACIÓN: la empresa ve el estado y puede lanzarla; importa los Exc
   fs.writeFileSync(path.join(syncDir, "clientes.xlsx"), buildWorkbook([{ name: "C", rows: [cabecera, ["8001", "CLIENTE SINCRONIZADO", "", "MEDINA", "", "", "", "A12345678", "No", "No", "1"]] }]));
   fs.writeFileSync(path.join(syncDir, "productos.xlsx"), buildWorkbook([{ name: "P", rows: [["Código", "Descripción", "Precio"], ["9001", "PRODUCTO NUEVO", "3,5"]] }]));
   let r = (await call("POST", "/api/admin/sincronizacion/ahora", { admin: true, body: {} })).json;
-  assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "importado"]);
+  assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "importado", "sin fichero"]);
   assert.equal((await call("GET", "/api/admin/clientes/lista?q=sincronizado", { admin: true })).json.total, 1);
   const ent = await entrarNif("345678"); // los 6 últimos números de A12345678: el cliente recién sincronizado ya tiene cuenta y entra
   assert.equal(ent.status, 200);
   assert.equal(ent.json.cliente.nombre, "CLIENTE SINCRONIZADO");
   r = (await call("POST", "/api/admin/sincronizacion/ahora", { admin: true, body: {} })).json;
-  assert.deepEqual(r.resultados.map((x) => x.estado), ["sin cambios", "sin cambios"]);
+  assert.deepEqual(r.resultados.map((x) => x.estado), ["sin cambios", "sin cambios", "sin fichero"]);
   e = (await call("GET", "/api/admin/sincronizacion", { admin: true })).json;
   assert.equal(e.registro.length, 1);
   assert.equal(e.ficheros.clientes.name, "clientes.xlsx");

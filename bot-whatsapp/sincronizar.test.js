@@ -35,20 +35,20 @@ test("carpeta local: importa clientes y productos, crea las cuentas, no repite s
   const d = deps(localSource(dir));
   let r = await sincronizar(d);
   assert.equal(r.ok, true);
-  assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "importado"]);
+  assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "importado", "sin fichero"]);
   assert.equal(d.customersDb.count(), 3);
   assert.equal(d.accountsDb.listAccounts().length, 3); // cuentas ya creadas
   assert.equal(d.customersDb.checkNif("1", "00001Z"), true); // el NIF se guarda solo como huella
   assert.equal(d.catalogDb.count(), 2);
   // sin cambios: no se vuelve a importar
   r = await sincronizar(d);
-  assert.deepEqual(r.resultados.map((x) => x.estado), ["sin cambios", "sin cambios"]);
+  assert.deepEqual(r.resultados.map((x) => x.estado), ["sin cambios", "sin cambios", "sin fichero"]);
   // cambia el precio de un producto y llega un cliente nuevo
   await new Promise((s) => setTimeout(s, 20));
   fs.writeFileSync(path.join(dir, "productos.xlsx"), productos([["1", "AGUA", "0,55"], ["2", "COLA", "0,6"]]));
   fs.writeFileSync(path.join(dir, "clientes.xlsx"), clientes(4));
   r = await sincronizar(d);
-  assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "importado"]);
+  assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "importado", "sin fichero"]);
   assert.equal(d.catalogDb.get("1").price, 0.55);
   assert.equal(d.customersDb.count(), 4);
   assert.equal(d.accountsDb.listAccounts().length, 4);
@@ -62,7 +62,7 @@ test("un fichero malo falla solo y se reintenta; un fichero de clientes incomple
   const d = deps(localSource(dir));
   let r = await sincronizar(d);
   assert.equal(r.ok, false);
-  assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "error"]); // los clientes entran aunque los productos fallen
+  assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "error", "sin fichero"]); // los clientes entran aunque los productos fallen
   assert.equal(d.customersDb.count(), 30);
   // fichero de clientes con solo 5 de 30
   await new Promise((s) => setTimeout(s, 20));
@@ -78,7 +78,7 @@ test("un fichero malo falla solo y se reintenta; un fichero de clientes incomple
 
 test("carpeta sin ficheros: lo dice claramente", async () => {
   const r = await sincronizar(deps(localSource(tmp())));
-  assert.deepEqual(r.resultados.map((x) => x.estado), ["sin fichero", "sin fichero"]);
+  assert.deepEqual(r.resultados.map((x) => x.estado), ["sin fichero", "sin fichero", "sin fichero"]);
 });
 
 // ---- Google Drive con un servidor de pruebas que imita la API (firma del JWT, listado, descarga y exportación) ----
@@ -127,12 +127,12 @@ test("Google Drive: firma el JWT, lista la carpeta, descarga el Excel y exporta 
     assert.deepEqual(lista.map((f) => f.name).sort(), ["Productos (hoja de Google)", "clientes.xlsx"]); // el .txt se ignora
     const d = deps(src);
     const r = await sincronizar(d);
-    assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "importado"]);
+    assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "importado", "sin fichero"]);
     assert.equal(d.customersDb.count(), 2);
     assert.equal(d.catalogDb.get("7").price, 1.2);
     assert.equal(visto.tokens, 1); // el token se reutiliza
     assert.equal(visto.bad, 0);
-    assert.deepEqual((await sincronizar(d)).resultados.map((x) => x.estado), ["sin cambios", "sin cambios"]);
+    assert.deepEqual((await sincronizar(d)).resultados.map((x) => x.estado), ["sin cambios", "sin cambios", "sin fichero"]);
   } finally {
     srv.close();
   }
@@ -154,4 +154,50 @@ test("Google Drive: errores claros (credenciales, carpeta no compartida) y nada 
   } finally {
     srv.close();
   }
+});
+
+// ---- Historial de compras (lo que prepara el servidor de la oficina a partir de la copia de a3) ----
+const historial = (rows) => buildWorkbook([{ name: "H", rows: [["Cód. cliente", "Fecha", "Documento", "Cód. artículo", "Cantidad"], ...rows] }]);
+
+test("historial: el Excel de compras alimenta el histórico de cada cliente (y se lee después de los clientes)", async () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, "clientes.xlsx"), clientes(2));
+  fs.writeFileSync(path.join(dir, "productos.xlsx"), productos([["1001", "AGUA", "0,5"], ["1002", "COLA", "0,6"]]));
+  fs.writeFileSync(path.join(dir, "historial-ventas.xlsx"), historial([
+    ["1", "28/10/2026", "A-100", "1001", "24"], ["1", "28/10/2026", "A-100", "1002", "12"], ["1", "2026-10-01", "A-090", "1001", "6"],
+    ["2", "15/10/2026", "A-095", "1002", "48"],
+    ["99", "15/10/2026", "A-096", "1002", "5"], // cliente que no existe
+    ["1", "15/10/2026", "A-097", "1001", "-3"], // abono: no cuenta
+    ["1", "sin fecha", "A-098", "1001", "3"],
+  ]));
+  const d = deps(localSource(dir));
+  const r = await sincronizar(d);
+  assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "importado", "importado"]);
+  assert.match(r.resultados[2].detalle, /2 clientes \(4 líneas\).*1 clientes desconocidos/);
+  const c1 = d.customersDb.getById("1");
+  assert.deepEqual(c1.orders.map((o) => [o.doc, o.date, o.lines.length]), [["A-100", "2026-10-28", 2], ["A-090", "2026-10-01", 1]]); // el más reciente primero
+  assert.deepEqual(d.customersDb.getById("2").orders[0].lines, [{ productId: "1002", qty: 48 }]);
+  // una versión nueva sustituye el historial de esos clientes
+  await new Promise((s) => setTimeout(s, 20));
+  fs.writeFileSync(path.join(dir, "historial-ventas.xlsx"), historial([["1", "29/10/2026", "A-101", "1002", "10"]]));
+  await sincronizar(d);
+  assert.deepEqual(d.customersDb.getById("1").orders.map((o) => o.doc), ["A-101"]);
+  assert.equal(d.customersDb.getById("2").orders.length, 1); // los que no vienen no se tocan
+});
+
+test("historial sin clientes cargados se rechaza con un mensaje claro; cabecera desconocida también", async () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, "historial.xlsx"), historial([["1", "28/10/2026", "A-1", "1001", "2"]]));
+  let r = await sincronizar(deps(localSource(dir)));
+  assert.equal(r.resultados[2].estado, "error");
+  assert.match(r.resultados[2].detalle, /importó antes el Excel de clientes/);
+  fs.writeFileSync(path.join(dir, "historial.xlsx"), buildWorkbook([{ name: "H", rows: [["a", "b"], ["1", "2"]] }]));
+  r = await sincronizar(deps(localSource(dir)));
+  assert.match(r.resultados[2].detalle, /cabecera/);
+});
+
+test("pickFiles: «historial-clientes» es historial, no la lista de clientes", () => {
+  const p = pickFiles([{ name: "historial-clientes.xlsx", modified: "2026-10-30" }, { name: "clientes.xlsx", modified: "2026-10-01" }, { name: "compras 2026.xlsx", modified: "2026-10-20" }]);
+  assert.equal(p.clientes.name, "clientes.xlsx");
+  assert.equal(p.historial.name, "historial-clientes.xlsx");
 });
