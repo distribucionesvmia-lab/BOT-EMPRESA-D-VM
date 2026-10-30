@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pedidos · Distribuciones VM</title>
+<style>
+  :root { --bg:#eef1ee; --panel:#fff; --fg:#17211c; --muted:#5d6b63; --line:#dbe2dd; --accent:#0f7a4d; --accent-fg:#fff; --chat:#e9e3da; --in:#fff; --out:#d6f0cf; --bar:#0b5b43; --err:#a12d2d; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1512; --panel:#18211d; --fg:#e6ede8; --muted:#93a39a; --line:#2a3630; --accent:#37c382; --accent-fg:#07251a; --chat:#0d1411; --in:#1e2924; --out:#1c4a37; --bar:#123c2e; --err:#f1a1a1; color-scheme: dark; } }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; background: var(--bg); color: var(--fg); display: flex; justify-content: center; padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  main { width: 100%; max-width: 440px; display: flex; flex-direction: column; min-height: 100%; padding: 16px; gap: 14px; }
+  h1 { font-size: 20px; margin: 8px 0 0; } p { margin: 0; color: var(--muted); }
+  form.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  input { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; }
+  input:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.main { font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 10px; padding: 12px; cursor: pointer; }
+  button.link { font: inherit; background: none; border: 0; color: var(--accent); font-weight: 600; cursor: pointer; padding: 4px; }
+  .err { color: var(--err); font-size: 14px; } .ok { color: var(--accent); font-size: 14px; }
+  .phone { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--chat); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; position: relative; height: calc(100vh - 32px); max-height: 760px; }
+  .bar { background: var(--bar); color: #fff; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .bar b { display: block; } .bar small { opacity: .8; }
+  .bar button { background: none; border: 1px solid rgba(255,255,255,.5); color: #fff; border-radius: 8px; padding: 5px 10px; cursor: pointer; font: inherit; font-size: 13px; }
+  #chat { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .m { max-width: 85%; padding: 7px 10px; border-radius: 9px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.35; box-shadow: 0 1px 1px rgba(0,0,0,.12); }
+  .m.in { background: var(--in); align-self: flex-start; } .m.out { background: var(--out); align-self: flex-end; }
+  .ui { display: flex; flex-direction: column; gap: 5px; width: min(85%, 300px); align-self: flex-start; } .ui.usado { opacity: .45; pointer-events: none; }
+  .pill { border: 0; background: var(--in); color: #1769b3; font: inherit; font-weight: 600; padding: 9px 12px; border-radius: 9px; cursor: pointer; box-shadow: 0 1px 1px rgba(0,0,0,.12); text-decoration: none; text-align: left; display: block; }
+  @media (prefers-color-scheme: dark) { .pill { color: #7dc0ff; } }
+  form.send { display: flex; gap: 8px; padding: 8px 10px; background: var(--panel); border-top: 1px solid var(--line); }
+  form.send input { flex: 1; min-width: 0; border-radius: 20px; }
+  form.send button { border: 0; background: var(--accent); color: var(--accent-fg); width: 42px; border-radius: 50%; font-size: 16px; cursor: pointer; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; max-height: 70%; overflow-y: auto; background: var(--panel); border-radius: 16px 16px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,.25); }
+  .sheet .h { padding: 12px 14px; font-weight: 600; display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); } .sheet .h span { cursor: pointer; }
+  .row { padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; flex-direction: column; gap: 2px; } .row small { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <!-- Entrar -->
+  <section id="acceso" hidden>
+    <h1>Pedidos · Distribuciones VM</h1>
+    <p>Entra con tu teléfono y el PIN que te dio la empresa.</p>
+    <form class="card" id="f-acceso">
+      <label>Teléfono<input id="a-tel" type="tel" inputmode="tel" autocomplete="tel" required></label>
+      <label>PIN de 6 cifras<input id="a-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password" required></label>
+      <div class="err" id="a-err" role="alert"></div>
+      <button class="main">Entrar</button>
+      <button class="link" type="button" id="ir-registro">¿No tienes acceso? Solicítalo</button>
+    </form>
+  </section>
+
+  <!-- Solicitar acceso -->
+  <section id="registro" hidden>
+    <h1>Solicitar acceso</h1>
+    <p>Dinos tus datos. La empresa los revisará, te llamará y te dará un PIN para entrar.</p>
+    <form class="card" id="f-registro">
+      <label>Nombre de tu empresa o negocio<input id="r-emp" maxlength="80" required></label>
+      <label>Teléfono (el mismo con el que te conocen)<input id="r-tel" type="tel" inputmode="tel" required></label>
+      <label>Correo electrónico<input id="r-mail" type="email" autocomplete="email" required></label>
+      <div class="err" id="r-err" role="alert"></div><div class="ok" id="r-ok" role="status"></div>
+      <button class="main">Enviar solicitud</button>
+      <button class="link" type="button" id="ir-acceso">Ya tengo PIN: entrar</button>
+    </form>
+  </section>
+
+  <!-- Chat -->
+  <section class="phone" id="chatbox" hidden>
+    <div class="bar"><div><b id="cli">Cliente</b><small>Asistente de pedidos</small></div><button type="button" id="salir">Salir</button></div>
+    <div id="chat" role="log" aria-live="polite"></div>
+    <div class="sheet" id="sheet" hidden></div>
+    <form class="send" id="f"><input id="t" autocomplete="off" placeholder="Escribe un mensaje" aria-label="Mensaje"><button aria-label="Enviar">➤</button></form>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const post = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const uuid = () => (self.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2));
+const chat = $("chat"), sheet = $("sheet");
+
+function ver(v) { for (const id of ["acceso", "registro", "chatbox"]) $(id).hidden = id !== v; }
+$("ir-registro").onclick = () => ver("registro");
+$("ir-acceso").onclick = () => ver("acceso");
+
+$("f-registro").onsubmit = async (e) => {
+  e.preventDefault(); $("r-err").textContent = ""; $("r-ok").textContent = "";
+  const r = await post("/api/registro", { empresa: $("r-emp").value, telefono: $("r-tel").value, correo: $("r-mail").value });
+  const j = await r.json().catch(() => ({}));
+  if (r.ok) { $("r-ok").textContent = j.mensaje; $("f-registro").reset(); } else $("r-err").textContent = j.error || "No se pudo enviar la solicitud.";
+};
+$("f-acceso").onsubmit = async (e) => {
+  e.preventDefault(); $("a-err").textContent = "";
+  const r = await post("/api/acceso", { telefono: $("a-tel").value, pin: $("a-pin").value });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { $("a-err").textContent = j.error || "No se pudo entrar."; $("a-pin").value = ""; return; }
+  $("f-acceso").reset(); entrar(j.cliente.nombre);
+};
+$("salir").onclick = async () => { await post("/api/salir", {}); chat.innerHTML = ""; ver("acceso"); };
+
+function burbuja(texto, clase) {
+  const d = document.createElement("div"); d.className = "m " + clase;
+  const esc = texto.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  d.innerHTML = esc.replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/_([^_\n]+)_/g, "<i>$1</i>");
+  chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
+}
+function pill(texto, fn, href) {
+  const el = document.createElement(href ? "a" : "button"); el.className = "pill"; el.textContent = texto;
+  if (href) el.href = href; else { el.type = "button"; el.onclick = fn; }
+  return el;
+}
+function interactivo(ui) {
+  const box = document.createElement("div"); box.className = "ui";
+  if (ui.type === "link") box.appendChild(pill("🔗 " + ui.title, null, ui.url));
+  else if (ui.type === "buttons") ui.buttons.forEach((b) => box.appendChild(pill(b.title, () => enviar(b.id, b.title))));
+  else box.appendChild(pill("☰ " + ui.button, () => {
+    sheet.innerHTML = "";
+    const h = document.createElement("div"); h.className = "h"; const t = document.createElement("span"); t.textContent = ui.section;
+    const x = document.createElement("span"); x.textContent = "✕"; x.onclick = () => (sheet.hidden = true); h.append(t, x); sheet.appendChild(h);
+    ui.rows.forEach((r) => { const row = document.createElement("div"); row.className = "row"; const a = document.createElement("b"); a.textContent = r.title; const d = document.createElement("small"); d.textContent = r.description; row.append(a, d); row.onclick = () => enviar(r.id, r.title); sheet.appendChild(row); });
+    sheet.hidden = false;
+  }));
+  chat.appendChild(box); chat.scrollTop = chat.scrollHeight;
+}
+async function enviar(texto, etiqueta, silencioso) {
+  document.querySelectorAll(".ui").forEach((u) => u.classList.add("usado")); sheet.hidden = true;
+  if (!silencioso) burbuja(etiqueta ?? texto, "out");
+  const r = await post("/api/chat", { text: texto, id: uuid() });
+  if (r.status === 401) { chat.innerHTML = ""; ver("acceso"); $("a-err").textContent = "Tu sesión ha caducado. Entra de nuevo."; return; }
+  const j = await r.json().catch(() => null);
+  if (!j) return burbuja("No he podido responder. Inténtalo de nuevo.", "in");
+  burbuja(j.reply, "in"); if (j.ui) interactivo(j.ui);
+}
+$("f").onsubmit = (e) => { e.preventDefault(); const v = $("t").value.trim(); if (v) { $("t").value = ""; enviar(v); } };
+function entrar(nombre) { $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); }
+
+(async () => {
+  const r = await fetch("/api/yo");
+  if (r.ok) entrar((await r.json()).cliente.nombre); else ver("acceso");
+})();
+</script>
+</body>
+</html>

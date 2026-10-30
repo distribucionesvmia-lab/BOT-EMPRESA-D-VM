@@ -26,6 +26,12 @@ services:
         value: /var/data/catalogo.sqlite
       - key: CUSTOMERS_DB
         value: /var/data/clientes.sqlite
+      - key: ACCOUNTS_DB
+        value: /var/data/cuentas.sqlite
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: TRUST_PROXY
+        value: "1"
       - key: BACKUP_DIR
         value: /var/data/respaldos
     disk:

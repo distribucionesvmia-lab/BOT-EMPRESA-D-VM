@@ -3,10 +3,11 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog as catalogNow, habitualProducts } from "./bot.js";
-import { getCatalog, catalogVersion, getCustomerByPhone, getCustomerById, findCustomers, createOrder } from "./erp.js";
+import { getCatalog, catalogVersion, getCustomerByPhone, getCustomerById, findCustomers, createOrder, getAccountsDb, customerDirectory } from "./erp.js";
 import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder } from "./pricing.js";
+import { createAuth } from "./auth.js";
 import { webProducts, webOrderFromBody } from "./weborder.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { BUSINESS } from "./config.js";
@@ -16,6 +17,8 @@ if (process.env.DEMO === "1") {
   process.env.DB_PATH ??= "demo.sqlite";
   process.env.CATALOG_DB ??= "catalogo-demo.sqlite";
   process.env.CUSTOMERS_DB ??= "clientes-demo.sqlite";
+  process.env.ACCOUNTS_DB ??= "cuentas-demo.sqlite";
+  process.env.ADMIN_TOKEN ??= "demo"; // clave de la vista del distribuidor en la demo
   process.env.EXPORT_DIR ??= "exportaciones-demo";
 }
 
@@ -37,6 +40,7 @@ const SESSION_TTL = 24 * 60 * 60 * 1000;
 const PUBLIC_URL = (process.env.PUBLIC_URL ?? `http://localhost:${PORT}`).replace(/\/$/, "");
 
 const sessions = new Map(); // teléfono -> { session, last }
+const chatSessions = new Map(); // id de cuenta -> { session, last }: conversación de un cliente con sesión iniciada
 
 const hasCredentials = () => WHATSAPP_TOKEN && PHONE_NUMBER_ID;
 
@@ -281,10 +285,102 @@ function validSignature(raw, header) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+// ---- Aplicación web de los clientes (sin WhatsApp): acceso con teléfono + PIN y vista del distribuidor ----
+const auth = createAuth({
+  accounts: getAccountsDb(),
+  customers: customerDirectory,
+  adminToken: process.env.ADMIN_TOKEN,
+  secure: PUBLIC_URL.startsWith("https://"),
+  trustProxy: process.env.TRUST_PROXY === "1",
+});
+const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
+const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" };
+const sendJson = (res, code, data) => res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify(data));
+
+// Conversación de un cliente con sesión: el cliente sale SIEMPRE de la cuenta (nunca de lo que envíe el navegador)
+async function accountChat(account, text, msgId) {
+  const customer = customerDirectory.getById(account.customerId);
+  if (!customer) throw new Error("La cuenta no tiene cliente asociado");
+  await refreshCatalog();
+  const entry = chatSessions.get(account.id);
+  let cur = entry && Date.now() - entry.last < SESSION_TTL ? entry.session : newSession(customer, "/catalogo", { phone: account.phone, holdUnverified: false, showHabitual: true });
+  cur = { ...cur, customer }; // datos al día (precios especiales, historial)
+  const out = handleMessage(cur, text);
+  chatSessions.set(account.id, { session: out.session, last: Date.now() });
+  if (out.order) {
+    const key = `chat:${account.id}:${msgId ?? crypto.randomUUID()}`; // el mismo mensaje reenviado no duplica el pedido
+    await createOrder(priceOrder({ at: new Date().toISOString(), phone: account.phone, key, ...out.order }, customer, catalogNow()));
+  }
+  return out;
+}
+
+const isJson = (req) => /^application\/json/i.test(req.headers["content-type"] ?? "");
+
+async function appRoutes(req, res, url) {
+  const p = url.pathname;
+  if (p === "/") {
+    if (!String(req.headers.accept ?? "").includes("text/html")) return void res.end("Bot activo");
+    return void res.writeHead(302, { Location: "/cliente" }).end();
+  }
+  if (p === "/cliente" && req.method === "GET") return void res.writeHead(200, HTML).end(page("cliente.html"));
+  if (p === "/distribuidor" && req.method === "GET") return void res.writeHead(200, HTML).end(page("distribuidor.html"));
+  if (await auth.route(req, res, url)) return;
+
+  const account = auth.sessionOf(req);
+
+  if (p === "/api/chat" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "No has iniciado sesión." });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const body = await readJson(req);
+    const text = typeof body?.text === "string" ? body.text.slice(0, 1000) : "";
+    const msgId = typeof body?.id === "string" && /^[\w-]{8,64}$/.test(body.id) ? body.id : undefined;
+    const out = await accountChat(account, text, msgId);
+    return void sendJson(res, 200, { reply: out.reply, ui: out.ui ?? null, handoff: !!out.handoff });
+  }
+
+  // Catálogo de pedido (la mini-aplicación) del cliente con sesión
+  if (p === "/catalogo" && req.method === "GET") {
+    if (!account) return void res.writeHead(302, { Location: "/cliente" }).end();
+    return void res.writeHead(200, HTML).end(page("pedido.html"));
+  }
+  if (p === "/catalogo/datos" && req.method === "GET") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const customer = customerDirectory.getById(account.customerId);
+    return void sendJson(res, 200, {
+      business: BUSINESS.name,
+      priceNote: BUSINESS.priceNote,
+      customer: { name: customer.name, address: customer.address },
+      used: false,
+      products: webProducts(customer, catalogNow(), habitualProducts),
+    });
+  }
+  if (p === "/catalogo" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const body = await readJson(req);
+    const key = typeof body?.key === "string" && /^[\w-]{8,64}$/.test(body.key) ? body.key : null;
+    if (!key) return void sendJson(res, 400, { error: "Solicitud no válida" });
+    const customer = customerDirectory.getById(account.customerId);
+    const built = webOrderFromBody(body, customer, { key: `web:${account.id}:${key}`, phone: account.phone }, catalogNow());
+    if (built.error) return void sendJson(res, 400, { error: built.error });
+    const priced = priceOrder(built.order, customer, catalogNow());
+    const { duplicate } = await createOrder(priced);
+    if (duplicate) return void sendJson(res, 409, { error: "Este pedido ya se envió" }); // doble clic o dos pestañas
+    return void sendJson(res, 200, { ok: true, message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} artículos, total aprox. ${priced.total.toFixed(2)}${BUSINESS.currency}.\n\n${BUSINESS.payment}` });
+  }
+  res.writeHead(404).end();
+}
+
 http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://x");
-    if (url.pathname === "/") return res.end("Bot activo");
+    if (url.pathname === "/" || url.pathname === "/cliente" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo")) {
+      appRoutes(req, res, url).catch((err) => {
+        console.error(err);
+        if (!res.headersSent) res.writeHead(500).end();
+      });
+      return;
+    }
     if (url.pathname === "/health") {
       // Para vigilar el servicio (UptimeRobot, Render…): responde 200 solo si la base de datos funciona
       try {

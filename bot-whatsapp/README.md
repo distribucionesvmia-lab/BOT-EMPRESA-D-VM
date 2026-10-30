@@ -64,6 +64,23 @@ Cuando haya API del ERP, solo hay que cambiar el interior de las funciones de `e
 
 Se gestionan con `node datos.js`: `importar <fichero.json>` (crea o actualiza; solo se tocan y se registran los campos que cambian), `ejemplo` (datos ficticios), `productos`, `clientes`, `precio <código> <precio>`, `historial <código>` y `buscar <nombre>`. Si cambian los productos o precios, el bot los usa **sin reiniciar**. La primera vez, si las bases están vacías, se cargan de `historial-demo.json` (el que genera `importar_historial.py`) o, en la demo, de `ejemplo/`. Más adelante la sincronización con a3ERP alimentará estas mismas bases.
 
+## 1c-ter. Cuentas de clientes (sin WhatsApp): alta aprobada por la empresa, teléfono + PIN
+Cada cliente entra en `/cliente` con su **teléfono y un PIN de 6 cifras**; la empresa lo gestiona en `/distribuidor`. Así **un cliente nunca ve el historial de otro**.
+1. **Solicitud:** el cliente pide acceso con el nombre de su empresa, su teléfono y su correo.
+2. **Aprobación:** la empresa abre `/distribuidor` (clave en `ADMIN_TOKEN`), ve la solicitud con **sugerencias de a qué cliente corresponde** (por nombre y por teléfono), llama al cliente para comprobar que es él y pulsa *Aprobar*. Se genera un **PIN que se muestra una sola vez**, para dárselo por teléfono. Con esa llamada se comprueba también que el teléfono es suyo: **un teléfono solo no es un secreto**, por eso hace falta el PIN.
+3. **Acceso:** teléfono + PIN. La sesión dura 30 días en una cookie `HttpOnly` y `SameSite=Strict`.
+4. **Chat y catálogo:** `/cliente` (chat con sus productos habituales) y `/catalogo` (la mini-aplicación).
+
+**Privacidad y seguridad (comprobado con pruebas de extremo a extremo en `server.test.js`):**
+- El cliente sale **siempre de la sesión**: ninguna ruta acepta un código de cliente enviado por el navegador. Un cliente no puede pedir datos ni hacer pedidos «como» otro, ni con parámetros, ni con el cuerpo, ni con una cookie falsa.
+- El PIN y el token de sesión no se guardan en claro (scrypt y SHA-256). Teléfono desconocido y PIN erróneo dan **la misma respuesta**.
+- 5 fallos bloquean la cuenta 15 minutos; tras 3 bloqueos queda bloqueada hasta que la empresa la reactive. Límite de intentos por IP.
+- Un **nuevo PIN** o **bloquear** cierra todas las sesiones de esa cuenta.
+- Los pedidos se guardan con una clave: reenviar el mismo pedido no lo duplica.
+- Variables: `ACCOUNTS_DB` (por defecto `cuentas.sqlite`), `ADMIN_TOKEN` (clave de la empresa; sin ella no se puede administrar; en la demo es `demo`), `TRUST_PROXY=1` si hay un proxy delante (para leer la IP real), y `PUBLIC_URL` con `https://` para que la cookie sea `Secure`.
+- Si se olvida el PIN: la empresa genera uno nuevo. Recuperarlo por correo requeriría un servicio de envío.
+- El código de WhatsApp (`/webhook`) sigue en el proyecto pero ya no se usa.
+
 ## 1d. Mini-aplicación de pedido (catálogo estilo app)
 A los clientes conocidos el bot les envía un botón **Hacer pedido** con un **enlace personal** a `/pedido/<token>`: una página para móvil con sus artículos habituales (precio, "Última vez: N uds", botón "+" y contador de unidades), buscador, catálogo completo, carrito, nota y confirmación. Al confirmar, el pedido se graba igual que los del chat (con código de cliente y de artículo) y el cliente recibe la confirmación por WhatsApp.
 - El enlace va **firmado y caduca a las 24 h**, solo sirve para ese cliente y **para enviar un solo pedido**. Los artículos y precios se validan en el servidor.

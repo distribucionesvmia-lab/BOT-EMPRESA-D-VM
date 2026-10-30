@@ -168,18 +168,21 @@ const WHO_PROMPT =
   `Para atenderte, dime el *nombre de tu negocio* tal y como nos compras (por ejemplo: _Bar El Ejemplo_) o tu *código de cliente*.\n\n` +
   `Si eres cliente nuevo, escribe *nuevo*.`;
 
-// Tras identificar al cliente: confirmación + sus productos habituales (los que más y más recientemente compra)
-const identifiedIntro = (s) => {
+// Sus productos habituales (los que más y más recientemente compra)
+const habitualBlock = (s) => {
   const top = habitualProducts(s.customer).slice(0, 6);
-  const list = top.length
+  return top.length
     ? `⭐ *Tus productos habituales* (según tus últimos pedidos):\n` + top.map((p) => `• ${p.name} — última vez: ${p.lastQty} uds`).join("\n") + `\n\n`
     : `Todavía no tengo pedidos tuyos anteriores.\n\n`;
-  return `✅ ¡Identificado! Eres *${s.customer.name}* (cód. ${s.customer.id}).\n\n${list}`;
 };
+// Tras identificar al cliente por su nombre: confirmación + sus productos habituales
+const identifiedIntro = (s) => `✅ ¡Identificado! Eres *${s.customer.name}* (cód. ${s.customer.id}).\n\n${habitualBlock(s)}`;
 
 const greeting = (s, justIdentified = false) => {
   if (!s.customer) return { reply: s.opts?.identify && s.state === "who" ? WHO_PROMPT : GENERIC_MENU };
-  const hi = justIdentified ? identifiedIntro(s) : `👋 ¡Hola, *${s.customer.name}*! Soy el asistente de *${BUSINESS.name}*.\n\n`;
+  const saludo = `👋 ¡Hola, *${s.customer.name}*! Soy el asistente de *${BUSINESS.name}*.\n\n`;
+  // opts.showHabitual: cliente con sesión iniciada: se le saluda y se le muestran sus habituales
+  const hi = justIdentified ? identifiedIntro(s) : s.opts?.showHabitual ? saludo + habitualBlock(s) : saludo;
   // Con enlace personal: se abre el catálogo de pedido. Sin él: lista y botones dentro del chat
   if (s.link) {
     return {

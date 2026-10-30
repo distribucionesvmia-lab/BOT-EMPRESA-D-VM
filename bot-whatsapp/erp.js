@@ -9,6 +9,7 @@ import { getDb } from "./db.js";
 import { importData } from "./seed.js";
 import { openCatalogDb } from "./catalogo-db.js";
 import { openCustomersDb } from "./clientes-db.js";
+import { openAccountsDb } from "./cuentas-db.js";
 
 const { SHEET_WEBHOOK_URL, SHEET_SECRET } = process.env;
 
@@ -49,6 +50,25 @@ export async function getCustomerById(id) {
 }
 /** Clientes que encajan con el nombre o código que escribe el cliente. */
 export const findCustomers = (query) => dbs().customersDb.find(query);
+
+// Cuentas de acceso de los clientes (teléfono + PIN) en su propia base: cuentas.sqlite
+let accountsDb;
+export const getAccountsDb = () => (accountsDb ??= openAccountsDb());
+
+const digits9 = (p) => String(p ?? "").replace(/\D/g, "").slice(-9);
+/** Lo que necesita la administración de cuentas: listar clientes, ficha por código y sugerencias para aprobar una solicitud. */
+export const customerDirectory = {
+  list: () => dbs().customersDb.list(),
+  getById: (id) => dbs().customersDb.getById(id),
+  /** Clientes que podrían ser el que pide acceso: por el nombre de empresa que escribió o por su teléfono. */
+  suggest(business, phone) {
+    const out = new Map();
+    for (const c of dbs().customersDb.find(business)) out.set(c.id, { id: c.id, name: c.name, phone: c.phone, motivo: "nombre" });
+    const k = digits9(phone);
+    if (k.length === 9) for (const c of dbs().customersDb.list()) if (digits9(c.phone) === k) out.set(c.id, { id: c.id, name: c.name, phone: c.phone, motivo: out.has(c.id) ? "nombre y teléfono" : "teléfono" });
+    return [...out.values()];
+  },
+};
 
 export async function createOrder(order) {
   const result = getDb().createOrder(order); // si falla, el error se propaga: el pedido NO se da por registrado

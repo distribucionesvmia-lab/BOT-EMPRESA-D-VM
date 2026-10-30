@@ -88,7 +88,7 @@
   </section>
 
   <section class="screen" id="done" hidden>
-    <div class="ok"><div class="tick">✓</div><h2 id="doneT">¡Pedido recibido!</h2><p id="doneP" style="color:var(--gris)"></p></div>
+    <div class="ok"><div class="tick">✓</div><h2 id="doneT">¡Pedido recibido!</h2><p id="doneP" style="color:var(--gris)"></p><p id="backlink" hidden><a href="/cliente">Volver al chat</a></p></div>
   </section>
 </div>
 
@@ -98,6 +98,8 @@ const $ = id => document.getElementById(id);
 const COLORS = ["#2f8f6b", "#c0763a", "#5b7bd5", "#a1507c", "#8a8f2b", "#3c8fa6", "#b8523f", "#6c5ba8"];
 const eur = n => n.toFixed(2).replace(".", ",") + " €";
 let data = null, tab = "hab", query = "";
+// Clave de este pedido: si se reenvía (doble clic, fallo de red), el servidor no lo duplica
+const orderKey = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
 const qty = new Map(); // id -> cantidad (en cajas o en unidades, según unitOf)
 const unitOf = new Map(); // id -> "ud" | "caja"
 const notes = new Map(); // id -> observación de la línea
@@ -214,17 +216,17 @@ $("back").onclick = $("keep").onclick = () => showCart(false);
 $("confirm").onclick = async () => {
   const btn = $("confirm"); btn.disabled = true; $("err").textContent = "";
   try {
-    const r = await fetch(location.pathname, { method: "POST", body: JSON.stringify({ lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value }) });
+    const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "No se ha podido enviar el pedido");
-    $("doneP").textContent = j.message; $("done").hidden = false;
+    $("doneP").textContent = j.message; $("done").hidden = false; $("backlink").hidden = parent !== window;
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
   } catch (e) { $("err").textContent = e.message; btn.disabled = false; }
 };
 
 (async () => {
   const r = await fetch(location.pathname + "/datos");
-  if (!r.ok) { $("ttl").textContent = "Enlace caducado"; $("sub").textContent = "Escribe «hola» en WhatsApp para recibir uno nuevo."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
+  if (!r.ok) { $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con tu teléfono y PIN</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
   data = await r.json();
   document.title = "Pedido a " + data.business;
   $("ttl").textContent = "Pedido a " + data.business;
@@ -232,7 +234,7 @@ $("confirm").onclick = async () => {
   $("logo").textContent = initials(data.business);
   $("addr").textContent = "📍 Entrega en: " + (data.customer.address || "—");
   $("priceNote").textContent = data.priceNote || "";
-  if (data.used) { $("doneT").textContent = "Este pedido ya se envió"; $("doneP").textContent = "Escribe «hola» en WhatsApp para hacer otro."; $("done").hidden = false; return; }
+  if (data.used) { $("doneT").textContent = "Este pedido ya se envió"; $("doneP").textContent = "Vuelve al chat para hacer otro pedido."; $("done").hidden = false; return; }
   if (!data.products.some(p => p.count > 0)) { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); }
   refresh();
 })();
