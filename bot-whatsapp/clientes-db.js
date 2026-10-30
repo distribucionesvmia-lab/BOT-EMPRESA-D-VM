@@ -146,6 +146,9 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       const r = db.prepare("SELECT nif_keys FROM customers WHERE id = ? AND active = 1").get(String(id));
       return !!r?.nif_keys && nifMatches(String(id), typed, JSON.parse(r.nif_keys));
     },
+    /** Ids de los clientes activos cuyo NIF termina en lo escrito (sin decir el nombre). Normalmente uno; si hay coincidencia de códigos, varios. */
+    findByNif: (typed) =>
+      db.prepare("SELECT id, nif_keys FROM customers WHERE active = 1 AND nif_keys IS NOT NULL").all().filter((r) => nifMatches(r.id, typed, JSON.parse(r.nif_keys))).map((r) => r.id),
     withNif: () => db.prepare("SELECT COUNT(*) AS n FROM customers WHERE nif_keys IS NOT NULL").get().n,
 
     getById: (id) => (byId.get(String(id)) ? full(byId.get(String(id))) : null),

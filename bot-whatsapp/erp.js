@@ -67,6 +67,7 @@ export const customerDirectory = {
   search: (opts) => dbs().customersDb.search(opts),
   /** Acceso con NIF: clientes que encajan con el nombre escrito (flexible) y comprobación de los 6 últimos caracteres. */
   candidates: (query) => dbs().customersDb.candidates(query),
+  findByNif: (typed) => dbs().customersDb.findByNif(typed),
   checkNif: (id, typed) => dbs().customersDb.checkNif(id, typed),
   /** ¿El nombre escrito coincide con el del cliente (nombre comercial o razón social)? Un cliente de baja nunca coincide. */
   nameMatches: (customer, typed) => !!customer && findCustomersIn([customer], typed).length > 0,

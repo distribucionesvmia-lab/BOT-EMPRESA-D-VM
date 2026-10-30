@@ -43,9 +43,9 @@
   <!-- Entrar -->
   <section id="acceso" hidden>
     <h1>Pedidos · Distribuciones VM</h1>
-    <p>Entra con el nombre de tu empresa y los <b>6 últimos caracteres de tu NIF o CIF</b>.</p>
+    <p>Entra con los <b>6 últimos caracteres de tu NIF o CIF</b>.</p>
     <form class="card" id="f-acceso">
-      <label>Nombre de tu empresa<input id="a-emp" maxlength="80" autocomplete="organization" required></label>
+      <label id="l-emp" hidden>Nombre de tu empresa<input id="a-emp" maxlength="80" autocomplete="organization"></label>
       <label id="l-nif">Últimos 6 caracteres del NIF/CIF<input id="a-nif" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 45678Z" required></label>
       <label id="l-tel" hidden>Teléfono<input id="a-tel" type="tel" inputmode="tel" autocomplete="tel"></label>
       <label id="l-pin" hidden>PIN de 6 cifras<input id="a-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password"></label>
@@ -103,17 +103,18 @@ $("f-registro").onsubmit = async (e) => {
 let conPin = false; // alternativa: teléfono + PIN (clientes dados de alta con solicitud)
 function modoAcceso(pin) {
   conPin = pin;
-  $("l-nif").hidden = pin; $("l-tel").hidden = !pin; $("l-pin").hidden = !pin;
-  $("a-nif").required = !pin; $("a-tel").required = pin; $("a-pin").required = pin;
+  $("l-nif").hidden = pin; $("l-emp").hidden = !pin; if (!pin) $("a-emp").value = ""; $("l-tel").hidden = !pin; $("l-pin").hidden = !pin;
+  $("a-nif").required = !pin; $("a-emp").required = pin; $("a-tel").required = pin; $("a-pin").required = pin;
   $("ir-pin").textContent = pin ? "Entrar con los 6 últimos del NIF" : "Entrar con teléfono y PIN";
   $("a-err").textContent = "";
 }
 $("ir-pin").onclick = () => modoAcceso(!conPin);
 $("f-acceso").onsubmit = async (e) => {
   e.preventDefault(); $("a-err").textContent = "";
-  const body = conPin ? { telefono: $("a-tel").value, empresa: $("a-emp").value, pin: $("a-pin").value } : { empresa: $("a-emp").value, nif: $("a-nif").value };
+  const body = conPin ? { telefono: $("a-tel").value, empresa: $("a-emp").value, pin: $("a-pin").value } : { nif: $("a-nif").value, ...(!$("l-emp").hidden && { empresa: $("a-emp").value }) };
   const r = await post("/api/acceso", body);
   const j = await r.json().catch(() => ({}));
+  if (j.necesitaNombre) { $("l-emp").hidden = false; $("a-emp").focus(); $("a-err").textContent = j.error; return; } // mismo NIF en varios negocios: pide el nombre
   if (!r.ok) { $("a-err").textContent = j.error || "No se pudo entrar."; $("a-pin").value = ""; $("a-nif").value = ""; return; }
   $("f-acceso").reset(); entrar(j.cliente.nombre);
 };

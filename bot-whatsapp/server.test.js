@@ -18,7 +18,7 @@ before(async () => {
   proc = spawn(process.execPath, ["server.js"], {
     cwd: path.dirname(new URL(import.meta.url).pathname),
     env: {
-      ...process.env, DEMO: "1", PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
+      ...process.env, DEMO: "1", PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
       DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"),
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -358,30 +358,41 @@ test("RETENCIÓN: los pedidos de una cuenta automática sin confirmar quedan ret
   assert.deepEqual(ped.map((o) => o.estado).sort(), ["pendiente", "pendiente"]);
 });
 
-const entrarNif = (empresa, nif) => call("POST", "/api/acceso", { body: { empresa, nif } });
+const entrarNif = (nif, empresa) => call("POST", "/api/acceso", { body: { nif, ...(empresa ? { empresa } : {}) } });
 
-test("ACCESO CON NIF: las cuentas ya están creadas y el cliente entra con el nombre (aunque varíe) y los 6 últimos del NIF", async () => {
+test("ACCESO CON NIF: las cuentas ya están creadas y el cliente entra solo con los 6 últimos caracteres del NIF", async () => {
   // Todos los clientes activos importados tienen ya su cuenta, y el NIF no aparece en ninguna respuesta
   const cuentas = (await call("GET", "/api/admin/cuentas", { admin: true })).json;
   assert.ok(cuentas.find((c) => c.customerId === "7003"));
   assert.equal(cuentas.find((c) => c.customerId === "7002"), undefined); // de baja: sin cuenta
   assert.equal(JSON.stringify(cuentas).includes("B11111111"), false);
-  // nombre distinto al guardado («importada» vale para «CAFETERIA IMPORTADA») + NIF B11111111 → últimos 6: 111111
-  const r = await entrarNif("importada", "111111");
+  // NIF B11111111 → últimos 6: 111111 (sin decir el nombre)
+  const r = await entrarNif("111111");
   assert.equal(r.status, 200);
   assert.equal(r.json.cliente.nombre, "CAFETERIA IMPORTADA");
   assert.equal((await call("GET", "/api/yo", { cookie: cookieOf(r) })).json.cliente.nombre, "CAFETERIA IMPORTADA");
-  assert.equal((await entrarNif("Cafetería Importada", "b11111111")).status, 200); // también con el NIF entero
-  // errores: NIF equivocado, cliente sin NIF, nombre demasiado genérico, cliente de baja
-  assert.equal((await entrarNif("importada", "999999")).status, 401);
-  assert.equal((await entrarNif("kiosco sin datos", "000000")).status, 401);
-  assert.equal((await entrarNif("importada", "12")).status, 400);
-  assert.equal((await entrarNif("ferreteria cerrada", "111111")).status, 401);
-  // 5 fallos bloquean la cuenta, incluso con el NIF correcto
-  for (let i = 0; i < 5; i++) await entrarNif("importada", "000001");
-  const b = await entrarNif("importada", "111111");
+  assert.equal((await entrarNif("b11111111")).status, 200); // también con el NIF entero
+  assert.equal((await entrarNif("111111", "importada")).status, 200); // el nombre, si se envía, solo estrecha la búsqueda
+  assert.equal((await entrarNif("111111", "otra cosa")).status, 401);
+  // errores: NIF equivocado, texto demasiado corto, cliente de baja
+  assert.equal((await entrarNif("999999")).status, 401);
+  assert.equal((await entrarNif("12")).status, 400);
+  // un mismo NIF en dos negocios: pide el nombre y con él entra en el que corresponde
+  await subir(Buffer.from(buildWorkbook([{ name: "CLIENTES", rows: [cabecera,
+    ["7101", "BAR UNO", "TITULAR REPETIDO", "", "", "", "", "12222222A", "No", "No", "1"],
+    ["7102", "BAR DOS", "TITULAR REPETIDO", "", "", "", "", "12222222A", "No", "No", "1"],
+  ] }])));
+  const amb = await entrarNif("22222A");
+  assert.deepEqual([amb.status, amb.json.necesitaNombre], [409, true]);
+  assert.equal((await entrarNif("222222", "bar dos")).json.cliente.nombre, "BAR DOS");
+  // la empresa puede bloquear la cuenta: ni con el NIF correcto entra, y al reactivarla vuelve a entrar
+  const c = await cuentaDe("7001");
+  await call("POST", `/api/admin/cuentas/${c.id}/bloquear`, { admin: true, body: { bloquear: true } });
+  const b = await entrarNif("111111");
   assert.equal(b.status, 401);
   assert.match(b.json.error, /bloqueada/);
+  await call("POST", `/api/admin/cuentas/${c.id}/bloquear`, { admin: true, body: { bloquear: false } });
+  assert.equal((await entrarNif("111111")).status, 200);
 });
 
 test("EMPRESA: las solicitudes sin coincidencia muestran por qué y qué clientes podrían ser", async () => {

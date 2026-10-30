@@ -76,6 +76,9 @@ export { send, readJson };
 export function createAuth({ accounts, customers, secure = false, trustProxy = false }) {
   // Límites por IP (configurables para las pruebas): accesos cada 10 minutos y solicitudes de alta cada hora
   const loginLimit = rateLimiter(Number(process.env.LOGIN_LIMIT ?? 20), 10 * 60_000);
+  // Acceso solo con NIF (sin nombre): no hay una cuenta a la que contar los fallos, así que se limita más por IP y en conjunto
+  const nifLimit = rateLimiter(Number(process.env.NIF_LIMIT ?? 10), 10 * 60_000);
+  const nifGlobalFails = rateLimiter(Number(process.env.NIF_GLOBAL_FAILS ?? 15), 60 * 60_000); // fallos de NIF por hora, entre todos los clientes
   const registerLimit = rateLimiter(Number(process.env.REGISTER_LIMIT ?? 20), 60 * 60_000);
   const ip = (req) => (trustProxy ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() : "") || req.socket.remoteAddress || "?";
   const cookie = (token, maxAge) => `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
@@ -120,17 +123,25 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       const empresa = String(b.empresa ?? "").slice(0, 80);
-      if (empresa.trim().length < 2) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
-      // Cliente habitual: nombre de la empresa (puede variar: «alegría» vale para «Bar Alegría») + 6 últimos caracteres del NIF
+      // Cliente habitual: solo los 6 últimos caracteres del NIF/CIF (el nombre es opcional: si se envía, estrecha la búsqueda)
       if (b.nif !== undefined) {
         if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe los 6 últimos caracteres de tu NIF." }), true;
-        const cand = customers.candidates(empresa);
-        if (cand.length > 6) return send(res, 400, { error: "Escribe el nombre completo de tu empresa." }), true;
-        const r = accounts.loginNif(cand.map((c) => c.id), (id) => customers.checkNif(id, b.nif));
-        if (!r.ok) return send(res, 401, { error: r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Empresa o NIF incorrectos." }), true;
+        if (!nifLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+        const nombre = empresa.trim().length >= 2 ? new Set(customers.candidates(empresa).map((c) => c.id)) : null;
+        const ids = customers.findByNif(b.nif).filter((id) => !nombre || nombre.has(id));
+        // Si nadie coincide no hay cuenta a la que anotar el fallo: se cuenta en conjunto y, si hay demasiados, se frena a todo el mundo un rato
+        if (!ids.length) {
+          if (!nifGlobalFails("fallos")) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde o llama a la empresa." }), true;
+          return send(res, 401, { error: "NIF incorrecto." }), true;
+        }
+        // Varios negocios con el mismo NIF (p. ej. un mismo titular con dos locales): se pide además el nombre, sin anotar fallo
+        if (ids.length > 1 && !nombre) return send(res, 409, { necesitaNombre: true, error: "Hay varios negocios con ese NIF. Escribe también el nombre de tu empresa." }), true;
+        const r = accounts.loginNif(ids, () => true);
+        if (!r.ok || ids.length > 1) return send(res, 401, { error: r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "NIF incorrecto. Si te sigue fallando, llama a la empresa." }), true;
         const customer = customers.getById(r.account.customerId);
         return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": cookie(r.token, 30 * 86400) }), true;
       }
+      if (empresa.trim().length < 2) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
       // Teléfono + PIN + nombre de la empresa: el nombre debe coincidir con el del cliente guardado en la base de datos
       const r = accounts.login(b.telefono, b.pin, undefined, (acc) => customers.nameMatches(customers.getById(acc.customerId), empresa));
       if (!r.ok) return send(res, 401, { error: r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Teléfono o PIN incorrectos." }), true;
