@@ -10,18 +10,19 @@ test("clasificación por el nombre, con las categorías y subcategorías de la w
   assert.equal(k("S.PELLEGRINO 75 CL"), "aguas/pellegrino");
   assert.equal(k("VINO TINTO CRIANZA 75 CL (CAJA 6)"), "vinos/otros");
   assert.equal(k("Palacio de Bornos Verdejo"), "vinos/bornos");
-  assert.equal(k("Leche Pascual Classic semidesnatada 10 L"), "lacteos/leche");
-  assert.equal(k("Vivesoy Barista"), "lacteos/vegetales"); // «barista» aquí es de Pascual, no de café
-  assert.equal(k("Yogur natural vaso"), "lacteos/yogures");
-  assert.equal(k("ZUMO NARANJA 1 L"), "lacteos/zumos");
+  assert.equal(k("Leche Pascual Classic semidesnatada 10 L"), "pascual/leche");
+  assert.equal(k("Vivesoy Barista"), "pascual/vegetales"); // «barista» aquí es de Pascual, no de café
+  assert.equal(k("Yogur natural vaso"), "pascual/yogures");
+  assert.equal(k("ZUMO NARANJA 1 L"), "pascual/zumos");
   assert.equal(k("Café Mocay Maestro 1 kg"), "cafe/maestro");
   assert.equal(k("Infusión Mocay pirámide"), "cafe/infusiones");
-  assert.equal(k("Atún claro Calvo en aceite de oliva"), "conservas/aceites");
-  assert.equal(k("Kétchup Helios 3 kg"), "conservas/salsas");
+  assert.equal(k("Atún claro Calvo en aceite de oliva"), "despensa/calvo");
+  assert.equal(k("Kétchup Helios 3 kg"), "despensa/helios");
+  assert.equal(k("Aceite de oliva virgen extra 5 L"), "despensa/aceites");
   assert.equal(k("Chorizo Campofrío"), "refrigerados/charcuteria");
   assert.equal(k("Queso Reny Picot"), "refrigerados/quesos");
   assert.equal(k("Croissant mantequilla congelado Panamar"), "congelados/croissants");
-  assert.equal(k("Copa de cristal 33 cl"), "menaje/cristaleria");
+  assert.equal(k("Copa de cristal 33 cl"), "otros/otros"); // Menaje ya no es categoría de la web
   assert.equal(k("REFRESCO COLA LATA 33 CL"), "otros/refrescos");
   assert.equal(k("CERVEZA RUBIA LATA 33 CL"), "otros/cervezas");
   assert.equal(k("PATATAS FRITAS 150 GR"), "otros/snacks");
@@ -40,5 +41,5 @@ test("árbol: orden de la web, solo con productos, con sus cuentas", () => {
   const t = arbolCategorias([{ name: "AGUA MINERAL" }, { name: "Bezoya 1,5 L" }, { name: "CERVEZA RUBIA" }, { name: "Vino tinto" }, { name: "x", category: "Droguería", subcategory: "Limpieza" }]);
   assert.deepEqual(t.map((c) => [c.id, c.count]), [["vinos", 1], ["aguas", 2], ["otros", 1], ["f-drogueria", 1]]);
   assert.deepEqual(t[1].subs.map((s) => [s.id, s.count]), [["bezoya", 1], ["otros", 1]]); // en el orden de la web
-  assert.equal(CATEGORIAS.length, 9);
+  assert.deepEqual(CATEGORIAS.map((c) => c.nombre), ["Café", "Pascual", "Vinos", "Aguas", "Despensa", "Refrigerados", "Congelados", "Otros productos"]);
 });

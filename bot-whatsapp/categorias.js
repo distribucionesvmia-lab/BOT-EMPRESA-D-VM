@@ -1,5 +1,5 @@
-// Categorías y subcategorías del catálogo, las mismas que la web de la empresa (Lo que distribuimos): Café, Lácteos, Vinos, Aguas,
-// Aceite y conservas, Refrigerados, Congelados y Menaje (+ «Otros productos» para lo que no encaja: refrescos, cervezas, snacks…).
+// Categorías y subcategorías del catálogo, las del menú de la web de la empresa: Café, Pascual, Vinos, Aguas, Despensa, Refrigerados
+// y Congelados (+ «Otros productos», solo si hay algo que no encaja: refrescos, cervezas, snacks…).
 // Función pura (sin Node): la usan el servidor y la demo del navegador.
 //
 // Cada producto se clasifica así: si la ficha trae categoría/subcategoría (columnas «Categoría»/«Familia» y «Subcategoría»/«Subfamilia»
@@ -13,24 +13,22 @@ export const CATEGORIAS = [
   { id: "cafe", nombre: "Café", icono: "☕", re: /mocay|\bcafe\b|descafe|infusi|capsula/, subs: [
     ["maestro", "Maestro", /maestro/], ["barista", "Barista", /barista/], ["descafeinado", "Sin pausa (descafeinado)", /descafe|sin pausa/],
     ["infusiones", "Infusiones", /infusi|\bte\b|manzanilla|poleo|tila/], ["complementos", "Complementos", /azucar|sobre|palito|agitador|complement/], ["otros", "Otros cafés", /./]] },
-  { id: "lacteos", nombre: "Lácteos", icono: "🥛", re: /leche|pascual|bifrutas|vivesoy|yogur|yogikids|natilla|flan\b|postre|batido|zumo|\bnata\b|soja|avena|vegetal/, subs: [
+  { id: "pascual", nombre: "Pascual", icono: "🥛", re: /leche|pascual|bifrutas|vivesoy|yogur|yogikids|natilla|flan\b|postre|batido|zumo|\bnata\b|soja|avena|vegetal/, subs: [
     ["vegetales", "Bebidas vegetales", /vivesoy|soja|avena|vegetal|almendra/], ["yogures", "Yogures y Yogikids", /yogur|yogikids/], ["postres", "Natillas y postres", /natilla|flan\b|postre|cuajada/],
-    ["zumos", "Zumos y batidos", /zumo|bifrutas|batido|nectar/], ["leche", "Leche", /leche|\bnata\b/], ["otros", "Otros lácteos", /./]] },
+    ["zumos", "Zumos y batidos", /zumo|bifrutas|batido|nectar/], ["leche", "Leche", /leche|\bnata\b/], ["otros", "Otros Pascual", /./]] },
   { id: "vinos", nombre: "Vinos", icono: "🍷", re: /\bvino\b|bornos|verdejo|tinto|blanco|rosado|crianza|reserva|\bcava\b|pazos|rioja|ribera|albarino|tempranillo|sauvignon/, subs: [
     ["bornos", "Palacio de Bornos", /bornos/], ["pazos", "Pazos de Baró", /pazos|baro|albarino/], ["ribera", "Ribera del Duero", /ribera|tempranillo/], ["otros", "Otras bodegas", /./]] },
   { id: "aguas", nombre: "Aguas", icono: "💧", re: /\bagua\b|\baguas\b|bezoya|aquarel|pellegrino|perrier|pedras|mineral|con gas|sin gas/, subs: [
     ["bezoya", "Bezoya", /bezoya/], ["aquarel", "Nestlé Aquarel", /aquarel/], ["pellegrino", "S.Pellegrino", /pellegrino/], ["perrier", "Perrier", /perrier/], ["pedras", "Pedras", /pedras/], ["otros", "Otras aguas", /./]] },
-  { id: "conservas", nombre: "Aceite y conservas", icono: "🫒", re: /aceite|\baove\b|oliva|calvo|helios|\bprima\b|koipe|carbonell|luengo|ballena|carmencita|borges|villacampo|atun|bonito|sardina|conserva|tomate|ketchup|catsup|mayonesa|mostaza|salsa|maiz|esparrago|pimiento|aceituna|vinagre|especia|pimenton|oregano/, subs: [
-    ["aceites", "Aceites", /aceite|\baove\b|oliva|koipe|carbonell|borges/], ["conservas", "Conservas", /atun|bonito|sardina|calvo|conserva|esparrago|pimiento|maiz|ballena|villacampo|aceituna|luengo/],
-    ["salsas", "Salsas y tomate", /salsa|ketchup|catsup|mayonesa|mostaza|tomate|helios|\bprima\b|vinagre/], ["especias", "Especias", /especia|pimenton|carmencita|oregano/], ["otros", "Otros", /./]] },
+  { id: "despensa", nombre: "Despensa", icono: "🫒", re: /aceite|\baove\b|oliva|calvo|helios|\bprima\b|koipe|carbonell|luengo|ballena|carmencita|borges|villacampo|vegagel|atun|bonito|sardina|conserva|tomate|ketchup|catsup|mayonesa|mostaza|salsa|maiz|esparrago|pimiento|aceituna|vinagre|especia|pimenton|oregano|sirope|torti/, subs: [
+    ["calvo", "Calvo", /calvo/], ["helios", "Helios", /helios/], ["prima", "Prima", /\bprima\b/], ["koipe", "Carbonell · Koipe", /carbonell|koipe/], ["luengo", "Luengo", /luengo/],
+    ["ballena", "La Ballena", /ballena/], ["carmencita", "Carmencita", /carmencita/], ["borges", "Borges", /borges/], ["villacampo", "Villacampo", /villacampo|vegagel/],
+    ["aceites", "Aceites", /aceite|\baove\b|oliva/], ["conservas", "Conservas", /atun|bonito|sardina|conserva|esparrago|pimiento|maiz|aceituna/], ["salsas", "Salsas y tomate", /salsa|ketchup|catsup|mayonesa|mostaza|tomate|vinagre|sirope/], ["otros", "Otros", /./]] },
   { id: "refrigerados", nombre: "Refrigerados", icono: "🧀", re: /queso|charcut|jamon|chorizo|salchich|salchicha|lomo|fiambre|embutido|campofrio|reny|picot|mantequilla|bacon|panceta|pate\b|ahumado|preparado/, subs: [
     ["quesos", "Quesos", /queso|reny|picot/], ["charcuteria", "Charcutería", /jamon|chorizo|salchich|lomo|fiambre|embutido|campofrio|bacon|panceta|pate\b/], ["lacteos", "Lácteos", /mantequilla|\bnata\b/], ["preparados", "Preparados", /./]] },
   { id: "congelados", nombre: "Congelados", icono: "❄️", prio: -1, re: /congelad|panamar|croissant|bolleria|baguette|chapata|napolitana|donut|ensaimada|magdalena|palmera|pizza|helado|empanad|croqueta|nugget|rebozad|tarta|brownie|bizcocho|muffin|cheesecake/, subs: [
     ["panes", "Panes y barras", /\bpan\b|barra|baguette|chapata/], ["croissants", "Croissants", /croissant/], ["bolleria", "Bollería dulce", /bolleria|napolitana|donut|ensaimada|magdalena|palmera/],
     ["snacks", "Snacks salados", /snack|croqueta|empanad|nugget|pizza|rebozad/], ["pasteleria", "Pastelería", /pastel|tarta|brownie|bizcocho|muffin|cheesecake/], ["otros", "Otros congelados", /./]] },
-  { id: "menaje", nombre: "Menaje", icono: "🍽️", re: /vajilla|cuberter|cristaler|manteler|\bvaso\b|\bvasos\b|\bcopa\b|\bcopas\b|\bplato\b|\bplatos\b|\btaza\b|cuchar|tenedor|cuchillo|jarra|bandeja|servilleta|\bfuente\b|\bolla\b|sarten/, subs: [
-    ["vajilla", "Vajilla", /vajilla|plato|taza|fuente|bandeja/], ["cuberteria", "Cubertería", /cuberter|cuchar|tenedor|cuchillo/], ["cristaleria", "Cristalería", /cristaler|vaso|copa|jarra/],
-    ["manteleria", "Mantelería", /manteler|mantel|servilleta/], ["otros", "Auxiliar", /./]] },
   { id: "otros", nombre: "Otros productos", icono: "🛒", re: /./, subs: [
     ["refrescos", "Refrescos", /refresco|\bcola\b|fanta|limonada|tonica|isotonic|energetic|gaseosa|tonic/], ["cervezas", "Cervezas", /cerveza|\bcerv\b|radler|lager/],
     ["snacks", "Snacks", /patata|snack|frutos secos|aperitivo|cacahuete|pipas|palomitas/], ["otros", "Otros", /./]] },
