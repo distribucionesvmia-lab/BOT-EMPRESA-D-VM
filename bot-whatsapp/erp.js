@@ -10,6 +10,7 @@ import { importData } from "./seed.js";
 import { openCatalogDb } from "./catalogo-db.js";
 import { openCustomersDb } from "./clientes-db.js";
 import { openAccountsDb } from "./cuentas-db.js";
+import { findCustomers as findCustomersIn } from "./identify.js";
 
 const { SHEET_WEBHOOK_URL, SHEET_SECRET } = process.env;
 
@@ -55,21 +56,26 @@ export const findCustomers = (query) => dbs().customersDb.find(query);
 let accountsDb;
 export const getAccountsDb = () => (accountsDb ??= openAccountsDb());
 
-const digits9 = (p) => String(p ?? "").replace(/\D/g, "").slice(-9);
-/** Lo que necesita la administración de cuentas: listar clientes, ficha por código y sugerencias para aprobar una solicitud. */
+/** Lo que necesitan las cuentas y la administración: ficha, comprobación de altas, búsqueda e importación de clientes. */
 export const customerDirectory = {
   list: () => dbs().customersDb.list(),
   getById: (id) => dbs().customersDb.getById(id),
-  /** Clientes que podrían ser el que pide acceso: por el nombre de empresa que escribió o por su teléfono. */
-  suggest(business, phone) {
-    const out = new Map();
-    for (const c of dbs().customersDb.find(business)) out.set(c.id, { id: c.id, name: c.name, phone: c.phone, motivo: "nombre" });
-    const k = digits9(phone);
-    if (k.length === 9) for (const c of dbs().customersDb.list()) if (digits9(c.phone) === k) out.set(c.id, { id: c.id, name: c.name, phone: c.phone, motivo: out.has(c.id) ? "nombre y teléfono" : "teléfono" });
-    return [...out.values()];
-  },
+  /** Comprueba una solicitud de alta contra los clientes guardados (ver clientes-db.js). */
+  matchRegistration: (x) => dbs().customersDb.matchRegistration(x),
+  /** Clientes que podrían ser el que pide acceso, con el motivo (nombre, teléfono, correo). */
+  suggest: (business, phone, email) => dbs().customersDb.matchRegistration({ business, phone, email }).suggestions,
+  search: (opts) => dbs().customersDb.search(opts),
+  /** ¿El nombre escrito coincide con el del cliente (nombre comercial o razón social)? Un cliente de baja nunca coincide. */
+  nameMatches: (customer, typed) => !!customer && findCustomersIn([customer], typed).length > 0,
+  /** Crea o actualiza clientes (la lista que se importa del Excel de a3ERP). */
+  importMany: (list) => dbs().customersDb.upsertCustomers(list),
 };
 
+/**
+ * Guarda el pedido en la base de datos propia (SQLite). Si la clave de idempotencia (order.key) ya existe,
+ * no crea otro pedido y devuelve el original con duplicate=true.
+ * La copia a la hoja de Google es opcional y solo se envía para pedidos nuevos.
+ */
 export async function createOrder(order) {
   const result = getDb().createOrder(order); // si falla, el error se propaga: el pedido NO se da por registrado
   if (result.duplicate) {

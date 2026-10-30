@@ -109,3 +109,36 @@ test("rechazar una solicitud no crea cuenta", () => {
   assert.equal(db.listAccounts().length, 0);
   assert.equal(db.reject(id), false);
 });
+
+test("el cliente elige su PIN al registrarse: al aprobar se activa ese PIN y no se genera otro", () => {
+  const db = openAccountsDb(":memory:");
+  assert.match(db.requestRegistration(solicitud({ pin: "12ab56" })).error, /PIN/);
+  const { id } = db.requestRegistration(solicitud({ pin: "123456" }));
+  const r = db.approve(id, "9001");
+  assert.equal(r.pin, undefined);
+  assert.equal(r.account.verified, true);
+  assert.equal(db.login("600111222", "123456").ok, true);
+  assert.equal(db.login("600111222", "654321").ok, false);
+});
+
+test("alta automática: cuenta creada con el PIN del cliente pero sin confirmar; la empresa puede confirmarla", () => {
+  const db = openAccountsDb(":memory:");
+  const r = db.registerAuto({ ...solicitud(), pin: "246810", customerId: "493", matched: "nombre + teléfono" });
+  assert.deepEqual([r.account.customerId, r.account.verified, r.account.status], ["493", false, "active"]);
+  assert.equal(db.login("600111222", "246810").ok, true);
+  assert.equal(db.listRegistrations("auto")[0].matched, "nombre + teléfono");
+  assert.match(db.registerAuto({ ...solicitud(), pin: "111111", customerId: "493" }).error, /ya tiene acceso/);
+  assert.equal(db.confirm(1), true);
+  assert.equal(db.listAccounts()[0].verified, true);
+  assert.match(db.registerAuto({ ...solicitud({ phone: "699000111" }), pin: "12", customerId: "1" }).error, /PIN/);
+});
+
+test("acceso con comprobación extra: si falla (nombre de empresa distinto) cuenta como un intento fallido", () => {
+  const db = openAccountsDb(":memory:");
+  db.registerAuto({ ...solicitud(), pin: "246810", customerId: "493" });
+  const exigeNombre = (nombre) => (acc) => acc.customerId === "493" && nombre === "bar el ejemplo";
+  assert.deepEqual(db.login("600111222", "246810", undefined, exigeNombre("otro")), { ok: false, reason: "invalid" });
+  assert.equal(db.login("600111222", "246810", undefined, exigeNombre("bar el ejemplo")).ok, true);
+  for (let i = 0; i < MAX_FAILED; i++) db.login("600111222", "246810", undefined, exigeNombre("mal")); // adivinar el nombre también bloquea
+  assert.deepEqual(db.login("600111222", "246810", undefined, exigeNombre("bar el ejemplo")), { ok: false, reason: "locked" });
+});

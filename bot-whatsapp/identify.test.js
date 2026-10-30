@@ -46,3 +46,19 @@ test("si varios clientes encajan por igual se devuelven todos (el bot pedirá el
 test("ignora clientes dados de baja", () => {
   assert.deepEqual(ids("Mesón Antiguo"), []);
 });
+
+test("también encuentra por la razón social", () => {
+  const lista = [{ id: "1", name: "CARNICERIA JESUS", legalName: "JESUS ALONSO ARRIBAS" }, { id: "2", name: "BAR LA PLAZA", legalName: "" }];
+  assert.deepEqual(findCustomers(lista, "carniceria jesus").map((c) => c.id), ["1"]);
+  assert.deepEqual(findCustomers(lista, "Jesús Alonso Arribas").map((c) => c.id), ["1"]);
+  assert.deepEqual(findCustomers(lista, "Jesus Alonso").map((c) => c.id), ["1"]);
+  assert.deepEqual(findCustomers(lista, "Jesus").map((c) => c.id), []); // una sola palabra de tres no basta
+});
+
+test("la forma jurídica (SL, S.A., CB…) no cuenta: «Tienda Ficticia S.L.» es «Tienda Ficticia»", () => {
+  const lista = [{ id: "1", name: "TIENDA FICTICIA", legalName: "TIENDA FICTICIA S.L." }, { id: "2", name: "BAR LA PLAZA CB" }];
+  assert.deepEqual(findCustomers(lista, "Tienda Ficticia SL").map((c) => c.id), ["1"]);
+  assert.deepEqual(findCustomers(lista, "tienda ficticia s.l.").map((c) => c.id), ["1"]);
+  assert.deepEqual(findCustomers(lista, "Bar La Plaza").map((c) => c.id), ["2"]);
+  assert.deepEqual(findCustomers(lista, "SL"), []); // solo la forma jurídica no identifica a nadie
+});

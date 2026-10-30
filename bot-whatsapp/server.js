@@ -317,11 +317,13 @@ async function accountChat(account, text, msgId) {
   chatSessions.set(account.id, { session: out.session, last: Date.now() });
   if (out.order) {
     const key = `chat:${account.id}:${msgId ?? crypto.randomUUID()}`; // el mismo mensaje reenviado no duplica el pedido
-    await createOrder(priceOrder({ at: new Date().toISOString(), phone: account.phone, key, ...out.order }, customer, catalogNow()));
+    await createOrder(priceOrder({ at: new Date().toISOString(), phone: account.phone, key, ...holdIfUnconfirmed(account, out.order) }, customer, catalogNow()));
   }
   return out;
 }
 
+// Cuenta de alta automática aún sin confirmar por la empresa: puede pedir, pero sus pedidos se retienen hasta que alguien los revise
+const holdIfUnconfirmed = (account, order) => (account.verified ? order : { ...order, review: true, reason: "Cuenta de alta automática sin confirmar: comprueba que es el cliente antes de exportar" });
 const isJson = (req) => /^application\/json/i.test(req.headers["content-type"] ?? "");
 
 async function appRoutes(req, res, url) {
@@ -381,7 +383,7 @@ async function appRoutes(req, res, url) {
     const customer = customerDirectory.getById(account.customerId);
     const built = webOrderFromBody(body, customer, { key: `web:${account.id}:${key}`, phone: account.phone }, catalogNow());
     if (built.error) return void sendJson(res, 400, { error: built.error });
-    const priced = priceOrder(built.order, customer, catalogNow());
+    const priced = priceOrder(holdIfUnconfirmed(account, built.order), customer, catalogNow());
     const { duplicate } = await createOrder(priced);
     if (duplicate) return void sendJson(res, 409, { error: "Este pedido ya se envió" }); // doble clic o dos pestañas
     return void sendJson(res, 200, { ok: true, message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} artículos, total aprox. ${priced.total.toFixed(2)}${BUSINESS.currency}.\n\n${BUSINESS.payment}` });

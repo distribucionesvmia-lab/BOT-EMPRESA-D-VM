@@ -81,6 +81,12 @@ Cada cliente entra en `/cliente` con su **teléfono y un PIN de 6 cifras**; la e
 - Si se olvida el PIN: la empresa genera uno nuevo. Recuperarlo por correo requeriría un servicio de envío.
 - El código de WhatsApp (`/webhook`) sigue en el proyecto pero ya no se usa.
 
+### Alta automática y carga de clientes desde Excel
+- **Carga:** en `/distribuidor` → pestaña *Clientes* → importar el Excel de a3ERP (o `node datos.js clientes-excel fichero.xlsx`). Se guardan nombre, razón social, población, teléfonos y correos. **No se guarda el NIF.** El Excel real nunca se sube al repositorio.
+- **Registro del cliente:** empresa + teléfono + correo + un PIN que elige él. El sistema compara el **nombre de la empresa** con la base y exige que coincida el **teléfono o el correo** guardados; si coincide con un único cliente se da acceso al momento, si no queda en *Solicitudes de alta* para revisión manual.
+- **Acceso:** teléfono + nombre de la empresa + PIN.
+- Las cuentas creadas automáticamente quedan **sin confirmar**: sus pedidos se retienen con el motivo hasta que la empresa pulsa *Confirmar* en *Cuentas*.
+
 ## 1c-quater. Dos aplicaciones distintas: la del cliente y la de la empresa
 > Cómo entregarlas y cómo entrar tú a la de la empresa sin que el cliente pueda: **`docs/DESPLIEGUE.md`** (Docker Compose con la del cliente publicada y la de la empresa solo en el servidor).
 Comparten las mismas bases de datos, pero **no se mezclan**: lo que se entrega al cliente no contiene nada de lo del empresario.

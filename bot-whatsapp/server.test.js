@@ -18,7 +18,7 @@ before(async () => {
   proc = spawn(process.execPath, ["server.js"], {
     cwd: path.dirname(new URL(import.meta.url).pathname),
     env: {
-      ...process.env, DEMO: "1", PORT: String(PORT), PUBLIC_URL: BASE, LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
+      ...process.env, DEMO: "1", PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
       DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"),
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -38,16 +38,17 @@ const call = async (method, url, { body, cookie, admin, headers } = {}) => {
 };
 const cookieOf = (r) => r.setCookie.split(";")[0];
 
-// Alta y aprobación de un cliente: devuelve { cookie, pin }
-async function darDeAlta(telefono, empresa, clienteId) {
-  assert.equal((await call("POST", "/api/registro", { body: { telefono, correo: "x@ejemplo.es", empresa } })).status, 200);
-  const sol = (await call("GET", "/api/admin/solicitudes", { admin: true })).json.find((s) => s.business === empresa);
-  const ok = await call("POST", `/api/admin/solicitudes/${sol.id}/aprobar`, { admin: true, body: { clienteId } });
-  assert.equal(ok.status, 200);
-  const login = await call("POST", "/api/acceso", { body: { telefono, pin: ok.json.pin } });
-  assert.equal(login.status, 200);
-  return { cookie: cookieOf(login), pin: ok.json.pin, solId: sol.id, login };
+// Alta de un cliente: se registra con el PIN que elige. Devuelve { cookie, pin, estado }
+async function registrar(telefono, empresa, correo, pin) {
+  const r = await call("POST", "/api/registro", { body: { telefono, correo, empresa, pin } });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  return r.json.estado;
 }
+async function entrar(telefono, empresa, pin) {
+  const login = await call("POST", "/api/acceso", { body: { telefono, empresa, pin } });
+  return { status: login.status, cookie: login.status === 200 ? cookieOf(login) : null, login };
+}
+const cuentaDe = async (clienteId, telefono) => (await call("GET", "/api/admin/cuentas", { admin: true })).json.find((c) => c.customerId === clienteId && (!telefono || c.phone === telefono));
 
 let A, B;
 test("sin sesión no se accede a nada del cliente", async () => {
@@ -65,32 +66,67 @@ test("la administración exige la clave de la empresa", async () => {
   assert.equal((await call("POST", "/api/admin/cuentas/1/pin", { body: {} })).status, 403);
 });
 
-test("registro: valida datos y la empresa ve la solicitud con sugerencias de cliente", async () => {
-  assert.equal((await call("POST", "/api/registro", { body: { telefono: "12", correo: "x@e.es", empresa: "Bar" } })).status, 400);
-  assert.equal((await call("POST", "/api/registro", { body: { telefono: "600000001", correo: "mal", empresa: "Bar El Ejemplo" } })).status, 400);
-  await call("POST", "/api/registro", { body: { telefono: "600000001", correo: "a@ejemplo.es", empresa: "Bar El Ejemplo" } });
+test("registro: valida los datos", async () => {
+  const mal = (body) => call("POST", "/api/registro", { body });
+  const ok = { telefono: "600000001", correo: "a@ejemplo.es", empresa: "Bar El Ejemplo", pin: "111111" };
+  assert.equal((await mal({ ...ok, telefono: "12" })).status, 400);
+  assert.equal((await mal({ ...ok, correo: "mal" })).status, 400);
+  assert.equal((await mal({ ...ok, empresa: " " })).status, 400);
+  assert.equal((await mal({ ...ok, pin: "12ab" })).status, 400);
+  assert.equal((await mal({ ...ok, pin: undefined })).status, 400);
+});
+
+test("ALTA AUTOMÁTICA: si el nombre y el teléfono (o el correo) coinciden con la base de clientes, entra sin esperar a nadie", async () => {
+  assert.equal(await registrar("600000001", "Bar El Ejemplo", "a@ejemplo.es", "111111"), "activa");
+  assert.equal(await registrar("600000002", "tienda ficticia", "b@ejemplo.es", "222222"), "activa");
+  assert.equal((await call("GET", "/api/admin/solicitudes", { admin: true })).json.length, 0); // no hizo falta que nadie aprobara
+  const a = await cuentaDe("9001");
+  assert.equal(a.verified, false); // entra, pero queda por confirmar
+});
+
+test("ALTA PENDIENTE: si no coincide, la empresa ve la solicitud con lo que encajó y la aprueba; vale el PIN que eligió el cliente", async () => {
+  // el nombre coincide con un cliente pero el teléfono y el correo no: no entra solo
+  assert.equal(await registrar("699111222", "Bar El Ejemplo", "otro@ejemplo.es", "333333"), "pendiente");
+  assert.equal((await entrar("699111222", "Bar El Ejemplo", "333333")).status, 401); // aún sin acceso
   const sol = (await call("GET", "/api/admin/solicitudes", { admin: true })).json;
   assert.equal(sol.length, 1);
-  assert.deepEqual(sol[0].sugerencias.map((s) => s.id), ["9001"]); // por nombre y teléfono
-  assert.equal(sol[0].sugerencias[0].motivo, "nombre y teléfono");
+  assert.match(sol[0].matched, /nombre coincide/i);
+  assert.deepEqual(sol[0].sugerencias.map((x) => x.id), ["9001"]);
+  assert.equal((await call("POST", `/api/admin/solicitudes/${sol[0].id}/aprobar`, { admin: true, body: { clienteId: "0000" } })).status, 400);
+  const ap = await call("POST", `/api/admin/solicitudes/${sol[0].id}/aprobar`, { admin: true, body: { clienteId: "9001" } });
+  assert.equal(ap.status, 200);
+  assert.equal(ap.json.pin, undefined); // no se inventa otro PIN: vale el que eligió
+  assert.equal((await entrar("699111222", "Bar El Ejemplo", "333333")).status, 200);
 });
 
-test("aprobar con un cliente que no existe se rechaza; un teléfono aprobado entra con su PIN", async () => {
-  const sol = (await call("GET", "/api/admin/solicitudes", { admin: true })).json[0];
-  assert.equal((await call("POST", `/api/admin/solicitudes/${sol.id}/aprobar`, { admin: true, body: { clienteId: "0000" } })).status, 400);
-  A = await darDeAlta("600000001", "Bar El Ejemplo", "9001");
-  B = await darDeAlta("600000002", "Tienda Ficticia", "9002");
-  assert.match(A.pin, /^\d{6}$/);
-  const c = A.login.setCookie;
-  assert.match(c, /HttpOnly/);
-  assert.match(c, /SameSite=Strict/);
+test("ACCESO: pide teléfono, nombre de la empresa y PIN, y el nombre se compara con la base de datos", async () => {
+  assert.equal((await call("POST", "/api/acceso", { body: { telefono: "600000001", pin: "111111" } })).status, 400); // falta la empresa
+  const bien = await entrar("600000001", "Bar El Ejemplo", "111111");
+  assert.equal(bien.status, 200);
+  assert.match(bien.login.setCookie, /HttpOnly/);
+  assert.match(bien.login.setCookie, /SameSite=Strict/);
+  A = { cookie: bien.cookie, pin: "111111" };
   assert.equal((await call("GET", "/api/yo", { cookie: A.cookie })).json.cliente.nombre, "Bar El Ejemplo (ficticio)");
+  assert.equal((await entrar("600000001", "Tienda Ficticia", "111111")).status, 401); // PIN bueno, nombre de OTRA empresa
+  assert.equal((await entrar("600000001", "Bar Inventado", "111111")).status, 401);
+  B = { cookie: (await entrar("600000002", "Tienda Ficticia SL", "222222")).cookie, pin: "222222" }; // también vale con variantes del nombre
+  assert.ok(B.cookie);
 });
 
-test("PIN incorrecto y teléfono desconocido dan el mismo mensaje", async () => {
-  const mal = await call("POST", "/api/acceso", { body: { telefono: "600000001", pin: "000000" } });
-  const desconocido = await call("POST", "/api/acceso", { body: { telefono: "699999999", pin: "123456" } });
+test("la empresa confirma las cuentas automáticas", async () => {
+  for (const id of ["9001", "9002"]) {
+    const c = await cuentaDe(id, id === "9001" ? "600000001" : "600000002");
+    assert.equal((await call("POST", `/api/admin/cuentas/${c.id}/confirmar`, { admin: true, body: {} })).status, 200);
+  }
+  assert.equal((await cuentaDe("9001", "600000001")).verified, true);
+});
+
+test("PIN incorrecto, nombre incorrecto y teléfono desconocido dan el mismo mensaje", async () => {
+  const mal = await call("POST", "/api/acceso", { body: { telefono: "600000001", empresa: "Bar El Ejemplo", pin: "000000" } });
+  const nombre = await call("POST", "/api/acceso", { body: { telefono: "600000001", empresa: "Otra Empresa", pin: "111111" } });
+  const desconocido = await call("POST", "/api/acceso", { body: { telefono: "699999999", empresa: "Bar El Ejemplo", pin: "123456" } });
   assert.equal(mal.status, 401);
+  assert.deepEqual(mal.json, nombre.json);
   assert.deepEqual(mal.json, desconocido.json);
 });
 
@@ -156,8 +192,8 @@ test("un nuevo PIN cierra las sesiones y el PIN viejo deja de valer; bloquear co
   const cuentaB = cuentas.find((c) => c.customerId === "9002");
   const nuevo = await call("POST", `/api/admin/cuentas/${cuentaB.id}/pin`, { admin: true, body: {} });
   assert.equal((await call("GET", "/api/yo", { cookie: B.cookie })).status, 401);
-  assert.equal((await call("POST", "/api/acceso", { body: { telefono: "600000002", pin: B.pin } })).status, 401);
-  const ok = await call("POST", "/api/acceso", { body: { telefono: "600000002", pin: nuevo.json.pin } });
+  assert.equal((await entrar("600000002", "Tienda Ficticia", B.pin)).status, 401);
+  const ok = await call("POST", "/api/acceso", { body: { telefono: "600000002", empresa: "Tienda Ficticia", pin: nuevo.json.pin } });
   assert.equal(ok.status, 200);
   const cookieB = cookieOf(ok);
   await call("POST", `/api/admin/cuentas/${cuentaB.id}/bloquear`, { admin: true, body: { bloquear: true } });
@@ -165,8 +201,8 @@ test("un nuevo PIN cierra las sesiones y el PIN viejo deja de valer; bloquear co
 });
 
 test("tras varios PIN erróneos la cuenta se bloquea aunque luego se ponga el PIN bueno", async () => {
-  for (let i = 0; i < 5; i++) await call("POST", "/api/acceso", { body: { telefono: "600000001", pin: "111111" } });
-  const r = await call("POST", "/api/acceso", { body: { telefono: "600000001", pin: A.pin } });
+  for (let i = 0; i < 5; i++) await call("POST", "/api/acceso", { body: { telefono: "600000001", empresa: "Bar El Ejemplo", pin: "999999" } });
+  const r = await call("POST", "/api/acceso", { body: { telefono: "600000001", empresa: "Bar El Ejemplo", pin: A.pin } });
   assert.equal(r.status, 401);
   assert.match(r.json.error, /bloqueada/i);
 });
@@ -176,7 +212,7 @@ test("salir cierra la sesión", async () => {
   const a = cuentas.find((c) => c.customerId === "9001");
   await call("POST", `/api/admin/cuentas/${a.id}/pin`, { admin: true, body: {} }); // quita el bloqueo
   const pin = (await call("POST", `/api/admin/cuentas/${a.id}/pin`, { admin: true, body: {} })).json.pin;
-  const ok = await call("POST", "/api/acceso", { body: { telefono: "600000001", pin } });
+  const ok = await call("POST", "/api/acceso", { body: { telefono: "600000001", empresa: "Bar El Ejemplo", pin } });
   const cookie = cookieOf(ok);
   assert.equal((await call("GET", "/api/yo", { cookie })).status, 200);
   await call("POST", "/api/salir", { cookie, body: {} });
@@ -268,4 +304,65 @@ test("EMPRESA: adivinar la clave tiene límite de intentos", async () => {
   } finally {
     p.kill();
   }
+});
+
+// ---- Importar la lista de clientes (Excel de a3ERP) y retención de cuentas automáticas sin confirmar ----
+import { buildWorkbook } from "./xlsx.js";
+const cabecera = ["Cód. cliente", "Organización", "Razón social / Nombre fiscal de la organización", "Población", "Dirección fiscal", "Teléfono", "E-Mail", "NIF", "Bloqueado", "Obsoleto", "Sección"];
+const excelClientes = () =>
+  Buffer.from(buildWorkbook([{ name: "CLIENTES", rows: [cabecera,
+    ["    7001", "CAFETERIA IMPORTADA", "MARIA LOPEZ SL", "MEDINA DEL CAMPO", "CL. UNO 1", "611222333 / 983 00 11 22", "cafe@importada.es", "B11111111", "No", "No", "1"],
+    ["    7002", "FERRETERIA CERRADA", "FERRETERIA CERRADA", "TORDESILLAS", "CL. DOS 2", "622333444", "", "", "Sí", "No", "1"],
+    ["    7003", "KIOSCO SIN DATOS", "KIOSCO SIN DATOS", "", "", "", "", "", "No", "No", "1"],
+  ] }]));
+const subir = (buf, admin = true) => fetch(`${BASE}/api/admin/clientes/importar`, { method: "POST", headers: { "Content-Type": "application/octet-stream", ...(admin ? { Authorization: `Bearer ${ADMIN}` } : {}) }, body: buf }).then(async (r) => ({ status: r.status, json: await r.json() }));
+
+test("IMPORTAR: la empresa sube el Excel de clientes y aparecen en su lista (sin NIF)", async () => {
+  assert.equal((await subir(excelClientes(), false)).status, 403);
+  assert.equal((await subir(Buffer.from("no es un excel"))).status, 400);
+  const r = await subir(excelClientes());
+  assert.equal(r.status, 200);
+  assert.deepEqual([r.json.importados, r.json.nuevos, r.json.inactivos, r.json.sinTelefono, r.json.sinCorreo], [3, 3, 1, 1, 2]);
+  const lista = (await call("GET", "/api/admin/clientes/lista?q=importada", { admin: true })).json;
+  assert.equal(lista.total, 1);
+  assert.deepEqual([lista.clientes[0].id, lista.clientes[0].phones, lista.clientes[0].emails], ["7001", ["611222333", "983001122"], ["cafe@importada.es"]]);
+  assert.equal(JSON.stringify(lista).includes("B11111111"), false);
+  assert.equal((await call("GET", "/api/admin/clientes/lista", { admin: true })).json.total >= 5, true);
+  assert.equal((await subir(excelClientes())).json.nuevos, 0); // repetirlo actualiza, no duplica
+});
+
+test("IMPORTAR + ALTA AUTOMÁTICA: un cliente importado entra solo si coincide el nombre y uno de sus datos; los de baja o sin datos, no", async () => {
+  assert.equal(await registrar("655000000", "Cafetería Importada", "cafe@importada.es", "444444"), "activa"); // nombre + correo (el teléfono es otro)
+  assert.equal(await registrar("611222333", "Maria Lopez SL", "x@x.es", "555555"), "activa"); // razón social + uno de sus dos teléfonos
+  assert.equal(await registrar("622333444", "Ferretería Cerrada", "z@z.es", "666666"), "pendiente"); // cliente de baja
+  assert.equal(await registrar("600999888", "Kiosco Sin Datos", "k@k.es", "777777"), "pendiente"); // sin teléfono ni correo guardados
+  assert.equal(await registrar("611222333", "Panadería Inventada", "p@p.es", "888888"), "pendiente"); // teléfono sí, nombre no
+  assert.equal((await entrar("622333444", "Ferretería Cerrada", "666666")).status, 401);
+});
+
+test("RETENCIÓN: los pedidos de una cuenta automática sin confirmar quedan retenidos hasta que la empresa la confirma", async () => {
+  const { cookie } = await entrar("655000000", "Cafetería Importada", "444444");
+  assert.ok(cookie);
+  const pedir = (key) => call("POST", "/catalogo", { cookie, body: { key, lines: [{ id: "1010", qty: 1 }] } });
+  assert.equal((await pedir("clave-retenido")).status, 200);
+  let ped = (await call("GET", "/api/admin/pedidos", { admin: true })).json.find((o) => o.codigo === "7001");
+  assert.equal(ped.estado, "retenido");
+  assert.match(ped.motivo, /sin confirmar/);
+  // «Revisado: exportar» libera ese pedido concreto
+  assert.equal((await call("POST", `/api/admin/pedidos/${ped.ref}/aprobar`, { admin: true, body: {} })).status, 200);
+  // y tras confirmar la cuenta, los siguientes pedidos ya no se retienen
+  const c = await cuentaDe("7001", "655000000");
+  assert.equal((await call("POST", `/api/admin/cuentas/${c.id}/confirmar`, { admin: true, body: {} })).status, 200);
+  assert.equal((await pedir("clave-normal")).status, 200);
+  ped = (await call("GET", "/api/admin/pedidos", { admin: true })).json.filter((o) => o.codigo === "7001");
+  assert.deepEqual(ped.map((o) => o.estado).sort(), ["pendiente", "pendiente"]);
+});
+
+test("EMPRESA: las solicitudes sin coincidencia muestran por qué y qué clientes podrían ser", async () => {
+  const sol = (await call("GET", "/api/admin/solicitudes", { admin: true })).json;
+  const k = sol.find((x) => x.business === "Panadería Inventada");
+  assert.match(k.matched, /No hay ningún cliente con ese nombre/);
+  assert.deepEqual(k.sugerencias.map((x) => x.id), ["7001"]); // coincide su teléfono con ese cliente
+  assert.match(k.sugerencias[0].motivo, /teléfono/);
+  assert.ok(sol.length >= 3);
 });

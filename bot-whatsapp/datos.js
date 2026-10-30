@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Gestión de las bases de datos de productos y de clientes:
 //   node datos.js importar <fichero.json>      carga {products, customers} (crea o actualiza; registra cambios)
+//   node datos.js clientes-excel <lista.xlsx>  carga la lista de clientes que exporta a3ERP (Excel)
 //   node datos.js ejemplo                      carga los datos FICTICIOS de ejemplo/
 //   node datos.js productos                    lista el catálogo
 //   node datos.js clientes                     lista los clientes
@@ -11,6 +12,7 @@ import fs from "node:fs";
 import { openCatalogDb } from "./catalogo-db.js";
 import { openCustomersDb } from "./clientes-db.js";
 import { importData } from "./seed.js";
+import { parseClientesXlsx } from "./clientes-import.js";
 
 const [cmd, a, b] = process.argv.slice(2);
 const cat = openCatalogDb();
@@ -23,6 +25,12 @@ switch (cmd) {
     const file = cmd === "ejemplo" ? new URL("./ejemplo/historial-ficticio.json", import.meta.url) : a;
     if (!file) throw new Error("Indica el fichero: node datos.js importar historial.json");
     console.log(importData(read(file), cat, cus));
+    break;
+  }
+  case "clientes-excel": {
+    if (!a) throw new Error("Indica el Excel: node datos.js clientes-excel clientes.xlsx");
+    const { customers, stats } = parseClientesXlsx(fs.readFileSync(a));
+    console.log({ ...stats, ...cus.upsertCustomers(customers) });
     break;
   }
   case "productos":
@@ -41,7 +49,7 @@ switch (cmd) {
     console.log(cus.find(a).map((c) => `${c.id} ${c.name}`).join("\\n") || "Sin coincidencias");
     break;
   default:
-    console.log("Uso: node datos.js importar <fichero.json> | ejemplo | productos | clientes | precio <código> <precio> | historial <código> | buscar <nombre>");
+    console.log("Uso: node datos.js importar <fichero.json> | clientes-excel <lista.xlsx> | ejemplo | productos | clientes | precio <código> <precio> | historial <código> | buscar <nombre>");
 }
 cat.close();
 cus.close();

@@ -142,23 +142,26 @@
       <div id="c-acceso" hidden>
         <form class="form" id="f-acceso">
           <h2 style="margin:0">Entrar</h2>
-          <p class="msg">Entra con tu teléfono y el PIN que te dio la empresa.</p>
+          <p class="msg">Entra con tu teléfono, el nombre de tu empresa y tu PIN.</p>
           <label>Teléfono<input id="a-tel" type="tel" inputmode="tel" autocomplete="off" required></label>
+          <label>Nombre de tu empresa<input id="a-emp" maxlength="80" autocomplete="off" required></label>
           <label>PIN de 6 cifras<input id="a-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" required></label>
           <div class="err" id="a-err" role="alert"></div>
           <button class="btn main">Entrar</button>
           <button class="linkbtn" type="button" id="ir-registro">¿No tienes acceso? Solicítalo</button>
-          <div class="hintbox"><b>Cuentas de prueba</b><br>600 000 001 · PIN 111111 (Bar El Ejemplo)<br>600 000 002 · PIN 222222 (Tienda Ficticia)</div>
+          <div class="hintbox"><b>Cuentas de prueba</b><br>Teléfono 600 000 001 · empresa «Bar El Ejemplo» · PIN 111111<br>Teléfono 600 000 002 · empresa «Tienda Ficticia» · PIN 222222</div>
         </form>
       </div>
 
       <div id="c-registro" hidden>
         <form class="form" id="f-registro">
           <h2 style="margin:0">Solicitar acceso</h2>
-          <p class="msg">La empresa revisará tu solicitud, te llamará y te dará un PIN.</p>
+          <p class="msg">Dinos tus datos y elige un PIN. Si coinciden con los que tiene la empresa, entras al momento; si no, los revisará una persona.</p>
           <label>Nombre de tu empresa o negocio<input id="r-emp" maxlength="80" autocomplete="off" required></label>
           <label>Teléfono<input id="r-tel" type="tel" inputmode="tel" autocomplete="off" required></label>
           <label>Correo electrónico<input id="r-mail" type="email" autocomplete="off" required></label>
+          <label>Elige un PIN de 6 cifras<input id="r-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" required></label>
+          <label>Repite el PIN<input id="r-pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="off" required></label>
           <div class="err" id="r-err" role="alert"></div><div class="okmsg" id="r-ok" role="status"></div>
           <button class="btn main">Enviar solicitud</button>
           <button class="linkbtn" type="button" id="ir-acceso">Ya tengo PIN: entrar</button>
@@ -187,7 +190,8 @@
       <div class="tabs" role="tablist">
         <button class="tab" role="tab" type="button" data-t="pedidos" aria-selected="true">Pedidos <span class="cnt" id="n-ped" hidden></span></button>
         <button class="tab" role="tab" type="button" data-t="solicitudes" aria-selected="false">Solicitudes de alta <span class="cnt" id="n-sol" hidden></span></button>
-        <button class="tab" role="tab" type="button" data-t="cuentas" aria-selected="false">Cuentas de clientes</button>
+        <button class="tab" role="tab" type="button" data-t="clientes" aria-selected="false">Clientes</button>
+        <button class="tab" role="tab" type="button" data-t="cuentas" aria-selected="false">Cuentas de clientes <span class="cnt" id="n-cue" hidden></span></button>
         <button class="tab" role="tab" type="button" data-t="datos" aria-selected="false">Bases de datos</button>
       </div>
 
@@ -217,10 +221,18 @@
       </div>
 
       <div class="panel" id="p-solicitudes" hidden>
-        <h2>Clientes que piden darse de alta</h2>
-        <p class="msg">Llama al cliente para comprobar que es él, elige a qué cliente de vuestra base de datos corresponde y aprueba: se genera un PIN que le das por teléfono.</p>
-        <div class="scroll"><table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Correo</th><th>Cliente de la base de datos</th><th></th></tr></thead><tbody id="sol"></tbody></table></div>
-        <div class="vacio" id="sol-vacio" hidden>No hay solicitudes pendientes. Cuando un cliente solicite acceso desde su aplicación, aparecerá aquí.</div>
+        <h2>Solicitudes de alta pendientes</h2>
+        <p class="msg">Aquí solo llegan las que el sistema <b>no ha podido comprobar solo</b> (el nombre, el teléfono o el correo no coinciden con la base de clientes). Las que coinciden entran automáticamente y aparecen en «Cuentas de clientes» por confirmar. Si apruebas, vale el PIN que eligió el cliente.</p>
+        <div class="scroll"><table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Correo</th><th>Qué encajó</th><th>Cliente de la base de datos</th><th></th></tr></thead><tbody id="sol"></tbody></table></div>
+        <div class="vacio" id="sol-vacio" hidden>No hay solicitudes pendientes. Cuando un cliente solicite acceso y no coincida con la base de clientes, aparecerá aquí.</div>
+      </div>
+
+      <div class="panel" id="p-clientes" hidden>
+        <h2>Clientes</h2>
+        <p class="msg">La lista de clientes con la que el sistema comprueba las altas (nombre comercial o razón social, teléfono y correo).</p>
+        <div class="row2" style="margin-bottom:10px"><input id="q-cli" type="search" placeholder="Buscar por nombre, código, población, teléfono o correo" aria-label="Buscar cliente" style="min-width:min(100%,380px)"><span class="msg" id="cli-total"></span></div>
+        <div class="scroll"><table><thead><tr><th>Cód.</th><th>Cliente</th><th>Población</th><th>Teléfonos</th><th>Correo</th><th>App</th></tr></thead><tbody id="cli"></tbody></table></div>
+        <div class="row2" style="margin-top:10px"><button class="btn" id="cli-ant" type="button">← Anterior</button><button class="btn" id="cli-sig" type="button">Siguiente →</button><span class="msg" id="cli-pag"></span></div>
       </div>
 
       <div class="panel" id="p-cuentas" hidden>
@@ -289,12 +301,15 @@ $("ir-registro").onclick = () => { pantallaCliente.reg = true; pantallaCliente()
 $("ir-acceso").onclick = () => { pantallaCliente.reg = false; pantallaCliente(); };
 $("f-registro").onsubmit = async (e) => {
   e.preventDefault(); $("r-err").textContent = ""; $("r-ok").textContent = "";
-  const r = await VM.requestAccess({ business: $("r-emp").value, phone: $("r-tel").value, email: $("r-mail").value });
-  if (r.error) $("r-err").textContent = r.error; else { $("r-ok").textContent = "Solicitud enviada. La empresa la revisará y te dará tu PIN de acceso."; $("f-registro").reset(); }
+  if ($("r-pin").value !== $("r-pin2").value) { $("r-err").textContent = "Los dos PIN no coinciden."; return; }
+  const r = await VM.requestAccess({ business: $("r-emp").value, phone: $("r-tel").value, email: $("r-mail").value, pin: $("r-pin").value });
+  if (r.error) { $("r-err").textContent = r.error; return; }
+  $("r-ok").textContent = r.mensaje; $("f-registro").reset();
+  if (r.estado === "activa") setTimeout(() => { pantallaCliente.reg = false; pantallaCliente(); }, 1800);
 };
 $("f-acceso").onsubmit = (e) => {
   e.preventDefault(); $("a-err").textContent = "";
-  const r = VM.login($("a-tel").value, $("a-pin").value);
+  const r = VM.login($("a-tel").value, $("a-emp").value, $("a-pin").value);
   if (!r.ok) { $("a-err").textContent = r.error; $("a-pin").value = ""; return; }
   $("f-acceso").reset(); chatLoaded = false; pantallaCliente();
 };
@@ -356,7 +371,7 @@ $("f").addEventListener("submit", (e) => { e.preventDefault(); const v = t.value
 document.querySelectorAll(".dis-grid > .tabs .tab").forEach((b) => (b.onclick = () => { empTab = b.dataset.t; pintarTabs(); }));
 function pintarTabs() {
   document.querySelectorAll(".dis-grid > .tabs .tab").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.t === empTab)));
-  $("p-pedidos").hidden = empTab !== "pedidos"; $("p-solicitudes").hidden = empTab !== "solicitudes"; $("p-cuentas").hidden = empTab !== "cuentas"; $("p-datos").hidden = empTab !== "datos";
+  $("p-pedidos").hidden = empTab !== "pedidos"; $("p-solicitudes").hidden = empTab !== "solicitudes"; $("p-cuentas").hidden = empTab !== "cuentas"; $("p-clientes").hidden = empTab !== "clientes"; $("p-datos").hidden = empTab !== "datos";
 }
 function mostrarPin(texto, pin) { const p = $("pin"); p.hidden = false; p.textContent = texto + " "; p.appendChild(el("b", pin)); p.appendChild(el("span", " — anótalo ahora y díselo al cliente: no se volverá a mostrar.")); }
 
@@ -369,6 +384,7 @@ function pintarPedidos() {
     const cli = el("td"); cli.append(el("b", o.cliente), el("div", o.codigo ? "Cód. " + o.codigo : "Cliente nuevo", { className: "sub" }));
     const est = el("td"); est.appendChild(el("span", o.estado[0].toUpperCase() + o.estado.slice(1), { className: "badge " + o.estado, title: o.motivo }));
     if (o.motivo) est.appendChild(el("div", o.motivo, { className: "sub" }));
+    if (o.estado === "retenido" && o.codigo) { const b = el("button", "Revisado: exportar", { type: "button", className: "btn" }); b.onclick = () => VM.approveOrder(o.id).catch((e) => toast(e.message)); est.appendChild(b); }
     tr.append(el("td", o.ref, { className: "ref" }), el("td", o.hora), cli, el("td", o.resumen), el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
   }
   $("tabla").hidden = !list.length; $("vacio").hidden = !!list.length;
@@ -439,20 +455,35 @@ function pintarSolicitudes() {
     sel.onchange = () => eleccion.set(s.id, sel.value);
     buscar.onchange = () => { if ((busqueda.get(s.id) ?? "") === buscar.value) return; busqueda.set(s.id, buscar.value); opciones(buscar.value ? VM.searchCustomers(buscar.value) : s.sugerencias, !buscar.value); eleccion.delete(s.id); };
     const ok = el("button", "Aprobar", { type: "button", className: "btn main" });
-    ok.onclick = async () => { try { const r = await VM.approve(s.id, sel.value); mostrarPin(`Cuenta creada para ${r.cliente} (${r.telefono}). PIN:`, r.pin); } catch (e) { toast(e.message); } };
+    ok.onclick = async () => { try { const r = await VM.approve(s.id, sel.value); toast(`Cuenta activada para ${r.cliente}. Entra con el PIN que eligió.`); } catch (e) { toast(e.message); } };
     const no = el("button", "Rechazar", { type: "button", className: "btn" }); no.onclick = () => VM.reject(s.id).catch((e) => toast(e.message));
     const td = el("td"); const box = el("div", "", { className: "row2" }); box.append(sel, buscar); td.appendChild(box); const acc = el("td"); acc.append(ok, " ", no);
-    tr.append(el("td", s.business), el("td", s.phone), el("td", s.email), td, acc); tb.appendChild(tr);
+    tr.append(el("td", s.business), el("td", s.phone), el("td", s.email), el("td", s.matched || "—", { className: "msg" }), td, acc); tb.appendChild(tr);
   }
 }
+let pagCli = 0, qCli = "";
+function pintarClientes() {
+  const r = VM.customersPage(qCli, pagCli); const tb = $("cli"); tb.innerHTML = "";
+  $("cli-total").textContent = `${r.total} cliente${r.total === 1 ? "" : "s"}`;
+  for (const c of r.rows) {
+    const tr = document.createElement("tr"); const nom = el("td"); nom.append(el("b", c.name), c.legalName ? el("div", c.legalName, { className: "sub" }) : "");
+    tr.append(el("td", c.id, { className: "ref" }), nom, el("td", c.city), el("td", c.phones.join(" · ") || "—"), el("td", c.emails.join(" · ") || "—"), el("td", !c.active ? "De baja" : c.cuenta ? "✓ con acceso" : "—")); tb.appendChild(tr);
+  }
+  const paginas = Math.max(1, Math.ceil(r.total / r.perPage)); $("cli-pag").textContent = `Página ${pagCli + 1} de ${paginas}`; $("cli-ant").disabled = pagCli === 0; $("cli-sig").disabled = pagCli + 1 >= paginas;
+}
+$("q-cli").oninput = (e) => { qCli = e.target.value; pagCli = 0; pintarClientes(); };
+$("cli-ant").onclick = () => { pagCli = Math.max(0, pagCli - 1); pintarClientes(); };
+$("cli-sig").onclick = () => { pagCli++; pintarClientes(); };
 function pintarCuentas() {
   const tb = $("cue"); tb.innerHTML = "";
   for (const a of VM.accounts()) {
     const tr = document.createElement("tr");
     const pin = el("button", "Nuevo PIN", { type: "button", className: "btn" }); pin.onclick = async () => { try { const r = await VM.resetPin(a.id); mostrarPin(`Nuevo PIN para ${r.cliente} (${r.telefono}):`, r.pin); } catch (e) { toast(e.message); } };
     const blq = el("button", a.status === "blocked" ? "Reactivar" : "Bloquear", { type: "button", className: "btn" }); blq.onclick = () => VM.setBlocked(a.id, a.status !== "blocked").catch((e) => toast(e.message));
-    const td = el("td"); td.append(pin, " ", blq);
-    tr.append(el("td", a.cliente), el("td", a.phone), el("td", a.email), el("td", a.status === "blocked" ? "Bloqueada" : "Activa"), td); tb.appendChild(tr);
+    const td = el("td");
+    if (!a.verified) { const cf = el("button", "Confirmar", { type: "button", className: "btn main" }); cf.title = "Compruebo que es el cliente: sus pedidos dejan de retenerse"; cf.onclick = () => VM.confirmAccount(a.id).catch((e) => toast(e.message)); td.append(cf, " "); }
+    td.append(pin, " ", blq);
+    tr.append(el("td", a.cliente), el("td", a.phone), el("td", a.email), el("td", a.status === "blocked" ? "Bloqueada" : a.verified ? "Activa" : "Automática: sin confirmar"), td); tb.appendChild(tr);
   }
 }
 function pintarBd() {
@@ -481,7 +512,7 @@ document.querySelectorAll(".dbtab").forEach((b) => (b.onclick = () => { dbTab = 
 
 function contadores() {
   const s = VM.summary(); const n = (id, v) => { $(id).hidden = !v; $(id).textContent = v; };
-  n("n-ped", s.pedidosPendientes + s.pedidosRetenidos); n("n-sol", s.solicitudes);
+  n("n-ped", s.pedidosPendientes + s.pedidosRetenidos); n("n-sol", s.solicitudes); n("n-cue", s.cuentasSinConfirmar);
 }
 let pending = false;
 // No se repinta un panel mientras la persona está escribiendo o eligiendo en él
@@ -489,6 +520,7 @@ const enUso = (id) => $(id).contains(document.activeElement) && /^(INPUT|SELECT)
 function pintarTodo() {
   if ($("v-empresa").hidden) return;
   pintarTabs(); contadores(); pintarPedidos(); pintarHistorial(); pintarCuentas();
+  if (!enUso("p-clientes")) pintarClientes();
   if (!enUso("p-solicitudes")) pintarSolicitudes();
   if (!enUso("p-datos")) pintarBd();
 }

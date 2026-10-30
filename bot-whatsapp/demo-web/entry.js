@@ -71,12 +71,25 @@ const store = { get: (k) => { try { return sessionStorage.getItem(k); } catch { 
 const attempts = new Map(); // intentos fallidos por teléfono (en la demo, solo en este navegador)
 const currentAccount = () => { const id = store.get("vm:acc"); return cache.accounts.find((a) => a.id === id && a.status === "active") ?? null; };
 const customerOf = (acc) => (acc ? cache.customers.find((c) => c.id === acc.customerId) ?? null : null);
-const suggest = (r) => {
-  const out = new Map();
-  for (const c of findCustomers(cache.customers, r.business)) out.set(c.id, { id: c.id, name: c.name, motivo: "nombre" });
-  for (const c of cache.customers) if (phone9(c.phone) === r.phone) out.set(c.id, { id: c.id, name: c.name, motivo: out.has(c.id) ? "nombre y teléfono" : "teléfono" });
-  return [...out.values()];
-};
+const phonesOf = (c) => (c.phones?.length ? c.phones : [phone9(c.phone)].filter(Boolean));
+// Compara una solicitud con la base de clientes. Acceso automático solo si hay UN cliente cuyo nombre (comercial o razón social)
+// coincide Y cuyo teléfono o correo guardados coinciden con los enviados.
+function matchRegistration({ phone, email, business }) {
+  const k = phone9(phone) ?? "", mail = String(email ?? "").trim().toLowerCase();
+  const byName = findCustomers(cache.customers, business);
+  const hasPhone = (c) => !!k && phonesOf(c).includes(k);
+  const hasEmail = (c) => !!mail && (c.emails ?? []).includes(mail);
+  const hits = byName.filter((c) => hasPhone(c) || hasEmail(c));
+  const ids = new Set([...byName.map((c) => c.id), ...cache.customers.filter((c) => c.active !== false && (hasPhone(c) || hasEmail(c))).map((c) => c.id)]);
+  const suggestions = [...ids].map((id) => { const c = cache.customers.find((x) => x.id === id); return { id, name: c.name, motivo: [byName.some((b) => b.id === id) ? "nombre" : null, hasPhone(c) ? "teléfono" : null, hasEmail(c) ? "correo" : null].filter(Boolean).join(" + ") }; });
+  if (hits.length === 1) return { customer: hits[0], matched: { phone: hasPhone(hits[0]), email: hasEmail(hits[0]) }, suggestions };
+  return { customer: null, reason: hits.length > 1 ? "ambiguo" : byName.length ? "contacto" : "nombre", suggestions };
+}
+const MOTIVOS = { ambiguo: "Hay varios clientes que encajan", contacto: "El nombre coincide pero no el teléfono ni el correo", nombre: "No hay ningún cliente con ese nombre" };
+const SIN_CONFIRMAR = "Cuenta de alta automática sin confirmar: comprueba que es el cliente antes de exportar";
+
+// Cuenta de alta automática sin confirmar: puede pedir, pero sus pedidos se retienen hasta que la empresa los revise
+const holdIfUnconfirmed = (acc, order) => (acc && acc.verified === false ? { ...order, review: true, reason: SIN_CONFIRMAR } : order);
 
 // ---- Pedidos ----
 const byDate = (a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : a.id < b.id ? -1 : 1);
@@ -90,7 +103,7 @@ function newOrderRow(order, customer) {
   return {
     id: `o${Date.now().toString(36)}${uid()}`,
     customer_id: o.customerId ?? null, phone: o.phone, name: o.name, address: o.address, text: o.text, note: o.note || null,
-    total: o.total, review: !!o.review, re: !!o.re, export_status: "pending", export_id: null, created_at: o.at,
+    total: o.total, review: !!o.review, reason: o.reason ?? null, re: !!o.re, export_status: "pending", export_id: null, created_at: o.at,
     items: o.items.map((i) => ({
       id: String(i.id), name: i.name, price: i.price, qty: i.qty, unit: i.unit ?? "ud", boxes: i.boxes ?? null, units: i.units ?? i.qty,
       discount: i.discount ?? 0, vat_rate: i.vat ?? null, amount: i.amount ?? null, note: i.note ?? null,
@@ -123,34 +136,52 @@ window.VM = {
   demoAccounts: DEMO_ACCOUNTS.map((a) => ({ phone: a.phone, pin: a.pin, customerId: a.customerId })),
 
   // ---- Vista del cliente: acceso con teléfono + PIN y chat ----
-  /** El cliente pide acceso: la empresa lo verá en «Solicitudes de alta». */
-  async requestAccess({ phone, email, business }) {
-    const p = phone9(phone), biz = String(business ?? "").trim().replace(/\s+/g, " ");
-    if (!p) return { error: "El teléfono no es válido." };
-    if (!validEmail(String(email ?? "").trim())) return { error: "El correo no es válido." };
+  /**
+   * El cliente se da de alta con empresa, teléfono, correo y un PIN que elige. El sistema lo comprueba contra la base de clientes:
+   * si coinciden el nombre y el teléfono (o el correo) de UN cliente, la cuenta queda activa al momento (sin confirmar); si no,
+   * pasa a «Solicitudes de alta» para que la revise la empresa.
+   */
+  async requestAccess({ phone, email, business, pin }) {
+    const p = phone9(phone), biz = String(business ?? "").trim().replace(/\s+/g, " "), mail = String(email ?? "").trim();
     if (biz.length < 2 || biz.length > 80) return { error: "Escribe el nombre de tu empresa." };
+    if (!p) return { error: "El teléfono no es válido." };
+    if (!validEmail(mail)) return { error: "El correo no es válido." };
+    if (!/^\d{6}$/.test(String(pin ?? ""))) return { error: "Elige un PIN de 6 cifras." };
     if (!perms.canWrite) return { error: "Solo lectura: no se pueden enviar solicitudes con este acceso." };
+    const now = new Date().toISOString();
+    const m = matchRegistration({ phone: p, email: mail, business: biz });
+    if (m.customer) {
+      if (cache.accounts.some((a) => a.phone === p)) return { error: "Este teléfono ya tiene acceso. Entra con tu PIN." };
+      const id = `a${Date.now().toString(36)}${uid()}`;
+      await backend.set("accounts", id, { id, customerId: m.customer.id, phone: p, email: mail, pinHash: pinHash(p, pin), status: "active", verified: false, createdAt: now });
+      const rid = `r${Date.now().toString(36)}${uid()}`;
+      await backend.set("registrations", rid, { id: rid, phone: p, email: mail, business: biz, status: "auto", customerId: m.customer.id, matched: `nombre + ${[m.matched.phone ? "teléfono" : null, m.matched.email ? "correo" : null].filter(Boolean).join(" y ")}`, createdAt: now });
+      return { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono, el nombre de tu empresa y tu PIN." };
+    }
     const open = cache.registrations.find((r) => r.phone === p && r.status === "pending");
     const id = open?.id ?? `r${Date.now().toString(36)}${uid()}`;
-    const doc = { id, phone: p, email: String(email).trim(), business: biz, status: "pending", createdAt: new Date().toISOString() };
+    const doc = { id, phone: p, email: mail, business: biz, status: "pending", pinHash: pinHash(p, pin), matched: MOTIVOS[m.reason], createdAt: now };
     await (open ? backend.update("registrations", id, doc) : backend.set("registrations", id, doc));
-    return { ok: true };
+    return { ok: true, estado: "pendiente", mensaje: "Hemos recibido tu solicitud. La empresa la revisará y te avisará." };
   },
-  /** Teléfono + PIN. La respuesta es la misma si el teléfono no existe o el PIN falla. */
-  login(phone, pin) {
+  /** Teléfono + nombre de la empresa + PIN. La respuesta es la misma si algo falla (no se revela qué). */
+  login(phone, business, pin) {
     const p = phone9(phone) ?? "";
+    if (String(business ?? "").trim().length < 2) return { ok: false, error: "Escribe el nombre de tu empresa." };
     const st = attempts.get(p) ?? { fails: 0, until: 0 };
     if (st.until > Date.now()) return { ok: false, error: "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." };
     const acc = cache.accounts.find((a) => a.phone === p && a.status === "active");
-    if (!acc || !/^\d{6}$/.test(String(pin)) || acc.pinHash !== pinHash(p, pin)) {
+    const customer = customerOf(acc);
+    const nombreOk = !!customer && findCustomers([customer], business).length > 0; // el nombre se compara con la base de clientes
+    if (!acc || !nombreOk || !/^\d{6}$/.test(String(pin)) || acc.pinHash !== pinHash(p, pin)) {
       st.fails += 1;
       if (st.fails >= 5) { st.fails = 0; st.until = Date.now() + 15 * 60_000; }
       attempts.set(p, st);
-      return { ok: false, error: "Teléfono o PIN incorrectos." };
+      return { ok: false, error: "Teléfono, empresa o PIN incorrectos." };
     }
     attempts.delete(p);
     store.set("vm:acc", acc.id);
-    return { ok: true, nombre: customerOf(acc)?.name ?? "" };
+    return { ok: true, nombre: customer.name };
   },
   logout() { store.set("vm:acc", null); sessions.clear(); },
   /** Cliente con sesión iniciada (o null). */
@@ -165,7 +196,7 @@ window.VM = {
     const out = handleMessage(cur, String(text ?? "").slice(0, 1000));
     sessions.set(acc.id, out.session);
     let saved = null;
-    if (out.order) saved = saveOrder({ at: new Date().toISOString(), phone: acc.phone, key: `demo:${uid()}`, ...out.order }, customer);
+    if (out.order) saved = saveOrder({ at: new Date().toISOString(), phone: acc.phone, key: `demo:${uid()}`, ...holdIfUnconfirmed(acc, out.order) }, customer);
     return { reply: out.reply, ui: out.ui, handoff: !!out.handoff, saved };
   },
 
@@ -188,7 +219,7 @@ window.VM = {
     if (built.error) return { status: 400, json: { error: built.error } };
     links.get(link).used = true;
     const priced = priceOrder(built.order, customer, getCatalog());
-    saveOrder(built.order, customer);
+    saveOrder(holdIfUnconfirmed(currentAccount(), built.order), customer);
     return { status: 200, json: { ok: true, message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} artículos, total aprox. ${priced.total.toFixed(2)}${BUSINESS.currency}.\n\n${BUSINESS.payment}` } };
   },
 
@@ -200,7 +231,7 @@ window.VM = {
       id: o.id, ref: o.ref, hora: madridTime(o.created_at), cliente: o.name, codigo: o.customer_id, lineas: o.items.length,
       resumen: o.items.map((i) => `${i.boxes ?? i.units} ${i.boxes ? "caja" + (i.boxes > 1 ? "s" : "") : "ud"} ${i.name}`).join(" · "),
       total: rowTotals(o).total, estado: o.export_status === "exported" ? "exportado" : o.review || !o.customer_id ? "retenido" : "pendiente",
-      motivo: !o.customer_id ? "Cliente sin código de ERP" : o.review ? "Interpretación dudosa" : "",
+      motivo: !o.customer_id ? "Cliente sin código de ERP" : o.review ? o.reason || "Interpretación dudosa" : "",
     })),
   exports: () => [...cache.exports].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
 
@@ -208,11 +239,11 @@ window.VM = {
   summary() {
     const rows = withRefs().filter((o) => o.export_status === "pending");
     const ready = rows.filter(isReady).length;
-    return { solicitudes: cache.registrations.filter((r) => r.status === "pending").length, pedidosPendientes: ready, pedidosRetenidos: rows.length - ready };
+    return { solicitudes: cache.registrations.filter((r) => r.status === "pending").length, cuentasSinConfirmar: cache.accounts.filter((a) => a.verified === false).length, pedidosPendientes: ready, pedidosRetenidos: rows.length - ready };
   },
-  registrations: () => cache.registrations.filter((r) => r.status === "pending").sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)).map((r) => ({ ...r, sugerencias: suggest(r) })),
+  registrations: () => cache.registrations.filter((r) => r.status === "pending").sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)).map((r) => ({ ...r, sugerencias: matchRegistration({ phone: r.phone, email: r.email, business: r.business }).suggestions })),
   searchCustomers: (q) => cache.customers.filter((c) => !q || c.name.toLowerCase().includes(String(q).toLowerCase()) || c.id === q).slice(0, 15).map((c) => ({ id: c.id, name: c.name })),
-  /** La empresa aprueba: liga el teléfono al cliente y genera el PIN (se devuelve una sola vez). */
+  /** La empresa aprueba una solicitud: liga el teléfono al cliente elegido. Vale el PIN que eligió el cliente. */
   async approve(regId, customerId) {
     if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para aprobar solicitudes.");
     const r = cache.registrations.find((x) => x.id === regId && x.status === "pending");
@@ -220,16 +251,33 @@ window.VM = {
     if (!r) throw new Error("La solicitud ya se resolvió.");
     if (!c) throw new Error("Elige un cliente de la lista.");
     if (cache.accounts.some((a) => a.phone === r.phone)) throw new Error("Ese teléfono ya tiene una cuenta.");
-    const pin = newPin(), now = new Date().toISOString(), id = `a${Date.now().toString(36)}${uid()}`;
-    await backend.set("accounts", id, { id, customerId: c.id, phone: r.phone, email: r.email, pinHash: pinHash(r.phone, pin), status: "active", createdAt: now });
+    const now = new Date().toISOString(), id = `a${Date.now().toString(36)}${uid()}`;
+    await backend.set("accounts", id, { id, customerId: c.id, phone: r.phone, email: r.email, pinHash: r.pinHash, status: "active", verified: true, createdAt: now });
     await backend.update("registrations", r.id, { status: "approved", customerId: c.id, decidedAt: now });
-    return { pin, cliente: c.name, telefono: r.phone };
+    return { cliente: c.name, telefono: r.phone };
   },
   async reject(regId) {
     if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor.");
     await backend.update("registrations", regId, { status: "rejected", decidedAt: new Date().toISOString() });
   },
-  accounts: () => cache.accounts.map((a) => ({ id: a.id, cliente: customerOf(a)?.name ?? a.customerId, phone: a.phone, email: a.email ?? "", status: a.status })),
+  accounts: () => cache.accounts.map((a) => ({ id: a.id, cliente: customerOf(a)?.name ?? a.customerId, phone: a.phone, email: a.email ?? "", status: a.status, verified: a.verified !== false })),
+  /** La empresa confirma una cuenta automática: sus pedidos dejan de retenerse. */
+  async confirmAccount(accId) {
+    if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor.");
+    await backend.update("accounts", accId, { verified: true });
+  },
+  /** Lista de clientes con búsqueda y páginas de 50 (la base completa está en memoria). */
+  customersPage(q = "", page = 0) {
+    const t = String(q).trim().toLowerCase();
+    const conCuenta = new Set(cache.accounts.map((a) => a.customerId));
+    const all = cache.customers.filter((c) => !t || [c.name, c.legalName, c.id, c.city, ...(c.phones ?? []), ...(c.emails ?? [])].some((v) => String(v ?? "").toLowerCase().includes(t))).sort((a, b) => a.name.localeCompare(b.name));
+    return { total: all.length, page, perPage: 50, rows: all.slice(page * 50, page * 50 + 50).map((c) => ({ id: c.id, name: c.name, legalName: c.legalName ?? "", city: c.city ?? "", phones: phonesOf(c), emails: c.emails ?? [], active: c.active !== false, cuenta: conCuenta.has(c.id) })) };
+  },
+  /** La empresa da por revisado un pedido retenido. */
+  async approveOrder(orderId) {
+    if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor.");
+    await backend.update("orders", orderId, { review: false });
+  },
   async resetPin(accId) {
     if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor.");
     const a = cache.accounts.find((x) => x.id === accId);

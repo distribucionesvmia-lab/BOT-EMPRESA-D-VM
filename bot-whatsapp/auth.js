@@ -3,6 +3,7 @@
 // Regla de oro: el servidor decide de quién son los datos a partir de la SESIÓN. Ninguna ruta acepta un código de
 // cliente enviado por el navegador, así que un cliente no puede pedir el historial de otro.
 import crypto from "node:crypto";
+import { normalizePhone, validEmail } from "./cuentas-db.js";
 
 const COOKIE = "vm_session";
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
@@ -68,12 +69,13 @@ export function makeAdminCheck(adminToken) {
 export { send, readJson };
 
 /**
- * accounts: base de cuentas · customers: { getById(id) }
+ * accounts: base de cuentas · customers: { getById(id), matchRegistration(), nameMatches() }
  * secure: cookie solo por HTTPS · trustProxy: usar X-Forwarded-For para la IP
  */
 export function createAuth({ accounts, customers, secure = false, trustProxy = false }) {
-  const loginLimit = rateLimiter(20, 10 * 60_000);
-  const registerLimit = rateLimiter(5, 60 * 60_000);
+  // Límites por IP (configurables para las pruebas): accesos cada 10 minutos y solicitudes de alta cada hora
+  const loginLimit = rateLimiter(Number(process.env.LOGIN_LIMIT ?? 20), 10 * 60_000);
+  const registerLimit = rateLimiter(Number(process.env.REGISTER_LIMIT ?? 20), 60 * 60_000);
   const ip = (req) => (trustProxy ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() : "") || req.socket.remoteAddress || "?";
   const cookie = (token, maxAge) => `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
 
@@ -89,17 +91,37 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
       if (!registerLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
-      const r = accounts.requestRegistration({ phone: b.telefono, email: b.correo, business: b.empresa });
+      const empresa = String(b.empresa ?? "").trim().replace(/\s+/g, " ");
+      const correo = String(b.correo ?? "").trim();
+      const pin = String(b.pin ?? "");
+      if (empresa.length < 2 || empresa.length > 80) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
+      if (!normalizePhone(b.telefono)) return send(res, 400, { error: "El teléfono no es válido." }), true;
+      if (!validEmail(correo)) return send(res, 400, { error: "El correo no es válido." }), true;
+      if (!/^\d{6}$/.test(pin)) return send(res, 400, { error: "Elige un PIN de 6 cifras." }), true;
+      // El sistema comprueba la solicitud contra la base de clientes. Acceso automático si el nombre de la empresa coincide
+      // con un cliente guardado Y su teléfono o su correo también; si no, queda pendiente para que la revise la empresa.
+      const m = customers.matchRegistration({ phone: b.telefono, email: correo, business: empresa });
+      if (m.customer) {
+        const dato = [m.matched.phone ? "teléfono" : null, m.matched.email ? "correo" : null].filter(Boolean).join(" y ");
+        const r = accounts.registerAuto({ phone: b.telefono, email: correo, business: empresa, pin, customerId: m.customer.id, matched: `nombre + ${dato}` });
+        if (r.error) return send(res, 400, { error: r.error }), true;
+        return send(res, 200, { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono, el nombre de tu empresa y tu PIN." }), true;
+      }
+      const r = accounts.requestRegistration({ phone: b.telefono, email: correo, business: empresa, pin });
       if (r.error) return send(res, 400, { error: r.error }), true;
-      // Misma respuesta exista o no el cliente: no se revela nada
-      return send(res, 200, { ok: true, mensaje: "Solicitud enviada. La empresa la revisará y te dará tu PIN de acceso." }), true;
+      const motivo = { ambiguo: "Hay varios clientes que encajan", contacto: "El nombre coincide pero no el teléfono ni el correo", nombre: "No hay ningún cliente con ese nombre" }[m.reason];
+      accounts.setMatched(r.id, motivo);
+      return send(res, 200, { ok: true, estado: "pendiente", mensaje: "Hemos recibido tu solicitud. La empresa la revisará y te avisará." }), true;
     }
 
     if (p === "/api/acceso" && req.method === "POST") {
       if (!loginLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
-      const r = accounts.login(b.telefono, b.pin);
+      const empresa = String(b.empresa ?? "").slice(0, 80);
+      if (empresa.trim().length < 2) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
+      // Teléfono + PIN + nombre de la empresa: el nombre debe coincidir con el del cliente guardado en la base de datos
+      const r = accounts.login(b.telefono, b.pin, undefined, (acc) => customers.nameMatches(customers.getById(acc.customerId), empresa));
       if (!r.ok) return send(res, 401, { error: r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Teléfono o PIN incorrectos." }), true;
       const customer = customers.getById(r.account.customerId);
       return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": cookie(r.token, 30 * 86400) }), true;

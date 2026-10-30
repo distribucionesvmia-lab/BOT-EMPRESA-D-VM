@@ -8,8 +8,9 @@
 //  - Se ignoran tildes, mayúsculas y palabras de relleno (el, la, de…). Nunca se devuelven coincidencias parciales.
 
 const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-const FILLER = new Set(["el", "la", "los", "las", "de", "del", "y", "e", "un", "una", "mi", "me", "es", "soy", "somos", "cliente", "nombre", "negocio", "se", "llama"]);
-const tokens = (s) => norm(s).split(/[^a-z0-9]+/).filter(Boolean);
+// Palabras que no identifican: artículos y, sobre todo, la forma jurídica (SL, S.A., CB…): «Tienda Ficticia SL» = «Tienda Ficticia»
+const FILLER = new Set(["el", "la", "los", "las", "de", "del", "y", "e", "un", "una", "mi", "me", "es", "soy", "somos", "cliente", "nombre", "negocio", "se", "llama", "sl", "sa", "slu", "sll", "cb", "scp", "sc", "slp", "coop"]);
+const tokens = (s) => norm(s).split(/[^a-z0-9]+/).filter((w) => w.length > 1 || /\d/.test(w)); // se ignoran las letras sueltas ("S.L." → "s", "l")
 const significant = (s) => tokens(s).filter((w) => !FILLER.has(w));
 // misma palabra, o prefijo de al menos 3 letras
 const match = (q, t) => q === t || (q.length >= 3 && t.startsWith(q));
@@ -25,15 +26,20 @@ export function findCustomers(customers, query) {
   const strong = [];
   for (const c of customers) {
     if (c.active === false) continue;
-    if (norm(c.id) === compact || norm(c.name) === q) {
+    const names = [c.name, c.legalName].filter(Boolean); // nombre comercial y razón social valen por igual
+    if (norm(c.id) === compact || names.some((n) => norm(n) === q)) {
       strong.push({ c, score: 3 });
       continue;
     }
-    const nWords = significant(c.name);
-    if (!nWords.length) continue;
-    const allKnown = qWords.every((w) => nWords.some((t) => match(w, t)));
-    const covered = nWords.filter((t) => qWords.some((w) => match(w, t))).length / nWords.length;
-    if (allKnown && covered >= MIN_COVERAGE) strong.push({ c, score: 2 + covered / 10 });
+    let best = 0;
+    for (const n of names) {
+      const nWords = significant(n);
+      if (!nWords.length) continue;
+      const allKnown = qWords.every((w) => nWords.some((t) => match(w, t)));
+      const covered = nWords.filter((t) => qWords.some((w) => match(w, t))).length / nWords.length;
+      if (allKnown && covered >= MIN_COVERAGE) best = Math.max(best, 2 + covered / 10);
+    }
+    if (best) strong.push({ c, score: best });
   }
   const best = Math.max(0, ...strong.map((s) => s.score));
   return strong.filter((s) => s.score >= best - 0.05).map((s) => s.c);

@@ -42,7 +42,8 @@
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-t="pedidos" aria-selected="true">Pedidos <span class="n" id="n-ped" hidden></span></button>
       <button class="tab" role="tab" data-t="solicitudes" aria-selected="false">Solicitudes de alta <span class="n" id="n-sol" hidden></span></button>
-      <button class="tab" role="tab" data-t="cuentas" aria-selected="false">Cuentas de clientes</button>
+      <button class="tab" role="tab" data-t="clientes" aria-selected="false">Clientes <span class="n" id="n-cli" hidden></span></button>
+      <button class="tab" role="tab" data-t="cuentas" aria-selected="false">Cuentas de clientes <span class="n" id="n-cue" hidden></span></button>
     </div>
 
     <!-- Pedidos -->
@@ -58,10 +59,25 @@
 
     <!-- Solicitudes -->
     <div class="panel" id="p-solicitudes" hidden>
-      <h2>Clientes que piden darse de alta</h2>
-      <p class="muted">Llama al cliente para comprobar que es él, elige a qué cliente de vuestra base de datos corresponde y aprueba: se genera un PIN que le das por teléfono.</p>
-      <div class="scroll"><table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Correo</th><th>Cliente de la base de datos</th><th></th></tr></thead><tbody id="sol"></tbody></table></div>
+      <h2>Solicitudes de alta pendientes</h2>
+      <p class="muted">Aquí solo llegan las que el sistema <b>no ha podido comprobar solo</b> (el nombre, el teléfono o el correo no coinciden con la base de clientes, o el cliente está de baja). Las que coinciden entran automáticamente y aparecen en «Cuentas de clientes» por confirmar. Si apruebas, vale el PIN que eligió el cliente.</p>
+      <div class="scroll"><table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Correo</th><th>Qué encajó</th><th>Cliente de la base de datos</th><th></th></tr></thead><tbody id="sol"></tbody></table></div>
       <p class="muted" id="sol-vacio" hidden>No hay solicitudes pendientes.</p>
+    </div>
+
+    <!-- Clientes -->
+    <div id="p-clientes" hidden style="display:grid;gap:14px">
+      <div class="panel">
+        <h2>Importar clientes desde Excel</h2>
+        <p class="muted">Sube la lista de clientes que exporta a3ERP (columnas «Cód. cliente», «Organización», «Razón social», «Población», «Dirección fiscal», «Teléfono», «E-Mail», «Bloqueado», «Obsoleto»). Los nuevos se añaden y los que ya existen se actualizan; no se toca su historial ni sus precios y <b>no se guarda el NIF</b>.</p>
+        <div class="row"><input type="file" id="f-excel" accept=".xlsx" aria-label="Archivo Excel de clientes"><button class="main" id="importar">Importar</button><span class="muted" id="imp-msg" role="status"></span></div>
+      </div>
+      <div class="panel">
+        <h2>Clientes</h2>
+        <div class="row" style="margin-bottom:10px"><input id="q-cli" type="search" placeholder="Buscar por nombre, código, población, teléfono o correo" aria-label="Buscar cliente" style="min-width:min(100%,380px)"><span class="muted" id="cli-total"></span></div>
+        <div class="scroll"><table><thead><tr><th>Cód.</th><th>Cliente</th><th>Población</th><th>Teléfonos</th><th>Correo</th><th>App</th></tr></thead><tbody id="cli"></tbody></table></div>
+        <div class="row" style="margin-top:10px"><button id="cli-ant">← Anterior</button><button id="cli-sig">Siguiente →</button><span class="muted" id="cli-pag"></span></div>
+      </div>
     </div>
 
     <!-- Cuentas -->
@@ -87,6 +103,7 @@ async function call(path, body, raw) {
   if (!r.ok) throw new Error(j.error || "Error");
   return j;
 }
+function mostrarAviso(texto) { const p = $("pin"); p.hidden = false; p.textContent = texto; setTimeout(() => (p.hidden = true), 8000); }
 function mostrarPin(texto, pin) { const p = $("pin"); p.hidden = false; p.textContent = texto + " "; p.appendChild(el("b", pin)); p.appendChild(el("span", " — anótalo ahora y díselo al cliente: no se volverá a mostrar.")); }
 
 // ---- Pedidos ----
@@ -144,36 +161,66 @@ async function solicitudes() {
     const buscar = el("input", "", { placeholder: "Buscar otro cliente…", type: "search" });
     buscar.onchange = async () => { const r = await call("/api/admin/clientes?q=" + encodeURIComponent(buscar.value)); sel.innerHTML = ""; sel.appendChild(el("option", "— elige un cliente —", { value: "" })); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); };
     const ok = el("button", "Aprobar", { className: "main" });
-    ok.onclick = async () => { try { const r = await call(`/api/admin/solicitudes/${s.id}/aprobar`, { clienteId: sel.value }); mostrarPin(`Cuenta creada para ${r.cliente} (${r.telefono}). PIN:`, r.pin); refrescar(); } catch (e) { alert(e.message); } };
+    ok.onclick = async () => { try { const r = await call(`/api/admin/solicitudes/${s.id}/aprobar`, { clienteId: sel.value }); if (r.pin) mostrarPin(`Cuenta creada para ${r.cliente} (${r.telefono}). PIN:`, r.pin); else mostrarAviso(`Cuenta activada para ${r.cliente} (${r.telefono}). Entra con el PIN que eligió.`); refrescar(); } catch (e) { alert(e.message); } };
     const no = el("button", "Rechazar"); no.onclick = async () => { await call(`/api/admin/solicitudes/${s.id}/rechazar`, {}); refrescar(); };
     const td = el("td"); const box = el("div", "", { className: "row" }); box.append(sel, buscar); td.appendChild(box);
     const acc = el("td"); acc.append(ok, " ", no);
-    tr.append(el("td", s.business), el("td", s.phone), el("td", s.email), td, acc); tb.appendChild(tr);
+    tr.append(el("td", s.business), el("td", s.phone), el("td", s.email), el("td", s.matched || "—", { className: "muted" }), td, acc); tb.appendChild(tr);
   }
 }
 async function cuentas() {
   const cue = await call("/api/admin/cuentas"); const tc = $("cue"); tc.innerHTML = "";
   for (const a of cue) {
     const tr = document.createElement("tr");
-    const estado = a.status === "blocked" ? "Bloqueada" : a.locked ? "Bloqueo temporal" : "Activa";
+    const estado = a.status === "blocked" ? "Bloqueada" : a.locked ? "Bloqueo temporal" : a.verified ? "Activa" : "Automática: sin confirmar";
     const pin = el("button", "Nuevo PIN"); pin.onclick = async () => { const r = await call(`/api/admin/cuentas/${a.id}/pin`, {}); mostrarPin(`Nuevo PIN para ${a.cliente} (${a.phone}):`, r.pin); refrescar(); };
     const blq = el("button", a.status === "blocked" ? "Reactivar" : "Bloquear"); blq.onclick = async () => { await call(`/api/admin/cuentas/${a.id}/bloquear`, { bloquear: a.status !== "blocked" }); refrescar(); };
-    const td = el("td"); td.append(pin, " ", blq);
+    const td = el("td");
+    if (!a.verified) { const cf = el("button", "Confirmar", { className: "main" }); cf.title = "Compruebo que es el cliente: sus pedidos dejan de retenerse"; cf.onclick = async () => { await call(`/api/admin/cuentas/${a.id}/confirmar`, {}); refrescar(); }; td.append(cf, " "); }
+    td.append(pin, " ", blq);
     tr.append(el("td", a.cliente || a.customerId), el("td", a.phone), el("td", a.email || ""), el("td", estado), el("td", a.lastLogin ? hora(a.lastLogin) : "—"), td); tc.appendChild(tr);
   }
 }
+let pagCli = 0, tClientes = null;
+async function clientes() {
+  const q = encodeURIComponent($("q-cli").value.trim());
+  const r = await call(`/api/admin/clientes/lista?q=${q}&pagina=${pagCli}`);
+  $("cli-total").textContent = `${r.total} cliente${r.total === 1 ? "" : "s"}`;
+  const tb = $("cli"); tb.innerHTML = "";
+  for (const c of r.clientes) {
+    const tr = document.createElement("tr"); const nom = el("td"); nom.append(el("b", c.name), c.legalName ? el("div", c.legalName, { className: "muted" }) : "");
+    tr.append(el("td", c.id, { className: "ref" }), nom, el("td", c.city), el("td", c.phones.join(" · ") || "—"), el("td", c.emails.join(" · ") || "—"), el("td", !c.active ? "De baja" : c.cuenta ? "✓ con acceso" : "—"));
+    tb.appendChild(tr);
+  }
+  const paginas = Math.max(1, Math.ceil(r.total / r.porPagina));
+  $("cli-pag").textContent = `Página ${pagCli + 1} de ${paginas}`; $("cli-ant").disabled = pagCli === 0; $("cli-sig").disabled = pagCli + 1 >= paginas;
+}
+$("q-cli").oninput = () => { clearTimeout(tClientes); tClientes = setTimeout(() => { pagCli = 0; clientes(); }, 300); };
+$("cli-ant").onclick = () => { pagCli = Math.max(0, pagCli - 1); clientes(); };
+$("cli-sig").onclick = () => { pagCli++; clientes(); };
+$("importar").onclick = async () => {
+  const f = $("f-excel").files[0]; if (!f) { $("imp-msg").textContent = "Elige primero el archivo Excel."; return; }
+  $("importar").disabled = true; $("imp-msg").textContent = "Importando…";
+  try {
+    const r = await fetch("/api/admin/clientes/importar", { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": "application/octet-stream" }, body: f });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "No se pudo importar");
+    $("imp-msg").textContent = `Hecho: ${j.importados} clientes (${j.nuevos} nuevos, ${j.actualizados} actualizados). ${j.sinTelefono} sin teléfono y ${j.sinCorreo} sin correo: esos solo podrán darse de alta con tu revisión.${j.inactivos ? ` ${j.inactivos} de baja.` : ""}`;
+    pagCli = 0; $("f-excel").value = ""; refrescar();
+  } catch (e) { $("imp-msg").textContent = e.message; } finally { $("importar").disabled = false; }
+};
 async function avisos() {
   const r = await call("/api/admin/resumen");
   const n = (id, v) => { $(id).hidden = !v; $(id).textContent = v; };
-  n("n-ped", r.pedidosPendientes + r.pedidosRetenidos); n("n-sol", r.solicitudes);
+  n("n-ped", r.pedidosPendientes + r.pedidosRetenidos); n("n-sol", r.solicitudes); n("n-cue", r.cuentasSinConfirmar);
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), avisos()]); } catch (e) { if (e.message !== "Clave incorrecta") $("act").textContent = "Sin conexión con el servidor"; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), clientes(), avisos()]); } catch (e) { if (e.message !== "Clave incorrecta") $("act").textContent = "Sin conexión con el servidor"; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-  $("p-pedidos").hidden = b.dataset.t !== "pedidos"; $("p-solicitudes").hidden = b.dataset.t !== "solicitudes"; $("p-cuentas").hidden = b.dataset.t !== "cuentas";
+  $("p-pedidos").hidden = b.dataset.t !== "pedidos"; $("p-solicitudes").hidden = b.dataset.t !== "solicitudes"; $("p-clientes").hidden = b.dataset.t !== "clientes"; $("p-cuentas").hidden = b.dataset.t !== "cuentas";
 }));
 async function entrar() { try { await refrescar(); if ($("app").hidden && clave) { await call("/api/admin/resumen"); $("login").hidden = true; $("app").hidden = false; clearInterval(timer); timer = setInterval(refrescar, 15000); } } catch (e) { $("l-err").textContent = e.message; } }
 $("f-login").onsubmit = (e) => { e.preventDefault(); clave = $("clave").value; try { sessionStorage.setItem("vm_admin", clave); } catch {} $("l-err").textContent = ""; entrar(); };

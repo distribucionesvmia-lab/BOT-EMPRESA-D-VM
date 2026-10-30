@@ -43,9 +43,10 @@
   <!-- Entrar -->
   <section id="acceso" hidden>
     <h1>Pedidos · Distribuciones VM</h1>
-    <p>Entra con tu teléfono y el PIN que te dio la empresa.</p>
+    <p>Entra con tu teléfono, el nombre de tu empresa y tu PIN.</p>
     <form class="card" id="f-acceso">
       <label>Teléfono<input id="a-tel" type="tel" inputmode="tel" autocomplete="tel" required></label>
+      <label>Nombre de tu empresa<input id="a-emp" maxlength="80" autocomplete="organization" required></label>
       <label>PIN de 6 cifras<input id="a-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password" required></label>
       <div class="err" id="a-err" role="alert"></div>
       <button class="main">Entrar</button>
@@ -56,11 +57,13 @@
   <!-- Solicitar acceso -->
   <section id="registro" hidden>
     <h1>Solicitar acceso</h1>
-    <p>Dinos tus datos. La empresa los revisará, te llamará y te dará un PIN para entrar.</p>
+    <p>Dinos tus datos y elige un PIN. Si coinciden con los que tiene la empresa, entras al momento; si no, los revisará una persona.</p>
     <form class="card" id="f-registro">
       <label>Nombre de tu empresa o negocio<input id="r-emp" maxlength="80" required></label>
       <label>Teléfono (el mismo con el que te conocen)<input id="r-tel" type="tel" inputmode="tel" required></label>
       <label>Correo electrónico<input id="r-mail" type="email" autocomplete="email" required></label>
+      <label>Elige un PIN de 6 cifras<input id="r-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required></label>
+      <label>Repite el PIN<input id="r-pin2" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required></label>
       <div class="err" id="r-err" role="alert"></div><div class="ok" id="r-ok" role="status"></div>
       <button class="main">Enviar solicitud</button>
       <button class="link" type="button" id="ir-acceso">Ya tengo PIN: entrar</button>
@@ -87,13 +90,17 @@ $("ir-acceso").onclick = () => ver("acceso");
 
 $("f-registro").onsubmit = async (e) => {
   e.preventDefault(); $("r-err").textContent = ""; $("r-ok").textContent = "";
-  const r = await post("/api/registro", { empresa: $("r-emp").value, telefono: $("r-tel").value, correo: $("r-mail").value });
+  if ($("r-pin").value !== $("r-pin2").value) { $("r-err").textContent = "Los dos PIN no coinciden."; return; }
+  const r = await post("/api/registro", { empresa: $("r-emp").value, telefono: $("r-tel").value, correo: $("r-mail").value, pin: $("r-pin").value });
   const j = await r.json().catch(() => ({}));
-  if (r.ok) { $("r-ok").textContent = j.mensaje; $("f-registro").reset(); } else $("r-err").textContent = j.error || "No se pudo enviar la solicitud.";
+  if (r.ok) {
+    $("r-ok").textContent = j.mensaje; $("f-registro").reset();
+    if (j.estado === "activa") setTimeout(() => ver("acceso"), 1800); // ya tiene acceso: pasa a entrar
+  } else $("r-err").textContent = j.error || "No se pudo enviar la solicitud.";
 };
 $("f-acceso").onsubmit = async (e) => {
   e.preventDefault(); $("a-err").textContent = "";
-  const r = await post("/api/acceso", { telefono: $("a-tel").value, pin: $("a-pin").value });
+  const r = await post("/api/acceso", { telefono: $("a-tel").value, empresa: $("a-emp").value, pin: $("a-pin").value });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { $("a-err").textContent = j.error || "No se pudo entrar."; $("a-pin").value = ""; return; }
   $("f-acceso").reset(); entrar(j.cliente.nombre);

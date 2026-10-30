@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS registrations (
   business    TEXT NOT NULL,
   status      TEXT NOT NULL DEFAULT 'pending',
   customer_id TEXT,
+  pin_hash    TEXT,
+  matched     TEXT,
   created_at  TEXT NOT NULL,
   decided_at  TEXT
 );
@@ -29,6 +31,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   email         TEXT,
   pin_hash      TEXT NOT NULL,
   status        TEXT NOT NULL DEFAULT 'active',
+  verified      INTEGER NOT NULL DEFAULT 1,
   failed        INTEGER NOT NULL DEFAULT 0,
   lock_count    INTEGER NOT NULL DEFAULT 0,
   locked_until  TEXT,
@@ -54,7 +57,7 @@ export function normalizePhone(p) {
   const d = String(p ?? "").replace(/\D/g, "");
   return d.length >= 9 && d.length <= 15 ? d.slice(-9) : null;
 }
-const validEmail = (e) => typeof e === "string" && e.length <= 120 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+export const validEmail = (e) => typeof e === "string" && e.length <= 120 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 
 const hashPin = (pin) => {
   const salt = crypto.randomBytes(16);
@@ -75,49 +78,84 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   db.exec(SCHEMA);
+  // Bases creadas con versiones anteriores
+  const addCol = (table, col, ddl) => {
+    if (!db.prepare(`PRAGMA table_info(${table})`).all().some((x) => x.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`);
+  };
+  addCol("registrations", "pin_hash", "TEXT");
+  addCol("registrations", "matched", "TEXT");
+  addCol("accounts", "verified", "INTEGER NOT NULL DEFAULT 1");
 
-  const accountOut = (r) => r && { id: r.id, customerId: r.customer_id, phone: r.phone, email: r.email, status: r.status, locked: !!r.locked_until && r.locked_until > new Date().toISOString(), lastLogin: r.last_login, createdAt: r.created_at };
+  const accountOut = (r) => r && { id: r.id, customerId: r.customer_id, phone: r.phone, email: r.email, status: r.status, verified: !!r.verified, locked: !!r.locked_until && r.locked_until > new Date().toISOString(), lastLogin: r.last_login, createdAt: r.created_at };
   const byPhone = db.prepare("SELECT * FROM accounts WHERE phone = ?");
   const byId = db.prepare("SELECT * FROM accounts WHERE id = ?");
   const dropSessions = db.prepare("DELETE FROM sessions WHERE account_id = ?");
 
   return {
     /** El cliente pide acceso. Devuelve { id } o { error }. Una solicitud pendiente del mismo teléfono se actualiza. */
-    requestRegistration({ phone, email, business }, now = new Date().toISOString()) {
+    requestRegistration({ phone, email, business, pin }, now = new Date().toISOString()) {
       const p = normalizePhone(phone);
       const biz = String(business ?? "").trim().replace(/\s+/g, " ");
       if (!p) return { error: "El teléfono no es válido." };
       if (!validEmail(String(email ?? "").trim())) return { error: "El correo no es válido." };
       if (biz.length < 2 || biz.length > 80) return { error: "Escribe el nombre de tu empresa." };
+      if (pin !== undefined && !/^\d{6}$/.test(String(pin))) return { error: "El PIN debe tener 6 cifras." };
       const mail = String(email).trim();
+      const hash = pin === undefined ? null : hashPin(String(pin));
       const open = db.prepare("SELECT id FROM registrations WHERE phone = ? AND status = 'pending'").get(p);
       if (open) {
-        db.prepare("UPDATE registrations SET email = ?, business = ?, created_at = ? WHERE id = ?").run(mail, biz, now, open.id);
+        db.prepare("UPDATE registrations SET email = ?, business = ?, pin_hash = ?, created_at = ? WHERE id = ?").run(mail, biz, hash, now, open.id);
         return { id: Number(open.id) };
       }
       if (db.prepare("SELECT COUNT(*) AS n FROM registrations WHERE status = 'pending'").get().n >= 300) return { error: "Hay demasiadas solicitudes pendientes. Inténtalo más tarde." };
-      return { id: Number(db.prepare("INSERT INTO registrations (phone, email, business, created_at) VALUES (?, ?, ?, ?)").run(p, mail, biz, now).lastInsertRowid) };
+      return { id: Number(db.prepare("INSERT INTO registrations (phone, email, business, pin_hash, created_at) VALUES (?, ?, ?, ?, ?)").run(p, mail, biz, hash, now).lastInsertRowid) };
     },
+    /** Anota qué datos coincidieron con la base de clientes (se muestra a la empresa). */
+    setMatched: (id, text) => void db.prepare("UPDATE registrations SET matched = ? WHERE id = ?").run(text, id),
     listRegistrations: (status = "pending") =>
-      db.prepare("SELECT id, phone, email, business, status, customer_id AS customerId, created_at AS createdAt FROM registrations WHERE status = ? ORDER BY id").all(status).map((r) => ({ ...r })),
+      db.prepare("SELECT id, phone, email, business, status, customer_id AS customerId, matched, created_at AS createdAt FROM registrations WHERE status = ? ORDER BY id").all(status).map((r) => ({ ...r })),
 
     /** La empresa aprueba: liga el teléfono al cliente elegido y genera el PIN (se devuelve UNA vez). */
     approve(id, customerId, now = new Date().toISOString()) {
       const r = db.prepare("SELECT * FROM registrations WHERE id = ?").get(id);
       if (!r || r.status !== "pending") return { error: "La solicitud no existe o ya se resolvió." };
       if (byPhone.get(r.phone)) return { error: "Ese teléfono ya tiene una cuenta." };
-      const pin = newPin();
+      // Si el cliente eligió su PIN al registrarse, ese es el que vale; si no, se genera uno (y se devuelve una vez)
+      const pin = r.pin_hash ? null : newPin();
       db.exec("BEGIN IMMEDIATE");
       try {
-        const accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, created_at) VALUES (?, ?, ?, ?, ?)").run(String(customerId), r.phone, r.email, hashPin(pin), now).lastInsertRowid);
+        const accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, created_at) VALUES (?, ?, ?, ?, ?)").run(String(customerId), r.phone, r.email, r.pin_hash ?? hashPin(pin), now).lastInsertRowid);
         db.prepare("UPDATE registrations SET status = 'approved', customer_id = ?, decided_at = ? WHERE id = ?").run(String(customerId), now, id);
         db.exec("COMMIT");
-        return { account: accountOut(byId.get(accId)), pin };
+        return { account: accountOut(byId.get(accId)), ...(pin ? { pin } : {}) };
       } catch (e) {
         db.exec("ROLLBACK");
         throw e;
       }
     },
+    /**
+     * Alta AUTOMÁTICA: el sistema comprobó los datos contra la base de clientes. Crea la cuenta enseguida con el PIN que eligió
+     * el cliente, pero «sin confirmar» (verified = 0): puede entrar y pedir, y la empresa revisa sus pedidos hasta confirmarla.
+     */
+    registerAuto({ phone, email, business, pin, customerId, matched }, now = new Date().toISOString()) {
+      const p = normalizePhone(phone);
+      if (!p) return { error: "El teléfono no es válido." };
+      if (!validEmail(String(email ?? "").trim())) return { error: "El correo no es válido." };
+      if (!/^\d{6}$/.test(String(pin ?? ""))) return { error: "El PIN debe tener 6 cifras." };
+      if (byPhone.get(p)) return { error: "Este teléfono ya tiene acceso. Entra con tu PIN, o pide uno nuevo a la empresa." };
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("INSERT INTO registrations (phone, email, business, status, customer_id, pin_hash, matched, created_at, decided_at) VALUES (?, ?, ?, 'auto', ?, NULL, ?, ?, ?)").run(p, String(email).trim(), String(business).trim().slice(0, 80), String(customerId), matched ?? null, now, now);
+        const accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, verified, created_at) VALUES (?, ?, ?, ?, 0, ?)").run(String(customerId), p, String(email).trim(), hashPin(String(pin)), now).lastInsertRowid);
+        db.exec("COMMIT");
+        return { account: accountOut(byId.get(accId)) };
+      } catch (e) {
+        db.exec("ROLLBACK");
+        throw e;
+      }
+    },
+    /** La empresa confirma una cuenta automática: sus pedidos ya no se retienen. */
+    confirm: (accountId) => db.prepare("UPDATE accounts SET verified = 1 WHERE id = ?").run(accountId).changes === 1,
     reject(id, now = new Date().toISOString()) {
       return db.prepare("UPDATE registrations SET status = 'rejected', decided_at = ? WHERE id = ? AND status = 'pending'").run(now, id).changes === 1;
     },
@@ -125,7 +163,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     listAccounts: () => db.prepare("SELECT * FROM accounts ORDER BY id").all().map(accountOut),
 
     /** Acceso con teléfono + PIN. { ok:true, token, account } o { ok:false, reason: "invalid" | "locked" }. */
-    login(phone, pin, now = new Date().toISOString()) {
+    login(phone, pin, now = new Date().toISOString(), verify = null) {
       const p = normalizePhone(phone);
       const row = p ? byPhone.get(p) : null;
       if (!row) {
@@ -134,7 +172,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       }
       if (row.status !== "active") return { ok: false, reason: "locked" };
       if (row.locked_until && row.locked_until > now) return { ok: false, reason: "locked" };
-      if (!/^\d{6}$/.test(String(pin ?? "")) || !checkPin(String(pin), row.pin_hash)) {
+      // verify(cuenta): comprobación extra (p. ej. el nombre de empresa escrito coincide con el cliente de la cuenta)
+      if (!/^\d{6}$/.test(String(pin ?? "")) || !checkPin(String(pin), row.pin_hash) || (verify && !verify(accountOut(row)))) {
         const failed = row.failed + 1;
         if (failed >= MAX_FAILED) {
           const locks = row.lock_count + 1;

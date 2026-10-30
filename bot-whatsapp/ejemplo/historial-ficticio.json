@@ -315,6 +315,53 @@
    ],
    "frequent": [],
    "recargoEquivalencia": true
+  },
+  {
+   "id": "9003",
+   "name": "Panadería Ficticia",
+   "phone": "+34 600 000 003",
+   "emails": [
+    "panaderia@ejemplo.es"
+   ],
+   "address": "Calle del Pan 3",
+   "orders": [
+    {
+     "doc": "F900",
+     "date": "2026-10-20",
+     "lines": [
+      {
+       "productId": "1007",
+       "qty": 72
+      },
+      {
+       "productId": "1010",
+       "qty": 20
+      },
+      {
+       "productId": "1009",
+       "qty": 8
+      }
+     ]
+    },
+    {
+     "doc": "F901",
+     "date": "2026-10-06",
+     "lines": [
+      {
+       "productId": "1007",
+       "qty": 72
+      },
+      {
+       "productId": "1010",
+       "qty": 10
+      }
+     ]
+    }
+   ],
+   "frequent": [],
+   "recargoEquivalencia": false,
+   "specialPrices": {},
+   "discounts": {}
   }
  ],
  "_aviso": "DATOS FICTICIOS de ejemplo. Los reales (unidades por caja, IVA, precios y descuentos) vendrán de las fichas de a3ERP."

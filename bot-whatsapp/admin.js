@@ -3,12 +3,26 @@
 import fs from "node:fs";
 import path from "node:path";
 import { send, readJson, makeAdminCheck } from "./auth.js";
+import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2 } from "./pricing.js";
 import { runExport } from "./exporter.js";
 
 const amountOf = (l) => l.amount ?? round2((l.units ?? l.qty) * (l.price ?? 0) * (1 - (l.discount ?? 0) / 100));
 
 /** Pedido tal como lo ve el empresario: líneas, total con impuestos y estado. */
+function readBuffer(req, max = 8_000_000) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    let size = 0;
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > max) { req.destroy(); resolve(null); } else chunks.push(c);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
+    req.on("error", () => resolve(null));
+  });
+}
+
 function orderView(o) {
   const items = o.items.map((l) => ({ ...l, amount: amountOf(l), vat: l.vat_rate }));
   const retenido = !o.review ? !o.customer_id : true;
@@ -17,7 +31,7 @@ function orderView(o) {
     lineas: o.items.map((l) => ({ id: l.id, nombre: l.name, cantidad: l.qty, unidad: l.unit, cajas: l.boxes, unidades: l.units ?? l.qty, precio: l.price, descuento: l.discount, importe: amountOf(l), iva: l.vat_rate, nota: l.note })),
     total: totals(items, o.re).total,
     estado: o.export_status === "exported" ? "exportado" : retenido ? "retenido" : "pendiente",
-    motivo: o.export_status === "exported" ? "" : !o.customer_id ? "Cliente sin código de ERP" : o.review ? "Pedido dudoso: revisar antes de exportar" : "",
+    motivo: o.export_status === "exported" ? "" : !o.customer_id ? "Cliente sin código de ERP" : o.review ? o.reason || "Pedido dudoso: revisar antes de exportar" : "",
     exportId: o.export_id,
   };
 }
@@ -47,7 +61,7 @@ export function createAdmin({ accounts, customers, orders, adminToken, exportDir
     // ---- Resumen para los avisos ----
     if (p === "/api/admin/resumen" && get) {
       const list = orders.listOrders({ exportStatus: "pending", limit: 500 }).map(orderView);
-      return send(res, 200, { solicitudes: accounts.listRegistrations("pending").length, pedidosPendientes: list.filter((o) => o.estado === "pendiente").length, pedidosRetenidos: list.filter((o) => o.estado === "retenido").length }), true;
+      return send(res, 200, { clientes: customers.search({ limit: 1 }).total, cuentasSinConfirmar: accounts.listAccounts().filter((a) => !a.verified).length, solicitudes: accounts.listRegistrations("pending").length, pedidosPendientes: list.filter((o) => o.estado === "pendiente").length, pedidosRetenidos: list.filter((o) => o.estado === "retenido").length }), true;
     }
 
     // ---- Pedidos ----
@@ -76,14 +90,34 @@ export function createAdmin({ accounts, customers, orders, adminToken, exportDir
     // ---- Solicitudes de alta y cuentas de clientes ----
     if (p === "/api/admin/solicitudes" && get) {
       const regs = accounts.listRegistrations(url.searchParams.get("estado") ?? "pending");
-      return send(res, 200, regs.map((r) => ({ ...r, sugerencias: customers.suggest(r.business, r.phone) }))), true;
+      return send(res, 200, regs.map((r) => ({ ...r, sugerencias: customers.suggest(r.business, r.phone, r.email) }))), true;
     }
     if (p === "/api/admin/clientes" && get) {
       const q = (url.searchParams.get("q") ?? "").toLowerCase().trim();
       return send(res, 200, customers.list().filter((c) => !q || c.name.toLowerCase().includes(q) || String(c.id) === q).slice(0, 15).map((c) => ({ id: c.id, name: c.name, phone: c.phone }))), true;
     }
+    // ---- Clientes (la lista que viene de a3ERP) ----
+    if (p === "/api/admin/clientes/lista" && get) {
+      const pagina = Math.max(0, Number(url.searchParams.get("pagina") ?? 0) || 0);
+      const r = customers.search({ q: url.searchParams.get("q") ?? "", offset: pagina * 50, limit: 50 });
+      const conCuenta = new Set(accounts.listAccounts().map((a) => String(a.customerId)));
+      return send(res, 200, { total: r.total, pagina, porPagina: 50, clientes: r.rows.map((c) => ({ ...c, cuenta: conCuenta.has(c.id) })) }), true;
+    }
+    if (p === "/api/admin/clientes/importar" && post) {
+      // El Excel que exporta a3ERP (lista de clientes). Crea los nuevos y actualiza los existentes; no toca historial ni precios.
+      const buf = await readBuffer(req);
+      if (!buf || !buf.length) return send(res, 400, { error: "No se recibió el archivo (máximo 8 MB)." }), true;
+      try {
+        const { customers: list, stats } = parseClientesXlsx(buf);
+        if (!list.length) return send(res, 400, { error: "El Excel no tiene clientes." }), true;
+        const r = customers.importMany(list);
+        return send(res, 200, { ok: true, ...stats, nuevos: r.added, actualizados: r.updated }), true;
+      } catch (e) {
+        return send(res, 400, { error: e.message || "No se pudo leer el Excel." }), true;
+      }
+    }
     if (p === "/api/admin/cuentas" && get) return send(res, 200, accounts.listAccounts().map((a) => ({ ...a, cliente: customers.getById(a.customerId)?.name ?? "" }))), true;
-    m = /^\/api\/admin\/(solicitudes|cuentas)\/(\d+)\/(aprobar|rechazar|pin|bloquear)$/.exec(p);
+    m = /^\/api\/admin\/(solicitudes|cuentas)\/(\d+)\/(aprobar|rechazar|pin|bloquear|confirmar)$/.exec(p);
     if (m && post) {
       const id = Number(m[2]);
       const b = (await readJson(req)) ?? {};
@@ -91,13 +125,14 @@ export function createAdmin({ accounts, customers, orders, adminToken, exportDir
         const cust = customers.getById(String(b.clienteId ?? ""));
         if (!cust) return send(res, 400, { error: "Elige un cliente de la lista." }), true;
         const r = accounts.approve(id, cust.id);
-        return r.error ? send(res, 400, { error: r.error }) : send(res, 200, { ok: true, cliente: cust.name, telefono: r.account.phone, pin: r.pin }), true;
+        return r.error ? send(res, 400, { error: r.error }) : send(res, 200, { ok: true, cliente: cust.name, telefono: r.account.phone, ...(r.pin ? { pin: r.pin } : {}) }), true;
       }
       if (m[1] === "solicitudes" && m[3] === "rechazar") return send(res, accounts.reject(id) ? 200 : 404, { ok: true }), true;
       if (m[1] === "cuentas" && m[3] === "pin") {
         const pin = accounts.resetPin(id);
         return send(res, pin ? 200 : 404, pin ? { ok: true, pin } : { error: "No existe la cuenta." }), true;
       }
+      if (m[1] === "cuentas" && m[3] === "confirmar") return send(res, accounts.confirm(id) ? 200 : 404, { ok: true }), true;
       if (m[1] === "cuentas" && m[3] === "bloquear") return accounts.setBlocked(id, b.bloquear !== false), send(res, 200, { ok: true }), true;
     }
     return send(res, 404, { error: "No existe." }), true;
