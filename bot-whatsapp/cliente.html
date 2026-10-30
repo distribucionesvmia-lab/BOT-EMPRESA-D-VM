@@ -11,7 +11,7 @@
   html { background: #b00000; }
   html, body { margin: 0; height: 100%; }
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; background: linear-gradient(180deg,#e60000 0%,#b00000 100%) fixed; color: var(--fg); display: flex; justify-content: center; padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
-  main { width: 100%; max-width: 440px; display: flex; flex-direction: column; min-height: 100%; padding: 16px; gap: 14px; }
+  main { width: 100%; max-width: 560px; display: flex; flex-direction: column; min-height: 100%; padding: 16px; gap: 14px; }
   h1 { font-size: 20px; margin: 8px 0 0; } p { margin: 0; color: var(--muted); }
   form.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
   label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
@@ -20,7 +20,7 @@
   button.main { font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 10px; padding: 12px; cursor: pointer; }
   button.link { font: inherit; background: none; border: 0; color: var(--accent); font-weight: 600; cursor: pointer; padding: 4px; }
   .err { color: var(--err); font-size: 14px; } .ok { color: var(--accent); font-size: 14px; }
-  .phone { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--chat); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; position: relative; height: calc(100vh - 32px); max-height: 760px; }
+  .phone { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--chat); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; position: relative; height: calc(100vh - 32px); max-height: 900px; }
   .bar { background: var(--bar); color: #fff; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .logo-chat { height: 34px; width: auto; flex: none; }
   .bar b { display: block; } .bar small { opacity: .8; }
@@ -40,7 +40,7 @@
   .row { padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; display: flex; flex-direction: column; gap: 2px; } .row small { color: var(--muted); }
 
   /* ---- Portada del cliente: fondo rojo, tarjetas blancas y botones grandes ---- */
-  .vm { --red:#d90000; --red-d:#a80000; --ink:#1d1d1f; --soft:#f4f4f5; --mute:#5f6368; width:100%; max-width:460px; margin:0 auto; display:flex; flex-direction:column; gap:16px; padding:8px 0 28px; color:var(--ink); }
+  .vm { --red:#d90000; --red-d:#a80000; --ink:#1d1d1f; --soft:#f4f4f5; --mute:#5f6368; width:100%; max-width:520px; margin:0 auto; display:flex; flex-direction:column; gap:16px; padding:8px 0 28px; color:var(--ink); }
   .vm .hero { text-align:center; color:#fff; padding:8px 8px 0; }
   .vm .hero img { width:min(260px,70%); height:auto; display:block; margin:0 auto 6px; }
   .vm .hero h1 { margin:6px 0 4px; font-size:clamp(24px,7vw,30px); line-height:1.15; color:#fff; letter-spacing:-.01em; }
@@ -82,6 +82,19 @@
   .vm-modal .vm-link { font:inherit; font-size:14px; font-weight:600; background:none; border:0; color:#a80000; cursor:pointer; padding:6px; text-decoration:underline; }
   .vm-modal .err { color:#b00020; font-size:14px; font-weight:600; } .vm-modal .okmsg { color:#0b6b3a; font-size:14px; font-weight:600; } .vm-modal .err:empty, .vm-modal .okmsg:empty { display:none; }
   .vm-modal [hidden] { display:none !important; }
+
+  /* Chat más grande y claro */
+  #chat .m { font-size: 17px; line-height: 1.4; padding: 10px 14px; max-width: 92%; border-radius: 14px; }
+  #chat .ui { width: min(94%, 440px); gap: 8px; }
+  #chat .pill { font-size: 17px; min-height: 54px; padding: 12px 16px; border-radius: 14px; }
+  #chat .pill.primary { background: #d90000; color: #fff; font-weight: 800; font-size: 19px; min-height: 62px; text-align: center; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 0 #a80000; }
+  form.send { padding: 10px 12px; gap: 10px; }
+  form.send input { font-size: 17px !important; min-height: 52px; padding: 0 16px !important; }
+  form.send button { width: 52px !important; height: 52px !important; font-size: 20px !important; }
+  .bar { flex-wrap: wrap; row-gap: 8px; }
+  .bar > div:first-child { flex: 1 1 200px; min-width: 0; }
+  .bar b { font-size: 18px; } .bar small { font-size: 14px; }
+  .bar button { min-height: 44px; font-size: 15px !important; padding: 0 12px; }
 </style>
 </head>
 <body>
@@ -236,7 +249,7 @@ function pill(texto, fn, href) {
 }
 function interactivo(ui) {
   const box = document.createElement("div"); box.className = "ui";
-  if (ui.type === "link") box.appendChild(pill("🔗 " + ui.title, null, ui.url));
+  if (ui.type === "link") { const l = pill("🛒 " + ui.title, null, ui.url); l.classList.add("primary"); box.appendChild(l); }
   else if (ui.type === "buttons") ui.buttons.forEach((b) => box.appendChild(pill(b.title, () => enviar(b.id, b.title))));
   else box.appendChild(pill("☰ " + ui.button, () => {
     sheet.innerHTML = "";
