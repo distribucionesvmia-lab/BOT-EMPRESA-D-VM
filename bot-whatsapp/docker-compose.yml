@@ -12,13 +12,14 @@ x-datos: &datos
   EXPORT_DIR: /data/exportaciones
   BACKUP_DIR: /data/respaldos
   NIF_PEPPER: ${NIF_PEPPER} # huellas del NIF de los clientes (igual en las dos aplicaciones)
+  LINK_SECRET: ${LINK_SECRET} # firma de los enlaces (igual en las dos aplicaciones)
 
 services:
   cliente:
     build: .
     restart: unless-stopped
     ports:
-      - "3000:3000" # detrás de un proxy con HTTPS (ver deploy/Caddyfile)
+      - "127.0.0.1:3000:3000" # solo el proxy HTTPS (Caddy, perfil «https») lo publica; ver deploy/Caddyfile
     environment:
       <<: *datos
       APP_MODE: cliente
@@ -40,10 +41,28 @@ services:
       # Sincronización automática de clientes y productos con una carpeta de Google Drive (ver docs/GOOGLE_DRIVE.md); solo esta aplicación
       DRIVE_FOLDER_ID: ${DRIVE_FOLDER_ID:-}
       GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      GOOGLE_SERVICE_ACCOUNT_FILE: ${GOOGLE_SERVICE_ACCOUNT_FILE:-}
       SYNC_MINUTES: ${SYNC_MINUTES:-15}
       PUBLIC_URL: http://localhost:3001
     volumes:
       - datos:/data
 
+  # HTTPS automático con tu dominio (docker compose --profile https up -d). Publica SOLO la aplicación del cliente.
+  caddy:
+    image: caddy:2
+    profiles: ["https"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO:-localhost}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - cliente
+
 volumes:
   datos:
+  caddy_data:
