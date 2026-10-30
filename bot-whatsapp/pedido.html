@@ -277,10 +277,10 @@ function pintarOpciones() {
     box.appendChild(b);
   }
   const otro = document.createElement("button"); otro.type = "button"; otro.className = "opt"; otro.id = "otroDia";
-  otro.append("📅 Otro día"); const sm = document.createElement("small"); sm.textContent = "Abre un calendario para elegir cualquier fecha"; otro.appendChild(sm);
+  otro.append("📅 Otro día"); const sm = document.createElement("small"); sm.textContent = "Abre un calendario para elegir una fecha más adelante"; otro.appendChild(sm);
   otro.onclick = abrirCal; box.appendChild(otro);
 }
-// «Otro día»: calendario pequeño para marcar cualquier día desde hoy hasta dentro de 90 días
+// «Otro día»: calendario pequeño para marcar un día más adelante de los botones, hasta dentro de 90 días
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const iso = (y, m, d) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -288,7 +288,7 @@ const addDaysIso = (day, n) => new Date(Date.UTC(+day.slice(0, 4), +day.slice(5,
 const largo = day => { const d = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10))); return `${DIAS[d.getUTCDay()]} ${+day.slice(8, 10)} de ${MESES[+day.slice(5, 7) - 1]}`; };
 let cal = { y: 0, m: 0, sel: null };
 function pintarCal() {
-  const hoy = data.minDate, max = addDaysIso(data.today, 90); // el calendario empieza en el mismo día que el primer botón: no puede contradecirlo
+  const hoy = data.minDate, max = addDaysIso(data.today, 90); // el calendario empieza donde acaban los botones (el día siguiente al último): no puede contradecirlos
   $("calMes").textContent = `${MESES[cal.m]} ${cal.y}`;
   const g = $("calGrid"); g.innerHTML = "";
   for (const d of ["L", "M", "X", "J", "V", "S", "D"]) { const e = document.createElement("span"); e.textContent = d; g.appendChild(e); }
@@ -302,11 +302,11 @@ function pintarCal() {
     b.onclick = () => { cal.sel = day; $("calSel").textContent = largo(day); $("calOk").disabled = false; pintarCal(); };
     g.appendChild(b);
   }
-  $("calAnt").disabled = iso(cal.y, cal.m, 1) <= data.today.slice(0, 8) + "01";
+  $("calAnt").disabled = iso(cal.y, cal.m, 1) <= data.minDate.slice(0, 8) + "01";
   $("calSig").disabled = iso(cal.y, cal.m + 1 > 11 ? cal.y + 1 : cal.y, cal.m + 1 > 11 ? 0 : cal.m + 1) > max.slice(0, 8) + "01";
 }
 function abrirCal() {
-  const [y, m] = data.today.split("-").map(Number);
+  const [y, m] = data.minDate.split("-").map(Number); // se abre en el mes donde empieza lo elegible
   cal = { y, m: m - 1, sel: null }; $("calSel").textContent = "Toca el día que quieras"; $("calOk").disabled = true;
   $("calFondo").hidden = false; pintarCal();
 }

@@ -10,7 +10,7 @@ import { priceOrder } from "./pricing.js";
 import { createAuth } from "./auth.js";
 import { createAdmin } from "./admin.js";
 import { webProducts, webHistory, webOrderFromBody } from "./weborder.js";
-import { deliveryOptions, deliveryMin, madridDay } from "./delivery.js";
+import { deliveryOptions, deliveryCalendarFrom, madridDay } from "./delivery.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { sourceFromEnv } from "./drive.js";
@@ -257,7 +257,7 @@ function webOrderRoutes(req, res, url) {
         history: webHistory(customer, catalogNow()),
         delivery: deliveryOptions(),
         today: madridDay(),
-        minDate: deliveryMin(),
+        minDate: deliveryCalendarFrom(),
       });
     }
 
@@ -394,7 +394,7 @@ async function appRoutes(req, res, url) {
       history: webHistory(customer, catalogNow()),
       delivery: deliveryOptions(),
       today: madridDay(),
-      minDate: deliveryMin(),
+      minDate: deliveryCalendarFrom(),
     });
   }
   if (p === "/catalogo" && req.method === "POST") {

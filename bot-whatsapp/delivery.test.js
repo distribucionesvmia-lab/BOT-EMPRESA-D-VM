@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deliveryOptions, deliveryInfo, deliveryAllowed, deliveryMin, longDate, madridDay } from "./delivery.js";
+import { deliveryOptions, deliveryInfo, deliveryAllowed, deliveryMin, deliveryCalendarFrom, longDate, madridDay } from "./delivery.js";
+const addDays0 = (d) => new Date(Date.parse(d + "T12:00:00Z") + 86_400_000).toISOString().slice(0, 10);
 import { webOrderFromBody } from "./weborder.js";
 
 test("opciones de entrega: hoy, mañana y los días laborables siguientes, con fecha (sin fines de semana)", () => {
@@ -34,14 +35,23 @@ test("«hoy» solo antes de las 10:00 (hora de Madrid); después, lo más pronto
   assert.equal(deliveryAllowed("2026-10-29", "2026-10-29T08:59:00Z"), true);
   assert.equal(deliveryAllowed("2026-10-29", "2026-10-29T09:00:00Z"), false);
   assert.equal(deliveryAllowed("2026-10-30", "2026-10-29T09:00:00Z"), true);
-  // el calendario («otro día») empieza donde el primer botón: viernes por la tarde → lunes; sábado → lunes
-  assert.equal(deliveryMin("2026-10-30T18:00:00Z"), "2026-11-02");
-  assert.equal(deliveryMin("2026-10-31T07:00:00Z"), "2026-11-02");
-  assert.equal(deliveryAllowed("2026-10-31", "2026-10-30T18:00:00Z"), false); // sábado: antes del primer botón
-  assert.equal(deliveryAllowed("2026-11-02", "2026-10-30T18:00:00Z"), true);
+  // el calendario («otro día») empieza donde acaban los botones: nunca los contradice
+  const vie = "2026-10-30T18:00:00Z"; // viernes por la tarde: botones del lunes 2 al viernes 6
+  assert.equal(deliveryCalendarFrom(vie), "2026-11-07");
+  assert.equal(deliveryAllowed("2026-11-06", vie), true); // último botón
+  assert.equal(deliveryAllowed("2026-11-07", vie), true); // primer día del calendario
+  assert.equal(deliveryAllowed("2026-10-31", vie), false); // antes de los botones
+  // jueves por la mañana: botones jueves 29, viernes 30, lunes 2, martes 3, miércoles 4; el fin de semana de en medio no se puede elegir
+  const jue = "2026-10-29T07:00:00Z";
+  assert.equal(deliveryCalendarFrom(jue), "2026-11-05");
+  assert.equal(deliveryAllowed("2026-10-31", jue), false);
+  assert.equal(deliveryAllowed("2026-11-05", jue), true);
   for (let d = 0; d < 366; d++) for (const h of [6, 12]) {
     const now = new Date(Date.UTC(2026, 0, 1 + d, h)).toISOString();
-    assert.equal(deliveryMin(now), deliveryOptions(now)[0].date); // siempre coinciden
+    const o = deliveryOptions(now);
+    assert.ok(deliveryCalendarFrom(now) > o[o.length - 1].date);
+    assert.equal(deliveryMin(now), o[0].date);
+    assert.equal(deliveryAllowed(addDays0(o[o.length - 1].date), now), true);
   }
   // en horario de verano (UTC+2) el corte sigue siendo a las 10:00 de Madrid
   assert.equal(deliveryMin("2026-07-15T07:59:00Z"), "2026-07-15");
@@ -78,7 +88,7 @@ test("el pedido web admite los días ofrecidos y cualquier día del calendario, 
 
 test("deliveryAllowed: de hoy a 90 días, fechas reales", () => {
   const at = "2026-10-29T09:00:00Z";
-  assert.equal(deliveryAllowed("2026-10-30", at), true); // a las 10:00 el primer día posible es mañana
+  assert.equal(deliveryAllowed("2026-10-30", at), true); // a las 10:00 el primer día posible es mañana (botón)
   assert.equal(deliveryAllowed("2026-10-28", at), false);
   assert.equal(deliveryAllowed("2027-01-27", at), true); // +90
   assert.equal(deliveryAllowed("2027-01-28", at), false);
