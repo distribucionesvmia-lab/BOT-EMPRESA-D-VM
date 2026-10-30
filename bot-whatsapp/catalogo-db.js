@@ -121,6 +121,10 @@ export function openCatalogDb(path = process.env.CATALOG_DB ?? "catalogo.sqlite"
     /** Cambia cuando se modifica el catálogo: sirve para que el bot recargue los precios sin reiniciar. */
     version: () => db.prepare("SELECT COUNT(*) || '-' || COALESCE(MAX(updated_at), '') AS v FROM products").get().v,
     history: (id, limit = 50) => db.prepare("SELECT field, old_value AS oldValue, new_value AS newValue, changed_at AS changedAt FROM product_changes WHERE product_id = ? ORDER BY id DESC LIMIT ?").all(String(id), limit),
+    /** Copia consistente de la base en un fichero nuevo (sin parar el servicio). */
+    backupTo(file) {
+      db.prepare("VACUUM INTO ?").run(file);
+    },
     close: () => db.close(),
   };
 }

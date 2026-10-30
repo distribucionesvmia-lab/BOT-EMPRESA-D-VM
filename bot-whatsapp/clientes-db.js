@@ -232,6 +232,10 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
         .all()
         .map((r) => ({ id: r.id, name: r.name, phone: r.phone ?? "", address: r.address ?? "", recargoEquivalencia: !!r.recargo, active: !!r.active, orders: r.n_orders, lastOrder: r.last_order, updatedAt: r.updated_at })),
     count: () => db.prepare("SELECT COUNT(*) AS n FROM customers").get().n,
+    /** Copia consistente de la base en un fichero nuevo (sin parar el servicio). */
+    backupTo(file) {
+      db.prepare("VACUUM INTO ?").run(file);
+    },
     close: () => db.close(),
   };
 }

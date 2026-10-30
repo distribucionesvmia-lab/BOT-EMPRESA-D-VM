@@ -300,6 +300,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       if (blocked) dropSessions.run(accountId);
       else db.prepare("UPDATE accounts SET failed = 0, lock_count = 0, locked_until = NULL WHERE id = ?").run(accountId);
     },
+    /** Copia consistente de la base en un fichero nuevo (sin parar el servicio). */
+    backupTo(file) {
+      db.prepare("VACUUM INTO ?").run(file);
+    },
     close: () => db.close(),
   };
 }

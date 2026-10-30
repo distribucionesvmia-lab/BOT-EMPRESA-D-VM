@@ -21,3 +21,23 @@ test("la copia de seguridad contiene los pedidos y se conservan solo las última
   copia.close();
   assert.equal(db.ping(), true);
 });
+
+import { backupAll } from "./backup.js";
+import { openCatalogDb } from "./catalogo-db.js";
+import { openCustomersDb } from "./clientes-db.js";
+import { openAccountsDb } from "./cuentas-db.js";
+
+test("copia de todas las bases: pedidos, cuentas, clientes y catálogo (con sus datos) y una que falla no impide las demás", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-bk-"));
+  const cat = openCatalogDb(":memory:"), cus = openCustomersDb(":memory:"), acc = openAccountsDb(":memory:"), ped = openDb(":memory:");
+  cat.upsertProducts([{ id: "1", name: "AGUA", price: 1 }]);
+  cus.upsertCustomers([{ id: "C1", name: "BAR UNO", nif: "12345678Z" }]);
+  acc.ensureMany(["C1"]);
+  const { files, errors } = backupAll({ pedidos: ped, cuentas: acc, clientes: cus, catalogo: cat, rota: { backupTo() { throw new Error("disco lleno"); } } }, { dir });
+  assert.deepEqual(Object.keys(files).sort(), ["catalogo", "clientes", "cuentas", "pedidos"]);
+  assert.match(errors.rota, /disco lleno/);
+  assert.equal(openCatalogDb(files.catalogo).get("1").name, "AGUA");
+  assert.equal(openCustomersDb(files.clientes).getById("C1").name, "BAR UNO");
+  assert.equal(openCustomersDb(files.clientes).checkNif("C1", "45678Z"), true); // la huella del NIF también va en la copia
+  assert.equal(openAccountsDb(files.cuentas).listAccounts().length, 1);
+});

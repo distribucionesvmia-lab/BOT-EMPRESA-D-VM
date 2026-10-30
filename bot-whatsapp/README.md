@@ -152,7 +152,7 @@ Las dos limitaciones del plan gratuito de Render (se suspende a los 15 min y los
 
 | Opción | Suspensión | Datos | Coste aprox. (verificar) |
 |---|---|---|---|
-| Render **starter** + disco (`render.yaml`) | No | Persistentes | ≈ 7 $/mes + ≈ 0,25 $/GB |
+| Render **starter** + disco (`render.yaml` en la raíz del repositorio) | No | Persistentes | ≈ 7 $/mes + ≈ 0,25 $/GB |
 | Servidor propio (VPS) con Docker (`docker compose up -d`) | No | Persistentes (volumen) | ≈ 4–6 €/mes |
 | Render gratis + UptimeRobot (ping a `/health` cada 5 min) | Casi no (puede seguir reiniciando) | **Se pierden** al reiniciar; copia de los pedidos en la hoja de Google (sección 1b) | 0 € |
 
@@ -173,3 +173,11 @@ Escribe "hola" al número de WhatsApp y debería responder.
 - Los avisos a `OWNER_PHONE` solo llegan si tú escribiste al bot en las últimas 24 h. Si no, mira la base de datos o los logs.
 - Las sesiones están en memoria: si el servidor se reinicia, los clientes a mitad de pedido vuelven al menú. En Render gratis, `pedidos.sqlite` se borra en cada despliegue; usa un disco persistente.
 - No uses librerías no oficiales con tu número de negocio: pueden bloquearlo.
+
+
+## Render: desplegar sin perder datos
+1. En Render: **New + → Blueprint** → elige este repositorio. Lee `render.yaml` (en la raíz): carpeta `bot-whatsapp`, comando de arranque y **disco persistente en `/var/data`** (plan Starter, de pago). Si prefieres crear el servicio a mano con Docker: deja **Root Directory vacío** (usa el `Dockerfile` de la raíz) y añade un **Disk** montado en `/var/data`.
+2. **Todas las bases viven en ese disco** (pedidos, cuentas con sus PIN, clientes, catálogo, exportaciones y copias): sobreviven a reinicios y redespliegues. Si `DB_PATH` no apunta a `/var/data`, el servidor lo avisa en el registro.
+3. **Copia diaria de todas las bases** a las 03:00 (hora de Madrid; `BACKUP_TIME` la cambia) en `/var/data/respaldos`, conservando las 14 últimas. Además Render guarda copias diarias del propio disco (se restauran desde su panel, hasta 7 días).
+4. Clientes, productos e historial se recuperan solos desde Drive si hiciera falta; lo que no se puede reconstruir (pedidos, cuentas y PIN personales) es lo que protegen el disco y las copias.
+5. Variables: `DRIVE_FOLDER_ID` y la clave de Google (ver `docs/GOOGLE_DRIVE.md`). No pongas `DEMO`.

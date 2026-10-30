@@ -1,4 +1,6 @@
-# Despliegue en Render con disco persistente y sin suspensión.
+# Despliegue en Render (Blueprint): el fichero tiene que estar en la RAÍZ del repositorio.
+# Disco persistente en /var/data: ahí viven TODAS las bases de datos (pedidos, cuentas, clientes, catálogo), las exportaciones y las copias
+# de seguridad diarias, y sobreviven a reinicios y redespliegues. Render además guarda copias diarias del disco (restaurables 7 días).
 # ⚠️ Usa el plan «starter» (de pago): el plan gratuito se suspende y no admite disco persistente.
 services:
   - type: web
@@ -12,8 +14,6 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
-      - key: DEMO              # quita esta variable cuando se use con clientes reales
-        value: "1"
       - key: LINK_SECRET
         generateValue: true
       - key: PUBLIC_URL        # pon aquí la dirección https que te asigne Render
