@@ -256,3 +256,16 @@ test("APP_MODE=empresa: la aplicación de la empresa no sirve nada del cliente",
     p.kill();
   }
 });
+
+test("EMPRESA: adivinar la clave tiene límite de intentos", async () => {
+  const { p, url } = await arrancar("empresa");
+  try {
+    let ultimo;
+    for (let i = 0; i < 12; i++) ultimo = await status(url + "/api/admin/resumen", { headers: { Authorization: "Bearer mal" + i } });
+    assert.equal(ultimo, 429);
+    // y una vez bloqueada esa IP, ni la clave correcta pasa
+    assert.equal(await status(url + "/api/admin/resumen", { headers: { Authorization: `Bearer ${ADMIN}` } }), 429);
+  } finally {
+    p.kill();
+  }
+});

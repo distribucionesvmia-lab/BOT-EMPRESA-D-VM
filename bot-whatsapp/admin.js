@@ -28,11 +28,20 @@ function orderView(o) {
  */
 export function createAdmin({ accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones" }) {
   const isAdmin = makeAdminCheck(adminToken);
+  // Máximo 10 claves erróneas cada 10 minutos por IP; superado el límite se bloquea esa IP aunque acierte la clave
+  const failures = new Map();
+  const recentFailures = (key, now = Date.now()) => (failures.get(key) ?? []).filter((t) => now - t < 10 * 60_000);
+  const ip = (req) => (process.env.TRUST_PROXY === "1" ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() : "") || req.socket.remoteAddress || "?";
 
   return async function route(req, res, url) {
     const p = url.pathname;
     if (!p.startsWith("/api/admin/")) return false;
-    if (!isAdmin(req)) return send(res, 403, { error: "Acceso no autorizado." }), true;
+    const who = ip(req);
+    if (recentFailures(who).length >= 10) return send(res, 429, { error: "Demasiados intentos. Espera unos minutos." }), true;
+    if (!isAdmin(req)) {
+      failures.set(who, [...recentFailures(who), Date.now()]);
+      return send(res, 403, { error: "Acceso no autorizado." }), true;
+    }
     const get = req.method === "GET", post = req.method === "POST";
 
     // ---- Resumen para los avisos ----

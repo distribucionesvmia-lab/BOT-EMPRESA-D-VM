@@ -1,13 +1,44 @@
-# Servidor propio:  docker compose up -d
-# Los datos quedan en el volumen «datos» y sobreviven a reinicios y actualizaciones.
+# Dos aplicaciones con las MISMAS bases de datos:
+#   cliente  lo que se entrega a los clientes: es la ÚNICA que se publica en internet.
+#   empresa  lo del empresario: solo escucha en el propio servidor (127.0.0.1); no se publica.
+# Los datos viven en el volumen «datos» y sobreviven a reinicios y actualizaciones.
+# Uso:  cp .env.example .env  (rellenar)  ·  docker compose up -d --build
+# Ver la aplicación de la empresa SIN abrirla a internet: ver docs/DESPLIEGUE.md (túnel SSH, Tailscale o red de la oficina).
+x-datos: &datos
+  DB_PATH: /data/pedidos.sqlite
+  CATALOG_DB: /data/catalogo.sqlite
+  CUSTOMERS_DB: /data/clientes.sqlite
+  ACCOUNTS_DB: /data/cuentas.sqlite
+  EXPORT_DIR: /data/exportaciones
+  BACKUP_DIR: /data/respaldos
+
 services:
-  bot:
+  cliente:
     build: .
     restart: unless-stopped
     ports:
-      - "3000:3000"
-    env_file: .env        # copia .env.example a .env y rellénalo
+      - "3000:3000" # detrás de un proxy con HTTPS (ver deploy/Caddyfile)
+    environment:
+      <<: *datos
+      APP_MODE: cliente
+      PUBLIC_URL: ${PUBLIC_URL} # https://pedidos.tuempresa.es
+      TRUST_PROXY: "1"
+      # Esta aplicación NO recibe la clave de la empresa
     volumes:
       - datos:/data
+
+  empresa:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000" # solo accesible desde el propio servidor
+    environment:
+      <<: *datos
+      APP_MODE: empresa
+      ADMIN_TOKEN: ${ADMIN_TOKEN} # clave de la empresa: larga y secreta
+      PUBLIC_URL: http://localhost:3001
+    volumes:
+      - datos:/data
+
 volumes:
   datos:

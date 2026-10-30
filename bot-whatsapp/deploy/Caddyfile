@@ -1,0 +1,10 @@
+# Proxy con HTTPS automático (Caddy) delante de la aplicación del CLIENTE.
+# Solo se publica lo del cliente: la aplicación de la empresa NO aparece aquí.
+# Sustituye el dominio por el vuestro.
+pedidos.tuempresa.es {
+	encode gzip
+	# Aun así, por si acaso: nunca entregar al exterior nada de la administración
+	@admin path /empresa* /distribuidor* /api/admin/*
+	respond @admin 404
+	reverse_proxy cliente:3000
+}

@@ -82,6 +82,7 @@ Cada cliente entra en `/cliente` con su **teléfono y un PIN de 6 cifras**; la e
 - El código de WhatsApp (`/webhook`) sigue en el proyecto pero ya no se usa.
 
 ## 1c-quater. Dos aplicaciones distintas: la del cliente y la de la empresa
+> Cómo entregarlas y cómo entrar tú a la de la empresa sin que el cliente pueda: **`docs/DESPLIEGUE.md`** (Docker Compose con la del cliente publicada y la de la empresa solo en el servidor).
 Comparten las mismas bases de datos, pero **no se mezclan**: lo que se entrega al cliente no contiene nada de lo del empresario.
 
 | | Aplicación del **cliente** (el bot) | Aplicación de la **empresa** (el empresario) |
@@ -112,8 +113,8 @@ npm run dev   # sin credenciales imprime las respuestas por consola
 La demo usa **clientes y productos ficticios** (`ejemplo/historial-ficticio.json`) salvo que exista un `historial-demo.json` propio, y guarda todo en `demo.sqlite` y `exportaciones-demo/`, sin tocar los datos reales.
 
 ## 2b. Demo en línea (sin servidor)
-`demo-web/` contiene una versión de la demo que funciona **entera en el navegador** (mismo bot, mismos cálculos y mismo Excel, con datos ficticios), con las **dos aplicaciones separadas**, cada una con su enlace:
-- `…#cliente` — la del cliente: solicitar acceso, entrar con **teléfono + PIN** y chat con el bot (sus productos habituales). Nada de lo de la empresa.
+`demo-web/` contiene una versión de la demo que funciona **entera en el navegador** (mismo bot, mismos cálculos y mismo Excel, con datos ficticios), con las **dos aplicaciones separadas**. Al abrir el enlace **se ve siempre la del cliente**; la de la empresa solo se abre añadiendo `#empresa` (no hay ningún enlace hacia ella desde la del cliente):
+- (sin nada) o `…#cliente` — la del cliente: solicitar acceso, entrar con **teléfono + PIN** y chat con el bot (sus productos habituales). Nada de lo de la empresa.
 - `…#empresa` — la del empresario: **Pedidos** (en directo, con exportación a Excel e historial), **Solicitudes de alta** (aprobar y dar el PIN), **Cuentas de clientes** y **Bases de datos** (precios editables).
 - Cuentas de prueba: `600 000 001` PIN `111111` (Bar El Ejemplo) y `600 000 002` PIN `222222` (Tienda Ficticia).
 

@@ -140,21 +140,10 @@
 
 <div class="shell">
 
-  <!-- Inicio: elegir qué aplicación ver -->
-  <section class="view home" id="v-inicio" aria-label="Elegir aplicación">
-    <h1>Pedidos · Distribuciones VM</h1>
-    <p>Demo con clientes y artículos ficticios. Son <b>dos aplicaciones distintas</b>: la que se entrega al cliente y la del empresario. Cada una tiene su propio enlace y se pueden abrir en dispositivos distintos.</p>
-    <div class="cards">
-      <a class="card" href="#cliente"><b>Aplicación del cliente</b><span>Lo que se le entrega: pide acceso, entra con su teléfono y PIN y hace sus pedidos con el bot, que le muestra sus productos habituales.</span><em>Abrir como cliente →</em></a>
-      <a class="card" href="#empresa"><b>Aplicación de la empresa</b><span>Lo del empresario: los pedidos que llegan, la exportación a Excel y las solicitudes de clientes que piden darse de alta.</span><em>Abrir como empresario →</em></a>
-    </div>
-    <p class="msg" id="estado-modo"></p>
-  </section>
-
   <!-- APLICACIÓN DEL CLIENTE -->
-  <section class="view" id="v-cliente" aria-label="Aplicación del cliente" hidden>
+  <section class="view" id="v-cliente" aria-label="Aplicación del cliente">
     <div class="client">
-      <div class="nav"><a class="back" href="#">← Cambiar de aplicación</a><span class="sub">Aplicación del cliente</span></div>
+      <div class="nav"><span class="sub">Distribuciones VM · Pedidos</span></div>
       <div class="banner" id="aviso-cliente" hidden></div>
 
       <div id="c-acceso" hidden>
@@ -198,7 +187,7 @@
 
   <!-- APLICACIÓN DE LA EMPRESA -->
   <section class="view" id="v-empresa" aria-label="Aplicación de la empresa" hidden>
-    <div class="nav"><a class="back" href="#">← Cambiar de aplicación</a><span class="sub">Aplicación de la empresa</span><span class="badge modo" id="modo"></span></div>
+    <div class="nav"><a class="back" href="#cliente">← Ver la aplicación del cliente</a><span class="sub">Aplicación de la empresa</span><span class="badge modo" id="modo"></span></div>
     <div class="dis-grid">
       <div class="banner" id="aviso-dis" hidden></div>
       <div class="pinbox" id="pin" role="status" hidden></div>
@@ -380,9 +369,10 @@ function toast(msg) { const e = $("toast"); e.textContent = msg; e.hidden = fals
 // ---- Rutas: cada aplicación tiene su propio enlace (#cliente, #empresa) ----
 function route() {
   const h = location.hash.slice(1);
-  const v = h === "cliente" ? "cliente" : h === "empresa" || h === "distribuidor" ? "empresa" : "inicio";
-  for (const id of ["inicio", "cliente", "empresa"]) $("v-" + id).hidden = id !== v;
-  document.title = v === "cliente" ? "Pedidos · Cliente" : v === "empresa" ? "Pedidos · Empresa" : "Pedidos · Distribuciones VM";
+  // Por defecto (sin nada detrás del enlace) se ve SIEMPRE la aplicación del cliente; la de la empresa solo con #empresa
+  const v = h === "empresa" || h === "distribuidor" ? "empresa" : "cliente";
+  for (const id of ["cliente", "empresa"]) $("v-" + id).hidden = id !== v;
+  document.title = v === "empresa" ? "Pedidos · Empresa" : "Pedidos · Distribuciones VM";
   if (v === "cliente") pantallaCliente();
   if (v === "empresa") pintarTodo();
   avisos();
@@ -391,9 +381,6 @@ window.addEventListener("hashchange", route);
 
 function avisos() {
   const i = VM.info();
-  $("estado-modo").textContent = i.mode === "shared"
-    ? "Los datos son compartidos y se guardan: lo que pide un cliente aparece al instante en la aplicación de la empresa, también desde otro dispositivo."
-    : "Los datos se guardan en este navegador. Si abres esta página con tu cuenta de Claude, se compartirán entre dispositivos.";
   $("modo").textContent = i.mode === "shared" ? "Datos compartidos" : "Datos en este navegador";
   const ac = $("aviso-cliente"), vacia = !VM.accounts().length && !VM.me();
   ac.hidden = !(i.mode === "shared" && !i.canWrite) && !vacia;

@@ -19,7 +19,7 @@ if (process.env.DEMO === "1") {
   process.env.CATALOG_DB ??= "catalogo-demo.sqlite";
   process.env.CUSTOMERS_DB ??= "clientes-demo.sqlite";
   process.env.ACCOUNTS_DB ??= "cuentas-demo.sqlite";
-  process.env.ADMIN_TOKEN ??= "demo"; // clave de la vista del distribuidor en la demo
+  if (process.env.APP_MODE !== "cliente") process.env.ADMIN_TOKEN ??= "demo"; // clave de la aplicación de la empresa en la demo
   process.env.EXPORT_DIR ??= "exportaciones-demo";
 }
 
@@ -300,7 +300,7 @@ const auth = createAuth({
   secure: PUBLIC_URL.startsWith("https://"),
   trustProxy: process.env.TRUST_PROXY === "1",
 });
-const admin = createAdmin({ accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: process.env.ADMIN_TOKEN });
+const admin = createAdmin({ accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" };
 const sendJson = (res, code, data) => res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify(data));
