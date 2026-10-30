@@ -9,16 +9,17 @@ import { FORMAT, madrid, madridTime } from "../export-format.js";
 import { workbookFiles } from "../xlsx-files.js";
 import { zipStore } from "./zip-browser.js";
 import { BUSINESS } from "../config.js";
-import { seedDocs } from "./seeds.js";
+import { seedDocs, DEMO_ACCOUNTS } from "./seeds.js";
+import { sha256hex } from "./sha256.js";
 import { makeDbBackend, makeLocalBackend } from "./backend.js";
 import data from "../ejemplo/historial-ficticio.json";
 
 const PHONE = "34600999999"; // el móvil de prueba no está en ninguna ficha: el bot pregunta quién es
-const COLLS = ["products", "customers", "orders", "exports"];
+const COLLS = ["products", "customers", "orders", "exports", "registrations", "accounts"];
 const uid = () => Math.random().toString(36).slice(2, 8);
 
 let backend, mode = "local", perms = { canWrite: true, isAdmin: true };
-const cache = { products: [], customers: [], orders: [], exports: [] };
+const cache = { products: [], customers: [], orders: [], exports: [], registrations: [], accounts: [] };
 const listeners = new Set();
 const errorListeners = new Set();
 const emit = () => listeners.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
@@ -60,6 +61,22 @@ async function init() {
   await Promise.race([Promise.all(firsts), new Promise((r) => setTimeout(r, 6000))]);
 }
 const ready = init();
+
+// ---- Cuentas de clientes: el cliente pide acceso, la empresa lo aprueba y le da un PIN ----
+const phone9 = (p) => { const d = String(p ?? "").replace(/\D/g, ""); return d.length >= 9 && d.length <= 15 ? d.slice(-9) : null; };
+const validEmail = (e) => typeof e === "string" && e.length <= 120 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+const pinHash = (phone, pin) => sha256hex(`${phone}:${pin}`); // en la demo se guarda el hash, nunca el PIN
+const newPin = () => String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
+const store = { get: (k) => { try { return sessionStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch {} } };
+const attempts = new Map(); // intentos fallidos por teléfono (en la demo, solo en este navegador)
+const currentAccount = () => { const id = store.get("vm:acc"); return cache.accounts.find((a) => a.id === id && a.status === "active") ?? null; };
+const customerOf = (acc) => (acc ? cache.customers.find((c) => c.id === acc.customerId) ?? null : null);
+const suggest = (r) => {
+  const out = new Map();
+  for (const c of findCustomers(cache.customers, r.business)) out.set(c.id, { id: c.id, name: c.name, motivo: "nombre" });
+  for (const c of cache.customers) if (phone9(c.phone) === r.phone) out.set(c.id, { id: c.id, name: c.name, motivo: out.has(c.id) ? "nombre y teléfono" : "teléfono" });
+  return [...out.values()];
+};
 
 // ---- Pedidos ----
 const byDate = (a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : a.id < b.id ? -1 : 1);
@@ -103,22 +120,59 @@ window.VM = {
   onError: (fn) => (errorListeners.add(fn), () => errorListeners.delete(fn)),
 
   // ---- Vista del cliente: el chat ----
-  resetChat: () => sessions.delete(PHONE),
-  /** Un mensaje del cliente al bot (texto libre o id de botón/fila). */
+  demoAccounts: DEMO_ACCOUNTS.map((a) => ({ phone: a.phone, pin: a.pin, customerId: a.customerId })),
+
+  // ---- Vista del cliente: acceso con teléfono + PIN y chat ----
+  /** El cliente pide acceso: la empresa lo verá en «Solicitudes de alta». */
+  async requestAccess({ phone, email, business }) {
+    const p = phone9(phone), biz = String(business ?? "").trim().replace(/\s+/g, " ");
+    if (!p) return { error: "El teléfono no es válido." };
+    if (!validEmail(String(email ?? "").trim())) return { error: "El correo no es válido." };
+    if (biz.length < 2 || biz.length > 80) return { error: "Escribe el nombre de tu empresa." };
+    if (!perms.canWrite) return { error: "Solo lectura: no se pueden enviar solicitudes con este acceso." };
+    const open = cache.registrations.find((r) => r.phone === p && r.status === "pending");
+    const id = open?.id ?? `r${Date.now().toString(36)}${uid()}`;
+    const doc = { id, phone: p, email: String(email).trim(), business: biz, status: "pending", createdAt: new Date().toISOString() };
+    await (open ? backend.update("registrations", id, doc) : backend.set("registrations", id, doc));
+    return { ok: true };
+  },
+  /** Teléfono + PIN. La respuesta es la misma si el teléfono no existe o el PIN falla. */
+  login(phone, pin) {
+    const p = phone9(phone) ?? "";
+    const st = attempts.get(p) ?? { fails: 0, until: 0 };
+    if (st.until > Date.now()) return { ok: false, error: "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." };
+    const acc = cache.accounts.find((a) => a.phone === p && a.status === "active");
+    if (!acc || !/^\d{6}$/.test(String(pin)) || acc.pinHash !== pinHash(p, pin)) {
+      st.fails += 1;
+      if (st.fails >= 5) { st.fails = 0; st.until = Date.now() + 15 * 60_000; }
+      attempts.set(p, st);
+      return { ok: false, error: "Teléfono o PIN incorrectos." };
+    }
+    attempts.delete(p);
+    store.set("vm:acc", acc.id);
+    return { ok: true, nombre: customerOf(acc)?.name ?? "" };
+  },
+  logout() { store.set("vm:acc", null); sessions.clear(); },
+  /** Cliente con sesión iniciada (o null). */
+  me() { const c = customerOf(currentAccount()); return c ? { nombre: c.name } : null; },
+  resetChat: () => sessions.clear(),
+  /** Un mensaje del cliente al bot (texto libre o id de botón/fila). El cliente sale SIEMPRE de la cuenta con sesión. */
   send(text) {
-    let cur = sessions.get(PHONE);
-    if (!cur) cur = newSession(null, null, { identify: true, phone: PHONE, holdUnverified: false });
+    const acc = currentAccount(), customer = customerOf(acc);
+    if (!customer) return { reply: "Tu sesión ha caducado. Entra de nuevo.", ui: null, needLogin: true };
+    let cur = sessions.get(acc.id) ?? newSession(customer, "#mini", { phone: acc.phone, holdUnverified: false, showHabitual: true });
+    cur = { ...cur, customer };
     const out = handleMessage(cur, String(text ?? "").slice(0, 1000));
-    sessions.set(PHONE, out.session);
+    sessions.set(acc.id, out.session);
     let saved = null;
-    if (out.order) saved = saveOrder({ at: new Date().toISOString(), phone: PHONE, key: `demo:${uid()}`, ...out.order }, cur.customer ?? null);
+    if (out.order) saved = saveOrder({ at: new Date().toISOString(), phone: acc.phone, key: `demo:${uid()}`, ...out.order }, customer);
     return { reply: out.reply, ui: out.ui, handoff: !!out.handoff, saved };
   },
 
   // ---- Mini-aplicación de pedido (lo que abre «Hacer pedido») ----
   miniOpen() {
     const id = uid();
-    links.set(id, { customer: sessions.get(PHONE)?.customer ?? null, used: false });
+    links.set(id, { customer: customerOf(currentAccount()), used: false });
     return id;
   },
   miniData(link) {
@@ -130,7 +184,7 @@ window.VM = {
     const customer = links.get(link)?.customer;
     if (!customer) return { status: 410, json: { error: "Enlace no válido o caducado" } };
     if (links.get(link).used) return { status: 409, json: { error: "Este pedido ya se envió" } };
-    const built = webOrderFromBody(body, customer, { key: `web:${link}`, phone: PHONE }, getCatalog());
+    const built = webOrderFromBody(body, customer, { key: `web:${link}`, phone: currentAccount()?.phone ?? PHONE }, getCatalog());
     if (built.error) return { status: 400, json: { error: built.error } };
     links.get(link).used = true;
     const priced = priceOrder(built.order, customer, getCatalog());
@@ -149,6 +203,45 @@ window.VM = {
       motivo: !o.customer_id ? "Cliente sin código de ERP" : o.review ? "Interpretación dudosa" : "",
     })),
   exports: () => [...cache.exports].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+
+  /** Avisos del panel: solicitudes pendientes y pedidos por exportar. */
+  summary() {
+    const rows = withRefs().filter((o) => o.export_status === "pending");
+    const ready = rows.filter(isReady).length;
+    return { solicitudes: cache.registrations.filter((r) => r.status === "pending").length, pedidosPendientes: ready, pedidosRetenidos: rows.length - ready };
+  },
+  registrations: () => cache.registrations.filter((r) => r.status === "pending").sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)).map((r) => ({ ...r, sugerencias: suggest(r) })),
+  searchCustomers: (q) => cache.customers.filter((c) => !q || c.name.toLowerCase().includes(String(q).toLowerCase()) || c.id === q).slice(0, 15).map((c) => ({ id: c.id, name: c.name })),
+  /** La empresa aprueba: liga el teléfono al cliente y genera el PIN (se devuelve una sola vez). */
+  async approve(regId, customerId) {
+    if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para aprobar solicitudes.");
+    const r = cache.registrations.find((x) => x.id === regId && x.status === "pending");
+    const c = cache.customers.find((x) => x.id === String(customerId));
+    if (!r) throw new Error("La solicitud ya se resolvió.");
+    if (!c) throw new Error("Elige un cliente de la lista.");
+    if (cache.accounts.some((a) => a.phone === r.phone)) throw new Error("Ese teléfono ya tiene una cuenta.");
+    const pin = newPin(), now = new Date().toISOString(), id = `a${Date.now().toString(36)}${uid()}`;
+    await backend.set("accounts", id, { id, customerId: c.id, phone: r.phone, email: r.email, pinHash: pinHash(r.phone, pin), status: "active", createdAt: now });
+    await backend.update("registrations", r.id, { status: "approved", customerId: c.id, decidedAt: now });
+    return { pin, cliente: c.name, telefono: r.phone };
+  },
+  async reject(regId) {
+    if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor.");
+    await backend.update("registrations", regId, { status: "rejected", decidedAt: new Date().toISOString() });
+  },
+  accounts: () => cache.accounts.map((a) => ({ id: a.id, cliente: customerOf(a)?.name ?? a.customerId, phone: a.phone, email: a.email ?? "", status: a.status })),
+  async resetPin(accId) {
+    if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor.");
+    const a = cache.accounts.find((x) => x.id === accId);
+    if (!a) throw new Error("No existe la cuenta.");
+    const pin = newPin();
+    await backend.update("accounts", a.id, { pinHash: pinHash(a.phone, pin), status: "active" });
+    return { pin, cliente: customerOf(a)?.name ?? "", telefono: a.phone };
+  },
+  async setBlocked(accId, blocked) {
+    if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor.");
+    await backend.update("accounts", accId, { status: blocked ? "blocked" : "active" });
+  },
 
   /** Cambia el precio (u otro campo) de un producto: queda registrado y el bot lo usa al instante. */
   async updateProduct(id, fields) {

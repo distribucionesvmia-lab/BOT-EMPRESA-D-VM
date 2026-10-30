@@ -13,20 +13,20 @@ export function makeDbBackend(db) {
     remove: (coll, id) => db.doc(`${coll}/${id}`).delete(),
     /** Borra pedidos y exportaciones y restaura productos y clientes. */
     async reset(seed) {
-      for (const coll of ["orders", "exports"]) for (const d of (await db.collection(coll).get()).docs) await db.doc(`${coll}/${d.id}`).delete();
-      for (const coll of ["products", "customers"]) for (const doc of seed[coll]) await db.doc(`${coll}/${doc.id}`).set(clone(doc));
+      for (const coll of ["orders", "exports", "registrations", "accounts"]) for (const d of (await db.collection(coll).get()).docs) await db.doc(`${coll}/${d.id}`).delete();
+      for (const coll of ["products", "customers", "accounts"]) for (const doc of seed[coll]) await db.doc(`${coll}/${doc.id}`).set(clone(doc));
     },
   };
 }
 
-const KEY = "vmdemo:v2";
+const KEY = "vmdemo:v3";
 export function makeLocalBackend(seed) {
   const byId = (list) => Object.fromEntries(list.map((d) => [d.id, clone(d)]));
-  const fresh = (s) => ({ products: byId(s.products), customers: byId(s.customers), orders: {}, exports: {} });
+  const fresh = (s) => ({ products: byId(s.products), customers: byId(s.customers), accounts: byId(s.accounts), orders: {}, exports: {}, registrations: {} });
   const load = () => {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
-      return s && s.products && s.orders ? s : null;
+      return s && s.products && s.orders && s.accounts && s.registrations ? s : null;
     } catch {
       return null;
     }

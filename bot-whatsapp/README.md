@@ -112,16 +112,17 @@ npm run dev   # sin credenciales imprime las respuestas por consola
 La demo usa **clientes y productos ficticios** (`ejemplo/historial-ficticio.json`) salvo que exista un `historial-demo.json` propio, y guarda todo en `demo.sqlite` y `exportaciones-demo/`, sin tocar los datos reales.
 
 ## 2b. Demo en línea (sin servidor)
-`demo-web/` contiene una versión de la demo que funciona **entera en el navegador** (mismo bot, mismos cálculos y mismo Excel, con datos ficticios), con **dos vistas separadas** y cada una con su enlace:
-- `…#cliente`: el chat de WhatsApp (el bot pregunta quién es, identifica y muestra los productos habituales).
-- `…#distribuidor`: pedidos recibidos **en directo**, exportación a Excel con su historial, y las bases de datos de productos (precios editables) y de clientes.
+`demo-web/` contiene una versión de la demo que funciona **entera en el navegador** (mismo bot, mismos cálculos y mismo Excel, con datos ficticios), con las **dos aplicaciones separadas**, cada una con su enlace:
+- `…#cliente` — la del cliente: solicitar acceso, entrar con **teléfono + PIN** y chat con el bot (sus productos habituales). Nada de lo de la empresa.
+- `…#empresa` — la del empresario: **Pedidos** (en directo, con exportación a Excel e historial), **Solicitudes de alta** (aprobar y dar el PIN), **Cuentas de clientes** y **Bases de datos** (precios editables).
+- Cuentas de prueba: `600 000 001` PIN `111111` (Bar El Ejemplo) y `600 000 002` PIN `222222` (Tienda Ficticia).
 
-**Las bases de datos se guardan y se actualizan.** Cuatro colecciones: `products`, `customers`, `orders` y `exports`.
-- Publicada como página de Claude, usan su **base compartida** (`db`): persisten entre sesiones y dispositivos, y lo que pide un cliente aparece al momento en la vista del distribuidor. Permisos: cualquiera puede leer; **Colaborador** puede hacer pedidos; **Editor** puede exportar, cambiar precios y restaurar los datos.
-- Abierta como archivo suelto (`demo-online.html`) se guardan en el navegador (localStorage); en pestañas del mismo navegador también se ven en directo.
-- Cambiar un precio en la vista del distribuidor queda registrado y el bot lo usa al instante en la vista del cliente.
+**Las bases de datos se guardan y se actualizan** (productos, clientes, pedidos, exportaciones, solicitudes y cuentas).
+- Publicada como página de Claude usan su **base compartida** (`db`): persisten y se ven en directo entre dispositivos. Permisos: cualquiera puede leer; **Colaborador** puede hacer pedidos y solicitar acceso; **Editor** puede exportar, aprobar altas, cambiar precios y restaurar los datos.
+- Como archivo suelto (`demo-online.html`) se guardan en el navegador (localStorage).
+- ⚠️ En la demo **no hay aislamiento real entre clientes** (la base compartida la lee cualquiera con acceso a la página). Ese aislamiento solo existe en el servidor real (sección 1c-ter), que lo comprueba con pruebas.
 
-Reconstruir: `node demo-web/build.mjs` (descarga esbuild con `npx` la primera vez) → `demo-web/dist/artifact.html` (para publicar como página de Claude) y `demo-web/dist/demo-online.html` (para cualquier alojamiento estático o abrir directamente). Es una demostración; el sistema real con servidor (secciones 1 a 4) guarda todo en SQLite.
+Reconstruir: `node demo-web/build.mjs` (descarga esbuild con `npx` la primera vez) → `demo-web/dist/artifact.html` (para publicar como página de Claude) y `demo-web/dist/demo-online.html`.
 
 ## 3. Crear la app en Meta (gratis)
 1. Entra en https://developers.facebook.com con tu cuenta de Facebook → **Crear app** → tipo **Empresa** → añade el producto **WhatsApp**.
