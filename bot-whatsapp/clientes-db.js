@@ -5,6 +5,7 @@
 
 import { DatabaseSync } from "node:sqlite";
 import { findCustomers } from "./identify.js";
+import { nifKeys, nifMatches } from "./nif-key.js";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS customers (
@@ -59,7 +60,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   db.exec(SCHEMA);
   // Bases creadas antes de existir razón social y población
-  for (const col of ["legal_name", "city"]) {
+  for (const col of ["legal_name", "city", "nif_keys"]) {
     if (!db.prepare("PRAGMA table_info(customers)").all().some((x) => x.name === col)) db.exec(`ALTER TABLE customers ADD COLUMN ${col} TEXT`);
   }
   const phones9 = (c) => [...new Set([...(c.phones ?? []), ...(c.phone ? [c.phone] : [])].map(last9).filter((p) => p.length === 9))];
@@ -106,6 +107,9 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
                phone = COALESCE(excluded.phone, phone), address = COALESCE(excluded.address, address),
                recargo = excluded.recargo, active = excluded.active, updated_at = excluded.updated_at`,
           ).run(id, String(c.name).trim(), c.legalName ?? null, c.city ?? null, c.phone ?? phones9(c)[0] ?? null, c.address ?? null, c.recargoEquivalencia ? 1 : 0, c.active === false ? 0 : 1, now);
+          // El NIF no se guarda: solo la huella de sus 6 últimos caracteres (nif-key.js). Si el cliente ya trae las huellas, se usan tal cual.
+          const keys = Array.isArray(c.nifKeys) ? c.nifKeys : c.nif ? nifKeys(id, c.nif) : [];
+          if (keys.length) db.prepare("UPDATE customers SET nif_keys = ? WHERE id = ?").run(JSON.stringify(keys), id);
           if (c.phones || c.phone) {
             db.prepare("DELETE FROM customer_phones WHERE customer_id = ?").run(id);
             for (const p of phones9(c)) db.prepare("INSERT OR IGNORE INTO customer_phones VALUES (?, ?)").run(id, p);
@@ -134,6 +138,15 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
         throw err;
       }
     },
+
+    /** Clientes activos que podrían ser el que escribe (modo flexible: «alegría» encaja con «Bar Alegría»). Solo id y nombre. */
+    candidates: (query) => findCustomers(db.prepare("SELECT id, name, legal_name AS legalName, active FROM customers").all().map((r) => ({ ...r, active: !!r.active })), query, { lenient: true }).map((c) => ({ id: c.id, name: c.name })),
+    /** ¿Los 6 últimos caracteres del NIF escritos corresponden a este cliente? Un cliente sin NIF guardado nunca coincide. */
+    checkNif(id, typed) {
+      const r = db.prepare("SELECT nif_keys FROM customers WHERE id = ? AND active = 1").get(String(id));
+      return !!r?.nif_keys && nifMatches(String(id), typed, JSON.parse(r.nif_keys));
+    },
+    withNif: () => db.prepare("SELECT COUNT(*) AS n FROM customers WHERE nif_keys IS NOT NULL").get().n,
 
     getById: (id) => (byId.get(String(id)) ? full(byId.get(String(id))) : null),
     /** Cliente cuyo teléfono coincide (9 últimos dígitos). Si lo comparten varios, null: se identificará por nombre. */

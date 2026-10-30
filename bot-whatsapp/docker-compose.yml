@@ -11,6 +11,7 @@ x-datos: &datos
   ACCOUNTS_DB: /data/cuentas.sqlite
   EXPORT_DIR: /data/exportaciones
   BACKUP_DIR: /data/respaldos
+  NIF_PEPPER: ${NIF_PEPPER} # huellas del NIF de los clientes (igual en las dos aplicaciones)
 
 services:
   cliente:

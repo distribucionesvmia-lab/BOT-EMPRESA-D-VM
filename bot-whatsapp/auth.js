@@ -4,6 +4,7 @@
 // cliente enviado por el navegador, así que un cliente no puede pedir el historial de otro.
 import crypto from "node:crypto";
 import { normalizePhone, validEmail } from "./cuentas-db.js";
+import { nifCodes } from "./nif-codes.js";
 
 const COOKIE = "vm_session";
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
@@ -120,6 +121,16 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       const empresa = String(b.empresa ?? "").slice(0, 80);
       if (empresa.trim().length < 2) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
+      // Cliente habitual: nombre de la empresa (puede variar: «alegría» vale para «Bar Alegría») + 6 últimos caracteres del NIF
+      if (b.nif !== undefined) {
+        if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe los 6 últimos caracteres de tu NIF." }), true;
+        const cand = customers.candidates(empresa);
+        if (cand.length > 6) return send(res, 400, { error: "Escribe el nombre completo de tu empresa." }), true;
+        const r = accounts.loginNif(cand.map((c) => c.id), (id) => customers.checkNif(id, b.nif));
+        if (!r.ok) return send(res, 401, { error: r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Empresa o NIF incorrectos." }), true;
+        const customer = customers.getById(r.account.customerId);
+        return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": cookie(r.token, 30 * 86400) }), true;
+      }
       // Teléfono + PIN + nombre de la empresa: el nombre debe coincidir con el del cliente guardado en la base de datos
       const r = accounts.login(b.telefono, b.pin, undefined, (acc) => customers.nameMatches(customers.getById(acc.customerId), empresa));
       if (!r.ok) return send(res, 401, { error: r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Teléfono o PIN incorrectos." }), true;

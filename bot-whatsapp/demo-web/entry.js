@@ -13,6 +13,8 @@ import { seedDocs, DEMO_ACCOUNTS } from "./seeds.js";
 import { sha256hex } from "./sha256.js";
 import { makeDbBackend, makeLocalBackend } from "./backend.js";
 import data from "../ejemplo/historial-ficticio.json";
+import { demoNifMatches } from "./nif-demo.js";
+import { nifCodes } from "../nif-codes.js";
 
 const PHONE = "34600999999"; // el móvil de prueba no está en ninguna ficha: el bot pregunta quién es
 const COLLS = ["products", "customers", "orders", "exports", "registrations", "accounts"];
@@ -31,6 +33,11 @@ const activeCatalog = () =>
   [...cache.products].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({ id: p.id, name: p.name, price: p.price, ...(p.unitsPerBox ? { unitsPerBox: p.unitsPerBox } : {}), vat: p.vat, discount: p.discount }));
 
 function onData(coll, rows) {
+  if (coll === "customers") {
+    // El documento «_nifindex» guarda las huellas de los 6 últimos caracteres del NIF de cada cliente (no es un cliente)
+    const idx = rows.find((d) => d.id === "_nifindex")?.keys ?? {};
+    rows = rows.filter((d) => d.id !== "_nifindex").map((c) => (c.nifKeys ? c : { ...c, nifKeys: idx[c.id] ?? [] }));
+  }
   cache[coll] = rows;
   if (coll === "products" && rows.length) setCatalog(activeCatalog()); // el bot usa el precio nuevo al instante
   emit();
@@ -69,7 +76,13 @@ const pinHash = (phone, pin) => sha256hex(`${phone}:${pin}`); // en la demo se g
 const newPin = () => String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
 const store = { get: (k) => { try { return sessionStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch {} } };
 const attempts = new Map(); // intentos fallidos por teléfono (en la demo, solo en este navegador)
-const currentAccount = () => { const id = store.get("vm:acc"); return cache.accounts.find((a) => a.id === id && a.status === "active") ?? null; };
+// Cuentas de clientes habituales: ya existen para todos los clientes activos (id "n"+código); entran con el NIF y no se guardan
+const nifAccount = (customer) => ({ id: "n" + customer.id, customerId: customer.id, phone: phonesOf(customer)[0] ?? PHONE, status: "active", verified: true });
+const currentAccount = () => {
+  const id = store.get("vm:acc");
+  if (id?.startsWith("n")) { const c = cache.customers.find((x) => x.id === id.slice(1) && x.active !== false); return c ? nifAccount(c) : null; }
+  return cache.accounts.find((a) => a.id === id && a.status === "active") ?? null;
+};
 const customerOf = (acc) => (acc ? cache.customers.find((c) => c.id === acc.customerId) ?? null : null);
 const phonesOf = (c) => (c.phones?.length ? c.phones : [phone9(c.phone)].filter(Boolean));
 // Compara una solicitud con la base de clientes. Acceso automático solo si hay UN cliente cuyo nombre (comercial o razón social)
@@ -182,6 +195,24 @@ window.VM = {
     attempts.delete(p);
     store.set("vm:acc", acc.id);
     return { ok: true, nombre: customer.name };
+  },
+  /** Cliente habitual: nombre de la empresa (puede variar: «alegría» vale para «Bar Alegría») + 6 últimos caracteres del NIF/CIF. */
+  loginNif(business, nif) {
+    if (String(business ?? "").trim().length < 2) return { ok: false, error: "Escribe el nombre de tu empresa." };
+    if (!nifCodes(nif).length) return { ok: false, error: "Escribe los 6 últimos caracteres de tu NIF." };
+    const cand = findCustomers(cache.customers, business, { lenient: true });
+    if (cand.length > 6) return { ok: false, error: "Escribe el nombre completo de tu empresa." };
+    const now = Date.now();
+    const live = cand.filter((c) => (attempts.get("n" + c.id)?.until ?? 0) <= now);
+    if (cand.length && !live.length) return { ok: false, error: "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." };
+    const hits = live.filter((c) => demoNifMatches(c.id, nif, c.nifKeys));
+    if (hits.length !== 1) {
+      for (const c of live) { const st = attempts.get("n" + c.id) ?? { fails: 0, until: 0 }; st.fails += 1; if (st.fails >= 5) { st.fails = 0; st.until = now + 15 * 60_000; } attempts.set("n" + c.id, st); }
+      return { ok: false, error: "Empresa o NIF incorrectos." };
+    }
+    attempts.delete("n" + hits[0].id);
+    store.set("vm:acc", "n" + hits[0].id);
+    return { ok: true, nombre: hits[0].name };
   },
   logout() { store.set("vm:acc", null); sessions.clear(); },
   /** Cliente con sesión iniciada (o null). */

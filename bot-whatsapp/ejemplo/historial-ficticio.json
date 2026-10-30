@@ -216,7 +216,8 @@
    "discounts": {
     "1004": 8
    },
-   "recargoEquivalencia": false
+   "recargoEquivalencia": false,
+   "nif": "00000001R"
   },
   {
    "id": "9002",
@@ -314,7 +315,8 @@
     }
    ],
    "frequent": [],
-   "recargoEquivalencia": true
+   "recargoEquivalencia": true,
+   "nif": "B00000002"
   },
   {
    "id": "9003",
@@ -361,7 +363,8 @@
    "frequent": [],
    "recargoEquivalencia": false,
    "specialPrices": {},
-   "discounts": {}
+   "discounts": {},
+   "nif": "00000003T"
   }
  ],
  "_aviso": "DATOS FICTICIOS de ejemplo. Los reales (unidades por caja, IVA, precios y descuentos) vendrán de las fichas de a3ERP."

@@ -164,14 +164,16 @@
       <div id="c-acceso" hidden>
         <form class="form" id="f-acceso">
           <h2 style="margin:0">Entrar</h2>
-          <p class="msg">Entra con tu teléfono, el nombre de tu empresa y tu PIN.</p>
-          <label>Teléfono<input id="a-tel" type="tel" inputmode="tel" autocomplete="off" required></label>
+          <p class="msg">Entra con el nombre de tu empresa y los <b>6 últimos caracteres de tu NIF o CIF</b>.</p>
           <label>Nombre de tu empresa<input id="a-emp" maxlength="80" autocomplete="off" required></label>
-          <label>PIN de 6 cifras<input id="a-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" required></label>
+          <label id="l-nif">Últimos 6 caracteres del NIF/CIF<input id="a-nif" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 45678Z" required></label>
+          <label id="l-tel" hidden>Teléfono<input id="a-tel" type="tel" inputmode="tel" autocomplete="off"></label>
+          <label id="l-pin" hidden>PIN de 6 cifras<input id="a-pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off"></label>
           <div class="err" id="a-err" role="alert"></div>
           <button class="btn main">Entrar</button>
-          <button class="linkbtn" type="button" id="ir-registro">¿No tienes acceso? Solicítalo</button>
-          <div class="hintbox"><b>Cuentas de prueba</b><br>Teléfono 600 000 001 · empresa «Bar El Ejemplo» · PIN 111111<br>Teléfono 600 000 002 · empresa «Tienda Ficticia» · PIN 222222</div>
+          <button class="linkbtn" type="button" id="ir-pin">Entrar con teléfono y PIN</button>
+          <button class="linkbtn" type="button" id="ir-registro">¿Cliente nuevo? Solicita acceso</button>
+          <div class="hintbox"><b>Cuentas de prueba</b><br>«Bar El Ejemplo» · últimos 6 del NIF: 00001R<br>«Tienda Ficticia» · últimos 6 del NIF: 000002<br>Los 544 clientes reales cargados entran con su propio NIF.</div>
         </form>
       </div>
 
@@ -186,7 +188,7 @@
           <label>Repite el PIN<input id="r-pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="off" required></label>
           <div class="err" id="r-err" role="alert"></div><div class="okmsg" id="r-ok" role="status"></div>
           <button class="btn main">Enviar solicitud</button>
-          <button class="linkbtn" type="button" id="ir-acceso">Ya tengo PIN: entrar</button>
+          <button class="linkbtn" type="button" id="ir-acceso">Ya soy cliente: entrar</button>
         </form>
       </div>
 
@@ -349,10 +351,19 @@ $("f-registro").onsubmit = async (e) => {
   $("r-ok").textContent = r.mensaje; $("f-registro").reset();
   if (r.estado === "activa") setTimeout(() => { pantallaCliente.reg = false; pantallaCliente(); }, 1800);
 };
+let conPin = false; // alternativa: teléfono + PIN (clientes dados de alta con solicitud)
+function modoAcceso(pin) {
+  conPin = pin;
+  $("l-nif").hidden = pin; $("l-tel").hidden = !pin; $("l-pin").hidden = !pin;
+  $("a-nif").required = !pin; $("a-tel").required = pin; $("a-pin").required = pin;
+  $("ir-pin").textContent = pin ? "Entrar con los 6 últimos del NIF" : "Entrar con teléfono y PIN";
+  $("a-err").textContent = "";
+}
+$("ir-pin").onclick = () => modoAcceso(!conPin);
 $("f-acceso").onsubmit = (e) => {
   e.preventDefault(); $("a-err").textContent = "";
-  const r = VM.login($("a-tel").value, $("a-emp").value, $("a-pin").value);
-  if (!r.ok) { $("a-err").textContent = r.error; $("a-pin").value = ""; return; }
+  const r = conPin ? VM.login($("a-tel").value, $("a-emp").value, $("a-pin").value) : VM.loginNif($("a-emp").value, $("a-nif").value);
+  if (!r.ok) { $("a-err").textContent = r.error; $("a-pin").value = ""; $("a-nif").value = ""; return; }
   $("f-acceso").reset(); chatLoaded = false; pantallaCliente();
 };
 $("salir").onclick = () => { VM.logout(); chat.innerHTML = ""; chatLoaded = false; pantallaCliente.reg = false; pantallaCliente(); };

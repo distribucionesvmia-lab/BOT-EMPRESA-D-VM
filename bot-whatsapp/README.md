@@ -81,11 +81,12 @@ Cada cliente entra en `/cliente` con su **teléfono y un PIN de 6 cifras**; la e
 - Si se olvida el PIN: la empresa genera uno nuevo. Recuperarlo por correo requeriría un servicio de envío.
 - El código de WhatsApp (`/webhook`) sigue en el proyecto pero ya no se usa.
 
-### Alta automática y carga de clientes desde Excel
-- **Carga:** en `/distribuidor` → pestaña *Clientes* → importar el Excel de a3ERP (o `node datos.js clientes-excel fichero.xlsx`). Se guardan nombre, razón social, población, teléfonos y correos. **No se guarda el NIF.** El Excel real nunca se sube al repositorio.
-- **Registro del cliente:** empresa + teléfono + correo + un PIN que elige él. El sistema compara el **nombre de la empresa** con la base y exige que coincida el **teléfono o el correo** guardados; si coincide con un único cliente se da acceso al momento, si no queda en *Solicitudes de alta* para revisión manual.
-- **Acceso:** teléfono + nombre de la empresa + PIN.
-- Las cuentas creadas automáticamente quedan **sin confirmar**: sus pedidos se retienen con el motivo hasta que la empresa pulsa *Confirmar* en *Cuentas*.
+### Acceso de los clientes habituales con el NIF (cuentas ya creadas)
+- **Carga:** en `/distribuidor` → pestaña *Clientes* → importar el Excel de a3ERP (o `node datos.js clientes-excel fichero.xlsx`). Al importar, **cada cliente activo ya tiene su cuenta creada**. El Excel real nunca se sube al repositorio.
+- **Acceso:** nombre de la empresa + **6 últimos caracteres del NIF/CIF** (vale también escribir los 6 últimos números, o el NIF entero). El nombre no tiene que ser idéntico: «alegría» entra en «Bar Alegría» y «bar alegría» en «Alegría» (se ignoran palabras como bar, cafetería, restaurante…). Si varios clientes encajan con el nombre, decide el NIF; si el nombre es demasiado genérico se pide más.
+- **El NIF no se guarda.** De cada cliente solo se conserva una huella (HMAC-SHA256) de esos 6 caracteres, con un secreto del servidor: **define `NIF_PEPPER`** (cadena larga y secreta) en `.env`, igual en las dos aplicaciones, y no la cambies después o habrá que volver a importar el Excel.
+- **Seguridad:** 5 fallos bloquean la cuenta 15 minutos y tras 3 bloqueos queda bloqueada hasta que la empresa la reactive; además hay un límite de intentos por IP. Conocer el NIF confirma la cuenta (sus pedidos no se retienen).
+- **Clientes nuevos** (que no están en la lista): solicitan acceso con empresa, teléfono, correo y un PIN; si coincide nombre + teléfono/correo con la base entran solos (cuenta sin confirmar: sus pedidos se retienen hasta que la empresa la confirme), si no, quedan en *Solicitudes de alta*. Entran con teléfono + PIN.
 
 ## 1c-quater. Dos aplicaciones distintas: la del cliente y la de la empresa
 > Cómo entregarlas y cómo entrar tú a la de la empresa sin que el cliente pueda: **`docs/DESPLIEGUE.md`** (Docker Compose con la del cliente publicada y la de la empresa solo en el servidor).

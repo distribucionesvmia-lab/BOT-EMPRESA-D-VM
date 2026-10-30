@@ -111,7 +111,8 @@ export function createAdmin({ accounts, customers, orders, adminToken, exportDir
         const { customers: list, stats } = parseClientesXlsx(buf);
         if (!list.length) return send(res, 400, { error: "El Excel no tiene clientes." }), true;
         const r = customers.importMany(list);
-        return send(res, 200, { ok: true, ...stats, nuevos: r.added, actualizados: r.updated }), true;
+        const cuentasNuevas = accounts.ensureMany(list.filter((c) => c.active !== false).map((c) => c.id)); // cada cliente activo ya tiene su cuenta
+        return send(res, 200, { ok: true, ...stats, nuevos: r.added, actualizados: r.updated, cuentasNuevas }), true;
       } catch (e) {
         return send(res, 400, { error: e.message || "No se pudo leer el Excel." }), true;
       }

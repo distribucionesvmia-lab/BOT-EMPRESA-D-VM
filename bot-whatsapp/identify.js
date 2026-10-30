@@ -16,11 +16,18 @@ const significant = (s) => tokens(s).filter((w) => !FILLER.has(w));
 const match = (q, t) => q === t || (q.length >= 3 && t.startsWith(q));
 
 export const MIN_COVERAGE = 0.6;
+// Palabras genéricas de negocio: «bar alegría» y «alegría» son el mismo nombre (solo en modo `lenient`)
+const GENERIC = new Set(["bar", "cafe", "cafeteria", "restaurante", "meson", "hotel", "pub", "taberna", "tienda", "bodega", "pizzeria", "asador", "cerveceria"]);
 
-/** Clientes que encajan con lo escrito; [] si ninguno encaja con suficiente seguridad. */
-export function findCustomers(customers, query) {
+/**
+ * Clientes que encajan con lo escrito; [] si ninguno encaja con suficiente seguridad.
+ * lenient: para el acceso con NIF (el NIF es lo que identifica de verdad): basta que todas las palabras escritas estén en el
+ * nombre, sin exigir cobertura, y se ignoran palabras genéricas como «bar» o «cafetería». Devuelve todos los que encajan.
+ */
+export function findCustomers(customers, query, { lenient = false } = {}) {
   const q = norm(query);
-  const qWords = significant(q);
+  const sig = lenient ? (s) => significant(s).filter((w) => !GENERIC.has(w)) : significant;
+  const qWords = sig(q);
   if (!q || !qWords.length) return [];
   const compact = q.replace(/\s+/g, "");
   const strong = [];
@@ -33,14 +40,15 @@ export function findCustomers(customers, query) {
     }
     let best = 0;
     for (const n of names) {
-      const nWords = significant(n);
+      const nWords = sig(n);
       if (!nWords.length) continue;
       const allKnown = qWords.every((w) => nWords.some((t) => match(w, t)));
       const covered = nWords.filter((t) => qWords.some((w) => match(w, t))).length / nWords.length;
-      if (allKnown && covered >= MIN_COVERAGE) best = Math.max(best, 2 + covered / 10);
+      if (allKnown && (lenient || covered >= MIN_COVERAGE)) best = Math.max(best, 2 + covered / 10);
     }
     if (best) strong.push({ c, score: best });
   }
+  if (lenient) return strong.map((s) => s.c);
   const best = Math.max(0, ...strong.map((s) => s.score));
   return strong.filter((s) => s.score >= best - 0.05).map((s) => s.c);
 }

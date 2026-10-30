@@ -37,7 +37,7 @@ test("extractEmails: varios correos, en minúsculas y sin repetir", () => {
   assert.deepEqual(extractEmails("no es correo"), []);
 });
 
-test("parseClientes: campos, inactivos, duplicados y filas de total; sin NIF", () => {
+test("parseClientes: campos, inactivos, duplicados y filas de total; el NIF no sale del lector", () => {
   const { customers, stats } = parseClientesXlsx(xlsx());
   assert.deepEqual(customers.map((c) => c.id), ["493", "0004", "954", "955"]); // códigos limpios, ceros conservados
   const t = customers[1];
@@ -46,7 +46,7 @@ test("parseClientes: campos, inactivos, duplicados y filas de total; sin NIF", (
   assert.equal(customers[2].active, false); // bloqueado
   assert.equal(customers[3].active, false); // obsoleto
   assert.equal(JSON.stringify(customers).includes("00000000T"), false); // el NIF no se guarda
-  assert.deepEqual(stats, { filas: 6, importados: 4, sinTelefono: 1, sinCorreo: 2, inactivos: 2, duplicados: 1, descartadas: 1 });
+  assert.deepEqual(stats, { filas: 6, importados: 4, sinTelefono: 1, sinCorreo: 2, sinNif: 2, inactivos: 2, duplicados: 1, descartadas: 1 });
 });
 
 test("parseClientes: sin cabecera reconocible da un error claro", () => {

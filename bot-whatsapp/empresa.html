@@ -172,13 +172,13 @@ async function cuentas() {
   const cue = await call("/api/admin/cuentas"); const tc = $("cue"); tc.innerHTML = "";
   for (const a of cue) {
     const tr = document.createElement("tr");
-    const estado = a.status === "blocked" ? "Bloqueada" : a.locked ? "Bloqueo temporal" : a.verified ? "Activa" : "Automática: sin confirmar";
-    const pin = el("button", "Nuevo PIN"); pin.onclick = async () => { const r = await call(`/api/admin/cuentas/${a.id}/pin`, {}); mostrarPin(`Nuevo PIN para ${a.cliente} (${a.phone}):`, r.pin); refrescar(); };
+    const estado = a.status === "blocked" ? "Bloqueada" : a.locked ? "Bloqueo temporal" : a.verified ? "Activa" : a.phone ? "Automática: sin confirmar" : "Creada: aún no ha entrado";
+    const pin = el("button", "Nuevo PIN"); pin.onclick = async () => { const r = await call(`/api/admin/cuentas/${a.id}/pin`, {}); mostrarPin(`Nuevo PIN para ${a.cliente} (${a.phone || "sin teléfono"}):`, r.pin); refrescar(); };
     const blq = el("button", a.status === "blocked" ? "Reactivar" : "Bloquear"); blq.onclick = async () => { await call(`/api/admin/cuentas/${a.id}/bloquear`, { bloquear: a.status !== "blocked" }); refrescar(); };
     const td = el("td");
     if (!a.verified) { const cf = el("button", "Confirmar", { className: "main" }); cf.title = "Compruebo que es el cliente: sus pedidos dejan de retenerse"; cf.onclick = async () => { await call(`/api/admin/cuentas/${a.id}/confirmar`, {}); refrescar(); }; td.append(cf, " "); }
     td.append(pin, " ", blq);
-    tr.append(el("td", a.cliente || a.customerId), el("td", a.phone), el("td", a.email || ""), el("td", estado), el("td", a.lastLogin ? hora(a.lastLogin) : "—"), td); tc.appendChild(tr);
+    tr.append(el("td", a.cliente || a.customerId), el("td", a.phone || "— (entra con NIF)"), el("td", a.email || ""), el("td", estado), el("td", a.lastLogin ? hora(a.lastLogin) : "—"), td); tc.appendChild(tr);
   }
 }
 let pagCli = 0, tClientes = null;

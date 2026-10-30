@@ -358,6 +358,32 @@ test("RETENCIÓN: los pedidos de una cuenta automática sin confirmar quedan ret
   assert.deepEqual(ped.map((o) => o.estado).sort(), ["pendiente", "pendiente"]);
 });
 
+const entrarNif = (empresa, nif) => call("POST", "/api/acceso", { body: { empresa, nif } });
+
+test("ACCESO CON NIF: las cuentas ya están creadas y el cliente entra con el nombre (aunque varíe) y los 6 últimos del NIF", async () => {
+  // Todos los clientes activos importados tienen ya su cuenta, y el NIF no aparece en ninguna respuesta
+  const cuentas = (await call("GET", "/api/admin/cuentas", { admin: true })).json;
+  assert.ok(cuentas.find((c) => c.customerId === "7003"));
+  assert.equal(cuentas.find((c) => c.customerId === "7002"), undefined); // de baja: sin cuenta
+  assert.equal(JSON.stringify(cuentas).includes("B11111111"), false);
+  // nombre distinto al guardado («importada» vale para «CAFETERIA IMPORTADA») + NIF B11111111 → últimos 6: 111111
+  const r = await entrarNif("importada", "111111");
+  assert.equal(r.status, 200);
+  assert.equal(r.json.cliente.nombre, "CAFETERIA IMPORTADA");
+  assert.equal((await call("GET", "/api/yo", { cookie: cookieOf(r) })).json.cliente.nombre, "CAFETERIA IMPORTADA");
+  assert.equal((await entrarNif("Cafetería Importada", "b11111111")).status, 200); // también con el NIF entero
+  // errores: NIF equivocado, cliente sin NIF, nombre demasiado genérico, cliente de baja
+  assert.equal((await entrarNif("importada", "999999")).status, 401);
+  assert.equal((await entrarNif("kiosco sin datos", "000000")).status, 401);
+  assert.equal((await entrarNif("importada", "12")).status, 400);
+  assert.equal((await entrarNif("ferreteria cerrada", "111111")).status, 401);
+  // 5 fallos bloquean la cuenta, incluso con el NIF correcto
+  for (let i = 0; i < 5; i++) await entrarNif("importada", "000001");
+  const b = await entrarNif("importada", "111111");
+  assert.equal(b.status, 401);
+  assert.match(b.json.error, /bloqueada/);
+});
+
 test("EMPRESA: las solicitudes sin coincidencia muestran por qué y qué clientes podrían ser", async () => {
   const sol = (await call("GET", "/api/admin/solicitudes", { admin: true })).json;
   const k = sol.find((x) => x.business === "Panadería Inventada");

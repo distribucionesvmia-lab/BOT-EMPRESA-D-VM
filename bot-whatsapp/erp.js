@@ -65,6 +65,9 @@ export const customerDirectory = {
   /** Clientes que podrían ser el que pide acceso, con el motivo (nombre, teléfono, correo). */
   suggest: (business, phone, email) => dbs().customersDb.matchRegistration({ business, phone, email }).suggestions,
   search: (opts) => dbs().customersDb.search(opts),
+  /** Acceso con NIF: clientes que encajan con el nombre escrito (flexible) y comprobación de los 6 últimos caracteres. */
+  candidates: (query) => dbs().customersDb.candidates(query),
+  checkNif: (id, typed) => dbs().customersDb.checkNif(id, typed),
   /** ¿El nombre escrito coincide con el del cliente (nombre comercial o razón social)? Un cliente de baja nunca coincide. */
   nameMatches: (customer, typed) => !!customer && findCustomersIn([customer], typed).length > 0,
   /** Crea o actualiza clientes (la lista que se importa del Excel de a3ERP). */

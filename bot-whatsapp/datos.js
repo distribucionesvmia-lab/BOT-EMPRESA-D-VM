@@ -11,6 +11,7 @@
 import fs from "node:fs";
 import { openCatalogDb } from "./catalogo-db.js";
 import { openCustomersDb } from "./clientes-db.js";
+import { openAccountsDb } from "./cuentas-db.js";
 import { importData } from "./seed.js";
 import { parseClientesXlsx } from "./clientes-import.js";
 
@@ -30,7 +31,10 @@ switch (cmd) {
   case "clientes-excel": {
     if (!a) throw new Error("Indica el Excel: node datos.js clientes-excel clientes.xlsx");
     const { customers, stats } = parseClientesXlsx(fs.readFileSync(a));
-    console.log({ ...stats, ...cus.upsertCustomers(customers) });
+    const r = cus.upsertCustomers(customers);
+    const acc = openAccountsDb();
+    console.log({ ...stats, ...r, cuentasNuevas: acc.ensureMany(customers.filter((c) => c.active !== false).map((c) => c.id)) });
+    acc.close();
     break;
   }
   case "productos":
