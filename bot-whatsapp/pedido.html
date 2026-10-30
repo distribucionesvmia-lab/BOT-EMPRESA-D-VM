@@ -11,7 +11,7 @@
   body { font-family:-apple-system,"Segoe UI",Roboto,system-ui,sans-serif; font-size:17px; background:var(--fondo); color:var(--texto); display:flex; justify-content:center; }
   button, input, textarea { font-family:inherit; }
   button:focus-visible, input:focus-visible, textarea:focus-visible { outline:3px solid #ffb3b3; outline-offset:2px; }
-  .app { width:100%; max-width:640px; height:100%; background:#fff; display:flex; flex-direction:column; position:relative; box-shadow:0 0 30px rgba(0,0,0,.08); }
+  .app { width:100%; max-width:none; height:100vh; height:100dvh; background:#fff; display:flex; flex-direction:column; position:relative; }
 
   /* Cabecera roja con el logo */
   header { display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--rojo); color:#fff; }
@@ -31,7 +31,7 @@
   .buscar { padding:0 14px 10px; position:relative; }
   .buscar input { width:100%; min-height:54px; border:2px solid var(--linea); border-radius:14px; padding:0 14px 0 46px; font-size:18px; background:#fff; }
   .buscar input:focus { border-color:var(--rojo); outline:none; }
-  .buscar::before { content:"🔍"; position:absolute; left:28px; top:13px; font-size:20px; }
+  .buscar::before { content:"🔍"; position:absolute; left:calc(max(14px, (100% - 860px) / 2) + 14px); top:13px; font-size:20px; }
   .filbar { display:flex; align-items:center; gap:12px; padding:0 14px 10px; flex-wrap:wrap; }
   .filbar[hidden] { display:none; }
   .filbar .fil { border:2px solid var(--linea); background:#fff; min-height:48px; padding:0 16px; border-radius:14px; font-size:16px; font-weight:700; color:var(--gris); cursor:pointer; }
@@ -125,7 +125,15 @@
   .ok .tick { width:96px; height:96px; border-radius:50%; background:var(--ok); color:#fff; font-size:54px; display:grid; place-items:center; margin:0 auto 20px; }
   .ok h2 { font-size:28px; } .ok p { font-size:18px; line-height:1.45; }
   .err { color:#b00020; padding:0 14px 10px; font-size:16px; font-weight:600; }
-  @media (min-width:700px) { .app { height:calc(100% - 24px); margin:12px 0; border-radius:20px; overflow:hidden; } }
+
+  /* A pantalla completa, igual que el chat: la cabecera y el fondo ocupan todo el ancho y el contenido va centrado en 860 px */
+  header, .paso, .guia, .tabs, .buscar, .filbar, footer { padding-left:max(14px, calc((100% - 860px) / 2)); padding-right:max(14px, calc((100% - 860px) / 2)); }
+  header { padding-top:max(10px, env(safe-area-inset-top)); }
+  main { padding-left:max(0px, calc((100% - 860px) / 2)); padding-right:max(0px, calc((100% - 860px) / 2)); }
+  .screen .head, .tot { padding-left:max(14px, calc((100% - 860px) / 2)); padding-right:max(14px, calc((100% - 860px) / 2)); }
+  .screen .body, .screen > .box { padding-left:max(0px, calc((100% - 860px) / 2)); padding-right:max(0px, calc((100% - 860px) / 2)); }
+  .screen > .box { padding-top:14px; padding-bottom:14px; }
+  .screen .body[style*="padding:14px"] { padding-left:max(14px, calc((100% - 860px) / 2)) !important; padding-right:max(14px, calc((100% - 860px) / 2)) !important; }
 </style>
 </head>
 <body>
