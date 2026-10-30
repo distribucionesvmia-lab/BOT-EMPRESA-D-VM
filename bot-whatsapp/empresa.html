@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Empresa · Pedidos y altas de clientes</title>
+<style>
+  :root { --bg:#eef1ee; --panel:#fff; --fg:#17211c; --muted:#5d6b63; --line:#dbe2dd; --accent:#0f7a4d; --accent-fg:#fff; --soft:#e0f1e8; --warn:#fbefcf; --warn-fg:#8a5a00; --ok:#d7f0e0; --ok-fg:#14532d; --hold:#f8dcdc; --hold-fg:#8a2c2c; --err:#a12d2d; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1512; --panel:#18211d; --fg:#e6ede8; --muted:#93a39a; --line:#2a3630; --accent:#37c382; --accent-fg:#07251a; --soft:#173b2c; --warn:#3a2f10; --warn-fg:#f0c66a; --ok:#153a29; --ok-fg:#8fe0b4; --hold:#40201f; --hold-fg:#f1a1a1; --err:#f1a1a1; color-scheme: dark; } }
+  * { box-sizing: border-box; } [hidden] { display: none !important; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px; line-height: 1.4; background: var(--bg); color: var(--fg); padding: 16px max(16px, env(safe-area-inset-left)); }
+  main { max-width: 1060px; margin: 0 auto; display: grid; gap: 14px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+  h1 { margin: 0; font-size: 20px; } h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  input, select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  button { font: inherit; font-weight: 600; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button.main { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); } button:disabled { opacity: .5; cursor: default; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; } th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; } .num { text-align: right; white-space: nowrap; } .scroll { overflow-x: auto; } .muted { color: var(--muted); } .ref { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; } .tab[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  .n { display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: var(--warn); color: var(--warn-fg); font-size: 12px; text-align: center; }
+  .badge { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; } .pendiente { background: var(--warn); color: var(--warn-fg); } .exportado { background: var(--ok); color: var(--ok-fg); } .retenido { background: var(--hold); color: var(--hold-fg); }
+  .pin { background: var(--warn); border-radius: 10px; padding: 12px 14px; font-size: 15px; } .pin b { font-size: 22px; letter-spacing: .15em; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .err { color: var(--err); } .lines td { border: 0; padding: 2px 8px; font-size: 13px; color: var(--muted); }
+  .nuevo td { animation: flash 2.4s ease-out; } @keyframes flash { from { background: var(--soft); } to { background: transparent; } }
+  details summary { cursor: pointer; }
+</style>
+</head>
+<body>
+<main>
+  <header><h1>Empresa · Pedidos y altas de clientes</h1><span class="muted" id="act"></span></header>
+
+  <div class="panel" id="login">
+    <h2>Acceso de la empresa</h2>
+    <form class="row" id="f-login"><input id="clave" type="password" placeholder="Clave de la empresa" aria-label="Clave de la empresa" autocomplete="current-password"><button class="main">Entrar</button><span class="err" id="l-err" role="alert"></span></form>
+  </div>
+
+  <div id="app" hidden style="display:grid;gap:14px">
+    <div class="pin" id="pin" role="status" hidden></div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-t="pedidos" aria-selected="true">Pedidos <span class="n" id="n-ped" hidden></span></button>
+      <button class="tab" role="tab" data-t="solicitudes" aria-selected="false">Solicitudes de alta <span class="n" id="n-sol" hidden></span></button>
+      <button class="tab" role="tab" data-t="cuentas" aria-selected="false">Cuentas de clientes</button>
+    </div>
+
+    <!-- Pedidos -->
+    <div id="p-pedidos">
+      <div class="panel">
+        <h2>Pedidos recibidos</h2>
+        <div class="row" style="margin-bottom:10px"><button class="main" id="exportar">Exportar a Excel</button><span class="muted" id="expmsg" role="status"></span></div>
+        <div class="scroll"><table><thead><tr><th>Pedido</th><th>Recibido</th><th>Cliente</th><th>Artículos</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody id="ped"></tbody></table></div>
+        <p class="muted" id="ped-vacio" hidden>Todavía no hay pedidos.</p>
+      </div>
+      <div class="panel" id="hist-panel" hidden style="margin-top:14px"><h2>Excel exportados</h2><div class="scroll"><table><tbody id="hist"></tbody></table></div></div>
+    </div>
+
+    <!-- Solicitudes -->
+    <div class="panel" id="p-solicitudes" hidden>
+      <h2>Clientes que piden darse de alta</h2>
+      <p class="muted">Llama al cliente para comprobar que es él, elige a qué cliente de vuestra base de datos corresponde y aprueba: se genera un PIN que le das por teléfono.</p>
+      <div class="scroll"><table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Correo</th><th>Cliente de la base de datos</th><th></th></tr></thead><tbody id="sol"></tbody></table></div>
+      <p class="muted" id="sol-vacio" hidden>No hay solicitudes pendientes.</p>
+    </div>
+
+    <!-- Cuentas -->
+    <div class="panel" id="p-cuentas" hidden>
+      <h2>Cuentas de clientes</h2>
+      <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
+    </div>
+  </div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let clave = ""; try { clave = sessionStorage.getItem("vm_admin") || ""; } catch {}
+let seen = null, timer = null;
+const eur = (n) => Number(n).toFixed(2).replace(".", ",") + " €";
+const el = (tag, text, props = {}) => Object.assign(document.createElement(tag), { textContent: text ?? "" }, props);
+const hora = (iso) => new Date(iso).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+async function call(path, body, raw) {
+  const r = await fetch(path, { method: body ? "POST" : "GET", headers: { Authorization: "Bearer " + clave, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 403) { try { sessionStorage.removeItem("vm_admin"); } catch {} clearInterval(timer); $("app").hidden = true; $("login").hidden = false; throw new Error("Clave incorrecta"); }
+  if (raw) return r;
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "Error");
+  return j;
+}
+function mostrarPin(texto, pin) { const p = $("pin"); p.hidden = false; p.textContent = texto + " "; p.appendChild(el("b", pin)); p.appendChild(el("span", " — anótalo ahora y díselo al cliente: no se volverá a mostrar.")); }
+
+// ---- Pedidos ----
+async function pedidos() {
+  const list = await call("/api/admin/pedidos");
+  const first = seen === null; seen ??= new Set();
+  const tb = $("ped"); tb.innerHTML = ""; $("ped-vacio").hidden = list.length > 0;
+  for (const o of list) {
+    const tr = document.createElement("tr"); if (!first && !seen.has(o.ref)) tr.className = "nuevo"; seen.add(o.ref);
+    const resumen = o.lineas.map((l) => `${l.unidad === "caja" ? l.cajas + " caja" + (l.cajas > 1 ? "s" : "") : l.unidades + " ud"} ${l.nombre}`).join(" · ");
+    const det = el("details"); det.appendChild(el("summary", resumen.length > 90 ? resumen.slice(0, 88) + "…" : resumen));
+    const t = document.createElement("table"); t.className = "lines";
+    for (const l of o.lineas) { const r = document.createElement("tr"); r.append(el("td", l.id), el("td", l.nombre), el("td", `${l.unidades} uds`), el("td", `${eur(l.precio)}${l.descuento ? " −" + l.descuento + "%" : ""}`), el("td", eur(l.importe)), el("td", l.nota ? "📝 " + l.nota : "")); t.appendChild(r); }
+    det.appendChild(t); if (o.nota) det.appendChild(el("p", "📝 Observaciones: " + o.nota, { className: "muted" }));
+    const cli = el("td"); cli.append(el("b", o.cliente), el("div", o.codigo ? "Cód. " + o.codigo : "Cliente nuevo", { className: "muted" }));
+    const est = el("td"); est.appendChild(el("span", o.estado[0].toUpperCase() + o.estado.slice(1), { className: "badge " + o.estado }));
+    if (o.motivo) est.appendChild(el("div", o.motivo, { className: "muted" }));
+    if (o.estado === "retenido" && o.codigo) { const b = el("button", "Revisado: exportar"); b.onclick = async () => { await call(`/api/admin/pedidos/${o.ref}/aprobar`, {}); refrescar(); }; est.appendChild(b); }
+    const detTd = el("td"); detTd.appendChild(det);
+    tr.append(el("td", o.ref, { className: "ref" }), el("td", hora(o.fecha)), cli, detTd, el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
+  }
+  const h = await call("/api/admin/exportaciones"); $("hist-panel").hidden = !h.length;
+  const th = $("hist"); th.innerHTML = "";
+  for (const e of h.slice(0, 10)) {
+    const b = el("button", "Descargar"); b.onclick = () => descargar(e);
+    const tr = document.createElement("tr"); const td = el("td"); td.appendChild(b);
+    tr.append(el("td", e.archivo, { className: "ref" }), el("td", hora(e.fecha)), el("td", `${e.pedidos} pedido${e.pedidos === 1 ? "" : "s"} · ${e.lineas} línea${e.lineas === 1 ? "" : "s"}`), td); th.appendChild(tr);
+  }
+}
+async function descargar(e) {
+  const r = await call(`/api/admin/exportaciones/${e.id}/descargar`, null, true);
+  if (!r.ok) return alert("No se encuentra el archivo.");
+  const url = URL.createObjectURL(await r.blob()); const a = el("a", "", { href: url, download: e.archivo }); a.click(); setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+$("exportar").onclick = async () => {
+  $("exportar").disabled = true;
+  try {
+    const r = await call("/api/admin/exportar", {});
+    $("expmsg").textContent = r.exportacion ? `${r.exportacion.pedidos} pedido${r.exportacion.pedidos === 1 ? "" : "s"} exportado${r.exportacion.pedidos === 1 ? "" : "s"}.` + (r.retenidos ? ` ${r.retenidos} retenidos para revisar.` : "") : "No hay pedidos pendientes de exportar." + (r.retenidos ? ` (${r.retenidos} retenidos para revisar)` : "");
+    if (r.exportacion) descargar({ id: r.exportacion.id, archivo: r.exportacion.archivo });
+    refrescar();
+  } catch (e) { $("expmsg").textContent = e.message; } finally { $("exportar").disabled = false; }
+};
+
+// ---- Solicitudes de alta y cuentas ----
+async function solicitudes() {
+  const sol = await call("/api/admin/solicitudes");
+  const tb = $("sol"); tb.innerHTML = ""; $("sol-vacio").hidden = sol.length > 0;
+  for (const s of sol) {
+    const tr = document.createElement("tr");
+    const sel = el("select", "", { ariaLabel: "Cliente" });
+    sel.appendChild(el("option", "— elige un cliente —", { value: "" }));
+    for (const c of s.sugerencias) sel.appendChild(el("option", `${c.name} (${c.id}) · coincide por ${c.motivo}`, { value: c.id }));
+    if (s.sugerencias.length === 1) sel.value = s.sugerencias[0].id;
+    const buscar = el("input", "", { placeholder: "Buscar otro cliente…", type: "search" });
+    buscar.onchange = async () => { const r = await call("/api/admin/clientes?q=" + encodeURIComponent(buscar.value)); sel.innerHTML = ""; sel.appendChild(el("option", "— elige un cliente —", { value: "" })); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); };
+    const ok = el("button", "Aprobar", { className: "main" });
+    ok.onclick = async () => { try { const r = await call(`/api/admin/solicitudes/${s.id}/aprobar`, { clienteId: sel.value }); mostrarPin(`Cuenta creada para ${r.cliente} (${r.telefono}). PIN:`, r.pin); refrescar(); } catch (e) { alert(e.message); } };
+    const no = el("button", "Rechazar"); no.onclick = async () => { await call(`/api/admin/solicitudes/${s.id}/rechazar`, {}); refrescar(); };
+    const td = el("td"); const box = el("div", "", { className: "row" }); box.append(sel, buscar); td.appendChild(box);
+    const acc = el("td"); acc.append(ok, " ", no);
+    tr.append(el("td", s.business), el("td", s.phone), el("td", s.email), td, acc); tb.appendChild(tr);
+  }
+}
+async function cuentas() {
+  const cue = await call("/api/admin/cuentas"); const tc = $("cue"); tc.innerHTML = "";
+  for (const a of cue) {
+    const tr = document.createElement("tr");
+    const estado = a.status === "blocked" ? "Bloqueada" : a.locked ? "Bloqueo temporal" : "Activa";
+    const pin = el("button", "Nuevo PIN"); pin.onclick = async () => { const r = await call(`/api/admin/cuentas/${a.id}/pin`, {}); mostrarPin(`Nuevo PIN para ${a.cliente} (${a.phone}):`, r.pin); refrescar(); };
+    const blq = el("button", a.status === "blocked" ? "Reactivar" : "Bloquear"); blq.onclick = async () => { await call(`/api/admin/cuentas/${a.id}/bloquear`, { bloquear: a.status !== "blocked" }); refrescar(); };
+    const td = el("td"); td.append(pin, " ", blq);
+    tr.append(el("td", a.cliente || a.customerId), el("td", a.phone), el("td", a.email || ""), el("td", estado), el("td", a.lastLogin ? hora(a.lastLogin) : "—"), td); tc.appendChild(tr);
+  }
+}
+async function avisos() {
+  const r = await call("/api/admin/resumen");
+  const n = (id, v) => { $(id).hidden = !v; $(id).textContent = v; };
+  n("n-ped", r.pedidosPendientes + r.pedidosRetenidos); n("n-sol", r.solicitudes);
+  document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
+  $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+}
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), avisos()]); } catch (e) { if (e.message !== "Clave incorrecta") $("act").textContent = "Sin conexión con el servidor"; } }
+
+document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
+  document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+  $("p-pedidos").hidden = b.dataset.t !== "pedidos"; $("p-solicitudes").hidden = b.dataset.t !== "solicitudes"; $("p-cuentas").hidden = b.dataset.t !== "cuentas";
+}));
+async function entrar() { try { await refrescar(); if ($("app").hidden && clave) { await call("/api/admin/resumen"); $("login").hidden = true; $("app").hidden = false; clearInterval(timer); timer = setInterval(refrescar, 15000); } } catch (e) { $("l-err").textContent = e.message; } }
+$("f-login").onsubmit = (e) => { e.preventDefault(); clave = $("clave").value; try { sessionStorage.setItem("vm_admin", clave); } catch {} $("l-err").textContent = ""; entrar(); };
+if (clave) entrar();
+</script>
+</body>
+</html>

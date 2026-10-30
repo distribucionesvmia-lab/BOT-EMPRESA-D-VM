@@ -1,4 +1,5 @@
-// Rutas HTTP de cuentas: solicitud de alta, acceso con teléfono + PIN, sesión por cookie y administración de la empresa.
+// Rutas HTTP del CLIENTE: solicitud de alta, acceso con teléfono + PIN y sesión por cookie.
+// (La administración de la empresa está aparte, en admin.js.)
 // Regla de oro: el servidor decide de quién son los datos a partir de la SESIÓN. Ninguna ruta acepta un código de
 // cliente enviado por el navegador, así que un cliente no puede pedir el historial de otro.
 import crypto from "node:crypto";
@@ -56,11 +57,21 @@ const sameToken = (a, b) => {
   return crypto.timingSafeEqual(x, y);
 };
 
+/** Comprueba la clave de la empresa (cabecera Authorization: Bearer …). Sin clave configurada, nadie es administrador. */
+export function makeAdminCheck(adminToken) {
+  return (req) => {
+    if (!adminToken) return false;
+    const m = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
+    return !!m && sameToken(m[1], adminToken);
+  };
+}
+export { send, readJson };
+
 /**
- * accounts: base de cuentas · customers: { list(), getById(id) } · adminToken: clave de la empresa
+ * accounts: base de cuentas · customers: { getById(id) }
  * secure: cookie solo por HTTPS · trustProxy: usar X-Forwarded-For para la IP
  */
-export function createAuth({ accounts, customers, adminToken, secure = false, trustProxy = false }) {
+export function createAuth({ accounts, customers, secure = false, trustProxy = false }) {
   const loginLimit = rateLimiter(20, 10 * 60_000);
   const registerLimit = rateLimiter(5, 60 * 60_000);
   const ip = (req) => (trustProxy ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() : "") || req.socket.remoteAddress || "?";
@@ -69,13 +80,7 @@ export function createAuth({ accounts, customers, adminToken, secure = false, tr
   /** Cuenta de la sesión de esta petición (o null). */
   const sessionOf = (req) => accounts.sessionAccount(parseCookies(req.headers.cookie)[COOKIE]);
 
-  const isAdmin = (req) => {
-    if (!adminToken) return false;
-    const m = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
-    return !!m && sameToken(m[1], adminToken);
-  };
-
-  /** Atiende las rutas /api/registro, /api/acceso, /api/salir, /api/yo y /api/admin/*. Devuelve true si la ruta era suya. */
+  /** Atiende las rutas del cliente: /api/registro, /api/acceso, /api/salir y /api/yo. Devuelve true si la ruta era suya. */
   async function route(req, res, url) {
     const p = url.pathname;
     if (!p.startsWith("/api/")) return false;
@@ -111,41 +116,8 @@ export function createAuth({ accounts, customers, adminToken, secure = false, tr
       return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "" } }), true;
     }
 
-    // ---- Administración (la empresa) ----
-    if (p.startsWith("/api/admin/")) {
-      if (!isAdmin(req)) return send(res, 403, { error: "Acceso no autorizado." }), true;
-      if (p === "/api/admin/solicitudes" && req.method === "GET") {
-        const regs = accounts.listRegistrations(url.searchParams.get("estado") ?? "pending");
-        return send(res, 200, regs.map((r) => ({ ...r, sugerencias: customers.suggest(r.business, r.phone) }))), true;
-      }
-      if (p === "/api/admin/clientes" && req.method === "GET") {
-        const q = (url.searchParams.get("q") ?? "").toLowerCase().trim();
-        return send(res, 200, customers.list().filter((c) => !q || c.name.toLowerCase().includes(q) || String(c.id) === q).slice(0, 15).map((c) => ({ id: c.id, name: c.name, phone: c.phone }))), true;
-      }
-      if (p === "/api/admin/cuentas" && req.method === "GET") {
-        return send(res, 200, accounts.listAccounts().map((a) => ({ ...a, cliente: customers.getById(a.customerId)?.name ?? "" }))), true;
-      }
-      const m = /^\/api\/admin\/(solicitudes|cuentas)\/(\d+)\/(aprobar|rechazar|pin|bloquear)$/.exec(p);
-      if (m && req.method === "POST") {
-        const id = Number(m[2]);
-        const b = (await readJson(req)) ?? {};
-        if (m[1] === "solicitudes" && m[3] === "aprobar") {
-          const cust = customers.getById(String(b.clienteId ?? ""));
-          if (!cust) return send(res, 400, { error: "Elige un cliente de la lista." }), true;
-          const r = accounts.approve(id, cust.id);
-          return r.error ? send(res, 400, { error: r.error }) : send(res, 200, { ok: true, cliente: cust.name, telefono: r.account.phone, pin: r.pin }), true;
-        }
-        if (m[1] === "solicitudes" && m[3] === "rechazar") return send(res, accounts.reject(id) ? 200 : 404, { ok: true }), true;
-        if (m[1] === "cuentas" && m[3] === "pin") {
-          const pin = accounts.resetPin(id);
-          return send(res, pin ? 200 : 404, pin ? { ok: true, pin } : { error: "No existe la cuenta." }), true;
-        }
-        if (m[1] === "cuentas" && m[3] === "bloquear") return accounts.setBlocked(id, b.bloquear !== false), send(res, 200, { ok: true }), true;
-      }
-      return send(res, 404, { error: "No existe." }), true;
-    }
     return false;
   }
 
-  return { route, sessionOf, isAdmin };
+  return { route, sessionOf };
 }

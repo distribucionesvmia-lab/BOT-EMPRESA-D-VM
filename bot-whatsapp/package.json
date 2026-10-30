@@ -3,11 +3,15 @@
   "version": "1.0.0",
   "type": "module",
   "private": true,
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node --env-file=.env server.js",
     "demo": "DEMO=1 node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "start:cliente": "APP_MODE=cliente node server.js",
+    "start:empresa": "APP_MODE=empresa node server.js"
   }
 }

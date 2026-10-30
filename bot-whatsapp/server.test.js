@@ -182,3 +182,77 @@ test("salir cierra la sesión", async () => {
   await call("POST", "/api/salir", { cookie, body: {} });
   assert.equal((await call("GET", "/api/yo", { cookie })).status, 401);
 });
+
+// ---- Aplicación de la empresa: pedidos y exportación ----
+test("EMPRESA: ve los pedidos de todos los clientes, con el total, y los avisos", async () => {
+  assert.equal((await call("GET", "/api/admin/pedidos")).status, 403);
+  const ped = (await call("GET", "/api/admin/pedidos", { admin: true })).json;
+  assert.equal(ped.length, 2);
+  assert.deepEqual(ped.map((o) => o.codigo).sort(), ["9001", "9002"]);
+  assert.ok(ped.every((o) => o.estado === "pendiente" && o.total > 0 && o.lineas.length > 0));
+  const res = (await call("GET", "/api/admin/resumen", { admin: true })).json;
+  assert.equal(res.pedidosPendientes, 2);
+  assert.equal(typeof res.solicitudes, "number");
+});
+
+test("EMPRESA: exporta a Excel una sola vez y se puede descargar", async () => {
+  assert.equal((await call("POST", "/api/admin/exportar", { body: {} })).status, 403);
+  const r = await call("POST", "/api/admin/exportar", { admin: true, body: {} });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.exportacion.pedidos, 2);
+  const otra = await call("POST", "/api/admin/exportar", { admin: true, body: {} });
+  assert.equal(otra.json.exportacion, null); // no se repite
+  const lista = (await call("GET", "/api/admin/exportaciones", { admin: true })).json;
+  assert.equal(lista.length, 1);
+  const sinClave = await fetch(`${BASE}/api/admin/exportaciones/${lista[0].id}/descargar`);
+  assert.equal(sinClave.status, 403);
+  const dl = await fetch(`${BASE}/api/admin/exportaciones/${lista[0].id}/descargar`, { headers: { Authorization: `Bearer ${ADMIN}` } });
+  assert.equal(dl.status, 200);
+  assert.match(dl.headers.get("content-type"), /spreadsheetml/);
+  assert.equal(Buffer.from(await dl.arrayBuffer()).subarray(0, 2).toString(), "PK"); // un .xlsx es un zip
+  const ped = (await call("GET", "/api/admin/pedidos", { admin: true })).json;
+  assert.ok(ped.every((o) => o.estado === "exportado"));
+});
+
+// ---- Dos aplicaciones separadas: lo del cliente no tiene nada de la empresa y al revés ----
+async function arrancar(mode) {
+  const port = 3990 + Math.floor(Math.random() * 9) + (mode === "empresa" ? 10 : 0);
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), "vm-mode-"));
+  const p = spawn(process.execPath, ["server.js"], {
+    cwd: path.dirname(new URL(import.meta.url).pathname),
+    env: { ...process.env, DEMO: "1", APP_MODE: mode, PORT: String(port), PUBLIC_URL: `http://127.0.0.1:${port}`, LINK_SECRET: "x", ADMIN_TOKEN: ADMIN, DB_PATH: path.join(d, "p.sqlite"), CATALOG_DB: path.join(d, "c.sqlite"), CUSTOMERS_DB: path.join(d, "cl.sqlite"), ACCOUNTS_DB: path.join(d, "a.sqlite") },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  await new Promise((res, rej) => {
+    const t = setTimeout(() => rej(new Error("no arrancó")), 8000);
+    p.stdout.on("data", (x) => String(x).includes("Bot escuchando") && (clearTimeout(t), res()));
+  });
+  return { p, url: `http://127.0.0.1:${port}` };
+}
+const status = async (url, opts) => (await fetch(url, { redirect: "manual", ...opts })).status;
+
+test("APP_MODE=cliente: la aplicación del cliente no tiene NADA de administración, ni con la clave", async () => {
+  const { p, url } = await arrancar("cliente");
+  try {
+    assert.equal(await status(url + "/cliente"), 200);
+    for (const ruta of ["/empresa", "/distribuidor", "/api/admin/pedidos", "/api/admin/solicitudes", "/api/admin/cuentas", "/api/admin/exportar", "/api/admin/resumen"]) {
+      assert.equal(await status(url + ruta, { headers: { Authorization: `Bearer ${ADMIN}` } }), 404, ruta);
+    }
+  } finally {
+    p.kill();
+  }
+});
+
+test("APP_MODE=empresa: la aplicación de la empresa no sirve nada del cliente", async () => {
+  const { p, url } = await arrancar("empresa");
+  try {
+    assert.equal(await status(url + "/empresa"), 200);
+    assert.equal(await status(url + "/api/admin/resumen", { headers: { Authorization: `Bearer ${ADMIN}` } }), 200);
+    assert.equal(await status(url + "/api/admin/resumen"), 403);
+    for (const ruta of ["/cliente", "/catalogo", "/api/yo", "/api/chat"]) assert.equal(await status(url + ruta), 404, ruta);
+    assert.equal(await status(url + "/api/registro", { method: "POST", headers: json, body: "{}" }), 404);
+    assert.equal(await status(url + "/api/acceso", { method: "POST", headers: json, body: "{}" }), 404);
+  } finally {
+    p.kill();
+  }
+});

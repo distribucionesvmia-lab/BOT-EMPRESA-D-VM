@@ -81,6 +81,21 @@ Cada cliente entra en `/cliente` con su **teléfono y un PIN de 6 cifras**; la e
 - Si se olvida el PIN: la empresa genera uno nuevo. Recuperarlo por correo requeriría un servicio de envío.
 - El código de WhatsApp (`/webhook`) sigue en el proyecto pero ya no se usa.
 
+## 1c-quater. Dos aplicaciones distintas: la del cliente y la de la empresa
+Comparten las mismas bases de datos, pero **no se mezclan**: lo que se entrega al cliente no contiene nada de lo del empresario.
+
+| | Aplicación del **cliente** (el bot) | Aplicación de la **empresa** (el empresario) |
+|---|---|---|
+| Dirección | `/cliente` y `/catalogo` | `/empresa` (también `/distribuidor`) |
+| Qué ve | Acceso con teléfono + PIN, chat con sus productos habituales, catálogo de pedido | **Pedidos** recibidos (con líneas, totales y observaciones), exportación a Excel y descarga, **solicitudes de alta** de clientes y cuentas |
+| Acceso | Cuenta del cliente (teléfono + PIN) | Clave de la empresa (`ADMIN_TOKEN`) |
+| Arrancar solo esta | `npm run start:cliente` (`APP_MODE=cliente`) | `npm run start:empresa` (`APP_MODE=empresa`) |
+
+- Con `APP_MODE=cliente` el servidor **no tiene ninguna ruta de administración**: ni con la clave correcta responde (comprobado en las pruebas). Con `APP_MODE=empresa` no sirve nada del cliente.
+- Pueden ir en **dos servidores o procesos distintos**, por ejemplo la del cliente en internet y la de la empresa solo en la red de la oficina, apuntando a los mismos ficheros de base de datos. Con `APP_MODE=todo` (por defecto y en la demo) van juntas.
+- En la aplicación de la empresa: los pedidos nuevos aparecen solos (se actualiza cada 15 segundos) y avisa de cuántos pedidos y solicitudes hay pendientes; los pedidos dudosos o de clientes sin código quedan **retenidos** hasta que se marquen como revisados.
+- La exportación diaria automática a Excel solo la lanza la aplicación de la empresa.
+
 ## 1d. Mini-aplicación de pedido (catálogo estilo app)
 A los clientes conocidos el bot les envía un botón **Hacer pedido** con un **enlace personal** a `/pedido/<token>`: una página para móvil con sus artículos habituales (precio, "Última vez: N uds", botón "+" y contador de unidades), buscador, catálogo completo, carrito, nota y confirmación. Al confirmar, el pedido se graba igual que los del chat (con código de cliente y de artículo) y el cliente recibe la confirmación por WhatsApp.
 - El enlace va **firmado y caduca a las 24 h**, solo sirve para ese cliente y **para enviar un solo pedido**. Los artículos y precios se validan en el servidor.

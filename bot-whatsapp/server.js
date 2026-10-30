@@ -8,6 +8,7 @@ import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder } from "./pricing.js";
 import { createAuth } from "./auth.js";
+import { createAdmin } from "./admin.js";
 import { webProducts, webOrderFromBody } from "./weborder.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { BUSINESS } from "./config.js";
@@ -286,13 +287,20 @@ function validSignature(raw, header) {
 }
 
 // ---- Aplicación web de los clientes (sin WhatsApp): acceso con teléfono + PIN y vista del distribuidor ----
+// Dos aplicaciones distintas con las mismas bases de datos (APP_MODE):
+//   cliente  lo que se entrega al cliente: acceso, chat y catálogo (nada de administración)
+//   empresa  lo del empresario: pedidos, exportación a Excel, solicitudes de alta y cuentas
+//   todo     las dos en un mismo servidor (por defecto, y en la demo)
+const APP_MODE = process.env.APP_MODE ?? "todo";
+const clientEnabled = APP_MODE !== "empresa";
+const adminEnabled = APP_MODE !== "cliente";
 const auth = createAuth({
   accounts: getAccountsDb(),
   customers: customerDirectory,
-  adminToken: process.env.ADMIN_TOKEN,
   secure: PUBLIC_URL.startsWith("https://"),
   trustProxy: process.env.TRUST_PROXY === "1",
 });
+const admin = createAdmin({ accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: process.env.ADMIN_TOKEN });
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" };
 const sendJson = (res, code, data) => res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify(data));
@@ -320,10 +328,20 @@ async function appRoutes(req, res, url) {
   const p = url.pathname;
   if (p === "/") {
     if (!String(req.headers.accept ?? "").includes("text/html")) return void res.end("Bot activo");
-    return void res.writeHead(302, { Location: "/cliente" }).end();
+    return void res.writeHead(302, { Location: clientEnabled ? "/cliente" : "/empresa" }).end();
   }
+  // Aplicación de la empresa (el empresario)
+  if (p === "/empresa" || p === "/distribuidor") {
+    if (!adminEnabled) return void res.writeHead(404).end();
+    return void res.writeHead(200, HTML).end(page("empresa.html"));
+  }
+  if (p.startsWith("/api/admin/")) {
+    if (!adminEnabled) return void res.writeHead(404).end(); // la aplicación del cliente no tiene administración, ni con clave
+    if (await admin(req, res, url)) return;
+  }
+  // Aplicación del cliente
+  if (!clientEnabled) return void res.writeHead(404).end();
   if (p === "/cliente" && req.method === "GET") return void res.writeHead(200, HTML).end(page("cliente.html"));
-  if (p === "/distribuidor" && req.method === "GET") return void res.writeHead(200, HTML).end(page("distribuidor.html"));
   if (await auth.route(req, res, url)) return;
 
   const account = auth.sessionOf(req);
@@ -374,7 +392,7 @@ async function appRoutes(req, res, url) {
 http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://x");
-    if (url.pathname === "/" || url.pathname === "/cliente" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo")) {
+    if (url.pathname === "/" || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo")) {
       appRoutes(req, res, url).catch((err) => {
         console.error(err);
         if (!res.headersSent) res.writeHead(500).end();
@@ -427,5 +445,5 @@ http
   .listen(PORT, () => {
     console.log(`Bot escuchando en http://localhost:${PORT}`);
     // Exportación diaria a Excel (EXPORT_TIME, por defecto 21:00 hora de Madrid). En modo demo no se programa.
-    if (process.env.DEMO !== "1") scheduleDailyExport(getDb());
+    if (process.env.DEMO !== "1" && adminEnabled) scheduleDailyExport(getDb());
   });
