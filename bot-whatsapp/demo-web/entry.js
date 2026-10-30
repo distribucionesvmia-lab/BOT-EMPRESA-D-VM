@@ -4,7 +4,7 @@
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog, habitualProducts } from "../bot.js";
 import { priceOrder, totals } from "../pricing.js";
 import { webProducts, webHistory, webOrderFromBody } from "../weborder.js";
-import { deliveryOptions, deliveryInfo, madridDay } from "../delivery.js";
+import { deliveryOptions, deliveryInfo, deliveryMin, madridDay } from "../delivery.js";
 import { findCustomers } from "../identify.js";
 import { FORMAT, madrid, madridTime } from "../export-format.js";
 import { workbookFiles } from "../xlsx-files.js";
@@ -254,7 +254,7 @@ window.VM = {
   miniData(link) {
     const customer = links.get(link)?.customer;
     if (!customer) return { error: "Enlace no válido o caducado" };
-    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, products: webProducts(customer, getCatalog(), habitualProducts), history: webHistory(customer, getCatalog()), delivery: deliveryOptions(), today: madridDay() };
+    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, products: webProducts(customer, getCatalog(), habitualProducts), history: webHistory(customer, getCatalog()), delivery: deliveryOptions(), today: madridDay(), minDate: deliveryMin() };
   },
   miniSubmit(link, body) {
     const customer = links.get(link)?.customer;

@@ -9,6 +9,8 @@ export function madridDay(iso = new Date().toISOString()) {
   const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
   return `${p.year}-${p.month}-${p.day}`;
 }
+export const CUTOFF_HOUR = 10; // «hoy» solo se puede pedir antes de las 10:00 (hora de Madrid)
+const madridHour = (iso) => Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Madrid", hour: "2-digit", hourCycle: "h23" }).format(new Date(iso)));
 const toUtc = (day) => Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10));
 export const addDays = (day, n) => new Date(toUtc(day) + n * 86_400_000).toISOString().slice(0, 10);
 export const daysBetween = (a, b) => Math.round((toUtc(b) - toUtc(a)) / 86_400_000);
@@ -19,18 +21,25 @@ const isWorkday = (day) => weekday(day) >= 1 && weekday(day) <= 5;
 export const longDate = (day) => `${DIAS[weekday(day)]} ${+day.slice(8, 10)} de ${MESES[+day.slice(5, 7) - 1]}`;
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
+/** Primer día que se puede elegir: hoy si el pedido se hace antes de las 10:00; si no, mañana. */
+export function deliveryMin(nowIso = new Date().toISOString()) {
+  const today = madridDay(nowIso);
+  return madridHour(nowIso) < CUTOFF_HOUR ? today : addDays(today, 1);
+}
+
 export const SERVICE_DAYS = 5; // días de servicio que se ofrecen siempre (lunes a viernes)
 
 /**
- * Opciones que se muestran al cliente: siempre los próximos 5 días de servicio (sin sábados ni domingos) empezando por hoy si es laborable.
+ * Opciones que se muestran al cliente: siempre los próximos 5 días de servicio (sin sábados ni domingos). «Hoy» solo si es laborable y el
+ * pedido se hace antes de las 10:00; pasada esa hora, lo más pronto es mañana.
  * Hoy y mañana se llaman así y el resto va con la fecha (día y mes) en lugar de «el lunes que viene».
  * → [{ date, kind: "hoy" | "manana" | "dia", label, detail }]
  */
 export function deliveryOptions(nowIso = new Date().toISOString()) {
-  const today = madridDay(nowIso), out = [];
+  const today = madridDay(nowIso), out = [], min = deliveryMin(nowIso);
   for (let i = 0; out.length < SERVICE_DAYS; i++) {
     const date = addDays(today, i);
-    if (!isWorkday(date)) continue;
+    if (date < min || !isWorkday(date)) continue;
     if (i === 0) out.push({ date, kind: "hoy", label: "Hoy", detail: longDate(date) });
     else if (i === 1) out.push({ date, kind: "manana", label: "Mañana", detail: longDate(date) });
     else out.push({ date, kind: "dia", label: cap(longDate(date)), detail: "" });
@@ -40,12 +49,11 @@ export function deliveryOptions(nowIso = new Date().toISOString()) {
 
 export const MAX_AHEAD_DAYS = 90; // el calendario deja elegir hasta 90 días por delante
 
-/** ¿Es un día de entrega válido? Cualquier fecha real desde hoy hasta dentro de 90 días (el calendario deja elegir cualquiera). */
+/** ¿Es un día de entrega válido? Cualquier fecha real desde el primer día disponible (hoy antes de las 10:00; si no, mañana) hasta dentro de 90 días. */
 export function deliveryAllowed(date, nowIso = new Date().toISOString()) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ""))) return false;
   if (addDays(date, 0) !== date) return false; // fecha inexistente (31 de febrero…)
-  const d = daysBetween(madridDay(nowIso), date);
-  return d >= 0 && d <= MAX_AHEAD_DAYS;
+  return date >= deliveryMin(nowIso) && daysBetween(madridDay(nowIso), date) <= MAX_AHEAD_DAYS;
 }
 
 /**

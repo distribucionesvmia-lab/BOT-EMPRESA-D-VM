@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deliveryOptions, deliveryInfo, deliveryAllowed, longDate, madridDay } from "./delivery.js";
+import { deliveryOptions, deliveryInfo, deliveryAllowed, deliveryMin, longDate, madridDay } from "./delivery.js";
 import { webOrderFromBody } from "./weborder.js";
 
 test("opciones de entrega: hoy, mañana y los días laborables siguientes, con fecha (sin fines de semana)", () => {
   // jueves 29 de octubre de 2026
-  const o = deliveryOptions("2026-10-29T09:00:00Z");
+  const o = deliveryOptions("2026-10-29T07:00:00Z"); // 08:00 en Madrid: antes de las 10
   assert.deepEqual(o.map((x) => [x.kind, x.label, x.date]), [
     ["hoy", "Hoy", "2026-10-29"], ["manana", "Mañana", "2026-10-30"],
     ["dia", "Lunes 2 de noviembre", "2026-11-02"], ["dia", "Martes 3 de noviembre", "2026-11-03"], ["dia", "Miércoles 4 de noviembre", "2026-11-04"],
@@ -13,15 +13,30 @@ test("opciones de entrega: hoy, mañana y los días laborables siguientes, con f
   assert.equal(o[0].detail, "jueves 29 de octubre");
   assert.equal(o[1].detail, "viernes 30 de octubre");
   // viernes: «mañana» es sábado, no se ofrece; siguen 5 días de servicio
-  assert.deepEqual(deliveryOptions("2026-10-30T09:00:00Z").map((x) => x.label), ["Hoy", "Lunes 2 de noviembre", "Martes 3 de noviembre", "Miércoles 4 de noviembre", "Jueves 5 de noviembre"]);
+  assert.deepEqual(deliveryOptions("2026-10-30T07:00:00Z").map((x) => x.label), ["Hoy", "Lunes 2 de noviembre", "Martes 3 de noviembre", "Miércoles 4 de noviembre", "Jueves 5 de noviembre"]);
   // sábado: sin «hoy» ni «mañana»; de lunes a viernes
-  assert.deepEqual(deliveryOptions("2026-10-31T09:00:00Z").map((x) => x.label), ["Lunes 2 de noviembre", "Martes 3 de noviembre", "Miércoles 4 de noviembre", "Jueves 5 de noviembre", "Viernes 6 de noviembre"]);
+  assert.deepEqual(deliveryOptions("2026-10-31T07:00:00Z").map((x) => x.label), ["Lunes 2 de noviembre", "Martes 3 de noviembre", "Miércoles 4 de noviembre", "Jueves 5 de noviembre", "Viernes 6 de noviembre"]);
   // siempre 5 y nunca fin de semana, ningún día del año
   for (let d = 0; d < 366; d++) {
     const o = deliveryOptions(new Date(Date.UTC(2026, 0, 1 + d, 12)).toISOString());
     assert.equal(o.length, 5);
     assert.ok(o.every((x) => ![0, 6].includes(new Date(x.date + "T12:00:00Z").getUTCDay())));
   }
+});
+
+test("«hoy» solo antes de las 10:00 (hora de Madrid); después, lo más pronto es mañana", () => {
+  // jueves 29 de octubre (CET, UTC+1): 08:59 y 09:00 en Madrid
+  assert.equal(deliveryMin("2026-10-29T07:59:00Z"), "2026-10-29");
+  assert.equal(deliveryMin("2026-10-29T08:59:00Z"), "2026-10-29"); // 09:59
+  assert.equal(deliveryMin("2026-10-29T09:00:00Z"), "2026-10-30"); // 10:00
+  const tarde = deliveryOptions("2026-10-29T09:00:00Z");
+  assert.deepEqual(tarde.map((x) => x.label), ["Mañana", "Lunes 2 de noviembre", "Martes 3 de noviembre", "Miércoles 4 de noviembre", "Jueves 5 de noviembre"]); // siguen siendo 5
+  assert.equal(deliveryAllowed("2026-10-29", "2026-10-29T08:59:00Z"), true);
+  assert.equal(deliveryAllowed("2026-10-29", "2026-10-29T09:00:00Z"), false);
+  assert.equal(deliveryAllowed("2026-10-30", "2026-10-29T09:00:00Z"), true);
+  // en horario de verano (UTC+2) el corte sigue siendo a las 10:00 de Madrid
+  assert.equal(deliveryMin("2026-07-15T07:59:00Z"), "2026-07-15");
+  assert.equal(deliveryMin("2026-07-15T08:00:00Z"), "2026-07-16");
 });
 
 test("la fecha es la de Madrid, no la UTC", () => {
@@ -45,6 +60,8 @@ test("el pedido web admite los días ofrecidos y cualquier día del calendario, 
   const ok = webOrderFromBody(body("2026-11-02"), c, { key: "k", phone: "1", at }, cat);
   assert.equal(ok.order.delivery, "2026-11-02");
   assert.equal(webOrderFromBody(body("2026-12-15"), c, { key: "k", phone: "1", at }, cat).order.delivery, "2026-12-15"); // «otro día» del calendario
+  assert.match(webOrderFromBody(body("2026-10-29"), c, { key: "k", phone: "1", at }, cat).error, /antes de las 10:00/); // a las 10:00 ya no se puede pedir para hoy
+  assert.equal(webOrderFromBody(body("2026-10-29"), c, { key: "k", phone: "1", at: "2026-10-29T07:00:00Z" }, cat).order.delivery, "2026-10-29"); // a las 08:00 sí
   assert.match(webOrderFromBody(body("2020-01-01"), c, { key: "k", phone: "1", at }, cat).error, /día de entrega/); // pasado
   assert.match(webOrderFromBody(body("2027-06-01"), c, { key: "k", phone: "1", at }, cat).error, /día de entrega/); // demasiado lejos
   assert.equal(webOrderFromBody({ lines: [{ id: 1, qty: 1 }] }, c, { key: "k", phone: "1", at }, cat).order.delivery, null); // sin día: se admite
@@ -52,7 +69,7 @@ test("el pedido web admite los días ofrecidos y cualquier día del calendario, 
 
 test("deliveryAllowed: de hoy a 90 días, fechas reales", () => {
   const at = "2026-10-29T09:00:00Z";
-  assert.equal(deliveryAllowed("2026-10-29", at), true);
+  assert.equal(deliveryAllowed("2026-10-30", at), true); // a las 10:00 el primer día posible es mañana
   assert.equal(deliveryAllowed("2026-10-28", at), false);
   assert.equal(deliveryAllowed("2027-01-27", at), true); // +90
   assert.equal(deliveryAllowed("2027-01-28", at), false);

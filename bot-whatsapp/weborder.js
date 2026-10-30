@@ -1,4 +1,4 @@
-import { deliveryAllowed } from "./delivery.js";
+import { deliveryAllowed, madridDay } from "./delivery.js";
 
 // Lógica de la mini-aplicación de pedido, sin red ni disco (la comparten el servidor y la demo del navegador).
 
@@ -52,7 +52,9 @@ export function webOrderFromBody(body, customer, { key, phone, at = new Date().t
   // Día de entrega elegido (uno de los botones o cualquier día del calendario): debe ser una fecha real, de hoy en adelante
   let delivery = null;
   if (body?.delivery != null && body.delivery !== "") {
-    if (!deliveryAllowed(body.delivery, at)) return { error: "Elige un día de entrega válido." };
+    if (!deliveryAllowed(body.delivery, at)) {
+      return { error: body.delivery === madridDay(at) ? "Para recibirlo hoy hay que pedir antes de las 10:00. Elige otro día." : "Elige un día de entrega válido." };
+    }
     delivery = body.delivery;
   }
   return {
