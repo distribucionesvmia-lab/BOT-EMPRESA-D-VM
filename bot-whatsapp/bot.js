@@ -150,7 +150,7 @@ function listUi(s, page = 0) {
   }));
   if (!rows.length) return undefined;
   if (start + PAGE < all.length) rows.push({ id: `more:${page + 1}`, title: "Ver más artículos", description: `Quedan ${all.length - start - PAGE} por ver` });
-  return { type: "list", button: "Ver artículos", section: "Tus artículos habituales", rows };
+  return { type: "list", button: "Ver artículos", section: "Tu histórico", rows };
 }
 
 const GENERIC_MENU =
@@ -172,7 +172,7 @@ const WHO_PROMPT =
 const habitualBlock = (s) => {
   const top = habitualProducts(s.customer).slice(0, 6);
   return top.length
-    ? `⭐ *Tus productos habituales* (según tus últimos pedidos):\n` + top.map((p) => `• ${p.name} — última vez: ${p.lastQty} uds`).join("\n") + `\n\n`
+    ? `⭐ *Tu histórico de productos* (según tus últimos pedidos):\n` + top.map((p) => `• ${p.name} — última vez: ${p.lastQty} uds`).join("\n") + `\n\n`
     : `Todavía no tengo pedidos tuyos anteriores.\n\n`;
 };
 // Tras identificar al cliente por su nombre: confirmación + sus productos habituales
@@ -188,7 +188,7 @@ const greeting = (s, justIdentified = false) => {
     return {
       reply:
         hi +
-        `🛒 Pulsa *Hacer pedido* para abrir tu catálogo con tus artículos habituales, elegir las unidades y confirmar.\n\n` +
+        `🛒 Pulsa *Hacer pedido* para abrir tu catálogo con tu histórico, elegir las unidades y confirmar.\n\n` +
         `También puedes escribirlo aquí (_"6 verdejo y 2 coca cola zero"_), decir *repetir* para repetir tu último pedido, ` +
         `*lista* para elegir en el chat, o pedir *horarios* o *persona*.`,
       ui: { type: "link", title: "Hacer pedido", url: s.link },

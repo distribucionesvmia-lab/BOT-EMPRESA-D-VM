@@ -17,8 +17,8 @@
   header { display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--rojo); color:#fff; }
   header img { height:40px; width:auto; flex:none; }
   .ttl { flex:1; min-width:0; }
-  .ttl b { display:block; font-size:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .ttl small { color:rgba(255,255,255,.9); font-size:14px; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ttl b { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; font-size:18px; line-height:1.15; overflow:hidden; }
+  .ttl small { display:none; }
   .cartbtn { border:0; background:#fff; color:var(--rojo-o); font-size:18px; font-weight:800; min-height:48px; padding:0 16px; border-radius:14px; display:flex; align-items:center; gap:8px; cursor:pointer; flex:none; }
   .cartbtn span { background:var(--rojo); color:#fff; min-width:26px; height:26px; border-radius:13px; display:inline-grid; place-items:center; font-size:15px; padding:0 6px; }
 
@@ -40,25 +40,27 @@
   main { flex:1; overflow-y:auto; padding-bottom:110px; border-top:1px solid var(--linea); }
 
   /* Productos: grandes y claros; lo ya añadido se destaca */
-  .p { display:grid; grid-template-columns:auto 1fr; gap:10px 14px; padding:16px 14px; border-bottom:1px solid var(--linea); align-items:center; border-left:6px solid transparent; }
+  .p { display:grid; grid-template-columns:auto 1fr auto; gap:14px; padding:16px 14px; border-bottom:1px solid var(--linea); align-items:center; border-left:6px solid transparent; }
   .p.sel { background:#fff8f8; border-left-color:var(--rojo); }
-  .av { width:64px; height:64px; border-radius:14px; display:grid; place-items:center; color:#fff; font-weight:800; font-size:20px; }
-  .info { min-width:0; }
-  .info .n { font-weight:700; font-size:19px; line-height:1.25; }
+  .av { width:96px; height:96px; border-radius:18px; display:grid; place-items:center; color:#fff; font-weight:800; font-size:30px; }
+  .info { min-width:0; align-self:start; }
+  .info .n { font-weight:700; font-size:18px; line-height:1.25; overflow-wrap:anywhere; }
   .info .c { color:var(--gris); font-size:14px; margin-top:3px; }
-  .info .pr { display:flex; align-items:center; gap:10px; margin-top:6px; flex-wrap:wrap; }
+  .info .pr { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-top:6px; }
   .pr b { font-size:22px; }
-  .chip { background:var(--chip); color:var(--chip-t); border:0; border-radius:10px; font-size:15px; font-weight:700; min-height:40px; padding:0 12px; cursor:pointer; }
-  .ctl { grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .add { flex:1; min-height:56px; border:0; border-radius:14px; background:var(--rojo); color:#fff; font-size:20px; font-weight:800; cursor:pointer; box-shadow:0 3px 0 var(--rojo-o); }
+  .chip { background:var(--chip); color:var(--chip-t); border:0; border-radius:10px; font-size:14px; font-weight:700; min-height:40px; padding:6px 10px; cursor:pointer; text-align:left; line-height:1.2; }
+  /* Recuadro de compra a la derecha: unidades/cajas, botón añadir o cantidad */
+  .ctl { display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:8px; width:124px; padding:8px; border:2px solid var(--linea); border-radius:16px; background:#fff; }
+  .p.sel .ctl { border-color:var(--rojo); background:#fff; }
+  .add { min-height:64px; border:0; border-radius:12px; background:var(--rojo); color:#fff; font-size:18px; font-weight:800; cursor:pointer; box-shadow:0 3px 0 var(--rojo-o); line-height:1.15; }
   .add:active { transform:translateY(2px); box-shadow:none; }
-  .step { display:flex; align-items:center; border:2px solid var(--rojo); border-radius:14px; overflow:hidden; background:#fff; flex:1; max-width:260px; margin-left:auto; }
-  .step button { width:64px; height:56px; border:0; background:var(--rojo-s); font-size:30px; font-weight:700; color:var(--rojo-o); cursor:pointer; }
+  .step { display:flex; flex-direction:column; align-items:stretch; border:2px solid var(--rojo); border-radius:12px; overflow:hidden; background:#fff; }
+  .step button { height:52px; border:0; background:var(--rojo-s); font-size:30px; font-weight:700; color:var(--rojo-o); cursor:pointer; }
   .step button:active { background:#ffd9d9; }
-  .step input { flex:1; min-width:0; width:70px; height:56px; border:0; text-align:center; font-size:24px; font-weight:800; outline:none; -moz-appearance:textfield; }
+  .step input { width:100%; min-width:0; height:50px; border:0; text-align:center; font-size:24px; font-weight:800; outline:none; -moz-appearance:textfield; }
   .step input::-webkit-outer-spin-button, .step input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
   .ud { display:flex; border:2px solid var(--linea); border-radius:12px; overflow:hidden; }
-  .ud button { border:0; background:#fff; min-height:52px; padding:0 18px; font-size:17px; cursor:pointer; color:var(--gris); font-weight:700; }
+  .ud button { flex:1; border:0; background:#fff; min-height:44px; padding:0 4px; font-size:15px; cursor:pointer; color:var(--gris); font-weight:700; }
   .ud button.on { background:var(--rojo); color:#fff; }
   .lnote { width:calc(100% - 28px); margin:0 14px 14px; border:2px solid var(--linea); border-radius:12px; padding:12px; font:inherit; font-size:16px; }
   .vacio { padding:48px 24px; text-align:center; color:var(--gris); font-size:18px; line-height:1.4; }
@@ -123,11 +125,11 @@
   <div class="paso">Paso 1 de 3 · Elige tus productos</div>
   <div class="guia" id="guia">Toca <b>«+ Añadir»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.</div>
   <nav class="tabs">
-    <button class="tab on" data-t="hab" type="button">★ Histórico no habitual</button>
+    <button class="tab on" data-t="hab" type="button">★ Histórico</button>
     <button class="tab" data-t="all" type="button">☰ Catálogo completo</button>
   </nav>
   <div class="buscar"><input id="q" type="search" placeholder="Buscar un producto…" autocomplete="off" aria-label="Buscar un producto"></div>
-  <!-- Filtro de ida y vuelta, solo en la pestaña «Histórico no habitual» (data-t="hab") -->
+  <!-- Filtro de ida y vuelta, solo en la pestaña «Histórico» (data-t="hab") -->
   <div class="filbar" id="filbar" hidden><button class="fil" id="fil" type="button" aria-pressed="false">☑ Ver solo lo que he marcado</button><span id="filinfo"></span></div>
   <main id="list"></main>
   <footer><button class="big" id="verCarrito" type="button" disabled>Añade productos para empezar</button></footer>
@@ -228,16 +230,16 @@ function row(p) {
   const av = document.createElement("div"); av.className = "av"; av.style.background = hue(p.name); av.textContent = initials(p.name);
   const info = document.createElement("div"); info.className = "info";
   const n = document.createElement("div"); n.className = "n"; n.textContent = p.name;
-  const c = document.createElement("div"); c.className = "c"; c.textContent = "Cód. " + p.id;
+  const c = document.createElement("div"); c.className = "c"; c.textContent = ""; // el código de producto no se muestra
   const pr = document.createElement("div"); pr.className = "pr";
   const price = document.createElement("b"); price.textContent = eur(p.price); pr.appendChild(price);
   if (p.lastQty) {
     const chip = document.createElement("button"); chip.type = "button"; chip.className = "chip";
-    chip.textContent = "↻ Repetir última vez: " + p.lastQty + " uds"; chip.title = "Pedir las mismas unidades";
+    chip.textContent = "↻ Última vez: " + p.lastQty + " uds"; chip.title = "Pedir las mismas unidades";
     chip.onclick = () => { unitOf.set(p.id, "ud"); setQty(p.id, p.lastQty); }; // las de la última vez son unidades
     pr.appendChild(chip);
   }
-  if (p.unitsPerBox) c.textContent += " · caja de " + p.unitsPerBox + " uds" + (unit(p.id) === "caja" && qty.get(p.id) ? " → " + qty.get(p.id) * p.unitsPerBox + " uds" : "");
+  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " uds" + (unit(p.id) === "caja" && qty.get(p.id) ? " → " + qty.get(p.id) * p.unitsPerBox + " uds" : "");
   info.append(n, c, pr);
   el.append(av, info, control(p));
   return el;

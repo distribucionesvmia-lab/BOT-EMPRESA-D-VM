@@ -199,7 +199,7 @@ test("identificación: «hola» pregunta quién es, busca el nombre y muestra su
   assert.match(r.reply, /nombre de tu negocio/);
   r = handleMessage(r.session, "Bar El Ejemplo");
   assert.match(r.reply, /Identificado! Eres \*Bar El Ejemplo\* \(cód\. 9001\)/);
-  assert.match(r.reply, /Tus productos habituales/);
+  assert.match(r.reply, /Tu histórico de productos/);
   assert.match(r.reply, /AGUA GAS LIMON VIDRIO 250 — última vez: 12 uds/);
   assert.equal(r.ui.type, "link");
   assert.equal(r.ui.url, "https://x/pedido/9001");
