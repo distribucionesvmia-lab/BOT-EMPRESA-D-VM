@@ -181,11 +181,16 @@ test("un pedido hecho por el chat se guarda a nombre del cliente de la sesión",
   await say(B, "hola");
   const rep = await say(B, "repetir");
   assert.match(rep.json.reply, /Revisa tu pedido/);
-  assert.equal((await say(B, "c:ok")).status, 200);
+  const conf = await say(B, "c:ok");
+  assert.match(conf.json.reply, /Cuándo quieres recibirlo/); // antes de enviar pregunta el día de entrega
+  assert.equal(conf.json.ui.type, "list");
+  const fin = await say(B, "cuanto antes"); // se entiende una frase normal
+  assert.match(fin.json.reply, /Pedido recibido/);
   const db = openDb(path.join(dir, "pedidos.sqlite"));
   const orders = db.listOrders();
   db.close();
   assert.equal(orders.length, 2);
+  assert.ok(orders.find((o) => o.customer_id === "9002").delivery_date); // el día de entrega queda guardado
   assert.deepEqual(orders.map((o) => o.customer_id).sort(), ["9001", "9002"]);
 });
 

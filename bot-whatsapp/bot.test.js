@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleMessage, newSession, parseItems } from "./bot.js";
+import { handleMessage, newSession, parseItems, setAskDelivery } from "./bot.js";
+
+setAskDelivery(false); // estas pruebas son del pedido; la pregunta del día de entrega se prueba en bot.chat.test.js
 
 const say = (s, t) => handleMessage(s, t);
 

@@ -1,7 +1,9 @@
 // Prueba el bot con un catálogo con nombres reales de ERP y un cliente con historial de pedidos
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleMessage, newSession, parseItems, setCatalog } from "./bot.js";
+import { handleMessage, newSession, parseItems, setCatalog, setAskDelivery } from "./bot.js";
+
+setAskDelivery(false); // estas pruebas son del pedido; la pregunta del día de entrega se prueba en bot.chat.test.js
 
 const catalogo = [
   { id: "19500", name: "CERVEZA MAHOU 5* LATA PACK (12x33cl)", price: 5.95 },

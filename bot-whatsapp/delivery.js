@@ -14,8 +14,8 @@ const madridHour = (iso) => Number(new Intl.DateTimeFormat("en-GB", { timeZone: 
 const toUtc = (day) => Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10));
 export const addDays = (day, n) => new Date(toUtc(day) + n * 86_400_000).toISOString().slice(0, 10);
 export const daysBetween = (a, b) => Math.round((toUtc(b) - toUtc(a)) / 86_400_000);
-const weekday = (day) => new Date(toUtc(day)).getUTCDay();
-const isWorkday = (day) => weekday(day) >= 1 && weekday(day) <= 5;
+export const weekday = (day) => new Date(toUtc(day)).getUTCDay();
+export const isWorkday = (day) => weekday(day) >= 1 && weekday(day) <= 5;
 
 /** «jueves 30 de octubre» */
 export const longDate = (day) => `${DIAS[weekday(day)]} ${+day.slice(8, 10)} de ${MESES[+day.slice(5, 7) - 1]}`;

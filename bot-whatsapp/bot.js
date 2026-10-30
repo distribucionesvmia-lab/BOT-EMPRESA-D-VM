@@ -1,4 +1,6 @@
 import { BUSINESS, PRODUCTS } from "./config.js";
+import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRows, isYes, isNo, isDone, parseRemove, parseChangeQty, lev } from "./nlu.js";
+import { deliveryAllowed, longDate } from "./delivery.js";
 
 const money = (n) => `${n.toFixed(2)}${BUSINESS.currency}`;
 const norm = (s) =>
@@ -34,17 +36,20 @@ const tokensOf = (p) => {
   return productTokens.get(p);
 };
 
-const WORDS = { un: 1, una: 1, uno: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, doce: 12, veinte: 20, treinta: 30 };
+const WORDS = NUMBER_WORDS;
 const STOP = new Set(
   ("de del la el los las y e un una uno unos unas con para por me mas otro otra tambien gracias hola buenas " +
     "quiero quisiera necesito necesitamos ponme pon dame mandame manda pedido favor ud uds unidad unidades " +
-    "caja cajas lata latas botella botellas pack packs bandeja bandejas litro litros que a al en lo").split(" ")
+    "caja cajas lata latas botella botellas pack packs bandeja bandejas litro litros que a al en lo " +
+    // frases de cortesía y verbos de pedir: «buenos días, quería pedirte…», «si puede ser», «apúntame…»
+    "buenos dias tardes noches queria queremos quisieramos pedir pedirte pedirles voy puedes puedo podrias podeis traer traeme traenos enviame envia " +
+    "apuntame apunta anota sirveme porfa porfavor ademas luego si ser puede ponnos ponedme x eso esto mi nuestro nuestra").split(" ")
 );
 const UNITS = new Set(["cl", "ml", "l", "gr", "g", "kg", "lt"]);
 const REPEAT_PHRASES = ["como siempre", "lo de siempre", "lo habitual", "lo mismo", "repetir", "repetir pedido", "ultimo", "ultimo pedido"];
 
 // ¿la palabra del cliente (q) corresponde a la del producto (t)? Acepta plurales y prefijos
-const wordMatch = (q, t) => q === t || (q.length >= 3 && t.startsWith(q)) || (t.length >= 4 && q.startsWith(t));
+const wordMatch = (q, t) => q === t || (q.length >= 3 && t.startsWith(q)) || (t.length >= 4 && q.startsWith(t)) || (q.length >= 5 && t.length >= 5 && lev(q, t) <= 1); // perdona una errata: «cerbeza»
 
 /**
  * Interpreta texto libre ("2 cajas de coca cola zero y 6 verdejo") contra el catálogo.
@@ -55,7 +60,7 @@ export function parseItems(rawText, customer = null) {
     (customer?.orders ?? []).flatMap((o) => o.lines.map((l) => l.productId)).concat((customer?.usual ?? []).map((u) => u.productId))
   );
   const items = new Map();
-  for (const segment of norm(rawText).split(/\s*(?:,|;|\+|\n|\by\b|\be\b)\s*/)) {
+  for (const segment of numberWords(rawText).split(/\s*(?:,|;|\+|\n|\by\b|\be\b)\s*/)) {
     const words = tokenize(segment);
     let qty = 1;
     const qi = words.findIndex((w, i) => (/^\d+$/.test(w) || w in WORDS) && !UNITS.has(words[i + 1]));
@@ -189,7 +194,7 @@ const greeting = (s, justIdentified = false) => {
       reply:
         hi +
         `🛒 Pulsa *Hacer pedido* para abrir tu catálogo con tu histórico, elegir las unidades y confirmar.\n\n` +
-        `También puedes escribirlo aquí (_"6 verdejo y 2 coca cola zero"_), decir *repetir* para repetir tu último pedido, ` +
+        `También puedes escribirlo como lo dirías en persona (_"ponme 6 verdejo y media docena de coca cola zero para el lunes"_), decir *repetir* para repetir tu último pedido, ` +
         `*lista* para elegir en el chat, o pedir *horarios* o *persona*.`,
       ui: { type: "link", title: "Hacer pedido", url: s.link },
     };
@@ -229,6 +234,7 @@ export const newSession = (customer = null, link = null, opts = {}) => ({
   name: customer?.name ?? "",
   address: customer?.address ?? "",
   note: "", // observaciones generales del pedido ("servir el jueves…")
+  delivery: null, // día de entrega elegido (AAAA-MM-DD)
   customer,
 });
 
@@ -247,6 +253,7 @@ const confirmReply = (s) => {
     `Revisa tu pedido:\n\n${items.length ? itemsText(items) : `_"${s.orderText.replace(/\n/g, " + ")}"_`}\n\n` +
     (BUSINESS.priceNote ? `_${BUSINESS.priceNote}_\n\n` : "") +
     (s.note ? `📝 Observaciones: ${s.note}\n` : "") +
+    (s.delivery ? `📅 Entrega: *${longDate(s.delivery)}*\n` : "") +
     `👤 ${s.name}\n📍 Entrega en: ${s.address}\n\n`;
   return s.customer
     ? { reply: body + `Pulsa un botón, o escribe los cambios (por ejemplo _"6 verdejo y 2 coca cola zero"_) y lo rehago.\n\n_¿Alguna observación? Escribe *nota: servir el jueves*, o *nota jamón: pieza grande* para un artículo._`, ui: buttons(["c:ok", "Confirmar"], ["c:edit", "Cambiar"], ["c:cancel", "Cancelar"]) }
@@ -329,6 +336,40 @@ function askQty(s) {
   };
 }
 
+// ¿Se pregunta el día de entrega al confirmar? (sí; se puede desactivar en pruebas)
+let ASK_DELIVERY = true;
+export const setAskDelivery = (v) => (ASK_DELIVERY = !!v);
+
+/** Pregunta «¿Cuándo quieres recibirlo?»: lista de días (hoy/mañana/próximos días de servicio) y «Otro día» para escribirlo. */
+function askDelivery(s, now, lead = "") {
+  s.state = "delivery";
+  return {
+    reply: `${lead}📅 *¿Cuándo quieres recibirlo?*\nElige un día de la lista, o escríbelo como quieras (por ejemplo _"mañana"_, _"el lunes"_ o _"20 de noviembre"_).`,
+    session: s,
+    ui: { type: "list", button: "Elegir día", section: "Día de entrega", rows: deliveryRows(now) },
+  };
+}
+
+/**
+ * Saca el día de entrega de una frase («…para el lunes»). Si se puede servir lo apunta en s.delivery ({ set }); si no, devuelve el aviso
+ * ({ notice }). Devuelve siempre el resto de la frase, ya sin la fecha, para interpretar los artículos.
+ */
+function takeDate(s, rawText, now) {
+  const e = extractDelivery(rawText, now);
+  if (!e) return { rest: rawText };
+  if (e.ambiguous) return { rest: e.rest, notice: '📅 ¿Qué *día* de la semana que viene lo quieres? Por ejemplo _"el martes"_ o _"el 10 de noviembre"_.' };
+  const why = explainDelivery(e.date, now);
+  if (why) return { rest: e.rest, notice: `📅 ${why}` };
+  s.delivery = e.date;
+  return { rest: e.rest, set: true };
+}
+
+// Artículos del pedido que encajan con unas palabras («las cervezas», «el agua»)
+const findLines = (lines, query) => {
+  const q = tokenize(query).filter((w) => !STOP.has(w));
+  return lines.filter((i) => q.length && q.every((w) => tokensOf(i).some((t) => wordMatch(w, t))));
+};
+
 const HUMAN_REPLY =
   "👤 Avisamos a una persona del equipo, te responderá en cuanto pueda. Mientras tanto, escribe *menu* si necesitas algo más.";
 
@@ -336,10 +377,32 @@ const HUMAN_REPLY =
  * Procesa un mensaje del cliente (texto, o el id de la fila/botón que ha pulsado).
  * Devuelve { reply, ui?, session, order?, handoff? } sin tocar la red ni el disco.
  */
-export function handleMessage(session, rawText) {
+export function handleMessage(session, rawText, ctx = {}) {
+  const now = ctx.now ?? new Date().toISOString(); // el reloj se puede fijar en las pruebas
   const text = norm(rawText || "");
   const s = { ...session, cart: [...(session.cart ?? [])] };
   const fresh = () => ({ ...newSession(s.customer, s.link, s.opts), byName: s.byName });
+  // Cierra el pedido: lo devuelve como `order` (con el día de entrega) y reinicia la conversación
+  const placeOrder = () => {
+    const items = getItems(s);
+    const order = {
+      customerId: s.customer?.id ?? null,
+      name: s.name,
+      address: s.address,
+      text: s.orderText.replace(/\n/g, " + "),
+      note: s.note || "",
+      delivery: s.delivery ?? null,
+      items: items.map(({ unsure, upb, unitStated, ...i }) => i),
+      total: items.length ? total(items) : null,
+      // Quien se identificó solo por su nombre (el teléfono no es el del cliente) queda retenido hasta que lo revise una persona
+      review: items.some((i) => i.unsure) || !items.length || !!(s.opts?.holdUnverified && s.byName && last9(s.opts?.phone) !== last9(s.customer?.phone)),
+    };
+    return {
+      reply: `🎉 ¡Pedido recibido, ${s.name}!\n${s.delivery ? `📅 Entrega: *${longDate(s.delivery)}*\n` : ""}\n${BUSINESS.payment}\n\nEscribe *menu* si necesitas algo más.`,
+      session: fresh(),
+      order,
+    };
+  };
 
   // Comandos globales
   if (["menu", "inicio", "hola", "buenas", "hi", "empezar"].includes(text)) {
@@ -352,8 +415,32 @@ export function handleMessage(session, rawText) {
   if (["asesor", "humano", "persona"].includes(text)) {
     return { reply: HUMAN_REPLY, session: s, handoff: true };
   }
-  if (s.customer && REPEAT_PHRASES.includes(text) && ["menu", "items", "cart"].includes(s.state)) {
-    return repeatOrder(s, repeatOptions(s.customer)[0]);
+  if (s.customer && ["menu", "items", "cart"].includes(s.state)) {
+    // «lo de siempre», «repite el último pedido para el viernes»
+    const t0 = norm(extractDelivery(rawText, now)?.rest ?? text);
+    if (REPEAT_PHRASES.some((p) => t0 === p || t0.startsWith(p + " "))) {
+      const d = takeDate(s, rawText, now);
+      const r = repeatOrder(s, repeatOptions(s.customer)[0]);
+      return d.notice ? { ...r, reply: d.notice + "\n\n" + r.reply } : r;
+    }
+  }
+
+  // Día de entrega (se pregunta al confirmar el pedido)
+  if (s.state === "delivery") {
+    if (text === "d:otro") return { reply: 'Escribe el día que quieras, por ejemplo _"mañana"_, _"el viernes"_ o _"20 de noviembre"_.', session: s };
+    let date = /^d:(\d{4}-\d{2}-\d{2})$/.exec(text)?.[1] ?? null, notice = "";
+    if (!date) {
+      const e = extractDelivery(rawText, now);
+      if (e?.date) date = e.date;
+      else if (e?.ambiguous) notice = '📅 ¿Qué *día* de la semana que viene lo quieres? Por ejemplo _"el martes"_ o _"el 10 de noviembre"_.\n\n';
+    }
+    if (date) {
+      const why = explainDelivery(date, now);
+      if (why) return askDelivery(s, now, `📅 ${why}\n\n`);
+      s.delivery = date;
+      return placeOrder();
+    }
+    return askDelivery(s, now, notice || "No he entendido el día 🤔.\n\n");
   }
 
   // Identificación: el cliente dice quién es y se busca en la base de datos de clientes
@@ -424,6 +511,27 @@ export function handleMessage(session, rawText) {
 
   // Cuestionario del cliente conocido: lista de artículos y botones
   if (s.customer) {
+    // «quita las cervezas», «cambia el agua a 10»
+    if (["cart", "confirm"].includes(s.state)) {
+      const rm = parseRemove(rawText), ch = rm ? null : parseChangeQty(rawText);
+      if (rm || ch) {
+        const lines = s.state === "confirm" ? (s.items ?? s.cart) : s.cart;
+        const hits = findLines(lines, norm((rm ?? ch).query));
+        if (hits.length !== 1) return { reply: hits.length > 1 ? "Hay varios artículos que coinciden. Escribe una palabra más del nombre." : "No encuentro ese artículo en tu pedido.", session: s };
+        const updated = rm || ch.qty === 0 ? lines.filter((i) => i !== hits[0]) : lines.map((i) => (i === hits[0] ? { ...i, qty: ch.qty, ...(ch.unit && i.upb ? { unit: ch.unit } : {}) } : i));
+        const lead = rm || ch.qty === 0 ? `🗑️ Quitado: ${hits[0].name}\n\n` : `✏️ Cambiado: ${hits[0].name} → ${qtyLabel(updated.find((i) => i.id === hits[0].id && i.unit === (ch.unit && hits[0].upb ? ch.unit : hits[0].unit)) ?? { ...hits[0], qty: ch.qty })}\n\n`;
+        if (!updated.length) { s.cart = []; s.items = null; return showList(s, 0, `${lead}Tu pedido se ha quedado vacío. Elige un artículo:`); }
+        if (s.state === "confirm") { setCart(s, updated); const c = confirmReply(s); return { ...c, reply: lead + c.reply, session: s }; }
+        s.cart = updated;
+        return showCart(s, lead);
+      }
+    }
+    // «eso es todo», «ya está», «finalizar»: pasar a confirmar
+    if (["menu", "cart"].includes(s.state) && s.cart.length && isDone(rawText)) {
+      setCart(s, s.cart);
+      s.state = "confirm";
+      return { ...confirmReply(s), session: s };
+    }
     if (text === "lista" && ["menu", "cart"].includes(s.state)) return showList(s, 0, "Elige un artículo:");
     const pick = /^p:(.+)$/.exec(text);
     if (pick && ["menu", "cart", "qty"].includes(s.state)) {
@@ -450,7 +558,7 @@ export function handleMessage(session, rawText) {
     if (more && s.state === "menu") return showList(s, Number(more[1]), "Más artículos:");
 
     if (s.state === "unitq" && s.askUnit?.length) {
-      const m = /^ui:(caja|ud|no)$/.exec(text) ?? (text.startsWith("caja") ? [null, "caja"] : /^(ud|uds|unidad|unidades)$/.test(text) ? [null, "ud"] : null);
+      const m = /^ui:(caja|ud|no)$/.exec(text) ?? (text.startsWith("caja") ? [null, "caja"] : /^(ud|uds|unidad|unidades|suelt[oa]s?|latas?|botellas?|piezas?)\b/.test(text) ? [null, "ud"] : /^no( lo quiero| gracias)?$/.test(text) ? [null, "no"] : null);
       if (!m) return askUnitReply(s, "Pulsa un botón o escribe *cajas* o *unidades*.\n\n");
       const [f, ...rest] = s.askUnit;
       s.askUnit = rest;
@@ -507,8 +615,10 @@ export function handleMessage(session, rawText) {
       }
       if (!text) return { ...greeting(s), session: s };
       if (s.customer) {
-        // Cliente conocido que escribe lo que quiere: se suma al pedido
-        const found = parseItems(rawText, s.customer);
+        // Cliente conocido que escribe lo que quiere: se suma al pedido (y, si dice cuándo lo quiere, se apunta el día)
+        const dd = takeDate(s, rawText, now);
+        const found = parseItems(dd.rest, s.customer);
+        const lead = (dd.notice ? dd.notice + "\n\n" : "") + (dd.set ? `📅 Entrega apuntada: *${longDate(s.delivery)}*\n\n` : "");
         if (found.length) {
           const ask = [];
           for (const { unitStated, ...f } of found) {
@@ -517,24 +627,27 @@ export function handleMessage(session, rawText) {
           }
           if (ask.length) {
             s.askUnit = ask;
-            return askUnitReply(s, "Anotado ✅\n\n");
+            return askUnitReply(s, lead + "Anotado ✅\n\n");
           }
-          return showCart(s, "Anotado ✅\n\n");
+          return showCart(s, lead + "Anotado ✅\n\n");
         }
+        if (dd.set || dd.notice) return s.cart.length ? showCart(s, lead) : { reply: lead + "Ahora dime qué quieres pedir.", session: s };
         return showList(s, 0, "No he reconocido ese artículo. Elige de la lista, o escríbelo de otra forma (por ejemplo _\"6 verdejo\"_):");
       }
-      // Cualquier otro texto se toma como el pedido
+      // Cualquier otro texto se toma como el pedido (se conserva tal cual; si dice cuándo lo quiere, además se apunta el día)
+      const dd = takeDate(s, rawText, now);
+      const lead = (dd.notice ? dd.notice + "\n\n" : "") + (dd.set ? `📅 Entrega apuntada: *${longDate(s.delivery)}*\n\n` : "");
       s.orderText = rawText.trim().slice(0, 500);
       s.items = null;
       s.state = "items";
       return {
-        reply: `📝 Anotado: _"${s.orderText}"_\n\n${summary(s)}\n\nEscribe *1* para continuar, o escribe más cosas para añadirlas.`,
+        reply: `${lead}📝 Anotado: _"${s.orderText}"_\n\n${summary(s)}\n\nEscribe *1* para continuar, o escribe más cosas para añadirlas.`,
         session: s,
       };
     }
 
     case "items":
-      if (text === "1") {
+      if (text === "1" || isYes(rawText) || isDone(rawText)) {
         if (s.customer) {
           s.state = "confirm";
           return { ...confirmReply(s), session: s };
@@ -542,9 +655,12 @@ export function handleMessage(session, rawText) {
         s.state = "name";
         return { reply: "Perfecto. ¿A qué *nombre* pongo el pedido?", session: s };
       }
+      const dd = takeDate(s, rawText, now); // «…para el lunes»
+      const lead = (dd.notice ? dd.notice + "\n\n" : "") + (dd.set ? `📅 Entrega apuntada: *${longDate(s.delivery)}*\n\n` : "");
+      if ((dd.set || dd.notice) && !norm(dd.rest).replace(/[^a-z0-9]/g, "")) return { reply: lead + "Escribe *1* para continuar, o escribe más cosas para añadirlas.", session: s };
       s.orderText = `${s.orderText}\n${rawText.trim()}`.slice(0, 800);
       return {
-        reply: `📝 Pedido actual: _"${s.orderText.replace(/\n/g, " + ")}"_\n\n${summary(s)}\n\nEscribe *1* para continuar, o escribe más cosas para añadirlas.`,
+        reply: `${lead}📝 Pedido actual: _"${s.orderText.replace(/\n/g, " + ")}"_\n\n${summary(s)}\n\nEscribe *1* para continuar, o escribe más cosas para añadirlas.`,
         session: s,
       };
 
@@ -560,38 +676,31 @@ export function handleMessage(session, rawText) {
       s.state = "confirm";
       return { ...confirmReply(s), session: s };
 
-    case "confirm":
-      if (text === "1" || text === "c:ok") {
-        const items = getItems(s);
-        const order = {
-          customerId: s.customer?.id ?? null,
-          name: s.name,
-          address: s.address,
-          text: s.orderText.replace(/\n/g, " + "),
-          note: s.note || "",
-          items: items.map(({ unsure, upb, unitStated, ...i }) => i),
-          total: items.length ? total(items) : null,
-          // Quien se identificó solo por su nombre (el teléfono no es el del cliente) queda retenido hasta que lo revise una persona
-          review: items.some((i) => i.unsure) || !items.length || !!(s.opts?.holdUnverified && s.byName && last9(s.opts?.phone) !== last9(s.customer?.phone)),
-        };
-        return {
-          reply: `🎉 ¡Pedido recibido, ${s.name}!\n\n${BUSINESS.payment}\n\nEscribe *menu* si necesitas algo más.`,
-          session: fresh(),
-          order,
-        };
+    case "confirm": {
+      if (text === "1" || text === "c:ok" || isYes(rawText)) {
+        // Si aún no ha dicho cuándo lo quiere (o ese día ya no se puede servir), se le pregunta antes de enviar
+        if (ASK_DELIVERY && (!s.delivery || !deliveryAllowed(s.delivery, now))) {
+          const why = s.delivery ? explainDelivery(s.delivery, now) : null;
+          s.delivery = null;
+          return askDelivery(s, now, why ? `📅 ${why}\n\n` : "");
+        }
+        return placeOrder();
       }
-      if (text === "2") return { reply: "Pedido cancelado. Escribe *menu* para empezar de nuevo.", session: fresh() };
+      if (text === "2" || isNo(rawText)) return { reply: "Pedido cancelado. Escribe *menu* para empezar de nuevo.", session: fresh() };
       if (s.customer && text) {
-        // Cliente conocido que cambia cantidades: se rehace el pedido con lo que escribe
-        const found = parseItems(rawText, s.customer);
+        // Cliente conocido que cambia cantidades o el día: se rehace el pedido con lo que escribe
+        const dd = takeDate(s, rawText, now);
+        const found = parseItems(dd.rest, s.customer);
         if (found.length) setCart(s, found);
-        else {
+        else if (!dd.set && !dd.notice) {
           s.orderText = rawText.trim().slice(0, 500);
           s.items = null;
         }
-        return { ...confirmReply(s), session: s };
+        const c = confirmReply(s);
+        return { ...c, reply: (dd.notice ? dd.notice + "\n\n" : "") + c.reply, session: s };
       }
       return { reply: "Escribe *1* para confirmar o *2* para cancelar.", session: s };
+    }
 
     default:
       return { ...greeting(fresh()), session: fresh() };
