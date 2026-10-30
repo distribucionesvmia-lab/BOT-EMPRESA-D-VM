@@ -20,6 +20,11 @@
   nav button.tab { border:0; background:var(--fondo); padding:9px 12px; border-radius:10px; font-size:14px; font-weight:600; color:var(--gris); cursor:pointer; white-space:nowrap; }
   nav button.tab.on { background:#e5f5ec; color:var(--verde-oscuro); }
   nav input { flex:1; min-width:0; border:1px solid var(--linea); border-radius:10px; padding:9px 12px; font-size:14px; outline:none; }
+  .filbar { display:flex; align-items:center; gap:10px; padding:8px 14px; border-bottom:1px solid var(--linea); }
+  .filbar[hidden] { display:none; }
+  .filbar .fil { border:1px solid var(--linea); background:#fff; padding:8px 12px; border-radius:10px; font:inherit; font-size:14px; font-weight:600; color:var(--gris); cursor:pointer; }
+  .filbar .fil[aria-pressed="true"] { background:var(--verde-oscuro); border-color:var(--verde-oscuro); color:#fff; }
+  .filbar span { color:var(--gris); font-size:13px; }
   main { flex:1; overflow-y:auto; padding-bottom:84px; }
   .p { display:flex; gap:12px; padding:12px 14px; border-bottom:1px solid var(--linea); align-items:center; }
   .av { width:52px; height:52px; border-radius:10px; flex:none; display:grid; place-items:center; color:#fff; font-weight:700; font-size:16px; }
@@ -76,6 +81,8 @@
     <button class="tab" data-t="hist" type="button">🕘 Mis pedidos</button>
     <input id="q" type="search" placeholder="Buscar" autocomplete="off">
   </nav>
+  <!-- Filtro de ida y vuelta, solo en la pestaña de habituales (el histórico del cliente) -->
+  <div class="filbar" id="filbar" hidden><button class="fil" id="fil" type="button" aria-pressed="false">☑ Solo con cantidad</button><span id="filinfo"></span></div>
   <main id="list"></main>
   <footer><button class="big" id="verCarrito" type="button" disabled>Ver carrito (0)</button></footer>
 
@@ -188,14 +195,19 @@ function renderHistory(list) {
   }
 }
 
+let soloCantidad = false; // filtro de la pestaña de habituales: ocultar los artículos sin cantidad marcada
 function renderList() {
   const list = $("list"); list.innerHTML = "";
+  $("filbar").hidden = tab !== "hab"; // el filtro solo existe en esta pestaña
   if (tab === "hist") return renderHistory(list);
   const q = norm(query.trim());
-  let items = data.products.filter(p => (tab === "all" || p.count > 0 || q) && (!q || norm(p.name).includes(q) || p.id.includes(q)));
+  const filtra = tab === "hab" && soloCantidad;
+  let items = data.products.filter(p => (tab === "all" || p.count > 0 || q) && (!q || norm(p.name).includes(q) || p.id.includes(q)) && (!filtra || qty.get(p.id) > 0));
+  $("fil").setAttribute("aria-pressed", String(soloCantidad));
+  $("filinfo").textContent = filtra ? `Mostrando ${items.length} con cantidad` : "";
   if (!items.length) {
     const d = document.createElement("div"); d.className = "vacio";
-    d.textContent = tab === "hab" && !q ? "Aún no tienes artículos habituales. Mira el catálogo." : "No hay resultados.";
+    d.textContent = filtra ? "Aún no has marcado ninguna cantidad. Pulsa «Solo con cantidad» para volver a ver todos." : tab === "hab" && !q ? "Aún no tienes artículos habituales. Mira el catálogo." : "No hay resultados.";
     list.appendChild(d); return;
   }
   items.slice(0, 150).forEach(p => list.appendChild(row(p)));
@@ -230,6 +242,7 @@ document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === b));
   renderList();
 });
+$("fil").onclick = () => { soloCantidad = !soloCantidad; renderList(); }; // ida y vuelta
 $("q").oninput = e => { query = e.target.value; if (query.trim() && tab === "hist") { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); } renderList(); };
 $("verCarrito").onclick = $("cartIcon").onclick = () => count() && showCart(true);
 $("back").onclick = $("keep").onclick = () => showCart(false);
