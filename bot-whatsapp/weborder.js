@@ -1,3 +1,5 @@
+import { deliveryOptions } from "./delivery.js";
+
 // Lógica de la mini-aplicación de pedido, sin red ni disco (la comparten el servidor y la demo del navegador).
 
 /** Catálogo que ve el cliente: sus habituales primero, con las unidades de la última vez y las unidades por caja. */
@@ -47,6 +49,12 @@ export function webOrderFromBody(body, customer, { key, phone, at = new Date().t
   const items = [...merged.values()];
   if (!items.length) return { error: "El pedido está vacío" };
   const note = typeof body?.note === "string" ? body.note.trim().slice(0, 200) : "";
+  // Día de entrega elegido: debe ser uno de los que se ofrecieron (hoy, mañana o un día laborable de la semana siguiente)
+  let delivery = null;
+  if (body?.delivery != null && body.delivery !== "") {
+    if (!deliveryOptions(at).some((o) => o.date === body.delivery)) return { error: "Elige un día de entrega válido." };
+    delivery = body.delivery;
+  }
   return {
     order: {
       at,
@@ -60,6 +68,7 @@ export function webOrderFromBody(body, customer, { key, phone, at = new Date().t
       total: null, // lo calcula priceOrder (cajas × unidades por caja, precios especiales, descuentos)
       review: false,
       note,
+      delivery,
     },
   };
 }

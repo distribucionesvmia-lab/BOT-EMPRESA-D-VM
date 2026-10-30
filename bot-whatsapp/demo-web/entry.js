@@ -4,6 +4,7 @@
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog, habitualProducts } from "../bot.js";
 import { priceOrder, totals } from "../pricing.js";
 import { webProducts, webHistory, webOrderFromBody } from "../weborder.js";
+import { deliveryOptions, deliveryInfo } from "../delivery.js";
 import { findCustomers } from "../identify.js";
 import { FORMAT, madrid, madridTime } from "../export-format.js";
 import { workbookFiles } from "../xlsx-files.js";
@@ -117,7 +118,7 @@ function newOrderRow(order, customer) {
   const o = priceOrder(order, customer, getCatalog());
   return {
     id: `o${Date.now().toString(36)}${uid()}`,
-    customer_id: o.customerId ?? null, phone: o.phone, name: o.name, address: o.address, text: o.text, note: o.note || null,
+    customer_id: o.customerId ?? null, phone: o.phone, name: o.name, address: o.address, text: o.text, note: o.note || null, delivery_date: o.delivery ?? null,
     total: o.total, review: !!o.review, reason: o.reason ?? null, re: !!o.re, export_status: "pending", export_id: null, created_at: o.at,
     items: o.items.map((i) => ({
       id: String(i.id), name: i.name, price: i.price, qty: i.qty, unit: i.unit ?? "ud", boxes: i.boxes ?? null, units: i.units ?? i.qty,
@@ -253,7 +254,7 @@ window.VM = {
   miniData(link) {
     const customer = links.get(link)?.customer;
     if (!customer) return { error: "Enlace no válido o caducado" };
-    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, products: webProducts(customer, getCatalog(), habitualProducts), history: webHistory(customer, getCatalog()) };
+    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, products: webProducts(customer, getCatalog(), habitualProducts), history: webHistory(customer, getCatalog()), delivery: deliveryOptions() };
   },
   miniSubmit(link, body) {
     const customer = links.get(link)?.customer;
@@ -274,6 +275,7 @@ window.VM = {
     withRefs().reverse().map((o) => ({
       id: o.id, ref: o.ref, hora: madridTime(o.created_at), cliente: o.name, codigo: o.customer_id, lineas: o.items.length,
       nota: o.note || "",
+      entrega: deliveryInfo(o.delivery_date, o.created_at),
       resumen: o.items.map((i) => `${i.boxes ?? i.units} ${i.boxes ? "caja" + (i.boxes > 1 ? "s" : "") : "ud"} ${i.name}`).join(" · "),
       total: rowTotals(o).total, estado: o.export_status === "exported" ? "exportado" : o.review || !o.customer_id ? "retenido" : "pendiente",
       motivo: !o.customer_id ? "Cliente sin código de ERP" : o.review ? o.reason || "Interpretación dudosa" : "",

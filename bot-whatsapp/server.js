@@ -10,6 +10,7 @@ import { priceOrder } from "./pricing.js";
 import { createAuth } from "./auth.js";
 import { createAdmin } from "./admin.js";
 import { webProducts, webHistory, webOrderFromBody } from "./weborder.js";
+import { deliveryOptions } from "./delivery.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { sourceFromEnv } from "./drive.js";
@@ -254,6 +255,7 @@ function webOrderRoutes(req, res, url) {
         used: getDb().hasOrderKey(linkKey(link)),
         products,
         history: webHistory(customer, catalogNow()),
+        delivery: deliveryOptions(),
       });
     }
 
@@ -388,6 +390,7 @@ async function appRoutes(req, res, url) {
       used: false,
       products: webProducts(customer, catalogNow(), habitualProducts),
       history: webHistory(customer, catalogNow()),
+      delivery: deliveryOptions(),
     });
   }
   if (p === "/catalogo" && req.method === "POST") {

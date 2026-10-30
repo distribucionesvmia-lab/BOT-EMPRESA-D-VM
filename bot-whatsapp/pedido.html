@@ -49,6 +49,10 @@
   .big { width:100%; border:0; border-radius:12px; background:var(--verde); color:#fff; font-size:16px; font-weight:700; padding:15px; cursor:pointer; }
   .big:disabled { background:#b9c4be; cursor:default; }
   .big.sec { background:#fff; color:var(--verde-oscuro); border:1px solid var(--verde); margin-top:8px; }
+  .opt { width:100%; text-align:left; border:2px solid var(--linea); border-radius:14px; background:#fff; padding:14px 16px; font:inherit; font-size:17px; font-weight:700; color:var(--texto); cursor:pointer; display:flex; flex-direction:column; gap:2px; }
+  .opt small { font-size:13px; font-weight:400; color:var(--gris); }
+  .opt:hover, .opt:focus-visible { border-color:var(--verde); outline:none; background:#f3fbf7; }
+  .opt:disabled { opacity:.5; cursor:default; }
   .screen { position:absolute; inset:0; background:#fff; display:flex; flex-direction:column; z-index:5; }
   .screen[hidden] { display:none; }
   .screen h2 { margin:0; font-size:17px; }
@@ -91,7 +95,17 @@
       <div class="err" id="err"></div>
     </div>
     <div class="tot"><span>Total aprox.</span><b id="total">0,00 €</b></div>
-    <div class="box"><button class="big" id="confirm" type="button">Confirmar pedido</button><button class="big sec" id="keep" type="button">Seguir añadiendo</button></div>
+    <div class="box"><button class="big" id="confirm" type="button">Finalizar pedido</button><button class="big sec" id="keep" type="button">Seguir añadiendo</button></div>
+  </section>
+
+  <!-- Al finalizar: ¿cuándo quieres recibirlo? -->
+  <section class="screen" id="when" hidden style="z-index:6">
+    <div class="head"><button id="backWhen" type="button" aria-label="Volver al carrito">←</button><h2>¿Cuándo quieres recibirlo?</h2></div>
+    <div class="body" style="padding:14px">
+      <p style="margin:0 0 12px;color:var(--gris)">Elige el día de entrega. Al pulsarlo, tu pedido se envía.</p>
+      <div id="whenOpts" style="display:grid;gap:10px"></div>
+      <div class="err" id="errWhen" role="alert"></div>
+    </div>
   </section>
 
   <section class="screen" id="done" hidden>
@@ -226,16 +240,30 @@ $("q").oninput = e => { query = e.target.value; renderList(); };
 $("verCarrito").onclick = $("cartIcon").onclick = () => count() && showCart(true);
 $("back").onclick = $("keep").onclick = () => showCart(false);
 
-$("confirm").onclick = async () => {
-  const btn = $("confirm"); btn.disabled = true; $("err").textContent = "";
+// Finalizar: primero se pregunta el día de entrega y, al elegirlo, se envía el pedido
+$("confirm").onclick = () => {
+  if (!(data.delivery || []).length) return enviarPedido(null, $("err"));
+  const box = $("whenOpts"); box.innerHTML = ""; $("errWhen").textContent = "";
+  for (const o of data.delivery) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "opt";
+    b.append(o.label); if (o.detail) { const d = document.createElement("small"); d.textContent = o.detail; b.appendChild(d); }
+    b.onclick = () => enviarPedido(o.date, $("errWhen"));
+    box.appendChild(b);
+  }
+  $("when").hidden = false;
+};
+$("backWhen").onclick = () => ($("when").hidden = true);
+async function enviarPedido(delivery, errBox) {
+  const opts = [...document.querySelectorAll("#whenOpts .opt")], btn = $("confirm");
+  opts.forEach(o => (o.disabled = true)); btn.disabled = true; errBox.textContent = "";
   try {
-    const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value }) });
+    const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value, delivery }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "No se ha podido enviar el pedido");
-    $("doneP").textContent = j.message; $("done").hidden = false; $("backlink").hidden = parent !== window;
+    $("doneP").textContent = j.message; $("when").hidden = true; $("done").hidden = false; $("backlink").hidden = parent !== window;
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
-  } catch (e) { $("err").textContent = e.message; btn.disabled = false; }
-};
+  } catch (e) { errBox.textContent = e.message; opts.forEach(o => (o.disabled = false)); btn.disabled = false; }
+}
 
 (async () => {
   const r = await fetch(location.pathname + "/datos");

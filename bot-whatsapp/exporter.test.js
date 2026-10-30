@@ -106,6 +106,20 @@ test("hoja «Pedidos»: el cartel «PEDIDO …» va combinado en toda la anchura
   assert.match(xml, new RegExp(`<row r="${merges[1].match(/\d+/)[0]}" ht="38"`)); // el segundo pedido también
 });
 
+test("hoja «Pedidos»: el día de entrega va en observaciones del cliente, en MAYÚSCULAS y con color (rojo hoy, amarillo mañana, verde más de 24 h)", () => {
+  const casos = [["2026-10-28", "ENTREGA: HOY, MIÉRCOLES 28 DE OCTUBRE", 8], ["2026-10-29", "ENTREGA: MAÑANA, JUEVES 29 DE OCTUBRE", 9], ["2026-11-02", "ENTREGA: LUNES 2 DE NOVIEMBRE", 10]];
+  for (const [fecha, texto, estilo] of casos) {
+    const db = openDb(":memory:"), dir = tmp();
+    db.createOrder(pedido("k", { note: "Llamar antes", delivery: fecha }));
+    const xml = unzip(fs.readFileSync(runExport(db, { dir }).filePath))["xl/worksheets/sheet1.xml"];
+    const rows = grid(xml);
+    const obs = rows.find((r) => r[0] === "Observaciones del cliente");
+    assert.equal(obs[2], `${texto} · Llamar antes`);
+    assert.match(xml, new RegExp(`<c r="C\\d+" s="${estilo}" t="inlineStr"><is><t xml:space="preserve">${texto}`));
+    assert.equal([...xml.matchAll(/<mergeCell ref="C(\d+):I\1"/g)].length, 1); // el color cubre de la C a la I
+  }
+});
+
 test("hoja «Pedidos»: cabecera, líneas con cajas/unidades/precio/descuento y pie con totales", () => {
   const db = openDb(":memory:"), dir = tmp();
   db.createOrder(pedido("k1", { note: "Servir el jueves, los demás días estoy cerrado" }));

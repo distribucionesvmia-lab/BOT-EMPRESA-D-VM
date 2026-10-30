@@ -121,6 +121,7 @@ async function pedidos() {
     const tr = document.createElement("tr"); if (!first && !seen.has(o.ref)) tr.className = "nuevo"; seen.add(o.ref);
     const resumen = o.lineas.map((l) => `${l.unidad === "caja" ? l.cajas + " caja" + (l.cajas > 1 ? "s" : "") : l.unidades + " ud"} ${l.nombre}`).join(" · ");
     const det = el("details"); det.appendChild(el("summary", resumen.length > 90 ? resumen.slice(0, 88) + "…" : resumen));
+    if (o.entrega) { const b = el("div", o.entrega.texto, { className: "entrega" }); b.style.cssText = `font-weight:700;padding:5px 9px;border-radius:7px;margin-top:6px;display:block;width:fit-content;background:${{ rojo: "#ff0000", amarillo: "#ffff00", verde: "#92d050" }[o.entrega.color]};color:${o.entrega.color === "rojo" ? "#fff" : "#000"}`; det.appendChild(b); }
     const t = document.createElement("table"); t.className = "lines";
     for (const l of o.lineas) { const r = document.createElement("tr"); r.append(el("td", l.id), el("td", l.nombre), el("td", `${l.unidades} uds`), el("td", `${eur(l.precio)}${l.descuento ? " −" + l.descuento + "%" : ""}`), el("td", eur(l.importe)), el("td", l.nota ? "📝 " + l.nota : "")); t.appendChild(r); }
     det.appendChild(t); if (o.nota) det.appendChild(el("p", "📝 Observaciones: " + o.nota, { className: "muted" }));

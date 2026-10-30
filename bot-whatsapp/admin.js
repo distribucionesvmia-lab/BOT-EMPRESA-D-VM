@@ -1,5 +1,6 @@
 // Rutas HTTP de la EMPRESA (el empresario): pedidos recibidos y su exportación a Excel, solicitudes de alta de
 // clientes y cuentas. Es una aplicación aparte de la del cliente: todo va bajo /api/admin y exige la clave de la empresa.
+import { deliveryInfo } from "./delivery.js";
 import fs from "node:fs";
 import path from "node:path";
 import { send, readJson, makeAdminCheck } from "./auth.js";
@@ -27,7 +28,7 @@ function orderView(o) {
   const items = o.items.map((l) => ({ ...l, amount: amountOf(l), vat: l.vat_rate }));
   const retenido = !o.review ? !o.customer_id : true;
   return {
-    ref: o.ref, fecha: o.created_at, cliente: o.name, codigo: o.customer_id, telefono: o.phone, nota: o.note,
+    entrega: deliveryInfo(o.delivery_date, o.created_at), ref: o.ref, fecha: o.created_at, cliente: o.name, codigo: o.customer_id, telefono: o.phone, nota: o.note,
     lineas: o.items.map((l) => ({ id: l.id, nombre: l.name, cantidad: l.qty, unidad: l.unit, cajas: l.boxes, unidades: l.units ?? l.qty, precio: l.price, descuento: l.discount, importe: amountOf(l), iva: l.vat_rate, nota: l.note })),
     total: totals(items, o.re).total,
     estado: o.export_status === "exported" ? "exportado" : retenido ? "retenido" : "pendiente",
