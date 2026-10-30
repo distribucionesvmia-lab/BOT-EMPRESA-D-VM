@@ -11,7 +11,7 @@
   html { background: #b00000; }
   html, body { margin: 0; height: 100%; }
   body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; background: linear-gradient(180deg,#e60000 0%,#b00000 100%) fixed; color: var(--fg); display: flex; justify-content: center; padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
-  main { width: 100%; max-width: 560px; display: flex; flex-direction: column; min-height: 100%; padding: 16px; gap: 14px; }
+  main { width: 100%; max-width: 680px; display: flex; flex-direction: column; min-height: 100%; padding: 16px; gap: 14px; }
   h1 { font-size: 20px; margin: 8px 0 0; } p { margin: 0; color: var(--muted); }
   form.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
   label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
@@ -20,7 +20,7 @@
   button.main { font: inherit; font-weight: 600; background: var(--accent); color: var(--accent-fg); border: 0; border-radius: 10px; padding: 12px; cursor: pointer; }
   button.link { font: inherit; background: none; border: 0; color: var(--accent); font-weight: 600; cursor: pointer; padding: 4px; }
   .err { color: var(--err); font-size: 14px; } .ok { color: var(--accent); font-size: 14px; }
-  .phone { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--chat); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; position: relative; height: calc(100vh - 32px); max-height: 900px; }
+  .phone { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--chat); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; position: relative; height: calc(100vh - 32px); height: calc(100dvh - 32px); max-height: none; }
   .bar { background: var(--bar); color: #fff; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .logo-chat { height: 34px; width: auto; flex: none; }
   .bar b { display: block; } .bar small { opacity: .8; }
@@ -95,6 +95,15 @@
   .bar > div:first-child { flex: 1 1 200px; min-width: 0; }
   .bar b { font-size: 18px; } .bar small { font-size: 14px; }
   .bar button { min-height: 44px; font-size: 15px !important; padding: 0 12px; }
+
+  /* Chat aún más largo y grande */
+  #chat .m { font-size: 19px; line-height: 1.45; padding: 12px 16px; max-width: 94%; }
+  #chat .ui { width: min(96%, 520px); }
+  #chat .pill { font-size: 19px; min-height: 62px; padding: 14px 18px; }
+  #chat .pill.primary { font-size: 22px; min-height: 72px; }
+  form.send input { font-size: 19px !important; min-height: 58px; }
+  form.send button { width: 58px !important; height: 58px !important; font-size: 22px !important; }
+  .bar b { font-size: 20px; } .bar small { font-size: 15px; }
 </style>
 </head>
 <body>

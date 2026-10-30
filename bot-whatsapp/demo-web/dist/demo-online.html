@@ -47,7 +47,7 @@
   h2 { margin: 0 0 8px; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
   .who { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 10px; }
   select { font: inherit; font-size: 14px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
-  .phone { position: relative; background: var(--chat-bg); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; height: min(640px, calc(100vh - 150px)); min-height: 480px; box-shadow: var(--shadow); border: 1px solid var(--line); }
+  .phone { position: relative; background: var(--chat-bg); border-radius: 18px; overflow: hidden; display: flex; flex-direction: column; height: min(900px, calc(100vh - 110px)); min-height: 600px; box-shadow: var(--shadow); border: 1px solid var(--line); }
   .bar { background: var(--bar); color: #fff; padding: 12px 14px; display: flex; align-items: center; gap: 10px; }
   .logo-chat { height: 34px; width: auto; flex: none; }
   .avatar { width: 36px; height: 36px; border-radius: 50%; background: #25d366; color: #06301d; display: grid; place-items: center; font-weight: 600; flex: none; }
@@ -119,7 +119,7 @@
   a.card:hover { border-color: var(--accent); }
   a.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   a.card b { font-size: 17px; } a.card span { color: var(--muted); font-size: 13.5px; } a.card em { color: var(--accent); font-style: normal; font-weight: 600; font-size: 13.5px; margin-top: 4px; }
-  .client { max-width: 520px; margin: 0 auto; }
+  .client { max-width: 680px; margin: 0 auto; }
   .banner { background: var(--warn-soft); color: var(--warn); border-radius: 10px; padding: 9px 12px; font-size: 13px; margin: 0 0 12px; }
   .nuevo td { animation: flash 2.4s ease-out; } @keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
   .hist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
@@ -210,6 +210,16 @@
   form.send button { width: 52px !important; height: 52px !important; font-size: 20px !important; }
   .bar b { font-size: 18px; } .bar small { font-size: 14px; }
   .bar button { min-height: 44px; font-size: 15px !important; padding: 0 12px; }
+
+  /* Chat aún más largo y grande */
+  form.send button { background: #d90000 !important; color: #fff !important; }
+  #chat .m { font-size: 19px; line-height: 1.45; padding: 12px 16px; max-width: 94%; }
+  #chat .ui { width: min(96%, 520px); }
+  #chat .pill { font-size: 19px; min-height: 62px; padding: 14px 18px; }
+  #chat .pill.primary { font-size: 22px; min-height: 72px; }
+  form.send input { font-size: 19px !important; min-height: 58px; }
+  form.send button { width: 58px !important; height: 58px !important; font-size: 22px !important; }
+  .bar b { font-size: 20px; } .bar small { font-size: 15px; }
 </style>
 
 <button type="button" class="tecnico-btn" id="tecnico-btn">Técnico</button>
