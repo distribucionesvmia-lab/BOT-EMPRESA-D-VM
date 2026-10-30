@@ -83,8 +83,13 @@ export const customerDirectory = {
  * no crea otro pedido y devuelve el original con duplicate=true.
  * La copia a la hoja de Google es opcional y solo se envía para pedidos nuevos.
  */
+let orderHook = null;
+/** Función que se llama con cada pedido NUEVO ya guardado (el aviso por correo). Sus errores nunca afectan al pedido. */
+export const setOrderHook = (fn) => (orderHook = fn);
+
 export async function createOrder(order) {
   const result = getDb().createOrder(order); // si falla, el error se propaga: el pedido NO se da por registrado
+  if (!result.duplicate) try { orderHook?.(result.order); } catch (e) { console.error("Aviso del pedido:", e.message); }
   if (result.duplicate) {
     console.log("Pedido duplicado ignorado:", order.key, "->", result.order.ref);
     return result;

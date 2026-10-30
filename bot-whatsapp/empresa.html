@@ -50,6 +50,7 @@
     <div id="p-pedidos">
       <div class="panel">
         <h2>Pedidos recibidos</h2>
+        <p class="muted" id="correo-estado" style="margin:0 0 8px"></p>
         <div class="row" style="margin-bottom:10px"><button class="main" id="exportar-sel" disabled>Exportar seleccionados (0)</button><button id="exportar">Exportar todos los pendientes</button><span class="muted" id="expmsg" role="status"></span></div>
         <p class="muted" style="margin:0 0 8px">Marca los pedidos pendientes que quieras llevar al Excel; los que no marques siguen pendientes.</p>
         <div class="scroll"><table><thead><tr><th><input type="checkbox" id="sel-todos" aria-label="Seleccionar todos los pendientes"></th><th>Pedido</th><th>Recibido</th><th>Cliente</th><th>Artículos</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody id="ped"></tbody></table></div>
@@ -113,6 +114,16 @@ async function call(path, body, raw) {
 function mostrarAviso(texto) { const p = $("pin"); p.hidden = false; p.textContent = texto; setTimeout(() => (p.hidden = true), 8000); }
 function mostrarPin(texto, pin) { const p = $("pin"); p.hidden = false; p.textContent = texto + " "; p.appendChild(el("b", pin)); p.appendChild(el("span", " — anótalo ahora y díselo al cliente: no se volverá a mostrar.")); }
 
+// ---- Aviso por correo de cada pedido ----
+async function correo() {
+  const r = await call("/api/admin/correo"), el0 = $("correo-estado");
+  el0.innerHTML = "";
+  if (!r.configurado) { el0.textContent = "✉️ Avisos por correo: no configurados (ver .env.example: SMTP_HOST y MAIL_TO)."; return; }
+  el0.append(`✉️ Cada pedido se avisa por correo a ${r.destino.join(", ")}. `);
+  const b = el("button", "Enviar correo de prueba"); b.onclick = async () => { b.disabled = true; try { await call("/api/admin/correo/prueba", {}); mostrarAviso("Correo de prueba enviado: revisa la bandeja."); } catch (e) { alert(e.message); } finally { b.disabled = false; } };
+  el0.appendChild(b);
+  if (r.ultimoError) el0.append(el("div", `⚠️ Último error: ${r.ultimoError.message}`, { className: "muted" }));
+}
 // ---- Pedidos ----
 const sel = new Set(); // referencias de los pedidos marcados para exportar (se conservan al refrescar)
 function actualizarSel() {
@@ -260,7 +271,7 @@ async function avisos() {
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), clientes(), avisos(), sincronizacion()]); } catch (e) { if (e.message !== "Clave incorrecta") $("act").textContent = "Sin conexión con el servidor"; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), clientes(), avisos(), sincronizacion(), correo()]); } catch (e) { if (e.message !== "Clave incorrecta") $("act").textContent = "Sin conexión con el servidor"; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));

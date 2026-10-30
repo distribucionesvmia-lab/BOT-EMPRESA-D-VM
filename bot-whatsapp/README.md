@@ -184,3 +184,6 @@ Escribe "hola" al número de WhatsApp y debería responder.
 
 ## Entrega «hoy» solo en Medina del Campo
 «Hoy» solo se ofrece a los clientes cuyo **código de municipio es `47085`** (columna «Cód. municipio» del Excel de clientes; `MUNICIPIOS_HOY` en `delivery.js`) y solo si el pedido se hace antes de las 10:00. Los demás clientes no ven «hoy» ni en los botones, ni en el calendario, ni en el chat, y el servidor lo rechaza aunque lo intenten: para ellos el primer día posible es mañana (o el siguiente día de servicio). Si el Excel no trae la columna, nadie tiene «hoy».
+
+## Aviso por correo de cada pedido
+Cada pedido nuevo (del catálogo o del chat) envía un correo con asunto **«PEDIDO REALIZADO - NOMBRE COMERCIAL DEL CLIENTE»** y el cuerpo con cliente, código, referencia, fecha, día de entrega, total, observaciones y artículos. Se configura con `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` y `MAIL_TO` (ver `.env.example`; con IONOS: `smtp.ionos.es`, puerto 587). Si el correo no sale, el pedido se guarda igualmente y el aviso se reintenta cada 5 minutos durante una semana. En la vista de empresa (pestaña Pedidos) hay un botón «Enviar correo de prueba». Sin `SMTP_HOST` y `MAIL_TO` no se envía nada.

@@ -73,6 +73,8 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
   addColumn("orders", "export_id", "INTEGER REFERENCES exports(id)");
   addColumn("orders", "re", "INTEGER NOT NULL DEFAULT 0");
   addColumn("orders", "reason", "TEXT");
+  addColumn("orders", "notified_at", "TEXT"); // cuándo se envió el correo de aviso (null = pendiente)
+  addColumn("orders", "notify_lock", "TEXT"); // reserva del envío (evita que dos procesos envíen el mismo)
   addColumn("orders", "delivery_date", "TEXT"); // día de entrega que pidió el cliente (AAAA-MM-DD)
   for (const [c, ddl] of [["unit", "TEXT NOT NULL DEFAULT 'ud'"], ["boxes", "INTEGER"], ["units", "INTEGER"], ["discount", "REAL NOT NULL DEFAULT 0"], ["vat_rate", "REAL"], ["amount", "REAL"], ["note", "TEXT"]]) {
     addColumn("order_lines", c, ddl);
@@ -124,6 +126,16 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
     },
 
     hasOrderKey: (key) => !!byKey.get(key),
+
+    /** Reserva el envío del correo de un pedido durante 2 minutos. false si ya se envió o lo está enviando otro proceso. */
+    claimNotification(id, now = new Date().toISOString(), lockSeconds = 120) {
+      const limit = new Date(new Date(now).getTime() - lockSeconds * 1000).toISOString();
+      return db.prepare("UPDATE orders SET notify_lock = ? WHERE id = ? AND notified_at IS NULL AND (notify_lock IS NULL OR notify_lock < ?)").run(now, id, limit).changes === 1;
+    },
+    markNotified: (id, now = new Date().toISOString()) => void db.prepare("UPDATE orders SET notified_at = ? WHERE id = ?").run(now, id),
+    /** Pedidos aún sin correo de aviso (los más antiguos primero). */
+    pendingNotifications: ({ since = "1970-01-01", limit = 50 } = {}) =>
+      db.prepare("SELECT * FROM orders WHERE notified_at IS NULL AND created_at >= ? ORDER BY id LIMIT ?").all(since, limit).map(withLines),
 
     /** Registra un mensaje de WhatsApp como procesado. Devuelve false si ya se había procesado (reenvío de Meta). */
     markMessage: (id) => insertMsg.run(String(id), new Date().toISOString()).changes === 1,

@@ -41,7 +41,7 @@ function orderView(o) {
  * accounts: base de cuentas · customers: { list, getById, suggest } · orders: base de pedidos (db.js)
  * Devuelve route(req, res, url) → true si atendió la petición.
  */
-export function createAdmin({ sync = null, accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones" }) {
+export function createAdmin({ sync = null, mail = null, accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones" }) {
   const isAdmin = makeAdminCheck(adminToken);
   // Máximo 10 claves erróneas cada 10 minutos por IP; superado el límite se bloquea esa IP aunque acierte la clave
   const failures = new Map();
@@ -103,6 +103,12 @@ export function createAdmin({ sync = null, accounts, customers, orders, adminTok
     if (p === "/api/admin/clientes" && get) {
       const q = (url.searchParams.get("q") ?? "").toLowerCase().trim();
       return send(res, 200, customers.list().filter((c) => !q || c.name.toLowerCase().includes(q) || String(c.id) === q).slice(0, 15).map((c) => ({ id: c.id, name: c.name, phone: c.phone }))), true;
+    }
+    // ---- Aviso por correo de cada pedido ----
+    if (p === "/api/admin/correo" && get) return send(res, 200, mail ? mail.status() : { configurado: false }), true;
+    if (p === "/api/admin/correo/prueba" && post) {
+      if (!mail) return send(res, 400, { error: "Los avisos por correo no están configurados (ver .env.example: SMTP_HOST y MAIL_TO)." }), true;
+      try { await mail.prueba(); return send(res, 200, { ok: true }), true; } catch (e) { return send(res, 502, { error: e.message }), true; }
     }
     // ---- Sincronización automática con la carpeta de Drive ----
     if (p === "/api/admin/sincronizacion" && get) return send(res, 200, sync ? sync.status() : { configurado: false }), true;

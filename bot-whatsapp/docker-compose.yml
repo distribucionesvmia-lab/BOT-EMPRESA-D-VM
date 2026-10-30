@@ -13,6 +13,13 @@ x-datos: &datos
   BACKUP_DIR: /data/respaldos
   NIF_PEPPER: ${NIF_PEPPER} # huellas del NIF de los clientes (igual en las dos aplicaciones)
   LINK_SECRET: ${LINK_SECRET} # firma de los enlaces (igual en las dos aplicaciones)
+  # Aviso por correo de cada pedido (vacío = desactivado)
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASS: ${SMTP_PASS:-}
+  MAIL_FROM: ${MAIL_FROM:-}
+  MAIL_TO: ${MAIL_TO:-}
 
 services:
   cliente:

@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog as catalogNow, habitualProducts } from "./bot.js";
-import { getCatalog, catalogVersion, getCustomerByPhone, getCustomerById, findCustomers, createOrder, getAccountsDb, customerDirectory, getDatabases } from "./erp.js";
+import { getCatalog, catalogVersion, getCustomerByPhone, getCustomerById, findCustomers, createOrder, getAccountsDb, customerDirectory, getDatabases, setOrderHook } from "./erp.js";
 import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder } from "./pricing.js";
@@ -13,6 +13,8 @@ import { webProducts, webHistory, webTree, webOrderFromBody } from "./weborder.j
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy } from "./delivery.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
+import { mailConfigFromEnv } from "./mailer.js";
+import { crearNotificador } from "./notificaciones.js";
 import { scheduleBackups } from "./backup.js";
 import { sourceFromEnv } from "./drive.js";
 import nodePath from "node:path";
@@ -310,6 +312,15 @@ const auth = createAuth({
   secure: PUBLIC_URL.startsWith("https://"),
   trustProxy: process.env.TRUST_PROXY === "1",
 });
+// Aviso por correo de cada pedido nuevo («PEDIDO REALIZADO - NOMBRE COMERCIAL»): solo si hay SMTP_HOST y MAIL_TO (ver .env.example)
+let notificador = null;
+{
+  const cfg = mailConfigFromEnv();
+  if (cfg) {
+    notificador = crearNotificador({ db: getDb(), config: cfg });
+    setOrderHook((o) => notificador.notificar(o));
+  }
+}
 // Sincronización automática de clientes y productos con una carpeta de Google Drive (o del servidor): solo la aplicación de la empresa
 let sync = null;
 if (adminEnabled) {
@@ -321,7 +332,7 @@ if (adminEnabled) {
     console.error("Sincronización desactivada:", e.message); // credenciales o carpeta mal configuradas: la aplicación sigue funcionando
   }
 }
-const admin = createAdmin({ sync, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
+const admin = createAdmin({ sync, mail: notificador, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" };
 const sendJson = (res, code, data) => res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify(data));
@@ -477,6 +488,7 @@ http
     // EXPORT_AUTO=0 desactiva la exportación diaria automática: la empresa exporta cuando quiere y elige qué pedidos
     if (process.env.DEMO !== "1" && adminEnabled && process.env.EXPORT_AUTO !== "0") scheduleDailyExport(getDb());
     if (process.env.DEMO !== "1") sync?.start();
+    notificador?.start(); // reintenta los avisos que no salieron
     // Copia diaria de TODAS las bases (pedidos, cuentas, clientes y catálogo), aunque la exportación a Excel esté desactivada
     if (process.env.DEMO !== "1" && adminEnabled) scheduleBackups(() => ({ pedidos: getDb(), cuentas: getAccountsDb(), clientes: getDatabases().customersDb, catalogo: getDatabases().catalogDb }));
     // En Render (o similar) los datos deben estar en el disco persistente: si no, se pierden en cada despliegue

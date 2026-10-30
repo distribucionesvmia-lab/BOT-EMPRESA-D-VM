@@ -108,6 +108,12 @@ test("«hoy» solo para los clientes del municipio 47085; los demás empiezan en
   assert.equal(puedeHoy({ municipio: " 47085 " }), true);
   assert.equal(puedeHoy({ municipio: "47186" }), false); // otro municipio
   assert.equal(puedeHoy({ municipio: "" }), false);
+  // sin código en la ficha, se deduce de la población (Medina del Campo = 47085); si hay código, manda el código
+  assert.equal(puedeHoy({ city: "MEDINA DEL CAMPO" }), true);
+  assert.equal(puedeHoy({ city: "Medina  del Campo ", municipio: "" }), true);
+  assert.equal(puedeHoy({ city: "MEDINA DEL CAMPO", municipio: "47186" }), false);
+  assert.equal(puedeHoy({ city: "TORDESILLAS" }), false);
+  assert.equal(puedeHoy({ city: "MEDINA DE RIOSECO" }), false);
   assert.equal(puedeHoy({}), false);
   assert.equal(puedeHoy(null), false);
   const antes = "2026-10-29T07:00:00Z"; // 08:00, antes de las 10

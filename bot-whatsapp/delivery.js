@@ -12,7 +12,13 @@ export function madridDay(iso = new Date().toISOString()) {
 // «Hoy» solo se ofrece a los clientes de estos municipios (código INE que viene en la ficha del cliente de a3ERP): Medina del Campo.
 // Para todos los demás el primer día posible es mañana.
 export const MUNICIPIOS_HOY = ["47085"];
-export const puedeHoy = (customer) => MUNICIPIOS_HOY.includes(String(customer?.municipio ?? "").trim());
+// Si la ficha no trae código de municipio, se deduce de la población: «MEDINA DEL CAMPO» cuenta como 47085. Si trae código, manda el código.
+const sinTildes = (t) => String(t ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+export const puedeHoy = (customer) => {
+  const cod = String(customer?.municipio ?? "").trim();
+  if (cod) return MUNICIPIOS_HOY.includes(cod);
+  return sinTildes(customer?.city) === "medina del campo";
+};
 export const CUTOFF_HOUR = 10; // «hoy» solo se puede pedir antes de las 10:00 (hora de Madrid)
 const madridHour = (iso) => Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Madrid", hour: "2-digit", hourCycle: "h23" }).format(new Date(iso)));
 const toUtc = (day) => Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10));
