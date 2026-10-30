@@ -19,13 +19,16 @@ const isWorkday = (day) => weekday(day) >= 1 && weekday(day) <= 5;
 export const longDate = (day) => `${DIAS[weekday(day)]} ${+day.slice(8, 10)} de ${MESES[+day.slice(5, 7) - 1]}`;
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
+export const SERVICE_DAYS = 5; // días de servicio que se ofrecen siempre (lunes a viernes)
+
 /**
- * Opciones que se muestran al cliente: hoy y mañana (si son de lunes a viernes) y los demás días laborables hasta una semana vista,
- * con la fecha en lugar de «el lunes que viene».  → [{ date, kind: "hoy" | "manana" | "dia", label, detail }]
+ * Opciones que se muestran al cliente: siempre los próximos 5 días de servicio (sin sábados ni domingos) empezando por hoy si es laborable.
+ * Hoy y mañana se llaman así y el resto va con la fecha (día y mes) en lugar de «el lunes que viene».
+ * → [{ date, kind: "hoy" | "manana" | "dia", label, detail }]
  */
 export function deliveryOptions(nowIso = new Date().toISOString()) {
   const today = madridDay(nowIso), out = [];
-  for (let i = 0; i <= 8; i++) {
+  for (let i = 0; out.length < SERVICE_DAYS; i++) {
     const date = addDays(today, i);
     if (!isWorkday(date)) continue;
     if (i === 0) out.push({ date, kind: "hoy", label: "Hoy", detail: longDate(date) });

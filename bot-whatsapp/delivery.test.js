@@ -8,14 +8,20 @@ test("opciones de entrega: hoy, mañana y los días laborables siguientes, con f
   const o = deliveryOptions("2026-10-29T09:00:00Z");
   assert.deepEqual(o.map((x) => [x.kind, x.label, x.date]), [
     ["hoy", "Hoy", "2026-10-29"], ["manana", "Mañana", "2026-10-30"],
-    ["dia", "Lunes 2 de noviembre", "2026-11-02"], ["dia", "Martes 3 de noviembre", "2026-11-03"], ["dia", "Miércoles 4 de noviembre", "2026-11-04"], ["dia", "Jueves 5 de noviembre", "2026-11-05"], ["dia", "Viernes 6 de noviembre", "2026-11-06"],
-  ]);
+    ["dia", "Lunes 2 de noviembre", "2026-11-02"], ["dia", "Martes 3 de noviembre", "2026-11-03"], ["dia", "Miércoles 4 de noviembre", "2026-11-04"],
+  ]); // siempre 5 días de servicio
   assert.equal(o[0].detail, "jueves 29 de octubre");
   assert.equal(o[1].detail, "viernes 30 de octubre");
-  // viernes: mañana es sábado, no se ofrece
-  assert.deepEqual(deliveryOptions("2026-10-30T09:00:00Z").map((x) => x.kind), ["hoy", "dia", "dia", "dia", "dia", "dia"]);
-  // sábado: no hay «hoy» ni «mañana» (domingo)
-  assert.equal(deliveryOptions("2026-10-31T09:00:00Z")[0].label, "Lunes 2 de noviembre");
+  // viernes: «mañana» es sábado, no se ofrece; siguen 5 días de servicio
+  assert.deepEqual(deliveryOptions("2026-10-30T09:00:00Z").map((x) => x.label), ["Hoy", "Lunes 2 de noviembre", "Martes 3 de noviembre", "Miércoles 4 de noviembre", "Jueves 5 de noviembre"]);
+  // sábado: sin «hoy» ni «mañana»; de lunes a viernes
+  assert.deepEqual(deliveryOptions("2026-10-31T09:00:00Z").map((x) => x.label), ["Lunes 2 de noviembre", "Martes 3 de noviembre", "Miércoles 4 de noviembre", "Jueves 5 de noviembre", "Viernes 6 de noviembre"]);
+  // siempre 5 y nunca fin de semana, ningún día del año
+  for (let d = 0; d < 366; d++) {
+    const o = deliveryOptions(new Date(Date.UTC(2026, 0, 1 + d, 12)).toISOString());
+    assert.equal(o.length, 5);
+    assert.ok(o.every((x) => ![0, 6].includes(new Date(x.date + "T12:00:00Z").getUTCDay())));
+  }
 });
 
 test("la fecha es la de Madrid, no la UTC", () => {
