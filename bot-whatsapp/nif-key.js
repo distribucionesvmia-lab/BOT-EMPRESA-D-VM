@@ -24,3 +24,7 @@ export function nifMatches(customerId, typed, keys) {
   }
   return ok;
 }
+
+/** Huella del código personal que el cliente elige para sustituir a los 6 del NIF (único entre todos los clientes). */
+export const codeKey = (code) => crypto.createHmac("sha256", pepper()).update(`codigo:${nifClean(code)}`).digest("hex");
+export const validCode = (code) => /^[A-Z0-9]{6,10}$/.test(nifClean(code));

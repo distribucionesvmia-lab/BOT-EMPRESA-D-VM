@@ -15,6 +15,16 @@ export function webProducts(customer, catalog, habitualProducts) {
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
+/** Últimos pedidos del cliente (los más recientes primero) con sus líneas, para volver a comprarlos o modificarlos. */
+export function webHistory(customer, catalogList, limit = 5) {
+  const names = new Map(catalogList.map((p) => [String(p.id), p.name]));
+  return [...(customer.orders ?? [])]
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
+    .map((o) => ({ doc: String(o.doc), date: o.date, lines: o.lines.filter((l) => names.has(String(l.productId)) && l.qty > 0).map((l) => ({ id: String(l.productId), name: names.get(String(l.productId)), qty: l.qty })) }))
+    .filter((o) => o.lines.length)
+    .slice(0, limit);
+}
+
 /**
  * Valida lo que envía la mini-app y arma el pedido (sin precios: los pone priceOrder).
  * Devuelve { order } o { error } si el pedido está vacío.

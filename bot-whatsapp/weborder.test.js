@@ -27,3 +27,17 @@ test("el catálogo web trae unidades por caja y ordena por lo habitual", () => {
   const p = webProducts(cliente, catalogo, habituales);
   assert.deepEqual(p.map((x) => [x.id, x.unitsPerBox, x.lastQty]), [["B", null, 4], ["A", 6, null]]);
 });
+
+test("webHistory: últimos pedidos del más reciente al más antiguo, solo con artículos que siguen en catálogo", async () => {
+  const { webHistory } = await import("./weborder.js");
+  const cat = [{ id: 1, name: "AGUA" }, { id: 2, name: "COLA" }];
+  const customer = { orders: [
+    { doc: "A", date: "2026-01-01", lines: [{ productId: "1", qty: 6 }] },
+    { doc: "B", date: "2026-03-01", lines: [{ productId: "1", qty: 12 }, { productId: "2", qty: 24 }, { productId: "99", qty: 5 }] },
+    { doc: "C", date: "2026-02-01", lines: [{ productId: "99", qty: 5 }] }, // artículo descatalogado: el pedido se omite
+  ] };
+  const h = webHistory(customer, cat);
+  assert.deepEqual(h.map((o) => o.doc), ["B", "A"]);
+  assert.deepEqual(h[0].lines, [{ id: "1", name: "AGUA", qty: 12 }, { id: "2", name: "COLA", qty: 24 }]);
+  assert.equal(webHistory(customer, cat, 1).length, 1);
+});

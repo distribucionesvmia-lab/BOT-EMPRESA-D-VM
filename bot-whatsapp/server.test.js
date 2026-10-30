@@ -395,6 +395,30 @@ test("ACCESO CON NIF: las cuentas ya están creadas y el cliente entra solo con 
   assert.equal((await entrarNif("111111")).status, 200);
 });
 
+test("CAMBIAR EL CÓDIGO: el cliente sustituye los 6 del NIF por uno personal; el NIF deja de valer y la empresa puede restablecerlo", async () => {
+  const r = await entrarNif("111111");
+  assert.equal(r.status, 200);
+  const cookie = cookieOf(r);
+  assert.equal((await call("GET", "/api/yo", { cookie })).json.cliente.codigoPropio, false);
+  assert.equal((await call("POST", "/api/codigo", { body: { nuevo: "abcdef" } })).status, 401); // sin sesión
+  assert.equal((await call("POST", "/api/codigo", { cookie, body: { nuevo: "123" } })).status, 400); // demasiado corto
+  assert.equal((await call("POST", "/api/codigo", { cookie, body: { nuevo: "111111" } })).status, 400); // coincide con un NIF
+  assert.equal((await call("POST", "/api/codigo", { cookie, body: { nuevo: "Mi-Clave7" } })).status, 200);
+  assert.equal((await call("GET", "/api/yo", { cookie })).json.cliente.codigoPropio, true);
+  assert.equal((await entrarNif("MiClave7")).json.cliente.nombre, "CAFETERIA IMPORTADA"); // el código personal vale (sin importar mayúsculas ni guiones)
+  assert.equal((await entrarNif("miclave7")).status, 200);
+  assert.equal((await entrarNif("111111")).status, 401); // el NIF ya no vale para esa cuenta
+  // otro cliente no puede quedarse con el mismo código
+  const otro = await entrarNif("22222A", "bar uno");
+  assert.equal((await call("POST", "/api/codigo", { cookie: cookieOf(otro), body: { nuevo: "MiClave7" } })).status, 400);
+  // la empresa lo restablece: vuelve a valer el NIF
+  const c = await cuentaDe("7001");
+  assert.equal(c.ownCode, true);
+  assert.equal((await call("POST", `/api/admin/cuentas/${c.id}/pin`, { admin: true, body: {} })).status, 200);
+  assert.equal((await entrarNif("111111")).status, 200);
+  assert.equal((await entrarNif("MiClave7")).status, 401);
+});
+
 test("EMPRESA: las solicitudes sin coincidencia muestran por qué y qué clientes podrían ser", async () => {
   const sol = (await call("GET", "/api/admin/solicitudes", { admin: true })).json;
   const k = sol.find((x) => x.business === "Panadería Inventada");

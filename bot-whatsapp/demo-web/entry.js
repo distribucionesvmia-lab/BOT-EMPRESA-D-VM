@@ -3,7 +3,7 @@
 // clientes, pedidos y exportaciones, que se guardan y se actualizan (base compartida de Claude, o el navegador).
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog, habitualProducts } from "../bot.js";
 import { priceOrder, totals } from "../pricing.js";
-import { webProducts, webOrderFromBody } from "../weborder.js";
+import { webProducts, webHistory, webOrderFromBody } from "../weborder.js";
 import { findCustomers } from "../identify.js";
 import { FORMAT, madrid, madridTime } from "../export-format.js";
 import { workbookFiles } from "../xlsx-files.js";
@@ -13,7 +13,8 @@ import { seedDocs, DEMO_ACCOUNTS } from "./seeds.js";
 import { sha256hex } from "./sha256.js";
 import { makeDbBackend, makeLocalBackend } from "./backend.js";
 import data from "../ejemplo/historial-ficticio.json";
-import { demoNifMatches } from "./nif-demo.js";
+import { demoNifMatches, demoCodeKey } from "./nif-demo.js";
+import { nifClean } from "../nif-codes.js";
 import { nifCodes } from "../nif-codes.js";
 
 const PHONE = "34600999999"; // el móvil de prueba no está en ninguna ficha: el bot pregunta quién es
@@ -202,8 +203,11 @@ window.VM = {
     if (!nifCodes(nif).length) return { ok: false, error: "Escribe los 6 últimos caracteres de tu NIF." };
     const now = Date.now();
     if (nifFails.until > now) return { ok: false, error: "Demasiados intentos. Prueba más tarde o llama a la empresa." };
+    // ¿Es el código personal que el cliente eligió en lugar del NIF?
+    const own = /^[A-Z0-9]{6,10}$/.test(nifClean(nif)) && cache.accounts.find((a) => a.codeKey === demoCodeKey(nif) && a.status === "active");
+    if (own) { store.set("vm:acc", own.id); return { ok: true, nombre: customerOf(own)?.name ?? "" }; }
     const names = String(business ?? "").trim().length >= 2 ? new Set(findCustomers(cache.customers, business, { lenient: true }).map((c) => c.id)) : null;
-    const hits = cache.customers.filter((c) => c.active !== false && (!names || names.has(c.id)) && demoNifMatches(c.id, nif, c.nifKeys));
+    const hits = cache.customers.filter((c) => c.active !== false && (!names || names.has(c.id)) && !cache.accounts.some((a) => a.customerId === c.id && a.codeKey) && demoNifMatches(c.id, nif, c.nifKeys)); // con código personal, el NIF ya no vale
     if (hits.length > 1 && !names) return { ok: false, necesitaNombre: true, error: "Hay varios negocios con ese NIF. Escribe también el nombre de tu empresa." };
     if (hits.length !== 1) {
       if (!hits.length && ++nifFails.n >= 15) { nifFails.n = 0; nifFails.until = now + 60 * 60_000; } // como el servidor: pocos fallos por hora entre todos
@@ -214,7 +218,18 @@ window.VM = {
   },
   logout() { store.set("vm:acc", null); sessions.clear(); },
   /** Cliente con sesión iniciada (o null). */
-  me() { const c = customerOf(currentAccount()); return c ? { nombre: c.name } : null; },
+  me() { const a = currentAccount(), c = customerOf(a); return c ? { nombre: c.name, codigoPropio: !!cache.accounts.find((x) => x.id === a.id)?.codeKey } : null; },
+  /** El cliente cambia los 6 del NIF por un PIN personal (6 a 10 letras o números), único entre todos los clientes. */
+  async changeCode(nuevo) {
+    const a = currentAccount();
+    if (!a || !a.id.startsWith("n")) return { ok: false, error: "Entra primero con los 6 últimos del NIF." };
+    if (!/^[A-Z0-9]{6,10}$/.test(nifClean(nuevo))) return { ok: false, error: "El código debe tener entre 6 y 10 letras o números." };
+    if (cache.customers.some((c) => demoNifMatches(c.id, nuevo, c.nifKeys)) || cache.accounts.some((x) => x.codeKey === demoCodeKey(nuevo) && x.id !== a.id)) return { ok: false, error: "Ese código no está disponible. Elige otro." };
+    if (!perms.canWrite) return { ok: false, error: "En modo solo lectura no se puede cambiar el PIN." };
+    const cur = cache.accounts.find((x) => x.id === a.id);
+    await backend.set("accounts", a.id, { ...(cur ?? { id: a.id, customerId: a.customerId, status: "active", verified: true, createdAt: new Date().toISOString() }), codeKey: demoCodeKey(nuevo) });
+    return { ok: true };
+  },
   resetChat: () => sessions.clear(),
   /** Un mensaje del cliente al bot (texto libre o id de botón/fila). El cliente sale SIEMPRE de la cuenta con sesión. */
   send(text) {
@@ -238,7 +253,7 @@ window.VM = {
   miniData(link) {
     const customer = links.get(link)?.customer;
     if (!customer) return { error: "Enlace no válido o caducado" };
-    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, products: webProducts(customer, getCatalog(), habitualProducts) };
+    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, products: webProducts(customer, getCatalog(), habitualProducts), history: webHistory(customer, getCatalog()) };
   },
   miniSubmit(link, body) {
     const customer = links.get(link)?.customer;
@@ -312,6 +327,7 @@ window.VM = {
     if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor.");
     const a = cache.accounts.find((x) => x.id === accId);
     if (!a) throw new Error("No existe la cuenta.");
+    if (!a.phone) { await backend.update("accounts", a.id, { codeKey: null }); return { pin: "—", cliente: customerOf(a)?.name ?? "", telefono: "sin teléfono: vuelve a valer el NIF" }; } // cuenta de código personal: se restablece al NIF
     const pin = newPin();
     await backend.update("accounts", a.id, { pinHash: pinHash(a.phone, pin), status: "active" });
     return { pin, cliente: customerOf(a)?.name ?? "", telefono: a.phone };

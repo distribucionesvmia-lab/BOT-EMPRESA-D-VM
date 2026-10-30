@@ -85,15 +85,17 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   addCol("registrations", "pin_hash", "TEXT");
   addCol("registrations", "matched", "TEXT");
   addCol("accounts", "verified", "INTEGER NOT NULL DEFAULT 1");
+  addCol("accounts", "code_key", "TEXT"); // huella del código personal que sustituye a los 6 del NIF
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_code ON accounts(code_key) WHERE code_key IS NOT NULL");
   // Cuentas creadas con versiones anteriores exigían teléfono y PIN: se reconstruye la tabla sin esa exigencia
   if (db.prepare("PRAGMA table_info(accounts)").all().find((x) => x.name === "phone")?.notnull) {
-    const cols = "id, customer_id, phone, email, pin_hash, status, verified, failed, lock_count, locked_until, created_at, last_login";
+    const cols = "id, customer_id, phone, email, pin_hash, status, verified, failed, lock_count, locked_until, created_at, last_login, code_key";
     db.exec("PRAGMA foreign_keys = OFF; BEGIN");
-    db.exec(`CREATE TABLE accounts_new (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, phone TEXT UNIQUE, email TEXT, pin_hash TEXT, status TEXT NOT NULL DEFAULT 'active', verified INTEGER NOT NULL DEFAULT 1, failed INTEGER NOT NULL DEFAULT 0, lock_count INTEGER NOT NULL DEFAULT 0, locked_until TEXT, created_at TEXT NOT NULL, last_login TEXT);
+    db.exec(`CREATE TABLE accounts_new (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, phone TEXT UNIQUE, email TEXT, pin_hash TEXT, status TEXT NOT NULL DEFAULT 'active', verified INTEGER NOT NULL DEFAULT 1, failed INTEGER NOT NULL DEFAULT 0, lock_count INTEGER NOT NULL DEFAULT 0, locked_until TEXT, created_at TEXT NOT NULL, last_login TEXT, code_key TEXT);
       INSERT INTO accounts_new (${cols}) SELECT ${cols} FROM accounts; DROP TABLE accounts; ALTER TABLE accounts_new RENAME TO accounts; COMMIT; PRAGMA foreign_keys = ON;`);
   }
 
-  const accountOut = (r) => r && { id: r.id, customerId: r.customer_id, phone: r.phone, email: r.email, status: r.status, verified: !!r.verified, locked: !!r.locked_until && r.locked_until > new Date().toISOString(), lastLogin: r.last_login, createdAt: r.created_at };
+  const accountOut = (r) => r && { id: r.id, customerId: r.customer_id, phone: r.phone, email: r.email, status: r.status, verified: !!r.verified, locked: !!r.locked_until && r.locked_until > new Date().toISOString(), lastLogin: r.last_login, createdAt: r.created_at, ownCode: !!r.code_key };
   const byPhone = db.prepare("SELECT * FROM accounts WHERE phone = ?");
   const byId = db.prepare("SELECT * FROM accounts WHERE id = ?");
   const byCustomer = db.prepare("SELECT * FROM accounts WHERE customer_id = ? ORDER BY id LIMIT 1");
@@ -152,6 +154,26 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       const row = hits[0];
       // Conocer el NIF del cliente equivale a comprobar que es él: la cuenta pasa a confirmada
       db.prepare("UPDATE accounts SET failed = 0, lock_count = 0, locked_until = NULL, verified = 1, last_login = ? WHERE id = ?").run(now, row.id);
+      return { ok: true, token: openSession(row, now), account: accountOut(byId.get(row.id)) };
+    },
+
+    /** ¿Esta cuenta ya cambió el código del NIF por uno personal? Entonces el NIF deja de valer para entrar. */
+    hasOwnCode: (customerId) => !!byCustomer.get(String(customerId))?.code_key,
+    /** Guarda la huella del código personal de la cuenta. { ok:true } o { error } si otro cliente ya usa ese código. */
+    setCodeKey(accountId, key) {
+      try {
+        return db.prepare("UPDATE accounts SET code_key = ? WHERE id = ?").run(key, accountId).changes === 1 ? { ok: true } : { error: "Cuenta no encontrada." };
+      } catch (e) {
+        if (/UNIQUE/i.test(String(e.message))) return { error: "Ese código no está disponible. Elige otro." };
+        throw e;
+      }
+    },
+    /** Acceso con el código personal (la huella ya calculada). Los fallos no se anotan: no hay cuenta a la que atribuirlos. */
+    loginByCode(key, now = new Date().toISOString()) {
+      const row = db.prepare("SELECT * FROM accounts WHERE code_key = ?").get(key);
+      if (!row) return { ok: false, reason: "invalid" };
+      if (row.status !== "active" || (row.locked_until && row.locked_until > now)) return { ok: false, reason: "locked" };
+      db.prepare("UPDATE accounts SET last_login = ? WHERE id = ?").run(now, row.id);
       return { ok: true, token: openSession(row, now), account: accountOut(byId.get(row.id)) };
     },
 
@@ -269,7 +291,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     resetPin(accountId) {
       if (!byId.get(accountId)) return null;
       const pin = newPin();
-      db.prepare("UPDATE accounts SET pin_hash = ?, failed = 0, lock_count = 0, locked_until = NULL, status = 'active' WHERE id = ?").run(hashPin(pin), accountId);
+      db.prepare("UPDATE accounts SET pin_hash = ?, code_key = NULL, failed = 0, lock_count = 0, locked_until = NULL, status = 'active' WHERE id = ?").run(hashPin(pin), accountId);
       dropSessions.run(accountId);
       return pin;
     },

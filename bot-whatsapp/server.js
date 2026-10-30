@@ -9,7 +9,7 @@ import { getDb } from "./db.js";
 import { priceOrder } from "./pricing.js";
 import { createAuth } from "./auth.js";
 import { createAdmin } from "./admin.js";
-import { webProducts, webOrderFromBody } from "./weborder.js";
+import { webProducts, webHistory, webOrderFromBody } from "./weborder.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { BUSINESS } from "./config.js";
 
@@ -250,6 +250,7 @@ function webOrderRoutes(req, res, url) {
         customer: { name: customer.name, address: customer.address },
         used: getDb().hasOrderKey(linkKey(link)),
         products,
+        history: webHistory(customer, catalogNow()),
       });
     }
 
@@ -372,6 +373,7 @@ async function appRoutes(req, res, url) {
       customer: { name: customer.name, address: customer.address },
       used: false,
       products: webProducts(customer, catalogNow(), habitualProducts),
+      history: webHistory(customer, catalogNow()),
     });
   }
   if (p === "/catalogo" && req.method === "POST") {

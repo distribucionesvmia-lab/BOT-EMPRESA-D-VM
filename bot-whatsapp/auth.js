@@ -5,6 +5,7 @@
 import crypto from "node:crypto";
 import { normalizePhone, validEmail } from "./cuentas-db.js";
 import { nifCodes } from "./nif-codes.js";
+import { codeKey, validCode } from "./nif-key.js";
 
 const COOKIE = "vm_session";
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
@@ -127,8 +128,17 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
       if (b.nif !== undefined) {
         if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe los 6 últimos caracteres de tu NIF." }), true;
         if (!nifLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+        // ¿Es el código personal que el cliente puso en lugar del NIF? (si es así, no hace falta nada más)
+        if (validCode(b.nif)) {
+          const own = accounts.loginByCode(codeKey(b.nif));
+          if (own.ok) {
+            const customer = customers.getById(own.account.customerId);
+            return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": cookie(own.token, 30 * 86400) }), true;
+          }
+          if (own.reason === "locked") return send(res, 401, { error: "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." }), true;
+        }
         const nombre = empresa.trim().length >= 2 ? new Set(customers.candidates(empresa).map((c) => c.id)) : null;
-        const ids = customers.findByNif(b.nif).filter((id) => !nombre || nombre.has(id));
+        const ids = customers.findByNif(b.nif).filter((id) => (!nombre || nombre.has(id)) && !accounts.hasOwnCode(id)); // con código personal, el NIF ya no vale
         // Si nadie coincide no hay cuenta a la que anotar el fallo: se cuenta en conjunto y, si hay demasiados, se frena a todo el mundo un rato
         if (!ids.length) {
           if (!nifGlobalFails("fallos")) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde o llama a la empresa." }), true;
@@ -157,7 +167,21 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
     if (p === "/api/yo" && req.method === "GET") {
       const acc = sessionOf(req);
       if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
-      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "" } }), true;
+      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode } }), true;
+    }
+
+    // El cliente cambia el código de entrada (los 6 del NIF) por uno personal de 6 a 10 letras o números
+    if (p === "/api/codigo" && req.method === "POST") {
+      const acc = sessionOf(req);
+      if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
+      if (!loginLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+      const b = await readJson(req);
+      if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
+      if (!validCode(b.nuevo)) return send(res, 400, { error: "El código debe tener entre 6 y 10 letras o números." }), true;
+      if (customers.findByNif(b.nuevo).length) return send(res, 400, { error: "Ese código no está disponible. Elige otro." }), true; // no puede coincidir con el NIF de nadie
+      const r = accounts.setCodeKey(acc.id, codeKey(b.nuevo));
+      if (r.error) return send(res, 400, { error: r.error }), true;
+      return send(res, 200, { ok: true }), true;
     }
 
     return false;

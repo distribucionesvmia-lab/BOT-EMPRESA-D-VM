@@ -39,6 +39,10 @@
   .ud button { border:0; background:#fff; padding:4px 8px; cursor:pointer; color:var(--gris); font-weight:600; }
   .ud button.on { background:#e5f5ec; color:var(--verde-oscuro); }
   .lnote { width:calc(100% - 28px); margin:0 14px 10px; border:1px solid var(--linea); border-radius:8px; padding:8px 10px; font:inherit; font-size:13px; }
+  .ped { margin:10px 14px; border:1px solid var(--linea); border-radius:12px; padding:12px; }
+  .ped h3 { margin:0 0 6px; font-size:14px; }
+  .ped ul { margin:0 0 10px; padding-left:18px; font-size:13px; color:var(--gris); }
+  .ped button { border:0; background:var(--verde-oscuro); color:#fff; border-radius:9px; padding:9px 12px; font:inherit; font-weight:600; cursor:pointer; }
   .vacio { padding:40px 20px; text-align:center; color:var(--gris); }
   footer { position:absolute; left:0; right:0; bottom:0; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(transparent, #fff 30%); }
   .big { width:100%; border:0; border-radius:12px; background:var(--verde); color:#fff; font-size:16px; font-weight:700; padding:15px; cursor:pointer; }
@@ -69,6 +73,7 @@
   <nav>
     <button class="tab on" data-t="hab" type="button">★ Habituales</button>
     <button class="tab" data-t="all" type="button">☰ Catálogo</button>
+    <button class="tab" data-t="hist" type="button">🕘 Mis pedidos</button>
     <input id="q" type="search" placeholder="Buscar" autocomplete="off">
   </nav>
   <main id="list"></main>
@@ -168,8 +173,24 @@ function row(p) {
   return el;
 }
 
+// Historial: vuelve a comprar lo mismo (las unidades de aquel pedido) y, ya en el carrito, se puede modificar cualquier cantidad
+function renderHistory(list) {
+  const hist = data.history || [];
+  if (!hist.length) { const d = document.createElement("div"); d.className = "vacio"; d.textContent = "Aún no tienes pedidos anteriores."; list.appendChild(d); return; }
+  for (const o of hist) {
+    const card = document.createElement("div"); card.className = "ped";
+    const h = document.createElement("h3"); h.textContent = "Pedido del " + o.date.slice(0, 10).split("-").reverse().join("/");
+    const ul = document.createElement("ul");
+    for (const l of o.lines) { const li = document.createElement("li"); li.textContent = l.qty + " uds · " + l.name; ul.appendChild(li); }
+    const b = document.createElement("button"); b.type = "button"; b.textContent = "Repetir y modificar";
+    b.onclick = () => { for (const l of o.lines) { unitOf.set(l.id, "ud"); qty.set(l.id, l.qty); } refresh(); showCart(true); };
+    card.append(h, ul, b); list.appendChild(card);
+  }
+}
+
 function renderList() {
   const list = $("list"); list.innerHTML = "";
+  if (tab === "hist") return renderHistory(list);
   const q = norm(query.trim());
   let items = data.products.filter(p => (tab === "all" || p.count > 0 || q) && (!q || norm(p.name).includes(q) || p.id.includes(q)));
   if (!items.length) {
@@ -209,7 +230,7 @@ document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === b));
   renderList();
 });
-$("q").oninput = e => { query = e.target.value; renderList(); };
+$("q").oninput = e => { query = e.target.value; if (query.trim() && tab === "hist") { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); } renderList(); };
 $("verCarrito").onclick = $("cartIcon").onclick = () => count() && showCart(true);
 $("back").onclick = $("keep").onclick = () => showCart(false);
 
