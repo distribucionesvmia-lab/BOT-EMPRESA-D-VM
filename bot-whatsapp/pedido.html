@@ -288,7 +288,7 @@ const addDaysIso = (day, n) => new Date(Date.UTC(+day.slice(0, 4), +day.slice(5,
 const largo = day => { const d = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10))); return `${DIAS[d.getUTCDay()]} ${+day.slice(8, 10)} de ${MESES[+day.slice(5, 7) - 1]}`; };
 let cal = { y: 0, m: 0, sel: null };
 function pintarCal() {
-  const hoy = data.minDate, max = addDaysIso(data.today, 90); // el primer día elegible es hoy (antes de las 10:00) o mañana
+  const hoy = data.minDate, max = addDaysIso(data.today, 90); // el calendario empieza en el mismo día que el primer botón: no puede contradecirlo
   $("calMes").textContent = `${MESES[cal.m]} ${cal.y}`;
   const g = $("calGrid"); g.innerHTML = "";
   for (const d of ["L", "M", "X", "J", "V", "S", "D"]) { const e = document.createElement("span"); e.textContent = d; g.appendChild(e); }

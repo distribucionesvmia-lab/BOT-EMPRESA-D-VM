@@ -21,10 +21,17 @@ const isWorkday = (day) => weekday(day) >= 1 && weekday(day) <= 5;
 export const longDate = (day) => `${DIAS[weekday(day)]} ${+day.slice(8, 10)} de ${MESES[+day.slice(5, 7) - 1]}`;
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 
-/** Primer día que se puede elegir: hoy si el pedido se hace antes de las 10:00; si no, mañana. */
+// Primer día posible por la hora: hoy si el pedido se hace antes de las 10:00; si no, mañana
+const earliest = (nowIso) => (madridHour(nowIso) < CUTOFF_HOUR ? madridDay(nowIso) : addDays(madridDay(nowIso), 1));
+
+/**
+ * Primer día que se puede elegir, tanto en los botones como en el calendario de «otro día» (así nunca se contradicen):
+ * el primer día de servicio (lunes a viernes) a partir de hoy —si es antes de las 10:00— o de mañana.
+ */
 export function deliveryMin(nowIso = new Date().toISOString()) {
-  const today = madridDay(nowIso);
-  return madridHour(nowIso) < CUTOFF_HOUR ? today : addDays(today, 1);
+  let d = earliest(nowIso);
+  while (!isWorkday(d)) d = addDays(d, 1);
+  return d;
 }
 
 export const SERVICE_DAYS = 5; // días de servicio que se ofrecen siempre (lunes a viernes)
@@ -49,7 +56,7 @@ export function deliveryOptions(nowIso = new Date().toISOString()) {
 
 export const MAX_AHEAD_DAYS = 90; // el calendario deja elegir hasta 90 días por delante
 
-/** ¿Es un día de entrega válido? Cualquier fecha real desde el primer día disponible (hoy antes de las 10:00; si no, mañana) hasta dentro de 90 días. */
+/** ¿Es un día de entrega válido? Cualquier fecha real desde el primer día que ofrecen los botones (deliveryMin) hasta dentro de 90 días. */
 export function deliveryAllowed(date, nowIso = new Date().toISOString()) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ""))) return false;
   if (addDays(date, 0) !== date) return false; // fecha inexistente (31 de febrero…)

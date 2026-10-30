@@ -34,6 +34,15 @@ test("«hoy» solo antes de las 10:00 (hora de Madrid); después, lo más pronto
   assert.equal(deliveryAllowed("2026-10-29", "2026-10-29T08:59:00Z"), true);
   assert.equal(deliveryAllowed("2026-10-29", "2026-10-29T09:00:00Z"), false);
   assert.equal(deliveryAllowed("2026-10-30", "2026-10-29T09:00:00Z"), true);
+  // el calendario («otro día») empieza donde el primer botón: viernes por la tarde → lunes; sábado → lunes
+  assert.equal(deliveryMin("2026-10-30T18:00:00Z"), "2026-11-02");
+  assert.equal(deliveryMin("2026-10-31T07:00:00Z"), "2026-11-02");
+  assert.equal(deliveryAllowed("2026-10-31", "2026-10-30T18:00:00Z"), false); // sábado: antes del primer botón
+  assert.equal(deliveryAllowed("2026-11-02", "2026-10-30T18:00:00Z"), true);
+  for (let d = 0; d < 366; d++) for (const h of [6, 12]) {
+    const now = new Date(Date.UTC(2026, 0, 1 + d, h)).toISOString();
+    assert.equal(deliveryMin(now), deliveryOptions(now)[0].date); // siempre coinciden
+  }
   // en horario de verano (UTC+2) el corte sigue siendo a las 10:00 de Madrid
   assert.equal(deliveryMin("2026-07-15T07:59:00Z"), "2026-07-15");
   assert.equal(deliveryMin("2026-07-15T08:00:00Z"), "2026-07-16");
