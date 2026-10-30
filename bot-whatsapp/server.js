@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog as catalogNow, habitualProducts } from "./bot.js";
-import { getCatalog, catalogVersion, getCustomerByPhone, getCustomerById, findCustomers, createOrder, getAccountsDb, customerDirectory } from "./erp.js";
+import { getCatalog, catalogVersion, getCustomerByPhone, getCustomerById, findCustomers, createOrder, getAccountsDb, customerDirectory, getDatabases } from "./erp.js";
 import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder } from "./pricing.js";
@@ -11,6 +11,9 @@ import { createAuth } from "./auth.js";
 import { createAdmin } from "./admin.js";
 import { webProducts, webHistory, webOrderFromBody } from "./weborder.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
+import { crearSincronizacion, fileState } from "./sincronizar.js";
+import { sourceFromEnv } from "./drive.js";
+import nodePath from "node:path";
 import { BUSINESS } from "./config.js";
 
 if (process.env.DEMO === "1") {
@@ -301,7 +304,18 @@ const auth = createAuth({
   secure: PUBLIC_URL.startsWith("https://"),
   trustProxy: process.env.TRUST_PROXY === "1",
 });
-const admin = createAdmin({ accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
+// Sincronización automática de clientes y productos con una carpeta de Google Drive (o del servidor): solo la aplicación de la empresa
+let sync = null;
+if (adminEnabled) {
+  try {
+    const dbs = getDatabases();
+    const statePath = process.env.SYNC_STATE ?? nodePath.join(nodePath.dirname(process.env.CUSTOMERS_DB ?? "clientes.sqlite"), "sync-estado.json");
+    sync = crearSincronizacion({ source: sourceFromEnv(), state: fileState(statePath), catalogDb: dbs.catalogDb, customersDb: dbs.customersDb, accountsDb: getAccountsDb(), onChange: () => refreshCatalog().catch(console.error) });
+  } catch (e) {
+    console.error("Sincronización desactivada:", e.message); // credenciales o carpeta mal configuradas: la aplicación sigue funcionando
+  }
+}
+const admin = createAdmin({ sync, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" };
 const sendJson = (res, code, data) => res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify(data));
@@ -450,4 +464,5 @@ http
     console.log(`Bot escuchando en http://localhost:${PORT}`);
     // Exportación diaria a Excel (EXPORT_TIME, por defecto 21:00 hora de Madrid). En modo demo no se programa.
     if (process.env.DEMO !== "1" && adminEnabled) scheduleDailyExport(getDb());
+    if (process.env.DEMO !== "1") sync?.start();
   });

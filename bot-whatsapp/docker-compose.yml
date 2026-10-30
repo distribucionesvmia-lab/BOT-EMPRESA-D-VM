@@ -37,6 +37,10 @@ services:
       <<: *datos
       APP_MODE: empresa
       ADMIN_TOKEN: ${ADMIN_TOKEN} # clave de la empresa: larga y secreta
+      # Sincronización automática de clientes y productos con una carpeta de Google Drive (ver docs/GOOGLE_DRIVE.md); solo esta aplicación
+      DRIVE_FOLDER_ID: ${DRIVE_FOLDER_ID:-}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      SYNC_MINUTES: ${SYNC_MINUTES:-15}
       PUBLIC_URL: http://localhost:3001
     volumes:
       - datos:/data

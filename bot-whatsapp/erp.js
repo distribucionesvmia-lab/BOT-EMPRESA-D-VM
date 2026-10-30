@@ -33,6 +33,9 @@ function dbs() {
   return { catalogDb, customersDb };
 }
 
+/** Las dos bases (productos y clientes) para la sincronización automática. */
+export const getDatabases = () => dbs();
+
 export const listCustomers = () => dbs().customersDb.list();
 
 /** Catálogo de productos activos ([{ id, name, price, unitsPerBox?, vat, discount }]) o null si no hay datos (el bot usa config.js). */

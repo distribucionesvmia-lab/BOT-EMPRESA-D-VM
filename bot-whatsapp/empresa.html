@@ -67,9 +67,15 @@
 
     <!-- Clientes -->
     <div id="p-clientes" hidden style="display:grid;gap:14px">
+      <div class="panel" id="sync-panel">
+        <h2>Sincronización automática (Drive)</h2>
+        <p class="muted" id="sync-estado">Cargando…</p>
+        <div class="row"><button class="main" id="sync-ahora" type="button" hidden>Sincronizar ahora</button><span class="muted" id="sync-msg" role="status"></span></div>
+        <ul id="sync-reg" class="muted" style="margin:8px 0 0;padding-left:18px"></ul>
+      </div>
       <div class="panel">
         <h2>Importar clientes desde Excel</h2>
-        <p class="muted">Sube la lista de clientes que exporta a3ERP (columnas «Cód. cliente», «Organización», «Razón social», «Población», «Dirección fiscal», «Teléfono», «E-Mail», «Bloqueado», «Obsoleto»). Los nuevos se añaden y los que ya existen se actualizan; no se toca su historial ni sus precios y <b>no se guarda el NIF</b>.</p>
+        <p class="muted">Sube la lista de clientes que exporta a3ERP (columnas «Cód. cliente», «Organización», «Razón social», «Población», «Dirección fiscal», «Teléfono», «E-Mail», «Bloqueado», «Obsoleto»). Los nuevos se añaden y los que ya existen se actualizan; no se toca su historial ni sus precios y el NIF <b>no se guarda</b>: solo una huella de sus 6 últimos caracteres.</p>
         <div class="row"><input type="file" id="f-excel" accept=".xlsx" aria-label="Archivo Excel de clientes"><button class="main" id="importar">Importar</button><span class="muted" id="imp-msg" role="status"></span></div>
       </div>
       <div class="panel">
@@ -181,6 +187,25 @@ async function cuentas() {
     tr.append(el("td", a.cliente || a.customerId), el("td", a.phone || "— (entra con NIF)"), el("td", a.email || ""), el("td", estado), el("td", a.lastLogin ? hora(a.lastLogin) : "—"), td); tc.appendChild(tr);
   }
 }
+const hora2 = (iso) => new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
+const ESTADO = { importado: "✔ importado", "sin cambios": "sin cambios", error: "✖ error", "sin fichero": "sin fichero" };
+async function sincronizacion() {
+  const r = await call("/api/admin/sincronizacion");
+  if (!r.configurado) {
+    $("sync-estado").textContent = "No está activada. Cuando se conecte la carpeta de Google Drive (ver docs/GOOGLE_DRIVE.md), los Excel de clientes y productos que dejes ahí se importarán solos.";
+    $("sync-ahora").hidden = true; $("sync-reg").innerHTML = ""; return;
+  }
+  $("sync-ahora").hidden = false;
+  const u = r.ultima;
+  $("sync-estado").textContent = `Origen: ${r.origen}. Se revisa cada ${r.cadaMinutos} minutos.` + (u ? ` Última revisión: ${hora2(u.at)}.` : " Aún no se ha revisado.");
+  const ul = $("sync-reg"); ul.innerHTML = "";
+  for (const x of u?.resultados ?? []) ul.appendChild(el("li", `${x.tipo[0].toUpperCase() + x.tipo.slice(1)}: ${ESTADO[x.estado] ?? x.estado}${x.fichero ? ` · ${x.fichero}` : ""}${x.detalle ? ` · ${x.detalle}` : ""}`));
+}
+$("sync-ahora").onclick = async () => {
+  $("sync-ahora").disabled = true; $("sync-msg").textContent = "Sincronizando…";
+  try { const r = await call("/api/admin/sincronizacion/ahora", {}); $("sync-msg").textContent = r.ok ? "Hecho." : "Terminó con errores (mira el detalle)."; await refrescar(); }
+  catch (e) { $("sync-msg").textContent = e.message; } finally { $("sync-ahora").disabled = false; }
+};
 let pagCli = 0, tClientes = null;
 async function clientes() {
   const q = encodeURIComponent($("q-cli").value.trim());
@@ -216,7 +241,7 @@ async function avisos() {
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), clientes(), avisos()]); } catch (e) { if (e.message !== "Clave incorrecta") $("act").textContent = "Sin conexión con el servidor"; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), clientes(), avisos(), sincronizacion()]); } catch (e) { if (e.message !== "Clave incorrecta") $("act").textContent = "Sin conexión con el servidor"; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
