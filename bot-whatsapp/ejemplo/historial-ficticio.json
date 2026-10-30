@@ -217,7 +217,8 @@
     "1004": 8
    },
    "recargoEquivalencia": false,
-   "nif": "00000001R"
+   "nif": "00000001R",
+   "municipio": "47085"
   },
   {
    "id": "9002",
@@ -316,7 +317,8 @@
    ],
    "frequent": [],
    "recargoEquivalencia": true,
-   "nif": "B00000002"
+   "nif": "B00000002",
+   "municipio": "47186"
   },
   {
    "id": "9003",
@@ -364,7 +366,8 @@
    "recargoEquivalencia": false,
    "specialPrices": {},
    "discounts": {},
-   "nif": "00000003T"
+   "nif": "00000003T",
+   "municipio": "47085"
   }
  ],
  "_aviso": "DATOS FICTICIOS de ejemplo. Los reales (unidades por caja, IVA, precios y descuentos) vendrán de las fichas de a3ERP."

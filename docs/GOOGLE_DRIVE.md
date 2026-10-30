@@ -19,7 +19,7 @@ a3ERP ──► script de copia ──► carpeta «copias»  (PRIVADA, copias p
 ## Los tres Excel que lee el bot (carpeta «datos»)
 | Fichero (el nombre debe contener…) | Columnas (por su cabecera) | Para qué |
 |---|---|---|
-| `clientes` | Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto | Clientes y sus cuentas (acceso con los 6 últimos del NIF) |
+| `clientes` | Cód. cliente · Organización · Razón social · Población · **Cód. municipio** · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto | Clientes y sus cuentas (acceso con los 6 últimos del NIF). **El código de municipio decide quién puede pedir para «hoy»**: solo `47085` (Medina del Campo); sin esa columna, nadie ve «hoy». |
 | `productos` (o «artículos», «tarifa», «catálogo») | Código · Descripción · Precio · Uds. por caja · % IVA · Dto. · Categoría o Familia · Subcategoría o Subfamilia · Bloqueado | Catálogo, precios y categorías |
 | `historial` (o «compras», «ventas», «albarán») | Cód. cliente · Fecha · Documento · Cód. artículo · Cantidad | La pestaña «Histórico» de cada cliente (lo que suele comprar) |
 

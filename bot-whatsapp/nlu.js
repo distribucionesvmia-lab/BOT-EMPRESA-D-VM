@@ -54,7 +54,7 @@ const validDate = (y, m, d) => { const iso = `${y}-${pad(m)}-${pad(d)}`; return 
  * Busca un día en la frase. Devuelve null si no hay, o { date, phrase, rest } (rest = la frase sin ese trozo), o { ambiguous: true, rest }
  * si dice «la semana que viene» sin concretar. No valida si ese día se puede servir (eso lo hace explainDelivery).
  */
-export function extractDelivery(rawText, nowIso = new Date().toISOString()) {
+export function extractDelivery(rawText, nowIso = new Date().toISOString(), opts = {}) {
   const t = ` ${norm(rawText)} `;
   const today = madridDay(nowIso);
   const found = (date, m) => ({ date, phrase: m[0].trim(), rest: (t.slice(0, m.index) + " " + t.slice(m.index + m[0].length)).replace(/\s+/g, " ").trim() });
@@ -63,7 +63,7 @@ export function extractDelivery(rawText, nowIso = new Date().toISOString()) {
   if ((m = new RegExp(`\\b${art}pasado manana\\b`).exec(t))) return found(addDays(today, 2), m);
   if ((m = new RegExp(`\\b${art}manana\\b`).exec(t))) return found(addDays(today, 1), m);
   if ((m = new RegExp(`\\b${art}hoy\\b`).exec(t))) return found(today, m);
-  if ((m = /\b(?:lo antes posible|cuanto antes|urgente|lo mas pronto|cuando antes|para ya)\b/.exec(t))) return found(deliveryMin(nowIso), m);
+  if ((m = /\b(?:lo antes posible|cuanto antes|urgente|lo mas pronto|cuando antes|para ya)\b/.exec(t))) return found(deliveryMin(nowIso, opts), m);
   if ((m = /\b(?:para )?(?:dentro de|en) (\d{1,2}|dos|tres|cuatro|cinco|seis|siete) dias?\b/.exec(t))) { const n = /^\d+$/.test(m[1]) ? Number(m[1]) : UNIDADES[m[1]]; return found(addDays(today, n), m); }
   // «el 5 de noviembre», «5 de noviembre», «el viernes 20 de noviembre»
   if ((m = new RegExp(`\\b${art}(?:(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\\s+)?(?:dia\\s+)?(\\d{1,2})\\s+de\\s+(${Object.keys(MESES).join("|")})(?:\\s+(?:de\\s+)?(\\d{4}))?\\b`).exec(t))) {
@@ -99,12 +99,12 @@ export function extractDelivery(rawText, nowIso = new Date().toISOString()) {
 }
 
 /** Si ese día NO se puede servir, la explicación en lenguaje claro (con alternativas); null si vale. */
-export function explainDelivery(date, nowIso = new Date().toISOString()) {
-  if (deliveryAllowed(date, nowIso)) return null;
-  const first = deliveryMin(nowIso), today = madridDay(nowIso);
+export function explainDelivery(date, nowIso = new Date().toISOString(), opts = {}) {
+  if (deliveryAllowed(date, nowIso, opts)) return null;
+  const first = deliveryMin(nowIso, opts), today = madridDay(nowIso);
   const firstText = `${longDate(first)}`;
   if (date < today) return `Ese día ya ha pasado. Lo más pronto que puedo apuntarte es el ${firstText}.`;
-  if (date === today) return `Para recibirlo *hoy* hay que pedir antes de las ${CUTOFF_HOUR}:00. Lo más pronto es el ${firstText}.`;
+  if (date === today) return opts.hoy ? `Para recibirlo *hoy* hay que pedir antes de las ${CUTOFF_HOUR}:00. Lo más pronto es el ${firstText}.` : `Para tu zona no hay entrega en el mismo día. Lo más pronto es el ${firstText}.`;
   if (!isWorkday(date)) return `Los *sábados y domingos* no repartimos (${longDate(date)}). ¿Te viene bien el ${firstText} o el lunes siguiente?`;
   if (date < first) return `Ese día ya no llego. Lo más pronto es el ${firstText}.`;
   if (daysBetween(today, date) > MAX_AHEAD_DAYS) return `Solo puedo apuntar entregas de los próximos ${MAX_AHEAD_DAYS} días.`;
@@ -112,8 +112,8 @@ export function explainDelivery(date, nowIso = new Date().toISOString()) {
 }
 
 /** Filas de la lista «¿Cuándo quieres recibirlo?» (ids d:AAAA-MM-DD y d:otro). */
-export function deliveryRows(nowIso = new Date().toISOString()) {
-  const rows = deliveryOptions(nowIso).map((o) => ({ id: `d:${o.date}`, title: o.kind === "dia" ? o.label : `${o.label} · ${o.detail}`.slice(0, 24), description: o.kind === "dia" ? "" : o.detail }));
+export function deliveryRows(nowIso = new Date().toISOString(), opts = {}) {
+  const rows = deliveryOptions(nowIso, opts).map((o) => ({ id: `d:${o.date}`, title: o.kind === "dia" ? o.label : `${o.label} · ${o.detail}`.slice(0, 24), description: o.kind === "dia" ? "" : o.detail }));
   rows.push({ id: "d:otro", title: "📅 Otro día", description: "Escríbelo: «20 de noviembre», «el viernes 20»…" });
   return rows;
 }

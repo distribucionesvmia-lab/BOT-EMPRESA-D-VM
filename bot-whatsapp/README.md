@@ -181,3 +181,6 @@ Escribe "hola" al número de WhatsApp y debería responder.
 3. **Copia diaria de todas las bases** a las 03:00 (hora de Madrid; `BACKUP_TIME` la cambia) en `/var/data/respaldos`, conservando las 14 últimas. Además Render guarda copias diarias del propio disco (se restauran desde su panel, hasta 7 días).
 4. Clientes, productos e historial se recuperan solos desde Drive si hiciera falta; lo que no se puede reconstruir (pedidos, cuentas y PIN personales) es lo que protegen el disco y las copias.
 5. Variables: `DRIVE_FOLDER_ID` y la clave de Google (ver `docs/GOOGLE_DRIVE.md`). No pongas `DEMO`.
+
+## Entrega «hoy» solo en Medina del Campo
+«Hoy» solo se ofrece a los clientes cuyo **código de municipio es `47085`** (columna «Cód. municipio» del Excel de clientes; `MUNICIPIOS_HOY` en `delivery.js`) y solo si el pedido se hace antes de las 10:00. Los demás clientes no ven «hoy» ni en los botones, ni en el calendario, ni en el chat, y el servidor lo rechaza aunque lo intenten: para ellos el primer día posible es mañana (o el siguiente día de servicio). Si el Excel no trae la columna, nadie tiene «hoy».

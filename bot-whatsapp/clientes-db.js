@@ -60,7 +60,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   db.exec(SCHEMA);
   // Bases creadas antes de existir razón social y población
-  for (const col of ["legal_name", "city", "nif_keys"]) {
+  for (const col of ["legal_name", "city", "nif_keys", "municipio"]) {
     if (!db.prepare("PRAGMA table_info(customers)").all().some((x) => x.name === col)) db.exec(`ALTER TABLE customers ADD COLUMN ${col} TEXT`);
   }
   const phones9 = (c) => [...new Set([...(c.phones ?? []), ...(c.phone ? [c.phone] : [])].map(last9).filter((p) => p.length === 9))];
@@ -75,7 +75,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       orders.get(k).lines.push({ productId: l.product_id, qty: l.qty });
     }
     return {
-      id: r.id, name: r.name, legalName: r.legal_name ?? "", city: r.city ?? "", phone: r.phone ?? "", address: r.address ?? "", recargoEquivalencia: !!r.recargo, active: !!r.active,
+      id: r.id, name: r.name, legalName: r.legal_name ?? "", city: r.city ?? "", municipio: r.municipio ?? "", phone: r.phone ?? "", address: r.address ?? "", recargoEquivalencia: !!r.recargo, active: !!r.active,
       phones: db.prepare("SELECT phone FROM customer_phones WHERE customer_id = ? ORDER BY phone").all(r.id).map((x) => x.phone),
       emails: db.prepare("SELECT email FROM customer_emails WHERE customer_id = ? ORDER BY email").all(r.id).map((x) => x.email),
       specialPrices: Object.fromEntries(db.prepare("SELECT product_id, price FROM customer_prices WHERE customer_id = ?").all(r.id).map((x) => [x.product_id, x.price])),
@@ -102,11 +102,11 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
           const id = String(c.id).trim();
           out[byId.get(id) ? "updated" : "added"]++;
           db.prepare(
-            `INSERT INTO customers (id, name, legal_name, city, phone, address, recargo, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(id) DO UPDATE SET name = excluded.name, legal_name = COALESCE(excluded.legal_name, legal_name), city = COALESCE(excluded.city, city),
+            `INSERT INTO customers (id, name, legal_name, city, municipio, phone, address, recargo, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET name = excluded.name, legal_name = COALESCE(excluded.legal_name, legal_name), city = COALESCE(excluded.city, city), municipio = COALESCE(excluded.municipio, municipio),
                phone = COALESCE(excluded.phone, phone), address = COALESCE(excluded.address, address),
                recargo = excluded.recargo, active = excluded.active, updated_at = excluded.updated_at`,
-          ).run(id, String(c.name).trim(), c.legalName ?? null, c.city ?? null, c.phone ?? phones9(c)[0] ?? null, c.address ?? null, c.recargoEquivalencia ? 1 : 0, c.active === false ? 0 : 1, now);
+          ).run(id, String(c.name).trim(), c.legalName ?? null, c.city ?? null, String(c.municipio ?? "").trim() || null, c.phone ?? phones9(c)[0] ?? null, c.address ?? null, c.recargoEquivalencia ? 1 : 0, c.active === false ? 0 : 1, now);
           // El NIF no se guarda: solo la huella de sus 6 últimos caracteres (nif-key.js). Si el cliente ya trae las huellas, se usan tal cual.
           const keys = Array.isArray(c.nifKeys) ? c.nifKeys : c.nif ? nifKeys(id, c.nif) : [];
           if (keys.length) db.prepare("UPDATE customers SET nif_keys = ? WHERE id = ?").run(JSON.stringify(keys), id);

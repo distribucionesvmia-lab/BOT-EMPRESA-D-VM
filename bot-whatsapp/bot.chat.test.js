@@ -11,7 +11,7 @@ setCatalog([
   { id: "V1", name: "VINO TINTO CRIANZA 75 CL", price: 5 },
   { id: "H1", name: "HUEVOS DOCENA", price: 3 },
 ]);
-const cliente = { id: "9001", name: "BAR UNO", address: "Calle Uno 1", phone: "600000001", orders: [{ doc: "A", date: "2026-10-20", lines: [{ productId: "C1", qty: 24 }, { productId: "A1", qty: 12 }] }] };
+const cliente = { id: "9001", name: "BAR UNO", address: "Calle Uno 1", phone: "600000001", municipio: "47085", orders: [{ doc: "A", date: "2026-10-20", lines: [{ productId: "C1", qty: 24 }, { productId: "A1", qty: 12 }] }] };
 const hablar = (...frases) => {
   let r = { session: newSession(cliente, null, {}) };
   const out = [];
@@ -144,4 +144,29 @@ test("cliente sin identificar: texto libre, «sí» y día de entrega", () => {
   decir("vale");
   assert.equal(r.order.delivery, "2026-11-02");
   assert.equal(r.order.name, "Ana");
+});
+
+test("los clientes de otro municipio nunca ven «hoy»: ni en la lista, ni diciéndolo, ni con «cuanto antes»", () => {
+  const otro = { ...cliente, id: "9002", name: "BAR DOS", municipio: "47186" };
+  // lista de días
+  let s = newSession(otro, null, {}), rs = [];
+  for (const f of ["3 cervezas", "listo", "sí"]) { const x = handleMessage(s, f, { now: NOW }); rs.push(x); s = x.session; }
+  assert.equal(rs[2].ui.rows[0].id, "d:2026-10-30");
+  assert.ok(!rs[2].ui.rows.some((r) => r.id === "d:2026-10-29" || /^Hoy/.test(r.title)));
+  // pedirlo escribiendo «hoy»
+  let r = handleMessage(newSession(otro, null, {}), "3 cervezas para hoy", { now: NOW });
+  assert.equal(r.session.delivery, null);
+  assert.match(r.reply, /Para tu zona no hay entrega en el mismo día/);
+  r = handleMessage(rs[2].session, "hoy", { now: NOW });
+  assert.equal(r.order, undefined);
+  assert.match(r.reply, /Para tu zona no hay entrega en el mismo día/);
+  // «cuanto antes» → mañana
+  r = handleMessage(newSession(otro, null, {}), "3 cervezas cuanto antes", { now: NOW });
+  assert.equal(r.session.delivery, "2026-10-30");
+  // sin cliente identificado tampoco
+  r = handleMessage(newSession(null, null, {}), "3 cervezas para hoy", { now: NOW });
+  assert.equal(r.session.delivery, null);
+  // el de Medina sí
+  r = handleMessage(newSession(cliente, null, {}), "3 cervezas para hoy", { now: NOW });
+  assert.equal(r.session.delivery, "2026-10-29");
 });

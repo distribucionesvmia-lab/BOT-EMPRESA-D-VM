@@ -21,7 +21,7 @@ export function extractEmails(cell) {
 const yes = (v) => /^(si|sí|s|true|1|x)$/i.test(String(v ?? "").trim());
 
 const FIELDS = [
-  ["code", /^cod/], ["name", /^organizacion/], ["legal", /^razon social/], ["city", /^poblacion/], ["address", /^direccion/],
+  ["code", /^cod/], ["name", /^organizacion/], ["legal", /^razon social/], ["city", /^poblacion/], ["municipio", /^(cod\w* )?(de )?municipio$|^cod\w* ine$|^ine$/], ["address", /^direccion/],
   ["phone", /^telefono/], ["email", /^e ?mail|^correo/], ["nif", /^nif|^cif|^n\.?i\.?f/], ["blocked", /^bloqueado/], ["obsolete", /^obsoleto/], ["section", /^seccion/],
 ];
 
@@ -34,7 +34,7 @@ export function parseClientes(rows) {
   const get = (r, k) => String(r[col[k]] ?? "").trim();
   const customers = [];
   const seen = new Set();
-  const stats = { filas: 0, importados: 0, sinTelefono: 0, sinCorreo: 0, sinNif: 0, inactivos: 0, duplicados: 0, descartadas: 0 };
+  const stats = { filas: 0, importados: 0, sinTelefono: 0, sinCorreo: 0, sinNif: 0, sinMunicipio: 0, inactivos: 0, duplicados: 0, descartadas: 0 };
   for (const r of rows.slice(hi + 1)) {
     if (!r.some((c) => String(c).trim())) continue;
     stats.filas++;
@@ -45,11 +45,12 @@ export function parseClientes(rows) {
     const phones = extractPhones(get(r, "phone")), emails = extractEmails(get(r, "email"));
     const active = !(yes(get(r, "blocked")) || yes(get(r, "obsolete")));
     const legal = get(r, "legal");
-    customers.push({ id, name, legalName: legal && norm(legal) !== norm(name) ? legal : "", nifKeys: nifKeys(id, get(r, "nif")), city: get(r, "city"), address: [get(r, "address"), get(r, "city")].filter(Boolean).join(", "), phones, emails, phone: phones[0] ?? "", active });
+    customers.push({ id, name, legalName: legal && norm(legal) !== norm(name) ? legal : "", nifKeys: nifKeys(id, get(r, "nif")), city: get(r, "city"), municipio: String(get(r, "municipio")).replace(/\D/g, ""), address: [get(r, "address"), get(r, "city")].filter(Boolean).join(", "), phones, emails, phone: phones[0] ?? "", active });
     stats.importados++;
     if (!phones.length) stats.sinTelefono++;
     if (!emails.length) stats.sinCorreo++;
     if (!get(r, "nif")) stats.sinNif++;
+    if (!String(get(r, "municipio")).replace(/\D/g, "")) stats.sinMunicipio++;
     if (!active) stats.inactivos++;
   }
   return { customers, stats };

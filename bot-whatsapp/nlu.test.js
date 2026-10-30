@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { numberWords, extractDelivery, explainDelivery, deliveryRows, isYes, isNo, isDone, parseRemove, parseChangeQty, lev } from "./nlu.js";
 
+const H = { hoy: true };
 const JUE = "2026-10-29T07:00:00Z"; // jueves 29 de octubre, 08:00 en Madrid (antes de las 10)
 const JUE_TARDE = "2026-10-29T09:30:00Z"; // 10:30: ya no se puede «hoy»
 
@@ -17,7 +18,7 @@ test("números en palabras", () => {
 });
 
 test("día de entrega dicho con naturalidad", () => {
-  const d = (t, now = JUE) => extractDelivery(t, now);
+  const d = (t, now = JUE) => extractDelivery(t, now, H);
   assert.equal(d("6 cervezas para mañana").date, "2026-10-30");
   assert.equal(d("6 cervezas para mañana").rest, "6 cervezas");
   assert.equal(d("lo quiero hoy").date, "2026-10-29");
@@ -33,22 +34,24 @@ test("día de entrega dicho con naturalidad", () => {
   assert.equal(d("el 05-11-2026").date, "2026-11-05");
   assert.equal(d("dentro de 4 días").date, "2026-11-02");
   assert.equal(d("el día 3").date, "2026-11-03");
-  assert.equal(d("cuanto antes").date, "2026-10-29"); // antes de las 10: hoy
+  assert.equal(d("cuanto antes").date, "2026-10-29"); // antes de las 10 y con entrega en el día: hoy
+  assert.equal(extractDelivery("cuanto antes", JUE).date, "2026-10-30"); // sin ese permiso: mañana
   assert.equal(d("cuanto antes", JUE_TARDE).date, "2026-10-30"); // después: mañana
   assert.equal(d("para la semana que viene").ambiguous, true);
   assert.equal(d("6 cervezas y 2 aguas"), null);
 });
 
 test("explicación cuando ese día no se puede", () => {
-  assert.equal(explainDelivery("2026-11-02", JUE), null);
-  assert.match(explainDelivery("2026-10-29", JUE_TARDE), /antes de las 10:00.*viernes 30 de octubre/);
-  assert.match(explainDelivery("2026-10-31", JUE), /sábados y domingos/);
-  assert.match(explainDelivery("2026-10-20", JUE), /ya ha pasado/);
-  assert.match(explainDelivery("2027-06-01", JUE), /90 días/);
+  assert.equal(explainDelivery("2026-11-02", JUE, H), null);
+  assert.match(explainDelivery("2026-10-29", JUE_TARDE, H), /antes de las 10:00.*viernes 30 de octubre/);
+  assert.match(explainDelivery("2026-10-31", JUE, H), /sábados y domingos/);
+  assert.match(explainDelivery("2026-10-20", JUE, H), /ya ha pasado/);
+  assert.match(explainDelivery("2027-06-01", JUE, H), /90 días/);
+  assert.match(explainDelivery("2026-10-29", JUE), /Para tu zona no hay entrega en el mismo día.*viernes 30 de octubre/); // sin permiso para «hoy»
 });
 
 test("filas de la lista de días", () => {
-  const rows = deliveryRows(JUE);
+  const rows = deliveryRows(JUE, H);
   assert.deepEqual(rows.map((r) => r.id), ["d:2026-10-29", "d:2026-10-30", "d:2026-11-02", "d:2026-11-03", "d:2026-11-04", "d:otro"]);
   assert.ok(rows.every((r) => r.title.length <= 24));
 });

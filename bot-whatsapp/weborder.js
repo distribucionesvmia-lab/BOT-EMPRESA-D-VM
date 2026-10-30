@@ -1,4 +1,4 @@
-import { deliveryAllowed, madridDay } from "./delivery.js";
+import { deliveryAllowed, madridDay, puedeHoy } from "./delivery.js";
 import { categorizar, arbolCategorias } from "./categorias.js";
 
 // Lógica de la mini-aplicación de pedido, sin red ni disco (la comparten el servidor y la demo del navegador).
@@ -57,8 +57,9 @@ export function webOrderFromBody(body, customer, { key, phone, at = new Date().t
   // Día de entrega elegido (uno de los botones o cualquier día del calendario): debe ser una fecha real, de hoy en adelante
   let delivery = null;
   if (body?.delivery != null && body.delivery !== "") {
-    if (!deliveryAllowed(body.delivery, at)) {
-      return { error: body.delivery === madridDay(at) ? "Para recibirlo hoy hay que pedir antes de las 10:00. Elige otro día." : "Elige un día de entrega válido." };
+    const hoy = puedeHoy(customer); // el mismo día solo en los municipios que lo tienen
+    if (!deliveryAllowed(body.delivery, at, { hoy })) {
+      return { error: body.delivery === madridDay(at) ? (hoy ? "Para recibirlo hoy hay que pedir antes de las 10:00. Elige otro día." : "Para tu zona no hay entrega en el mismo día. Elige otro día.") : "Elige un día de entrega válido." };
     }
     delivery = body.delivery;
   }

@@ -10,7 +10,7 @@ import { priceOrder } from "./pricing.js";
 import { createAuth } from "./auth.js";
 import { createAdmin } from "./admin.js";
 import { webProducts, webHistory, webTree, webOrderFromBody } from "./weborder.js";
-import { deliveryOptions, deliveryCalendarFrom, madridDay } from "./delivery.js";
+import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy } from "./delivery.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { scheduleBackups } from "./backup.js";
@@ -257,9 +257,9 @@ function webOrderRoutes(req, res, url) {
         products,
         history: webHistory(customer, catalogNow()),
         tree: webTree(catalogNow()),
-        delivery: deliveryOptions(),
+        delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }),
         today: madridDay(),
-        minDate: deliveryCalendarFrom(),
+        minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }),
       });
     }
 
@@ -395,9 +395,9 @@ async function appRoutes(req, res, url) {
       products: webProducts(customer, catalogNow(), habitualProducts),
       history: webHistory(customer, catalogNow()),
       tree: webTree(catalogNow()),
-      delivery: deliveryOptions(),
+      delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }),
       today: madridDay(),
-      minDate: deliveryCalendarFrom(),
+      minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }),
     });
   }
   if (p === "/catalogo" && req.method === "POST") {

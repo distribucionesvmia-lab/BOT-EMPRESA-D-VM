@@ -1,6 +1,6 @@
 import { BUSINESS, PRODUCTS } from "./config.js";
 import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRows, isYes, isNo, isDone, parseRemove, parseChangeQty, lev } from "./nlu.js";
-import { deliveryAllowed, longDate } from "./delivery.js";
+import { deliveryAllowed, longDate, puedeHoy } from "./delivery.js";
 
 const money = (n) => `${n.toFixed(2)}${BUSINESS.currency}`;
 const norm = (s) =>
@@ -346,7 +346,7 @@ function askDelivery(s, now, lead = "") {
   return {
     reply: `${lead}📅 *¿Cuándo quieres recibirlo?*\nElige un día de la lista, o escríbelo como quieras (por ejemplo _"mañana"_, _"el lunes"_ o _"20 de noviembre"_).`,
     session: s,
-    ui: { type: "list", button: "Elegir día", section: "Día de entrega", rows: deliveryRows(now) },
+    ui: { type: "list", button: "Elegir día", section: "Día de entrega", rows: deliveryRows(now, { hoy: puedeHoy(s.customer) }) },
   };
 }
 
@@ -355,10 +355,10 @@ function askDelivery(s, now, lead = "") {
  * ({ notice }). Devuelve siempre el resto de la frase, ya sin la fecha, para interpretar los artículos.
  */
 function takeDate(s, rawText, now) {
-  const e = extractDelivery(rawText, now);
+  const e = extractDelivery(rawText, now, { hoy: puedeHoy(s.customer) });
   if (!e) return { rest: rawText };
   if (e.ambiguous) return { rest: e.rest, notice: '📅 ¿Qué *día* de la semana que viene lo quieres? Por ejemplo _"el martes"_ o _"el 10 de noviembre"_.' };
-  const why = explainDelivery(e.date, now);
+  const why = explainDelivery(e.date, now, { hoy: puedeHoy(s.customer) });
   if (why) return { rest: e.rest, notice: `📅 ${why}` };
   s.delivery = e.date;
   return { rest: e.rest, set: true };
@@ -417,7 +417,7 @@ export function handleMessage(session, rawText, ctx = {}) {
   }
   if (s.customer && ["menu", "items", "cart"].includes(s.state)) {
     // «lo de siempre», «repite el último pedido para el viernes»
-    const t0 = norm(extractDelivery(rawText, now)?.rest ?? text);
+    const t0 = norm(extractDelivery(rawText, now, { hoy: puedeHoy(s.customer) })?.rest ?? text);
     if (REPEAT_PHRASES.some((p) => t0 === p || t0.startsWith(p + " "))) {
       const d = takeDate(s, rawText, now);
       const r = repeatOrder(s, repeatOptions(s.customer)[0]);
@@ -430,12 +430,12 @@ export function handleMessage(session, rawText, ctx = {}) {
     if (text === "d:otro") return { reply: 'Escribe el día que quieras, por ejemplo _"mañana"_, _"el viernes"_ o _"20 de noviembre"_.', session: s };
     let date = /^d:(\d{4}-\d{2}-\d{2})$/.exec(text)?.[1] ?? null, notice = "";
     if (!date) {
-      const e = extractDelivery(rawText, now);
+      const e = extractDelivery(rawText, now, { hoy: puedeHoy(s.customer) });
       if (e?.date) date = e.date;
       else if (e?.ambiguous) notice = '📅 ¿Qué *día* de la semana que viene lo quieres? Por ejemplo _"el martes"_ o _"el 10 de noviembre"_.\n\n';
     }
     if (date) {
-      const why = explainDelivery(date, now);
+      const why = explainDelivery(date, now, { hoy: puedeHoy(s.customer) });
       if (why) return askDelivery(s, now, `📅 ${why}\n\n`);
       s.delivery = date;
       return placeOrder();
@@ -679,8 +679,8 @@ export function handleMessage(session, rawText, ctx = {}) {
     case "confirm": {
       if (text === "1" || text === "c:ok" || isYes(rawText)) {
         // Si aún no ha dicho cuándo lo quiere (o ese día ya no se puede servir), se le pregunta antes de enviar
-        if (ASK_DELIVERY && (!s.delivery || !deliveryAllowed(s.delivery, now))) {
-          const why = s.delivery ? explainDelivery(s.delivery, now) : null;
+        if (ASK_DELIVERY && (!s.delivery || !deliveryAllowed(s.delivery, now, { hoy: puedeHoy(s.customer) }))) {
+          const why = s.delivery ? explainDelivery(s.delivery, now, { hoy: puedeHoy(s.customer) }) : null;
           s.delivery = null;
           return askDelivery(s, now, why ? `📅 ${why}\n\n` : "");
         }

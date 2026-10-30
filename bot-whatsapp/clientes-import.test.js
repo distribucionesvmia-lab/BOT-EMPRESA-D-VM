@@ -46,9 +46,27 @@ test("parseClientes: campos, inactivos, duplicados y filas de total; el NIF no s
   assert.equal(customers[2].active, false); // bloqueado
   assert.equal(customers[3].active, false); // obsoleto
   assert.equal(JSON.stringify(customers).includes("00000000T"), false); // el NIF no se guarda
-  assert.deepEqual(stats, { filas: 6, importados: 4, sinTelefono: 1, sinCorreo: 2, sinNif: 2, inactivos: 2, duplicados: 1, descartadas: 1 });
+  assert.deepEqual(stats, { filas: 6, importados: 4, sinTelefono: 1, sinCorreo: 2, sinNif: 2, sinMunicipio: 4, inactivos: 2, duplicados: 1, descartadas: 1 });
 });
 
 test("parseClientes: sin cabecera reconocible da un error claro", () => {
   assert.throws(() => parseClientesXlsx(buildWorkbook([{ name: "X", rows: [["a", "b"], ["1", "2"]] }])), /cabecera/);
+});
+
+test("parseClientes: lee el código de municipio («Cód. municipio») para la entrega en el día", () => {
+  const cab2 = ["Cód. cliente", "Organización", "Razón social", "Población", "Cód. municipio", "Teléfono"];
+  const r = parseClientesXlsx(buildWorkbook([{ name: "C", rows: [cab2, ["1", "BAR MEDINA", "", "MEDINA DEL CAMPO", "47085", ""], ["2", "BAR OTRO", "", "TORDESILLAS", " 47 163 ", ""], ["3", "SIN CODIGO", "", "X", "", ""]] }]));
+  assert.deepEqual(r.customers.map((c) => c.municipio), ["47085", "47163", ""]);
+  assert.equal(r.stats.sinMunicipio, 1);
+});
+
+test("el municipio se guarda y no se borra si una importación posterior no trae esa columna", async () => {
+  const { openCustomersDb } = await import("./clientes-db.js");
+  const db = openCustomersDb(":memory:");
+  db.upsertCustomers([{ id: "1", name: "BAR MEDINA", municipio: "47085" }]);
+  assert.equal(db.getById("1").municipio, "47085");
+  db.upsertCustomers([{ id: "1", name: "BAR MEDINA" }]); // Excel sin la columna
+  assert.equal(db.getById("1").municipio, "47085");
+  db.upsertCustomers([{ id: "1", name: "BAR MEDINA", municipio: "47186" }]); // cambia de municipio
+  assert.equal(db.getById("1").municipio, "47186");
 });

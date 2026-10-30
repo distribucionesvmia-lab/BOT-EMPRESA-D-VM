@@ -15,7 +15,7 @@ export function seedDocs(data) {
       id: String(p.id), name: p.name, price: p.price, unitsPerBox: p.unitsPerBox ?? null, vat: p.vat ?? 21, discount: p.discount ?? 0, updatedAt: null, changes: [],
     })),
     customers: data.customers.map((c) => ({
-      id: String(c.id), name: c.name, legalName: c.legalName ?? "", city: c.city ?? "", phone: c.phone ?? "", phones: [String(c.phone ?? "").replace(/\D/g, "").slice(-9)].filter((p) => p.length === 9), emails: c.emails ?? [], active: c.active !== false,
+      id: String(c.id), name: c.name, legalName: c.legalName ?? "", city: c.city ?? "", municipio: c.municipio ?? "", phone: c.phone ?? "", phones: [String(c.phone ?? "").replace(/\D/g, "").slice(-9)].filter((p) => p.length === 9), emails: c.emails ?? [], active: c.active !== false,
       address: c.address ?? "", recargoEquivalencia: !!c.recargoEquivalencia,
       specialPrices: c.specialPrices ?? {}, discounts: c.discounts ?? {}, orders: c.orders ?? [],
       nifKeys: c.nifKeys ?? (c.nif ? demoNifKeys(String(c.id), c.nif) : []),
