@@ -1,6 +1,7 @@
 // Formato del Excel de pedidos para que una persona los pase a a3ERP.
 //
 // Hoja «Pedidos»: un bloque por pedido, con tres partes:
+//   CARTEL    «PEDIDO VM-…» grande, en una fila combinada de toda la anchura
 //   CABECERA  Nº pedido · Código cliente · Nombre comercial · Fecha recepción · Hora pedido
 //   LÍNEAS    Código artículo · Cajas · Descripción · Unidades · Precio · Dto. % · Importe · IVA % · Observaciones línea
 //   PIE       Total base imponible · Total IVA · Total R.E. · TOTAL PEDIDO · Observaciones del cliente
@@ -9,7 +10,7 @@
 // Precio, descuento, cajas/unidades e impuestos vienen ya calculados y guardados en cada línea (ver pricing.js).
 // Si en el futuro a3ERP exige una plantilla de importación concreta, solo hay que cambiar este fichero.
 
-import { STYLE } from "./xlsx-files.js";
+import { STYLE, colName } from "./xlsx-files.js";
 import { round2, totals } from "./pricing.js";
 
 export const madrid = (iso) => {
@@ -54,7 +55,7 @@ function orderBlock(o) {
   obs[0] = { v: "Observaciones del cliente", s: STYLE.bold };
   obs[2] = o.note || null;
   return [
-    pad([{ v: `PEDIDO ${o.ref}`, s: STYLE.title }], STYLE.title),
+    pad([{ v: `PEDIDO ${o.ref}`, s: STYLE.banner }], STYLE.banner), // cartel grande y combinado en toda la anchura (ver build)
     hdr(HEAD),
     [o.ref, o.customer_id, o.name, madridDate(o.created_at), madridTime(o.created_at)],
     hdr(LINE_HEAD),
@@ -72,7 +73,14 @@ export const FORMAT = {
   name: "pedidos-v2",
   /** orders -> { sheets: [{ name, widths, rows }], lineCount } */
   build(orders) {
-    const blocks = orders.flatMap(orderBlock);
+    // Cada pedido empieza con un cartel grande («PEDIDO VM-2026-000001») combinado en toda la anchura y con la fila más alta,
+    // para que no se confunda con una línea de pedido
+    const blocks = [], merges = [], heights = {};
+    for (const o of orders) {
+      merges.push(`A${blocks.length + 1}:${colName(COLS - 1)}${blocks.length + 1}`);
+      heights[blocks.length] = 38;
+      blocks.push(...orderBlock(o));
+    }
     const flat = [
       [...HEAD, ...LINE_HEAD, "Observaciones del pedido"].map((v) => ({ v, s: STYLE.bold })),
       ...orders.flatMap((o) =>
@@ -81,7 +89,7 @@ export const FORMAT = {
     ];
     return {
       sheets: [
-        { name: "Pedidos", widths: WIDTHS, rows: blocks },
+        { name: "Pedidos", widths: WIDTHS, rows: blocks, merges, heights },
         { name: "Líneas", widths: [18, 14, 30, 16, 12, 16, 8, 46, 10, 11, 8, 12, 8, 40, 30], rows: flat },
       ],
       lineCount: flat.length - 1,

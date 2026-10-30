@@ -94,6 +94,18 @@ test("exporta los pedidos pendientes una sola vez y guarda el historial", () => 
   assert.equal(db.listExports().length, 2);
 });
 
+test("hoja «Pedidos»: el cartel «PEDIDO …» va combinado en toda la anchura, grande y con la fila más alta", () => {
+  const db = openDb(":memory:"), dir = tmp();
+  db.createOrder(pedido("k1", {}));
+  db.createOrder(pedido("k2", {}));
+  const xml = unzip(fs.readFileSync(runExport(db, { dir }).filePath))["xl/worksheets/sheet1.xml"];
+  const merges = [...xml.matchAll(/<mergeCell ref="([A-Z0-9:]+)"/g)].map((m) => m[1]);
+  assert.equal(merges.length, 2);
+  assert.equal(merges[0], "A1:I1");
+  assert.match(xml, /<row r="1" ht="38" customHeight="1"><c r="A1" s="7"/);
+  assert.match(xml, new RegExp(`<row r="${merges[1].match(/\d+/)[0]}" ht="38"`)); // el segundo pedido también
+});
+
 test("hoja «Pedidos»: cabecera, líneas con cajas/unidades/precio/descuento y pie con totales", () => {
   const db = openDb(":memory:"), dir = tmp();
   db.createOrder(pedido("k1", { note: "Servir el jueves, los demás días estoy cerrado" }));

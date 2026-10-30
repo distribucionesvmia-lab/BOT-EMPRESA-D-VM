@@ -90,6 +90,7 @@
   .xl td { border: 1px solid var(--line); padding: 3px 7px; white-space: nowrap; }
   .xl .s1 { font-weight: 600; } .xl .s4 { background: var(--head); font-weight: 600; } .xl .s6 { background: var(--title); font-weight: 600; } .xl .s3 { font-weight: 600; }
   .xl .n { text-align: right; }
+  .xl .s7 { background: #1f3864; color: #fff; font-size: 24px; font-weight: 700; padding: 12px 16px; letter-spacing: .02em; }
   .file { font-family: var(--mono); font-size: 12px; color: var(--muted); }
   .muted { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
   .note { color: var(--muted); font-size: 12.5px; margin: 14px 0 0; max-width: 70ch; }
@@ -556,6 +557,7 @@ function pintarHoja(i) {
     for (let c = 0; c < Math.max(row.length, 1); c++) {
       let v = row[c], s = 0; if (v && typeof v === "object") { s = v.s ?? 0; v = v.v; }
       const td = document.createElement("td"); if (s) td.className = "s" + s;
+      if (s === 7) { td.colSpan = sh.widths?.length || 9; td.textContent = v ?? ""; tr.appendChild(td); break; } // cartel del pedido: una sola celda grande
       if (typeof v === "number") { td.className += " n"; td.textContent = Number.isInteger(v) ? String(v) : num(v); } else td.textContent = v ?? "";
       tr.appendChild(td);
     }
