@@ -129,7 +129,28 @@
   .cnt { display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: var(--warn-soft); color: var(--warn); font-size: 12px; text-align: center; }
   .tab[aria-selected="true"] .cnt { background: rgba(255,255,255,.25); color: inherit; }
   .toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 9px 14px; border-radius: 10px; font-size: 13px; z-index: 50; max-width: 90vw; }
+  .tecnico-btn { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); z-index: 40; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+  .tecnico-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .tecnico-btn:focus-visible, .tecnico-box button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tecnico-fondo { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .tecnico-fondo[hidden] { display: none; }
+  .tecnico-box { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 14px; padding: 18px; width: 100%; max-width: 320px; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow); }
+  .tecnico-box input { font: inherit; font-size: 18px; letter-spacing: .2em; text-align: center; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 10px; }
+  .tecnico-box .acc { display: flex; gap: 8px; justify-content: flex-end; }
+  .tecnico-box button { font: inherit; font-weight: 600; border-radius: 9px; padding: 8px 14px; cursor: pointer; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+  .tecnico-box button.ok { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 </style>
+
+<button type="button" class="tecnico-btn" id="tecnico-btn">Técnico</button>
+<div class="tecnico-fondo" id="tecnico-fondo" hidden>
+  <form class="tecnico-box" id="tecnico-form" role="dialog" aria-modal="true" aria-labelledby="tecnico-t">
+    <b id="tecnico-t">Acceso técnico</b>
+    <label for="tecnico-cod" class="sub">Introduce el código</label>
+    <input id="tecnico-cod" type="password" inputmode="numeric" autocomplete="off" maxlength="12">
+    <div class="err" id="tecnico-err" role="alert" hidden>Código incorrecto.</div>
+    <div class="acc"><button type="button" id="tecnico-cancel">Cancelar</button><button type="submit" class="ok">Entrar</button></div>
+  </form>
+</div>
 
 <div class="shell">
 
@@ -371,11 +392,31 @@ const num = (n) => Number(n).toFixed(2).replace(".", ",");
 const el = (tag, text, props = {}) => Object.assign(document.createElement(tag), { textContent: text ?? "" }, props);
 function toast(msg) { const e = $("toast"); e.textContent = msg; e.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (e.hidden = true), 4200); }
 
+// ---- Acceso técnico: el botón de arriba a la derecha pide un código para abrir la vista de la empresa ----
+const CODIGO_TECNICO = "123123";
+const tecnicoOk = () => { try { return sessionStorage.getItem("vm:tecnico") === "1"; } catch { return false; } };
+function tecnicoAbrir() { $("tecnico-err").hidden = true; $("tecnico-cod").value = ""; $("tecnico-fondo").hidden = false; $("tecnico-cod").focus(); }
+function tecnicoCerrar() { $("tecnico-fondo").hidden = true; $("tecnico-btn").focus(); }
+$("tecnico-btn").addEventListener("click", () => { if (tecnicoOk()) location.hash = "empresa"; else tecnicoAbrir(); });
+document.querySelector("#v-empresa .back").addEventListener("click", () => { try { sessionStorage.removeItem("vm:tecnico"); } catch {} });
+$("tecnico-cancel").addEventListener("click", tecnicoCerrar);
+$("tecnico-fondo").addEventListener("keydown", (e) => { if (e.key === "Escape") tecnicoCerrar(); });
+$("tecnico-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  if ($("tecnico-cod").value.trim() !== CODIGO_TECNICO) { $("tecnico-err").hidden = false; $("tecnico-cod").select(); return; }
+  try { sessionStorage.setItem("vm:tecnico", "1"); } catch {}
+  $("tecnico-fondo").hidden = true;
+  location.hash = "empresa";
+  route();
+});
+
 // ---- Rutas: cada aplicación tiene su propio enlace (#cliente, #empresa) ----
 function route() {
   const h = location.hash.slice(1);
-  // Por defecto (sin nada detrás del enlace) se ve SIEMPRE la aplicación del cliente; la de la empresa solo con #empresa
-  const v = h === "empresa" || h === "distribuidor" ? "empresa" : "cliente";
+  // Por defecto (sin nada detrás del enlace) se ve SIEMPRE la aplicación del cliente; la de la empresa solo con #empresa y el código técnico
+  let v = h === "empresa" || h === "distribuidor" ? "empresa" : "cliente";
+  if (v === "empresa" && !tecnicoOk()) { v = "cliente"; history.replaceState(null, "", location.pathname + location.search); tecnicoAbrir(); }
+  $("tecnico-btn").hidden = v === "empresa";
   for (const id of ["cliente", "empresa"]) $("v-" + id).hidden = id !== v;
   document.title = v === "empresa" ? "Pedidos · Empresa" : "Pedidos · Distribuciones VM";
   if (v === "cliente") pantallaCliente();
