@@ -229,6 +229,7 @@ window.VM = {
   orders: () =>
     withRefs().reverse().map((o) => ({
       id: o.id, ref: o.ref, hora: madridTime(o.created_at), cliente: o.name, codigo: o.customer_id, lineas: o.items.length,
+      nota: o.note || "",
       resumen: o.items.map((i) => `${i.boxes ?? i.units} ${i.boxes ? "caja" + (i.boxes > 1 ? "s" : "") : "ud"} ${i.name}`).join(" · "),
       total: rowTotals(o).total, estado: o.export_status === "exported" ? "exportado" : o.review || !o.customer_id ? "retenido" : "pendiente",
       motivo: !o.customer_id ? "Cliente sin código de ERP" : o.review ? o.reason || "Interpretación dudosa" : "",

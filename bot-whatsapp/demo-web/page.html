@@ -91,6 +91,7 @@
   .xl .s1 { font-weight: 600; } .xl .s4 { background: var(--head); font-weight: 600; } .xl .s6 { background: var(--title); font-weight: 600; } .xl .s3 { font-weight: 600; }
   .xl .n { text-align: right; }
   .file { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .muted { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
   .note { color: var(--muted); font-size: 12.5px; margin: 14px 0 0; max-width: 70ch; }
   @media (prefers-reduced-motion: no-preference) { .m { animation: pop .18s ease-out; } @keyframes pop { from { transform: translateY(4px); opacity: 0; } } }
 
@@ -426,7 +427,7 @@ function pintarPedidos() {
     const est = el("td"); est.appendChild(el("span", o.estado[0].toUpperCase() + o.estado.slice(1), { className: "badge " + o.estado, title: o.motivo }));
     if (o.motivo) est.appendChild(el("div", o.motivo, { className: "sub" }));
     if (o.estado === "retenido" && o.codigo) { const b = el("button", "Revisado: exportar", { type: "button", className: "btn" }); b.onclick = () => VM.approveOrder(o.id).catch((e) => toast(e.message)); est.appendChild(b); }
-    tr.append(el("td", o.ref, { className: "ref" }), el("td", o.hora), cli, el("td", o.resumen), el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
+    tr.append(el("td", o.ref, { className: "ref" }), el("td", o.hora), cli, (() => { const td = el("td", o.resumen); if (o.nota) td.append(el("div", "📝 Observaciones: " + o.nota, { className: "muted" })); return td; })(), el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
   }
   $("tabla").hidden = !list.length; $("vacio").hidden = !!list.length;
 }
