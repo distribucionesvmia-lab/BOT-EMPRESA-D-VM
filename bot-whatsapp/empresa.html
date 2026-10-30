@@ -50,8 +50,9 @@
     <div id="p-pedidos">
       <div class="panel">
         <h2>Pedidos recibidos</h2>
-        <div class="row" style="margin-bottom:10px"><button class="main" id="exportar">Exportar a Excel</button><span class="muted" id="expmsg" role="status"></span></div>
-        <div class="scroll"><table><thead><tr><th>Pedido</th><th>Recibido</th><th>Cliente</th><th>Artículos</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody id="ped"></tbody></table></div>
+        <div class="row" style="margin-bottom:10px"><button class="main" id="exportar-sel" disabled>Exportar seleccionados (0)</button><button id="exportar">Exportar todos los pendientes</button><span class="muted" id="expmsg" role="status"></span></div>
+        <p class="muted" style="margin:0 0 8px">Marca los pedidos pendientes que quieras llevar al Excel; los que no marques siguen pendientes.</p>
+        <div class="scroll"><table><thead><tr><th><input type="checkbox" id="sel-todos" aria-label="Seleccionar todos los pendientes"></th><th>Pedido</th><th>Recibido</th><th>Cliente</th><th>Artículos</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody id="ped"></tbody></table></div>
         <p class="muted" id="ped-vacio" hidden>Todavía no hay pedidos.</p>
       </div>
       <div class="panel" id="hist-panel" hidden style="margin-top:14px"><h2>Excel exportados</h2><div class="scroll"><table><tbody id="hist"></tbody></table></div></div>
@@ -113,6 +114,13 @@ function mostrarAviso(texto) { const p = $("pin"); p.hidden = false; p.textConte
 function mostrarPin(texto, pin) { const p = $("pin"); p.hidden = false; p.textContent = texto + " "; p.appendChild(el("b", pin)); p.appendChild(el("span", " — anótalo ahora y díselo al cliente: no se volverá a mostrar.")); }
 
 // ---- Pedidos ----
+const sel = new Set(); // referencias de los pedidos marcados para exportar (se conservan al refrescar)
+function actualizarSel() {
+  const pend = [...document.querySelectorAll("#ped input.sel")];
+  $("exportar-sel").textContent = `Exportar seleccionados (${sel.size})`; $("exportar-sel").disabled = !sel.size;
+  $("sel-todos").checked = pend.length > 0 && pend.every((c) => c.checked); $("sel-todos").disabled = !pend.length;
+}
+$("sel-todos").onchange = (e) => { document.querySelectorAll("#ped input.sel").forEach((c) => { c.checked = e.target.checked; e.target.checked ? sel.add(c.dataset.ref) : sel.delete(c.dataset.ref); }); actualizarSel(); };
 async function pedidos() {
   const list = await call("/api/admin/pedidos");
   const first = seen === null; seen ??= new Set();
@@ -130,8 +138,15 @@ async function pedidos() {
     if (o.motivo) est.appendChild(el("div", o.motivo, { className: "muted" }));
     if (o.estado === "retenido" && o.codigo) { const b = el("button", "Revisado: exportar"); b.onclick = async () => { await call(`/api/admin/pedidos/${o.ref}/aprobar`, {}); refrescar(); }; est.appendChild(b); }
     const detTd = el("td"); detTd.appendChild(det);
-    tr.append(el("td", o.ref, { className: "ref" }), el("td", hora(o.fecha)), cli, detTd, el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
+    const chk = el("td");
+    if (o.estado === "pendiente") {
+      const c = el("input", "", { type: "checkbox", className: "sel" }); c.dataset.ref = o.ref; c.checked = sel.has(o.ref); c.setAttribute("aria-label", "Exportar " + o.ref);
+      c.onchange = () => { c.checked ? sel.add(o.ref) : sel.delete(o.ref); actualizarSel(); }; chk.appendChild(c);
+    }
+    tr.append(chk, el("td", o.ref, { className: "ref" }), el("td", hora(o.fecha)), cli, detTd, el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
   }
+  const vivos = new Set(list.filter((o) => o.estado === "pendiente").map((o) => o.ref)); for (const r of [...sel]) if (!vivos.has(r)) sel.delete(r); // ya exportados o retenidos
+  actualizarSel();
   const h = await call("/api/admin/exportaciones"); $("hist-panel").hidden = !h.length;
   const th = $("hist"); th.innerHTML = "";
   for (const e of h.slice(0, 10)) {
@@ -145,15 +160,18 @@ async function descargar(e) {
   if (!r.ok) return alert("No se encuentra el archivo.");
   const url = URL.createObjectURL(await r.blob()); const a = el("a", "", { href: url, download: e.archivo }); a.click(); setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
-$("exportar").onclick = async () => {
-  $("exportar").disabled = true;
+async function exportar(refs) {
+  $("exportar").disabled = true; $("exportar-sel").disabled = true;
   try {
-    const r = await call("/api/admin/exportar", {});
-    $("expmsg").textContent = r.exportacion ? `${r.exportacion.pedidos} pedido${r.exportacion.pedidos === 1 ? "" : "s"} exportado${r.exportacion.pedidos === 1 ? "" : "s"}.` + (r.retenidos ? ` ${r.retenidos} retenidos para revisar.` : "") : "No hay pedidos pendientes de exportar." + (r.retenidos ? ` (${r.retenidos} retenidos para revisar)` : "");
-    if (r.exportacion) descargar({ id: r.exportacion.id, archivo: r.exportacion.archivo });
+    const r = await call("/api/admin/exportar", refs ? { refs } : {});
+    const n = r.exportacion?.pedidos ?? 0;
+    $("expmsg").textContent = r.exportacion ? `${n} pedido${n === 1 ? "" : "s"} exportado${n === 1 ? "" : "s"}.` + (r.retenidos ? ` ${r.retenidos} retenidos para revisar.` : "") : "No hay pedidos pendientes de exportar." + (r.retenidos ? ` (${r.retenidos} retenidos para revisar)` : "");
+    if (r.exportacion) { sel.clear(); descargar({ id: r.exportacion.id, archivo: r.exportacion.archivo }); }
     refrescar();
-  } catch (e) { $("expmsg").textContent = e.message; } finally { $("exportar").disabled = false; }
-};
+  } catch (e) { $("expmsg").textContent = e.message; } finally { $("exportar").disabled = false; actualizarSel(); }
+}
+$("exportar").onclick = () => exportar(null);
+$("exportar-sel").onclick = () => sel.size && exportar([...sel]);
 
 // ---- Solicitudes de alta y cuentas ----
 async function solicitudes() {

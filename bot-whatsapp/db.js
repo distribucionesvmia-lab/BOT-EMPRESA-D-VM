@@ -141,16 +141,19 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
      * Si algo falla (generar el fichero o anotar la exportación), no se marca ningún pedido y el fichero se descarta:
      * los pedidos siguen pendientes y se reintentan en la siguiente exportación.
      * Un pedido solo se exporta si es seguro: con código de cliente, con líneas y sin marca de "revisar".
+     * refs (Set de referencias, opcional): solo se exportan esos pedidos; el resto sigue pendiente.
      * Devuelve { export, held }: export es null si no había nada que exportar; held, cuántos pedidos pendientes
      * quedan retenidos esperando revisión.
      */
-    exportPending(build, now = new Date().toISOString()) {
+    exportPending(build, now = new Date().toISOString(), { refs = null } = {}) {
       db.exec("BEGIN IMMEDIATE");
       let built;
       try {
         const pending = db.prepare("SELECT * FROM orders WHERE export_status = 'pending' AND status = 'confirmed' ORDER BY id").all().map(withLines);
-        const ready = pending.filter((o) => !o.review && o.customer_id && o.items.length);
-        const held = pending.length - ready.length;
+        const allReady = pending.filter((o) => !o.review && o.customer_id && o.items.length);
+        const held = pending.length - allReady.length;
+        // refs: la empresa elige qué pedidos exportar; los demás siguen pendientes para otra exportación
+        const ready = refs ? allReady.filter((o) => refs.has(o.ref)) : allReady;
         if (!ready.length) {
           db.exec("COMMIT");
           return { export: null, held };

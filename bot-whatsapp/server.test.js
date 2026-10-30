@@ -449,3 +449,20 @@ test("SINCRONIZACIÓN: la empresa ve el estado y puede lanzarla; importa los Exc
   assert.equal(e.registro.length, 1);
   assert.equal(e.ficheros.clientes.name, "clientes.xlsx");
 });
+
+test("EXPORTAR ELEGIDOS: solo salen los pedidos marcados y se validan las referencias", async () => {
+  const lista = async () => (await call("GET", "/api/admin/pedidos", { admin: true })).json;
+  // dos pedidos nuevos de un cliente de la lista
+  const { cookie } = await entrarNif("111111").then((r) => ({ cookie: cookieOf(r) }));
+  for (const k of ["clave-sel-a", "clave-sel-b"]) { const rr = await call("POST", "/catalogo", { cookie, body: { key: k, lines: [{ id: "1010", qty: 1 }] } }); assert.equal(rr.status, 200, JSON.stringify(rr.json)); }
+  const pend = (await lista()).filter((o) => o.estado === "pendiente");
+  assert.ok(pend.length >= 2);
+  const [a, b] = pend.slice(0, 2).map((o) => o.ref);
+  assert.equal((await call("POST", "/api/admin/exportar", { admin: true, body: { refs: [] } })).status, 400);
+  assert.equal((await call("POST", "/api/admin/exportar", { admin: true, body: { refs: ["x; DROP"] } })).status, 400);
+  const r = (await call("POST", "/api/admin/exportar", { admin: true, body: { refs: [a] } })).json;
+  assert.equal(r.exportacion.pedidos, 1);
+  const tras = await lista();
+  assert.equal(tras.find((o) => o.ref === a).estado, "exportado");
+  assert.equal(tras.find((o) => o.ref === b).estado, "pendiente"); // el no marcado sigue pendiente
+});

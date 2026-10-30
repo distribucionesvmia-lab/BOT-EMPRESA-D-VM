@@ -9,10 +9,10 @@ import { backupDb } from "./backup.js";
 const EXPORT_DIR = () => process.env.EXPORT_DIR ?? "exportaciones";
 
 /**
- * Genera el Excel con los pedidos confirmados pendientes y los marca como exportados (todo o nada).
+ * Genera el Excel con los pedidos confirmados pendientes (todos, o solo los de `refs` si se indican) y los marca como exportados (todo o nada).
  * Devuelve { export, held, filePath } o { export: null, held } si no había pedidos.
  */
-export function runExport(db, { dir = EXPORT_DIR(), now = new Date(), format = FORMAT } = {}) {
+export function runExport(db, { dir = EXPORT_DIR(), now = new Date(), format = FORMAT, refs = null } = {}) {
   fs.mkdirSync(dir, { recursive: true });
   let filePath;
   const result = db.exportPending((orders) => {
@@ -29,7 +29,7 @@ export function runExport(db, { dir = EXPORT_DIR(), now = new Date(), format = F
       lineCount,
       discard: () => fs.rmSync(filePath, { force: true }),
     };
-  }, now.toISOString());
+  }, now.toISOString(), { refs: refs ? new Set(refs) : null });
   return { ...result, filePath: result.export ? filePath : null };
 }
 

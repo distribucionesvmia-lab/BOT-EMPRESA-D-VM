@@ -68,8 +68,15 @@ export function createAdmin({ sync = null, accounts, customers, orders, adminTok
     // ---- Pedidos ----
     if (p === "/api/admin/pedidos" && get) return send(res, 200, orders.listOrders({ limit: 150 }).map(orderView)), true;
     if (p === "/api/admin/exportar" && post) {
+      // Sin cuerpo o sin «refs»: se exportan todos los pendientes; con «refs»: solo los pedidos elegidos
+      const body = (await readJson(req)) ?? {};
+      let refs = null;
+      if (body.refs !== undefined) {
+        if (!Array.isArray(body.refs) || !body.refs.length || body.refs.length > 500 || !body.refs.every((r) => /^VM-\d{4}-\d{6}$/.test(String(r)))) return send(res, 400, { error: "Elige al menos un pedido válido para exportar." }), true;
+        refs = body.refs;
+      }
       try {
-        const r = runExport(orders, { dir: exportDir() });
+        const r = runExport(orders, { dir: exportDir(), refs });
         return send(res, 200, { exportacion: r.export && { id: r.export.id, archivo: r.export.file_name, pedidos: r.export.order_count, lineas: r.export.line_count }, retenidos: r.held }), true;
       } catch (e) {
         console.error("Error exportando:", e);

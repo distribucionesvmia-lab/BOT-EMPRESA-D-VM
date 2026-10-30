@@ -94,6 +94,21 @@ test("exporta los pedidos pendientes una sola vez y guarda el historial", () => 
   assert.equal(db.listExports().length, 2);
 });
 
+test("exportar solo los pedidos elegidos: los demás siguen pendientes y se pueden exportar después", () => {
+  const db = openDb(":memory:"), dir = tmp();
+  const refs = ["a", "b", "c"].map((k) => db.createOrder(pedido(k, {})).order.ref);
+  const r1 = runExport(db, { dir, refs: [refs[0], refs[2]] });
+  assert.equal(r1.export.order_count, 2);
+  const f = unzip(fs.readFileSync(r1.filePath));
+  const rows = grid(f["xl/worksheets/sheet1.xml"]);
+  assert.deepEqual(rows.filter((r) => /^PEDIDO /.test(r[0] ?? "")).map((r) => r[0]), [`PEDIDO ${refs[0]}`, `PEDIDO ${refs[2]}`]);
+  assert.deepEqual(db.listOrders().map((o) => [o.ref, o.export_status]).sort(), [[refs[0], "exported"], [refs[1], "pending"], [refs[2], "exported"]]);
+  // una referencia que no existe o ya exportada no exporta nada
+  assert.equal(runExport(db, { dir, refs: [refs[0], "VM-2026-999999"] }).export, null);
+  // el pedido que quedó se exporta después
+  assert.equal(runExport(db, { dir }).export.order_count, 1);
+});
+
 test("hoja «Pedidos»: el cartel «PEDIDO …» va combinado en toda la anchura, grande y con la fila más alta", () => {
   const db = openDb(":memory:"), dir = tmp();
   db.createOrder(pedido("k1", {}));

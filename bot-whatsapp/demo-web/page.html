@@ -321,13 +321,14 @@
         <div class="panel">
           <h2>Pedidos recibidos</h2>
           <div class="actions">
-            <button class="btn main" id="exportar" type="button">Exportar a Excel</button>
+            <button class="btn main" id="exportar-sel" type="button" disabled>Exportar seleccionados (0)</button>
+            <button class="btn" id="exportar" type="button">Exportar todos los pendientes</button>
             <button class="btn" id="reiniciar" type="button">Restaurar datos de ejemplo</button>
             <span class="msg" id="expmsg"></span>
           </div>
           <div class="scroll">
             <table id="tabla" hidden>
-              <thead><tr><th>Pedido</th><th>Hora</th><th>Cliente</th><th>Artículos</th><th class="num">Total</th><th>Estado</th></tr></thead>
+              <thead><tr><th><input type="checkbox" id="sel-todos" aria-label="Seleccionar todos los pendientes"></th><th>Pedido</th><th>Hora</th><th>Cliente</th><th>Artículos</th><th class="num">Total</th><th>Estado</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -431,6 +432,7 @@ function avisos() {
   const ad = $("aviso-dis"); ad.hidden = !(i.mode === "shared" && !i.isAdmin);
   ad.textContent = "Estás en modo lectura: ves los pedidos y las solicitudes, pero para exportar, aprobar altas o cambiar precios necesitas acceso de Editor.";
   for (const id of ["exportar", "reiniciar"]) $(id).disabled = !i.isAdmin;
+  actualizarSel();
 }
 
 // ---- Aplicación del cliente ----
@@ -538,8 +540,17 @@ function pintarTabs() {
 }
 function mostrarPin(texto, pin) { const p = $("pin"); p.hidden = false; p.textContent = texto + " "; p.appendChild(el("b", pin)); p.appendChild(el("span", " — anótalo ahora y díselo al cliente: no se volverá a mostrar.")); }
 
+const selOrd = new Set(); // pedidos marcados para exportar (se conservan al repintar)
+function actualizarSel() {
+  const pend = [...document.querySelectorAll("#tabla input.sel")];
+  const i = VM.info();
+  $("exportar-sel").textContent = `Exportar seleccionados (${selOrd.size})`; $("exportar-sel").disabled = !selOrd.size || !i.isAdmin;
+  $("sel-todos").checked = pend.length > 0 && pend.every((c) => c.checked); $("sel-todos").disabled = !pend.length;
+}
+$("sel-todos").onchange = (e) => { document.querySelectorAll("#tabla input.sel").forEach((c) => { c.checked = e.target.checked; e.target.checked ? selOrd.add(c.dataset.id) : selOrd.delete(c.dataset.id); }); actualizarSel(); };
 function pintarPedidos() {
   const list = VM.orders();
+  const vivos = new Set(list.filter((o) => o.estado === "pendiente").map((o) => o.id)); for (const id of [...selOrd]) if (!vivos.has(id)) selOrd.delete(id);
   const tb = document.querySelector("#tabla tbody"); tb.innerHTML = "";
   const first = seenOrders === null; seenOrders ??= new Set();
   for (const o of list) {
@@ -548,9 +559,12 @@ function pintarPedidos() {
     const est = el("td"); est.appendChild(el("span", o.estado[0].toUpperCase() + o.estado.slice(1), { className: "badge " + o.estado, title: o.motivo }));
     if (o.motivo) est.appendChild(el("div", o.motivo, { className: "sub" }));
     if (o.estado === "retenido" && o.codigo) { const b = el("button", "Revisado: exportar", { type: "button", className: "btn" }); b.onclick = () => VM.approveOrder(o.id).catch((e) => toast(e.message)); est.appendChild(b); }
-    tr.append(el("td", o.ref, { className: "ref" }), el("td", o.hora), cli, (() => { const td = el("td", o.resumen); if (o.entrega) { const b = el("div", o.entrega.texto); b.style.cssText = `font-weight:700;padding:4px 8px;border-radius:6px;margin-top:5px;display:block;width:fit-content;background:${{ rojo: "#ff0000", amarillo: "#ffff00", verde: "#92d050" }[o.entrega.color]};color:${o.entrega.color === "rojo" ? "#fff" : "#000"}`; td.append(b); } if (o.nota) td.append(el("div", "📝 Observaciones: " + o.nota, { className: "muted" })); return td; })(), el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
+    const chk = el("td");
+    if (o.estado === "pendiente") { const c = el("input", "", { type: "checkbox", className: "sel" }); c.dataset.id = o.id; c.checked = selOrd.has(o.id); c.setAttribute("aria-label", "Exportar " + o.ref); c.onchange = () => { c.checked ? selOrd.add(o.id) : selOrd.delete(o.id); actualizarSel(); }; chk.appendChild(c); }
+    tr.append(chk, el("td", o.ref, { className: "ref" }), el("td", o.hora), cli, (() => { const td = el("td", o.resumen); if (o.entrega) { const b = el("div", o.entrega.texto); b.style.cssText = `font-weight:700;padding:4px 8px;border-radius:6px;margin-top:5px;display:block;width:fit-content;background:${{ rojo: "#ff0000", amarillo: "#ffff00", verde: "#92d050" }[o.entrega.color]};color:${o.entrega.color === "rojo" ? "#fff" : "#000"}`; td.append(b); } if (o.nota) td.append(el("div", "📝 Observaciones: " + o.nota, { className: "muted" })); return td; })(), el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
   }
   $("tabla").hidden = !list.length; $("vacio").hidden = !!list.length;
+  actualizarSel();
 }
 function pintarHoja(i) {
   const sh = lastExport.sheets[i]; const tbl = $("xl"); tbl.innerHTML = "";
@@ -591,13 +605,15 @@ function pintarHistorial() {
     li.append(el("span", `${e.fileName} · ${plural(e.orderCount, "pedido", "pedidos")} · ${plural(e.lineCount, "línea", "líneas")}`, { className: "file" }), ver, dl); ul.appendChild(li);
   }
 }
-$("exportar").onclick = async () => {
+async function exportarPedidos(ids) {
   try {
-    const r = await VM.exportNow();
+    const r = await VM.exportNow(ids);
     $("expmsg").textContent = r.export ? `${plural(r.export.orderCount, "pedido exportado", "pedidos exportados")}.` + (r.held ? ` ${r.held} retenidos para revisar.` : "") : "No hay pedidos pendientes de exportar." + (r.held ? ` (${r.held} retenidos para revisar)` : "");
-    if (r.export) mostrarExcel(r.export);
+    if (r.export) { selOrd.clear(); mostrarExcel(r.export); }
   } catch (e) { $("expmsg").textContent = e.message; }
-};
+}
+$("exportar").onclick = () => exportarPedidos(null);
+$("exportar-sel").onclick = () => selOrd.size && exportarPedidos([...selOrd]);
 let confirmReset = null;
 $("reiniciar").onclick = async () => {
   const b = $("reiniciar");

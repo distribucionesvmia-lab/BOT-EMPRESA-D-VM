@@ -352,12 +352,13 @@ window.VM = {
   },
 
   /** Exporta a Excel los pedidos pendientes (los marca como exportados y guarda el historial). */
-  async exportNow() {
+  /** Exporta los pedidos pendientes listos (todos, o solo los de `ids` si la empresa los ha elegido). */
+  async exportNow(ids = null) {
     if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para exportar.");
     const all = withRefs();
     const pending = all.filter((o) => o.export_status === "pending");
-    const rows = pending.filter(isReady);
-    const held = pending.length - rows.length;
+    const rows = pending.filter(isReady).filter((o) => !ids || ids.includes(o.id));
+    const held = pending.length - pending.filter(isReady).length;
     if (!rows.length) return { export: null, held };
     const id = `e${Date.now().toString(36)}${uid()}`;
     const exp = buildExport(rows, stampName(), { id });

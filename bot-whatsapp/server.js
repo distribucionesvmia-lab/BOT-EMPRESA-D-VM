@@ -470,6 +470,7 @@ http
   .listen(PORT, () => {
     console.log(`Bot escuchando en http://localhost:${PORT}`);
     // Exportación diaria a Excel (EXPORT_TIME, por defecto 21:00 hora de Madrid). En modo demo no se programa.
-    if (process.env.DEMO !== "1" && adminEnabled) scheduleDailyExport(getDb());
+    // EXPORT_AUTO=0 desactiva la exportación diaria automática: la empresa exporta cuando quiere y elige qué pedidos
+    if (process.env.DEMO !== "1" && adminEnabled && process.env.EXPORT_AUTO !== "0") scheduleDailyExport(getDb());
     if (process.env.DEMO !== "1") sync?.start();
   });
