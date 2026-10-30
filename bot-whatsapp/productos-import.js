@@ -25,6 +25,8 @@ const FIELDS = [
   ["unitsPerBox", [/(ud|uds|unid\w*)\W*(por |\/ ?|x )?caja/, /^caja/, /^envase|^empaque/], []],
   ["vat", [/^(% ?)?iva|tipo iva|^impuesto/], [/recargo|r e/]],
   ["discount", [/^(dto|descuento|% ?dto)/], []],
+  ["category", [/^(categoria|familia)$/], []],
+  ["subcategory", [/^(subcategoria|subfamilia)$/], []],
   ["blocked", [/^bloqueado/], []],
   ["obsolete", [/^obsoleto|^baja$/], []],
 ];
@@ -63,6 +65,9 @@ export function parseProductos(rows) {
     if (upb !== null && Number.isInteger(upb) && upb >= 1) p.unitsPerBox = upb;
     if (vat !== null && vat >= 0 && vat <= 100) p.vat = vat;
     if (dto !== null && dto >= 0 && dto <= 100) p.discount = dto;
+    const cat = String(get(r, "category") ?? "").trim(), sub = String(get(r, "subcategory") ?? "").trim();
+    if (cat) p.category = cat;
+    if (sub) p.subcategory = sub;
     products.push(p);
     stats.importados++;
     if (!p.active) stats.inactivos++;

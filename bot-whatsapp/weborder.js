@@ -1,4 +1,5 @@
 import { deliveryAllowed, madridDay } from "./delivery.js";
+import { categorizar, arbolCategorias } from "./categorias.js";
 
 // Lógica de la mini-aplicación de pedido, sin red ni disco (la comparten el servidor y la demo del navegador).
 
@@ -11,11 +12,15 @@ export function webProducts(customer, catalog, habitualProducts) {
       name: p.name,
       price: p.price,
       unitsPerBox: Number.isInteger(p.unitsPerBox) && p.unitsPerBox > 1 ? p.unitsPerBox : null,
+      ...(({ cat, sub }) => ({ cat, sub }))(categorizar(p)), // categoría y subcategoría (ids) para navegar el catálogo
       lastQty: habit.get(p.id)?.lastQty ?? null,
       count: habit.get(p.id)?.count ?? 0,
     }))
     .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
+
+/** Árbol de categorías del catálogo que ve el cliente (con cuántos productos tiene cada una). */
+export const webTree = (catalog) => arbolCategorias(catalog);
 
 /** Últimos pedidos del cliente (los más recientes primero) con sus líneas, para volver a comprarlos o modificarlos. */
 export function webHistory(customer, catalogList, limit = 5) {

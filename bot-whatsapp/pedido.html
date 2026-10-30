@@ -63,6 +63,19 @@
   .ud button { flex:1; border:0; background:#fff; min-height:44px; padding:0 4px; font-size:15px; cursor:pointer; color:var(--gris); font-weight:700; }
   .ud button.on { background:var(--rojo); color:#fff; }
   .lnote { width:calc(100% - 28px); margin:0 14px 14px; border:2px solid var(--linea); border-radius:12px; padding:12px; font:inherit; font-size:16px; }
+  /* Catálogo por categorías: tarjetas grandes de categoría y subcategoría */
+  .cats { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:14px; }
+  .cat { border:2px solid var(--linea); border-radius:18px; background:#fff; padding:16px 12px; min-height:124px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; text-align:center; cursor:pointer; font:inherit; color:var(--texto); }
+  .cat:hover, .cat:focus-visible { border-color:var(--rojo); background:var(--rojo-s); outline:none; }
+  .cat .ico { font-size:40px; line-height:1; } .cat b { font-size:19px; line-height:1.2; } .cat small { color:var(--gris); font-size:15px; }
+  .migas { display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid var(--linea); background:#fff; position:sticky; top:0; z-index:2; }
+  .migas button { border:0; background:var(--rojo-s); color:var(--rojo-o); font-size:17px; font-weight:800; min-height:48px; padding:0 16px; border-radius:14px; cursor:pointer; flex:none; }
+  .migas span { font-size:16px; color:var(--gris); line-height:1.25; } .migas b { color:var(--texto); }
+  .subs { display:grid; gap:10px; padding:14px; }
+  .sub { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; text-align:left; border:2px solid var(--linea); border-radius:16px; background:#fff; padding:16px; min-height:68px; font:inherit; font-size:19px; font-weight:700; color:var(--texto); cursor:pointer; }
+  .sub:hover, .sub:focus-visible { border-color:var(--rojo); background:var(--rojo-s); outline:none; }
+  .sub small { color:var(--gris); font-size:15px; font-weight:400; white-space:nowrap; }
+  .sub.todo { background:var(--rojo-s); border-color:var(--rojo); color:var(--rojo-o); }
   .vacio { padding:48px 24px; text-align:center; color:var(--gris); font-size:18px; line-height:1.4; }
 
   /* Barra inferior: siempre a la vista, botón enorme */
@@ -126,7 +139,7 @@
   <div class="guia" id="guia">Toca <b>«+ Añadir»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.</div>
   <nav class="tabs">
     <button class="tab on" data-t="hab" type="button">★ Histórico</button>
-    <button class="tab" data-t="all" type="button">☰ Catálogo completo</button>
+    <button class="tab" data-t="all" type="button">☰ Catálogo</button>
   </nav>
   <div class="buscar"><input id="q" type="search" placeholder="Buscar un producto…" autocomplete="off" aria-label="Buscar un producto"></div>
   <!-- Filtro de ida y vuelta, solo en la pestaña «Histórico» (data-t="hab") -->
@@ -245,18 +258,64 @@ function row(p) {
   return el;
 }
 
+// Catálogo por categorías (las de la web): categorías → subcategorías → productos. Con el buscador se ve todo junto.
+let nav = { cat: null, sub: null }; // sub: null = elegir subcategoría; "*" = todo lo de la categoría
+const irA = (cat, sub) => { nav = { cat, sub }; $("list").scrollTop = 0; renderList(); };
+function renderCategorias(list) {
+  const g = document.createElement("div"); g.className = "cats";
+  for (const c of data.tree) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "cat";
+    const i = document.createElement("span"); i.className = "ico"; i.textContent = c.icono;
+    const n = document.createElement("b"); n.textContent = c.nombre;
+    const k = document.createElement("small"); k.textContent = c.count + (c.count === 1 ? " producto" : " productos");
+    b.append(i, n, k); b.onclick = () => (c.subs.length === 1 ? irA(c.id, c.subs[0].id) : irA(c.id, null)); g.appendChild(b);
+  }
+  list.appendChild(g);
+}
+function migas(list, texto, atras) {
+  const m = document.createElement("div"); m.className = "migas";
+  const b = document.createElement("button"); b.type = "button"; b.textContent = "← Volver"; b.onclick = atras;
+  const t = document.createElement("span"); t.innerHTML = texto;
+  m.append(b, t); list.appendChild(m);
+}
+const esc = t => String(t).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+function renderSubs(list, c) {
+  migas(list, `Catálogo › <b>${esc(c.nombre)}</b><br>Elige una subcategoría`, () => irA(null, null));
+  const g = document.createElement("div"); g.className = "subs";
+  const todo = document.createElement("button"); todo.type = "button"; todo.className = "sub todo";
+  todo.innerHTML = `<span>Ver todo ${esc(c.nombre)}</span><small>${c.count}</small>`; todo.onclick = () => irA(c.id, "*"); g.appendChild(todo);
+  for (const s of c.subs) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "sub";
+    b.innerHTML = `<span>${esc(s.nombre)}</span><small>${s.count} ›</small>`; b.onclick = () => irA(c.id, s.id); g.appendChild(b);
+  }
+  list.appendChild(g);
+}
+
 let soloCantidad = false; // filtro de la pestaña de habituales: ocultar los artículos sin cantidad marcada
 function renderList() {
   const list = $("list"); list.innerHTML = "";
   $("filbar").hidden = tab !== "hab"; // el filtro solo existe en esta pestaña
   const q = norm(query.trim());
   const filtra = tab === "hab" && soloCantidad;
-  let items = data.products.filter(p => (tab === "all" || p.count > 0 || q) && (!q || norm(p.name).includes(q) || p.id.includes(q)) && (!filtra || qty.get(p.id) > 0));
+  // Catálogo sin buscar: primero se eligen categoría y subcategoría
+  const arbol = tab === "all" && !q && (data.tree || []).length > 0;
+  let cabecera = null;
+  if (arbol) {
+    if (!nav.cat) return renderCategorias(list);
+    const c = data.tree.find(x => x.id === nav.cat);
+    if (!c) { nav = { cat: null, sub: null }; return renderCategorias(list); }
+    if (nav.sub === null) return renderSubs(list, c);
+    const s = c.subs.find(x => x.id === nav.sub);
+    cabecera = () => migas(list, `Catálogo › ${esc(c.nombre)} › <b>${nav.sub === "*" ? "Todo" : esc(s ? s.nombre : "")}</b>`, () => (c.subs.length === 1 ? irA(null, null) : irA(c.id, null)));
+  }
+  let items = data.products.filter(p => (tab === "all" || p.count > 0 || q) && (!q || norm(p.name).includes(q) || p.id.includes(q)) && (!filtra || qty.get(p.id) > 0)
+    && (!arbol || (p.cat === nav.cat && (nav.sub === "*" || p.sub === nav.sub))));
   $("fil").setAttribute("aria-pressed", String(soloCantidad));
   $("filinfo").textContent = filtra ? `Mostrando ${items.length} con cantidad` : "";
+  if (cabecera) cabecera();
   if (!items.length) {
     const d = document.createElement("div"); d.className = "vacio";
-    d.textContent = filtra ? "Aún no has marcado ninguna cantidad. Pulsa «Solo con cantidad» para volver a ver todos." : tab === "hab" && !q ? "Aún no tienes histórico. Mira el catálogo." : "No hay resultados.";
+    d.textContent = filtra ? "Aún no has marcado ninguna cantidad. Pulsa «Ver solo lo que he marcado» para volver a ver todos." : tab === "hab" && !q ? "Aún no tienes histórico. Mira el catálogo." : "No hay resultados.";
     list.appendChild(d); return;
   }
   items.slice(0, 150).forEach(p => list.appendChild(row(p)));
@@ -289,6 +348,7 @@ function showCart(on) { $("cart").hidden = !on; if (on) { $("err").textContent =
 
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   tab = b.dataset.t;
+  if (tab === "all") { nav = { cat: null, sub: null }; $("list").scrollTop = 0; } // «Catálogo» siempre empieza por las categorías
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === b));
   renderList();
 });

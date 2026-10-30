@@ -9,7 +9,7 @@ import { getDb } from "./db.js";
 import { priceOrder } from "./pricing.js";
 import { createAuth } from "./auth.js";
 import { createAdmin } from "./admin.js";
-import { webProducts, webHistory, webOrderFromBody } from "./weborder.js";
+import { webProducts, webHistory, webTree, webOrderFromBody } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay } from "./delivery.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
@@ -255,6 +255,7 @@ function webOrderRoutes(req, res, url) {
         used: getDb().hasOrderKey(linkKey(link)),
         products,
         history: webHistory(customer, catalogNow()),
+        tree: webTree(catalogNow()),
         delivery: deliveryOptions(),
         today: madridDay(),
         minDate: deliveryCalendarFrom(),
@@ -392,6 +393,7 @@ async function appRoutes(req, res, url) {
       used: false,
       products: webProducts(customer, catalogNow(), habitualProducts),
       history: webHistory(customer, catalogNow()),
+      tree: webTree(catalogNow()),
       delivery: deliveryOptions(),
       today: madridDay(),
       minDate: deliveryCalendarFrom(),

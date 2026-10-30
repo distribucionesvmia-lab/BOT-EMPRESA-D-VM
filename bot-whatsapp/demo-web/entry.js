@@ -3,7 +3,7 @@
 // clientes, pedidos y exportaciones, que se guardan y se actualizan (base compartida de Claude, o el navegador).
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog, habitualProducts } from "../bot.js";
 import { priceOrder, totals } from "../pricing.js";
-import { webProducts, webHistory, webOrderFromBody } from "../weborder.js";
+import { webProducts, webHistory, webTree, webOrderFromBody } from "../weborder.js";
 import { deliveryOptions, deliveryInfo, deliveryCalendarFrom, madridDay } from "../delivery.js";
 import { findCustomers } from "../identify.js";
 import { FORMAT, madrid, madridTime } from "../export-format.js";
@@ -32,7 +32,7 @@ const sessions = new Map();
 const links = new Map();
 
 const activeCatalog = () =>
-  [...cache.products].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({ id: p.id, name: p.name, price: p.price, ...(p.unitsPerBox ? { unitsPerBox: p.unitsPerBox } : {}), vat: p.vat, discount: p.discount }));
+  [...cache.products].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({ id: p.id, name: p.name, price: p.price, ...(p.unitsPerBox ? { unitsPerBox: p.unitsPerBox } : {}), vat: p.vat, discount: p.discount, ...(p.category ? { category: p.category } : {}), ...(p.subcategory ? { subcategory: p.subcategory } : {}) }));
 
 function onData(coll, rows) {
   if (coll === "customers") {
@@ -254,7 +254,7 @@ window.VM = {
   miniData(link) {
     const customer = links.get(link)?.customer;
     if (!customer) return { error: "Enlace no válido o caducado" };
-    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, products: webProducts(customer, getCatalog(), habitualProducts), history: webHistory(customer, getCatalog()), delivery: deliveryOptions(), today: madridDay(), minDate: deliveryCalendarFrom() };
+    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, products: webProducts(customer, getCatalog(), habitualProducts), history: webHistory(customer, getCatalog()), tree: webTree(getCatalog()), delivery: deliveryOptions(), today: madridDay(), minDate: deliveryCalendarFrom() };
   },
   miniSubmit(link, body) {
     const customer = links.get(link)?.customer;
