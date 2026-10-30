@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { deliveryOptions, deliveryInfo, deliveryAllowed, deliveryMin, deliveryCalendarFrom, longDate, madridDay } from "./delivery.js";
-const addDays0 = (d) => new Date(Date.parse(d + "T12:00:00Z") + 86_400_000).toISOString().slice(0, 10);
 import { webOrderFromBody } from "./weborder.js";
 
 test("opciones de entrega: hoy, mañana y los días laborables siguientes, con fecha (sin fines de semana)", () => {
@@ -37,9 +36,12 @@ test("«hoy» solo antes de las 10:00 (hora de Madrid); después, lo más pronto
   assert.equal(deliveryAllowed("2026-10-30", "2026-10-29T09:00:00Z"), true);
   // el calendario («otro día») empieza donde acaban los botones: nunca los contradice
   const vie = "2026-10-30T18:00:00Z"; // viernes por la tarde: botones del lunes 2 al viernes 6
-  assert.equal(deliveryCalendarFrom(vie), "2026-11-07");
+  assert.equal(deliveryCalendarFrom(vie), "2026-11-09"); // el sábado 7 y el domingo 8 no se sirven
   assert.equal(deliveryAllowed("2026-11-06", vie), true); // último botón
-  assert.equal(deliveryAllowed("2026-11-07", vie), true); // primer día del calendario
+  assert.equal(deliveryAllowed("2026-11-07", vie), false); // sábado
+  assert.equal(deliveryAllowed("2026-11-08", vie), false); // domingo
+  assert.equal(deliveryAllowed("2026-11-09", vie), true); // primer día del calendario
+  assert.equal(deliveryAllowed("2026-11-14", vie), false); // otro sábado más adelante
   assert.equal(deliveryAllowed("2026-10-31", vie), false); // antes de los botones
   // jueves por la mañana: botones jueves 29, viernes 30, lunes 2, martes 3, miércoles 4; el fin de semana de en medio no se puede elegir
   const jue = "2026-10-29T07:00:00Z";
@@ -51,7 +53,8 @@ test("«hoy» solo antes de las 10:00 (hora de Madrid); después, lo más pronto
     const o = deliveryOptions(now);
     assert.ok(deliveryCalendarFrom(now) > o[o.length - 1].date);
     assert.equal(deliveryMin(now), o[0].date);
-    assert.equal(deliveryAllowed(addDays0(o[o.length - 1].date), now), true);
+    assert.equal(deliveryAllowed(deliveryCalendarFrom(now), now), true);
+    assert.ok(![0, 6].includes(new Date(deliveryCalendarFrom(now) + "T12:00:00Z").getUTCDay()));
   }
   // en horario de verano (UTC+2) el corte sigue siendo a las 10:00 de Madrid
   assert.equal(deliveryMin("2026-07-15T07:59:00Z"), "2026-07-15");

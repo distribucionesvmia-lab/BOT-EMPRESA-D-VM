@@ -56,21 +56,23 @@ export function deliveryOptions(nowIso = new Date().toISOString()) {
 
 export const MAX_AHEAD_DAYS = 90; // el calendario deja elegir hasta 90 días por delante
 
-/** Primer día que deja marcar el calendario de «otro día»: el siguiente al último de los botones (nunca contradice a las opciones). */
+/** Primer día que deja marcar el calendario de «otro día»: el primer día de servicio posterior al último botón (nunca contradice a las opciones). */
 export function deliveryCalendarFrom(nowIso = new Date().toISOString()) {
   const o = deliveryOptions(nowIso);
-  return addDays(o[o.length - 1].date, 1);
+  let d = addDays(o[o.length - 1].date, 1);
+  while (!isWorkday(d)) d = addDays(d, 1);
+  return d;
 }
 
 /**
- * ¿Es un día de entrega válido? Uno de los botones, o cualquier fecha real desde el día siguiente al último botón
- * (calendario de «otro día») hasta dentro de 90 días.
+ * ¿Es un día de entrega válido? Uno de los botones, o un día de servicio (lunes a viernes) desde el primero posterior al último botón
+ * (calendario de «otro día») hasta dentro de 90 días. Nunca sábados ni domingos.
  */
 export function deliveryAllowed(date, nowIso = new Date().toISOString()) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ""))) return false;
   if (addDays(date, 0) !== date) return false; // fecha inexistente (31 de febrero…)
   if (deliveryOptions(nowIso).some((o) => o.date === date)) return true;
-  return date >= deliveryCalendarFrom(nowIso) && daysBetween(madridDay(nowIso), date) <= MAX_AHEAD_DAYS;
+  return isWorkday(date) && date >= deliveryCalendarFrom(nowIso) && daysBetween(madridDay(nowIso), date) <= MAX_AHEAD_DAYS;
 }
 
 /**

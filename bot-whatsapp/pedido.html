@@ -280,7 +280,7 @@ function pintarOpciones() {
   otro.append("📅 Otro día"); const sm = document.createElement("small"); sm.textContent = "Abre un calendario para elegir una fecha más adelante"; otro.appendChild(sm);
   otro.onclick = abrirCal; box.appendChild(otro);
 }
-// «Otro día»: calendario pequeño para marcar un día más adelante de los botones, hasta dentro de 90 días
+// «Otro día»: calendario pequeño para marcar un día de servicio (lunes a viernes) más adelante de los botones, hasta dentro de 90 días
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const iso = (y, m, d) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -296,7 +296,8 @@ function pintarCal() {
   for (let i = 0; i < (first + 6) % 7; i++) g.appendChild(document.createElement("i")); // la semana empieza en lunes
   for (let d = 1; d <= dias; d++) {
     const day = iso(cal.y, cal.m, d), b = document.createElement("button");
-    b.type = "button"; b.textContent = d; b.disabled = day < hoy || day > max;
+    const dow = new Date(Date.UTC(cal.y, cal.m, d)).getUTCDay();
+    b.type = "button"; b.textContent = d; b.disabled = day < hoy || day > max || dow === 0 || dow === 6; // sin sábados ni domingos
     if (day === data.today) b.className = "hoy"; if (day === cal.sel) b.classList.add("sel");
     b.setAttribute("aria-label", largo(day));
     b.onclick = () => { cal.sel = day; $("calSel").textContent = largo(day); $("calOk").disabled = false; pintarCal(); };
