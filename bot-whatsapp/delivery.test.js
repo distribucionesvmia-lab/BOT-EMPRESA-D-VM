@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { deliveryOptions, deliveryInfo, longDate, madridDay } from "./delivery.js";
+import { deliveryOptions, deliveryInfo, deliveryAllowed, longDate, madridDay } from "./delivery.js";
 import { webOrderFromBody } from "./weborder.js";
 
 test("opciones de entrega: hoy, mañana y los días laborables siguientes, con fecha (sin fines de semana)", () => {
@@ -38,13 +38,25 @@ test("deliveryInfo: rojo si es hoy, amarillo si es mañana, verde si pasa de 24 
   assert.equal(deliveryInfo("mañana", at), null);
 });
 
-test("el pedido web solo admite uno de los días ofrecidos", () => {
+test("el pedido web admite los días ofrecidos y cualquier día del calendario, pero no pasados ni inválidos", () => {
   const cat = [{ id: 1, name: "AGUA", price: 1 }], c = { id: "C", name: "Bar", address: "x" };
   const body = (delivery) => ({ lines: [{ id: 1, qty: 2 }], delivery });
   const at = "2026-10-29T09:00:00Z";
   const ok = webOrderFromBody(body("2026-11-02"), c, { key: "k", phone: "1", at }, cat);
   assert.equal(ok.order.delivery, "2026-11-02");
-  assert.match(webOrderFromBody(body("2026-11-07"), c, { key: "k", phone: "1", at }, cat).error, /día de entrega/); // sábado: no ofrecido
-  assert.match(webOrderFromBody(body("2020-01-01"), c, { key: "k", phone: "1", at }, cat).error, /día de entrega/);
+  assert.equal(webOrderFromBody(body("2026-12-15"), c, { key: "k", phone: "1", at }, cat).order.delivery, "2026-12-15"); // «otro día» del calendario
+  assert.match(webOrderFromBody(body("2020-01-01"), c, { key: "k", phone: "1", at }, cat).error, /día de entrega/); // pasado
+  assert.match(webOrderFromBody(body("2027-06-01"), c, { key: "k", phone: "1", at }, cat).error, /día de entrega/); // demasiado lejos
   assert.equal(webOrderFromBody({ lines: [{ id: 1, qty: 1 }] }, c, { key: "k", phone: "1", at }, cat).order.delivery, null); // sin día: se admite
+});
+
+test("deliveryAllowed: de hoy a 90 días, fechas reales", () => {
+  const at = "2026-10-29T09:00:00Z";
+  assert.equal(deliveryAllowed("2026-10-29", at), true);
+  assert.equal(deliveryAllowed("2026-10-28", at), false);
+  assert.equal(deliveryAllowed("2027-01-27", at), true); // +90
+  assert.equal(deliveryAllowed("2027-01-28", at), false);
+  assert.equal(deliveryAllowed("2026-11-31", at), false); // no existe
+  assert.equal(deliveryAllowed("mañana", at), false);
+  assert.equal(deliveryAllowed(undefined, at), false);
 });

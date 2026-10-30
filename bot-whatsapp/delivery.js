@@ -38,6 +38,16 @@ export function deliveryOptions(nowIso = new Date().toISOString()) {
   return out;
 }
 
+export const MAX_AHEAD_DAYS = 90; // el calendario deja elegir hasta 90 días por delante
+
+/** ¿Es un día de entrega válido? Cualquier fecha real desde hoy hasta dentro de 90 días (el calendario deja elegir cualquiera). */
+export function deliveryAllowed(date, nowIso = new Date().toISOString()) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ""))) return false;
+  if (addDays(date, 0) !== date) return false; // fecha inexistente (31 de febrero…)
+  const d = daysBetween(madridDay(nowIso), date);
+  return d >= 0 && d <= MAX_AHEAD_DAYS;
+}
+
 /**
  * Cómo aparece la entrega en el Excel (observaciones del cliente) según los días que faltan desde que se hizo el pedido:
  * el mismo día → rojo · el día siguiente → amarillo · más de 24 horas → verde. Texto en mayúsculas. null si el pedido no trae fecha.

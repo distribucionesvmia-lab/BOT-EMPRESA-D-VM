@@ -53,6 +53,22 @@
   .opt small { font-size:13px; font-weight:400; color:var(--gris); }
   .opt:hover, .opt:focus-visible { border-color:var(--verde); outline:none; background:#f3fbf7; }
   .opt:disabled { opacity:.5; cursor:default; }
+  .cal-fondo { position:absolute; inset:0; z-index:8; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; padding:16px; }
+  .cal-fondo[hidden] { display:none; }
+  .cal { background:#fff; border-radius:16px; padding:14px; width:100%; max-width:340px; box-shadow:0 10px 30px rgba(0,0,0,.3); }
+  .cal-h { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .cal-h b { text-transform:capitalize; font-size:16px; }
+  .cal-h button { border:0; background:var(--fondo); width:36px; height:36px; border-radius:10px; font-size:18px; cursor:pointer; }
+  .cal-h button:disabled { opacity:.35; cursor:default; }
+  .cal-g { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center; }
+  .cal-g span { font-size:12px; color:var(--gris); padding:4px 0; }
+  .cal-g button { border:0; background:none; height:38px; border-radius:10px; font:inherit; font-size:15px; cursor:pointer; color:var(--texto); }
+  .cal-g button:hover:not(:disabled) { background:#e5f5ec; }
+  .cal-g button:disabled { color:#c3c9c6; cursor:default; }
+  .cal-g button.hoy { font-weight:700; box-shadow:inset 0 0 0 1.5px var(--verde); }
+  .cal-g button.sel { background:var(--verde); color:#fff; font-weight:700; }
+  .cal-pie { margin-top:10px; display:grid; gap:8px; }
+  .cal-pie p { margin:0; font-size:14px; color:var(--gris); min-height:20px; text-align:center; }
   .screen { position:absolute; inset:0; background:#fff; display:flex; flex-direction:column; z-index:5; }
   .screen[hidden] { display:none; }
   .screen h2 { margin:0; font-size:17px; }
@@ -105,6 +121,13 @@
       <p style="margin:0 0 12px;color:var(--gris)">Elige el día de entrega. Al pulsarlo, tu pedido se envía.</p>
       <div id="whenOpts" style="display:grid;gap:10px"></div>
       <div class="err" id="errWhen" role="alert"></div>
+    </div>
+    <div class="cal-fondo" id="calFondo" hidden>
+      <div class="cal" role="dialog" aria-modal="true" aria-label="Elegir otro día de entrega">
+        <div class="cal-h"><button id="calAnt" type="button" aria-label="Mes anterior">‹</button><b id="calMes"></b><button id="calSig" type="button" aria-label="Mes siguiente">›</button></div>
+        <div class="cal-g" id="calGrid"></div>
+        <div class="cal-pie"><p id="calSel">Toca el día que quieras</p><button class="big" id="calOk" type="button" disabled>Elegir este día</button><button class="big sec" id="calCerrar" type="button" style="margin-top:0">Cancelar</button></div>
+      </div>
     </div>
   </section>
 
@@ -250,8 +273,45 @@ $("confirm").onclick = () => {
     b.onclick = () => enviarPedido(o.date, $("errWhen"));
     box.appendChild(b);
   }
+  const otro = document.createElement("button"); otro.type = "button"; otro.className = "opt"; otro.id = "otroDia";
+  otro.append("📅 Otro día"); const sm = document.createElement("small"); sm.textContent = "Abre un calendario para elegir cualquier fecha"; otro.appendChild(sm);
+  otro.onclick = abrirCal; box.appendChild(otro);
   $("when").hidden = false;
 };
+// «Otro día»: calendario pequeño para marcar cualquier día desde hoy hasta dentro de 90 días
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const iso = (y, m, d) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+const addDaysIso = (day, n) => new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10) + n)).toISOString().slice(0, 10);
+const largo = day => { const d = new Date(Date.UTC(+day.slice(0, 4), +day.slice(5, 7) - 1, +day.slice(8, 10))); return `${DIAS[d.getUTCDay()]} ${+day.slice(8, 10)} de ${MESES[+day.slice(5, 7) - 1]}`; };
+let cal = { y: 0, m: 0, sel: null };
+function pintarCal() {
+  const hoy = data.today, max = addDaysIso(hoy, 90);
+  $("calMes").textContent = `${MESES[cal.m]} ${cal.y}`;
+  const g = $("calGrid"); g.innerHTML = "";
+  for (const d of ["L", "M", "X", "J", "V", "S", "D"]) { const e = document.createElement("span"); e.textContent = d; g.appendChild(e); }
+  const first = new Date(Date.UTC(cal.y, cal.m, 1)).getUTCDay(), dias = new Date(Date.UTC(cal.y, cal.m + 1, 0)).getUTCDate();
+  for (let i = 0; i < (first + 6) % 7; i++) g.appendChild(document.createElement("i")); // la semana empieza en lunes
+  for (let d = 1; d <= dias; d++) {
+    const day = iso(cal.y, cal.m, d), b = document.createElement("button");
+    b.type = "button"; b.textContent = d; b.disabled = day < hoy || day > max;
+    if (day === hoy) b.className = "hoy"; if (day === cal.sel) b.classList.add("sel");
+    b.setAttribute("aria-label", largo(day));
+    b.onclick = () => { cal.sel = day; $("calSel").textContent = largo(day); $("calOk").disabled = false; pintarCal(); };
+    g.appendChild(b);
+  }
+  $("calAnt").disabled = iso(cal.y, cal.m, 1) <= hoy.slice(0, 8) + "01";
+  $("calSig").disabled = iso(cal.y, cal.m + 1 > 11 ? cal.y + 1 : cal.y, cal.m + 1 > 11 ? 0 : cal.m + 1) > max.slice(0, 8) + "01";
+}
+function abrirCal() {
+  const [y, m] = data.today.split("-").map(Number);
+  cal = { y, m: m - 1, sel: null }; $("calSel").textContent = "Toca el día que quieras"; $("calOk").disabled = true;
+  $("calFondo").hidden = false; pintarCal();
+}
+$("calAnt").onclick = () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } pintarCal(); };
+$("calSig").onclick = () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } pintarCal(); };
+$("calCerrar").onclick = () => ($("calFondo").hidden = true);
+$("calOk").onclick = () => { if (cal.sel) { $("calFondo").hidden = true; enviarPedido(cal.sel, $("errWhen")); } };
 $("backWhen").onclick = () => ($("when").hidden = true);
 async function enviarPedido(delivery, errBox) {
   const opts = [...document.querySelectorAll("#whenOpts .opt")], btn = $("confirm");
