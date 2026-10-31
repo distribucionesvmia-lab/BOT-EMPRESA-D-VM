@@ -10,7 +10,9 @@ export function webProducts(customer, catalog, habitualProducts) {
     .map((p) => ({
       id: String(p.id),
       name: p.name,
-      price: p.price,
+      // Mismo criterio que pricing.js (priceLine): precio y descuento especiales del cliente si los hay, si no los de la ficha
+      price: customer?.specialPrices?.[String(p.id)] ?? p.price,
+      discount: customer?.discounts?.[String(p.id)] ?? p.discount ?? 0,
       unitsPerBox: Number.isInteger(p.unitsPerBox) && p.unitsPerBox > 1 ? p.unitsPerBox : null,
       ...(({ cat, sub }) => ({ cat, sub }))(categorizar(p)), // categoría y subcategoría (ids) para navegar el catálogo
       lastQty: habit.get(p.id)?.lastQty ?? null,

@@ -49,3 +49,11 @@ test("el catálogo web lleva categoría y subcategoría de cada producto y el á
   assert.deepEqual(p.map((x) => [x.name, x.cat, x.sub]).sort(), [["AGUA MINERAL 1,5 L", "aguas", "otros"], ["Bezoya 50 cl", "aguas", "bezoya"], ["Escoba", "f-drogueria", "limpieza"], ["Vino tinto", "vinos", "otros"]]);
   assert.deepEqual(webTree(cat).map((c) => [c.nombre, c.count]), [["Vinos", 1], ["Aguas", 2], ["Droguería", 1]]);
 });
+
+test("el catálogo web lleva el precio y el descuento que aplicará el servidor (precio especial del cliente o ficha)", () => {
+  const cat = [{ id: "1", name: "COLA", price: 0.55, discount: 10 }, { id: "2", name: "AGUA", price: 1, discount: 5 }, { id: "3", name: "VINO", price: 5 }];
+  const p = Object.fromEntries(webProducts({ id: "C", specialPrices: { 2: 0.8 }, discounts: { 2: 0 } }, cat, () => []).map((x) => [x.id, x]));
+  assert.deepEqual([p[1].price, p[1].discount], [0.55, 10]);
+  assert.deepEqual([p[2].price, p[2].discount], [0.8, 0]);
+  assert.deepEqual([p[3].price, p[3].discount], [5, 0]);
+});

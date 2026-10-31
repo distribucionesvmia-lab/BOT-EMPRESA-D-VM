@@ -228,7 +228,9 @@ const hue = s => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS
 const initials = n => n.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9 ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
 const lines = () => data.products.filter(p => qty.get(p.id) > 0).map(p => ({ ...p, qty: qty.get(p.id) }));
 const count = () => lines().length;
-const total = () => lines().reduce((t, l) => t + uds(l) * l.price, 0);
+// Importe de una línea: mismo cálculo que el servidor (unidades × precio × (1 − descuento %), redondeado a céntimos)
+const importe = l => Math.round((uds(l) * l.price * (1 - (l.discount || 0) / 100) + Number.EPSILON) * 100) / 100;
+const total = () => Math.round(lines().reduce((t, l) => t + importe(l), 0) * 100) / 100;
 
 let toastT = 0;
 function aviso(texto, deshacer) {
@@ -403,7 +405,7 @@ function renderCart() {
     box.appendChild(row(l));
     const k = l.unitsPerBox || 1, cj = unit(l.id) === "caja";
     const sl = document.createElement("div"); sl.className = "subl";
-    sl.innerHTML = `${cj ? `${l.qty} ${l.qty === 1 ? "caja" : "cajas"} × ${k} uds = ` : ""}<b>${uds(l)} uds</b> × ${eur(l.price)} = <b>${eur(uds(l) * l.price)}</b>`;
+    sl.innerHTML = `${cj ? `${l.qty} ${l.qty === 1 ? "caja" : "cajas"} × ${k} uds = ` : ""}<b>${uds(l)} uds</b> × ${eur(l.price)}${l.discount ? ` (−${String(l.discount).replace(".", ",")} %)` : ""} = <b>${eur(importe(l))}</b>`;
     box.appendChild(sl);
     const ta = document.createElement("input"); ta.className = "lnote"; ta.maxLength = 120;
     ta.placeholder = "Observación para este artículo (opcional)"; ta.value = notes.get(l.id) || "";
@@ -503,7 +505,7 @@ function resumen(day) {
     d.className = "rl"; d.style.cssText = "display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--linea);font-size:16px";
     const a = document.createElement("span"), b = document.createElement("b");
     a.textContent = `${cj ? l.qty + (l.qty === 1 ? " caja" : " cajas") + " (" + uds(l) + " uds)" : uds(l) + " uds"} · ${l.name}` + ((notes.get(l.id) || "").trim() ? ` — «${notes.get(l.id).trim()}»` : "");
-    b.textContent = eur(uds(l) * l.price); b.style.whiteSpace = "nowrap";
+    b.textContent = eur(importe(l)); b.style.whiteSpace = "nowrap";
     d.append(a, b); box.appendChild(d);
   }
   const n = $("note").value.trim();

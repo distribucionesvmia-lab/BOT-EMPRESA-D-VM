@@ -265,7 +265,7 @@ window.VM = {
     links.get(link).used = true;
     const priced = priceOrder(built.order, customer, getCatalog());
     saveOrder(holdIfUnconfirmed(currentAccount(), built.order), customer);
-    return { status: 200, json: { ok: true, message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} artículos, total aprox. ${priced.total.toFixed(2)}${BUSINESS.currency}.\n\n${BUSINESS.payment}` } };
+    return { status: 200, json: { ok: true, message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} artículos, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.\n\n${BUSINESS.payment}` } };
   },
 
   // ---- Vista del distribuidor ----

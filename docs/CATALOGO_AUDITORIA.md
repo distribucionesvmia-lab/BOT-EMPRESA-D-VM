@@ -24,6 +24,11 @@ Prioridad: A = puede causar un pedido erróneo o bloquear la compra · M = moles
 | D16 | M | No hay favoritos, listas ni "repetir pedido" en la mini-app (solo en el chat). | código | Pendiente (Fase 6) |
 | D17 | M | Sin fotos: solo iniciales. Sin marca/formato/EAN en las fichas. | código | Pendiente; necesita datos reales (Fase 9) |
 | D18 | M | Las categorías no coinciden con la propuesta comercial del plan. | `categorias.js` | Pendiente (Fase 3) |
-| D19 | M | El total mostrado en el navegador (0,55 €) difiere del mensaje del servidor (0.50 €) con un producto demo; además el mensaje usa punto decimal. | prueba en navegador, run 1d | Pendiente (tarea 7.4; no tocar reglas de precios) |
+| D19 | M | El total mostrado en el navegador (0,55 €) difiere del mensaje del servidor (0.50 €) con un producto demo; además el mensaje usa punto decimal. | prueba en navegador, run 1d | **Corregido** (el navegador ignoraba el descuento; ahora coincide con el servidor) |
 
 Revisión humana necesaria: D3 (decisión de negocio), D18 (clasificación real), D17 (datos y fotos).
+
+## Decisiones por tomar (cliente)
+
+1. **Categorías:** mantener las actuales (Café, Pascual, Vinos, Aguas, Despensa, Refrigerados, Congelados, Otros — elegidas por el cliente) o pasar a las del plan (Bebidas, Café e infusiones, Lácteos y bebidas vegetales, Despensa, Aperitivos, Pan y bollería, Refrigerados, Congelados, Otros). Hasta que decida, no se cambia nada. Con el Excel real se ejecutará `node categorias-informe.js`.
+2. **Total mostrado al cliente:** hoy «total aprox.» es la base SIN IVA; el correo a la empresa dice «con IVA». Decidir qué se enseña (D20).
