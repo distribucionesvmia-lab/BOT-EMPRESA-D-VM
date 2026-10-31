@@ -37,6 +37,7 @@ Pantalla del cliente: `/` (`cliente.html`); catálogo: `/catalogo` (`pedido.html
 | 3/7 | 7.4 (D19) hecha; 3.1 parcial (informe sí, recategorizar pendiente de decisión) | run 2 |
 | 4/6 | 4.1 (estados vacíos) y 6.2 (repetir pedido) | Terminadas (run 3) |
 | 6 | 6.1 favoritos | Terminada (run 4), probada en navegador y con test (195 OK) |
+| 11 | 11.1 guion de pruebas de navegador guardado en el repo y pasado (11/11) | Terminada (run 6); 1.5 pasada manual cubierta por este guion (falta móvil real) |
 | 2 | Navegación y portada (Comprar/Explorar/Pedidos/Cuenta) | Pendiente |
 | 3 | Estructura del catálogo y revisión de clasificación | Pendiente |
 | 4 | Búsqueda y filtros | Pendiente |
@@ -117,7 +118,7 @@ Cada ejecución coge 2–4. Marca terminada aquí y en la tabla. Ejecuta `npm te
 9. ~~6.2~~ **Terminada (run 3)**: botón «↻ Repetir un pedido anterior» en Histórico: pantalla con los últimos 5 pedidos, casillas por línea, se añade al carrito (en unidades) con aviso de revisar. Probado en navegador móvil con el cliente demo.
 10. **8.1 / 9.1** – 8.1 CUBIERTA sin cambios: no hay promociones ni «recomendados» inventados; Histórico ya ordena por lo que más pide el cliente y los favoritos van primero. 9.1: las iniciales de color son el marcador; NO se añade campo de foto hasta que haya fotos reales verificadas (pendiente de datos).
 11. ~~10.1~~ **Terminada (run 5)**: foco dentro de las capas, `inert` en el fondo, Esc, botón Atrás del móvil (pushState), «paso» a 15 px. Probado con Playwright. Pendiente menor: revisión de contraste con herramienta y prueba con lector de pantalla real.
-12. **11.1** Pruebas: HECHO el borrador (195 tests de servidor + pruebas manuales con Playwright). PENDIENTE: guardar los guiones de Playwright como scripts en el repo (`bot-whatsapp/pruebas/`, sin dependencia nueva: usar el Playwright global) y métricas simples (tiempo/pasos por pedido). **12.1** Borrador hecho en `docs/CATALOGO_REVISION_FINAL.md`; actualizarlo al final.
+12. ~~11.1~~ **Terminada (run 6)**: `bot-whatsapp/pruebas/catalogo-movil.cjs` (11 comprobaciones de navegador a 390 px, solo contra la DEMO local; instrucciones en la cabecera del archivo). PENDIENTE de 11.1: métricas (pasos/tiempo por pedido) y pruebas de PIN/entrega por navegador si se quiere. **12.1** Borrador en `docs/CATALOGO_REVISION_FINAL.md`; actualizarlo en la última ejecución (23:24 UTC) con el estado real.
 
 Cuando todo esto esté hecho, 1.5 (pasada manual) y revisar de nuevo la auditoría.
 
@@ -131,3 +132,4 @@ Cuando todo esto esté hecho, 1.5 (pasada manual) y revisar de nuevo la auditor�
 - Run 3 (programada 17:24 UTC): 4.1 y 6.2 hechas y probadas en navegador (repbar visible, repetir añade 7 artículos, búsqueda vacía con botón). 194 tests OK. Siguiente: 6.1 favoritos/listas (necesita tabla en clientes-db.js + endpoints; atención a la demo del navegador), 2.1, 8.1/9.1, 10.1, 11.1, 12.1.
 - Run 4 (programada 18:24 UTC): 6.1 favoritos hecho (servidor + interfaz + demo + test). Siguiente: 2.1 (navegación; decidir con el cliente), 8.1/9.1, 10.1, 11.1, 12.1, 7.5 (IVA en total), 1.5.
 - Run 5 (programada 19:24 UTC): 10.1 accesibilidad (foco/Esc/Atrás), 8.1 cubierta sin cambios, 9.1 sin cambios (esperan datos), 12.1 borrador `docs/CATALOGO_REVISION_FINAL.md`. Siguiente: 11.1 guardar guiones de prueba, 7.5/2.1/categorías (esperan decisión del cliente), 1.5 pasada manual, actualizar la auditoría.
+- Run 6 (programada 20:24 UTC): 11.1 hecho (`pruebas/catalogo-movil.cjs`, 11/11 OK, 195 tests OK). Sin tareas nuevas que dependan solo de mí: restan 2.1, 3.1 (recategorizar), 7.5 (IVA) y 6.3 (listas) que esperan decisión del cliente; 9.1/4.1 marca-EAN esperan el Excel real. Próximas ejecuciones: revisar si el cliente decidió; si no, solo mantenimiento + actualizar CATALOGO_REVISION_FINAL.md en la de las 23:24 UTC y desactivar la tarea programada.

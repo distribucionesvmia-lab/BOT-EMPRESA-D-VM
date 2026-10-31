@@ -26,7 +26,7 @@ Estado: BORRADOR. Nada está publicado ni desplegado. Esto NO es una declaració
 - La demo del navegador (artifact) guarda favoritos solo en memoria.
 - La pestaña Histórico depende de que se sincronice el historial de a3ERP; si falta, solo hay favoritos.
 - `history.pushState` en la demo embebida (iframe) puede comportarse distinto que en producción.
-- No hay pruebas automáticas del HTML del navegador: la interfaz se probó a mano con Playwright (scripts no incluidos en el repo).
+- Las pruebas de navegador (`bot-whatsapp/pruebas/catalogo-movil.cjs`) no forman parte de `npm test` y solo funcionan contra la demo.
 
 ## Cómo revisar
 ```bash
