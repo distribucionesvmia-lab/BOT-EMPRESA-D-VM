@@ -105,7 +105,8 @@ Cada ejecución coge 2–4. Marca terminada aquí y en la tabla. Ejecuta `npm te
 1. ~~5.1 (D2, D6, D14)~~ **Terminada (run 1c)**: cambio Uds↔Cajas convierte (confirma si no es exacto), aviso de tope 999, "Deshacer" al quitar línea.
 2. ~~7.1 (D1)~~ **Terminada (run 1c)**: carrito en `localStorage` (clave por cliente, 24 h, se borra al enviar).
 3. ~~7.2 (D7)~~ **Terminada (run 1c)**: subtotal por línea en el carrito.
-4. **7.3 (D3)** Paso de confirmación opcional antes de enviar (resumen + día elegido). Decisión del cliente: implementarlo detrás de una constante `CONFIRMAR_ENVIO = true` en `pedido.html` y dejar la pregunta anotada.
+4. ~~7.3 (D3)~~ **Terminada (run 1d)**: el cliente confirmó que SÍ quiere confirmación. Al elegir el día aparece "Confirma tu pedido" (día, dirección, líneas, observaciones, total) con "Confirmar y enviar" / "Cambiar el día". Probado: no se envía nada hasta confirmar.
+4b. **Nueva 7.4 (D19)** Investigar por qué el total mostrado en el navegador (p. ej. 0,55 €) difiere del total del mensaje de confirmación del servidor (0.50 €) con el producto demo REFRESCO COLA LATA 33 CL: revisar `webProducts` (precio enviado al navegador) frente a `priceOrder` (descuento/IVA). NO cambiar reglas de precios: solo documentar la causa y, si es solo presentación, mostrar el mismo dato en ambos sitios o aclarar "aprox.". Formatear también el mensaje con coma decimal ("0,50 €").
 5. **3.1 (D18)** Revisar `categorias.js` contra las categorías comerciales del plan; adaptar sin inventar subcategorías; mantener familias a3; informe de "sin clasificar" (script `node categorias-informe.js` sobre catalogo.sqlite, sin escribir datos).
 6. **2.1** Navegación inferior Comprar / Explorar / Pedidos / Cuenta (si encaja con lo ya decidido: sin "Mis pedidos" por ahora; proponer "Repetir" en su lugar) y orden de la portada.
 7. **4.1** Búsqueda: marca/EAN solo si existen columnas en datos reales; estados vacíos útiles ("prueba con menos palabras").
@@ -122,3 +123,4 @@ Cuando todo esto esté hecho, 1.5 (pasada manual) y revisar de nuevo la auditor�
 - Run 1: Fase 0 completa (0.1–0.4). Solo se creó este archivo; sin cambios funcionales.
 - Run 1b: Fase 1 (auditoría por código) + correcciones rápidas en pedido.html (búsqueda por palabras, "Mostrar más", etiquetas accesibles, foco, mensaje de sesión). 193 tests OK. Se creó docs/CATALOGO_AUDITORIA.md.
 - Run 1c: 5.1, 7.1, 7.2 hechas y probadas con Playwright (390 px, demo, NIF 00000001R): conversión Uds/Cajas, recuperación del carrito tras recargar, subtotales, deshacer. Sin errores JS. 193 tests OK. Ojo: cuando se prueba con Playwright, `NODE_PATH=$(npm root -g)` y cliente demo `00000001R`; `fuser -k 3911/tcp` para parar el servidor.
+- Run 1d: 7.3 hecha (confirmación antes de enviar, decisión del cliente: sí). Probada con Playwright: 0 POST hasta confirmar. Detectada D19 (total navegador 0,55 € vs servidor 0.50 €), pendiente 7.4. 193 tests OK.

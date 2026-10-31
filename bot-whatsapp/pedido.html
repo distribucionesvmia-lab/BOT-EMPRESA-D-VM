@@ -191,6 +191,19 @@
     </div>
   </section>
 
+  <!-- Último paso: resumen y confirmación antes de enviar -->
+  <section class="screen" id="resumen" hidden style="z-index:7">
+    <div class="head"><button id="backRes" type="button" aria-label="Volver a elegir el día">←</button><div><small>Último paso</small><h2>Confirma tu pedido</h2></div></div>
+    <div class="body" style="padding:14px">
+      <div class="box" style="padding:0 0 10px"><b style="font-size:18px">Entrega</b><div id="resDia" style="font-size:20px;font-weight:800;color:var(--rojo-o);margin-top:4px"></div><div id="resAddr" style="color:var(--gris);font-size:16px;margin-top:2px"></div></div>
+      <div id="resLineas"></div>
+      <div id="resNota" style="margin-top:10px;font-size:16px"></div>
+      <div class="err" id="errRes" role="alert"></div>
+    </div>
+    <div class="tot"><span>Total aproximado</span><b id="resTotal">0,00 €</b></div>
+    <div class="box"><button class="big" id="resOk" type="button">✓ Confirmar y enviar pedido</button><button class="big sec" id="resCambiar" type="button">← Cambiar el día</button></div>
+  </section>
+
   <section class="screen" id="done" hidden>
     <div class="ok"><div class="tick">✓</div><h2 id="doneT">¡Pedido recibido!</h2><p id="doneP" style="color:var(--gris)"></p><p id="backlink" hidden><a href="/cliente">Volver al chat</a></p></div>
   </section>
@@ -435,7 +448,7 @@ function pintarOpciones() {
   for (const o of data.delivery) {
     const b = document.createElement("button"); b.type = "button"; b.className = "opt";
     b.append(o.label); if (o.detail) { const d = document.createElement("small"); d.textContent = o.detail; b.appendChild(d); }
-    b.onclick = () => enviarPedido(o.date, $("errWhen"));
+    b.onclick = () => resumen(o.date);
     box.appendChild(b);
   }
   const otro = document.createElement("button"); otro.type = "button"; otro.className = "opt"; otro.id = "otroDia";
@@ -476,20 +489,43 @@ function abrirCal() {
 $("calAnt").onclick = () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } pintarCal(); };
 $("calSig").onclick = () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } pintarCal(); };
 $("calCerrar").onclick = () => ($("calFondo").hidden = true);
-$("calOk").onclick = () => { if (cal.sel) { $("calFondo").hidden = true; enviarPedido(cal.sel, $("errWhen")); } };
+$("calOk").onclick = () => { if (cal.sel) { $("calFondo").hidden = true; resumen(cal.sel); } };
 $("backWhen").onclick = () => ($("when").hidden = true);
+// Antes de enviar se enseña el resumen (día, líneas, observaciones y total) y se pide confirmación
+let diaElegido = null;
+function resumen(day) {
+  diaElegido = day;
+  $("resDia").textContent = largo(day).replace(/^./, c => c.toUpperCase());
+  $("resAddr").textContent = "📍 " + (data.customer.address || "—");
+  const box = $("resLineas"); box.innerHTML = "";
+  for (const l of lines()) {
+    const k = l.unitsPerBox || 1, cj = unit(l.id) === "caja", d = document.createElement("div");
+    d.className = "rl"; d.style.cssText = "display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--linea);font-size:16px";
+    const a = document.createElement("span"), b = document.createElement("b");
+    a.textContent = `${cj ? l.qty + (l.qty === 1 ? " caja" : " cajas") + " (" + uds(l) + " uds)" : uds(l) + " uds"} · ${l.name}` + ((notes.get(l.id) || "").trim() ? ` — «${notes.get(l.id).trim()}»` : "");
+    b.textContent = eur(uds(l) * l.price); b.style.whiteSpace = "nowrap";
+    d.append(a, b); box.appendChild(d);
+  }
+  const n = $("note").value.trim();
+  $("resNota").textContent = n ? "Observaciones: " + n : "";
+  $("resTotal").textContent = eur(total()); $("errRes").textContent = "";
+  $("resOk").disabled = false; $("resumen").hidden = false;
+}
+$("resOk").onclick = () => enviarPedido(diaElegido, $("errRes"));
+$("resCambiar").onclick = $("backRes").onclick = () => ($("resumen").hidden = true);
 async function enviarPedido(delivery, errBox) {
   const opts = [...document.querySelectorAll("#whenOpts .opt")], btn = $("confirm");
-  opts.forEach(o => (o.disabled = true)); btn.disabled = true; errBox.textContent = "";
+  opts.forEach(o => (o.disabled = true)); btn.disabled = true; $("resOk").disabled = true; errBox.textContent = "";
   try {
     const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value, delivery }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "No se ha podido enviar el pedido");
     qty.clear(); unitOf.clear(); notes.clear(); try { localStorage.removeItem(clave()); } catch {}
-    $("doneP").textContent = j.message; $("when").hidden = true; $("done").hidden = false; $("backlink").hidden = parent !== window;
+    $("doneP").textContent = j.message; $("when").hidden = true; $("resumen").hidden = true; $("done").hidden = false; $("backlink").hidden = parent !== window;
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
   } catch (e) {
-    errBox.textContent = e.message; opts.forEach(o => (o.disabled = false)); btn.disabled = false;
+    errBox.textContent = e.message; opts.forEach(o => (o.disabled = false)); btn.disabled = false; $("resOk").disabled = false;
+    if (!$("resumen").hidden && /10:00|día|fecha/i.test(e.message)) { $("resumen").hidden = true; errBox = $("errWhen"); errBox.textContent = e.message; } // el día ya no vale: vuelve a la elección
     if (/10:00/.test(e.message)) { // pasó la hora de corte mientras elegía: se actualizan las opciones
       const r2 = await fetch(location.pathname + "/datos").catch(() => null);
       if (r2 && r2.ok) { const d2 = await r2.json(); data.delivery = d2.delivery; data.today = d2.today; data.minDate = d2.minDate; pintarOpciones(); errBox.textContent = e.message; }
