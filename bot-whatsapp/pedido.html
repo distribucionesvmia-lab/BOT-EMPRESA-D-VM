@@ -10,7 +10,7 @@
   html, body { margin:0; height:100%; }
   body { font-family:-apple-system,"Segoe UI",Roboto,system-ui,sans-serif; font-size:17px; background:var(--fondo); color:var(--texto); display:flex; justify-content:center; }
   button, input, textarea { font-family:inherit; }
-  button:focus-visible, input:focus-visible, textarea:focus-visible { outline:3px solid #ffb3b3; outline-offset:2px; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible { outline:3px solid #a80000; outline-offset:2px; }
   .app { width:100%; max-width:none; height:100vh; height:100dvh; background:#fff; display:flex; flex-direction:column; position:relative; }
 
   /* Cabecera roja con el logo */
@@ -144,10 +144,10 @@
     <button class="cartbtn" id="cartIcon" type="button" aria-label="Ver carrito">🛒 Carrito <span id="cnt">0</span></button>
   </header>
   <div class="paso">Paso 1 de 3 · Elige tus productos</div>
-  <div class="guia" id="guia">Toca <b>«+ Añadir»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.</div>
+  <div class="guia" id="guia" aria-live="polite">Toca <b>«+ Añadir»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.</div>
   <nav class="tabs">
-    <button class="tab on" data-t="hab" type="button">★ Histórico</button>
-    <button class="tab" data-t="all" type="button">☰ Catálogo</button>
+    <button class="tab on" data-t="hab" type="button" aria-pressed="true">★ Histórico</button>
+    <button class="tab" data-t="all" type="button" aria-pressed="false">☰ Catálogo</button>
   </nav>
   <div class="buscar"><input id="q" type="search" placeholder="Buscar un producto…" autocomplete="off" aria-label="Buscar un producto"></div>
   <!-- Filtro de ida y vuelta, solo en la pestaña «Histórico» (data-t="hab") -->
@@ -162,7 +162,7 @@
       <div class="box"><div id="addr" style="font-size:16px;color:var(--gris)"></div></div>
       <div class="box" style="padding-top:0"><label for="note" style="display:block;font-weight:700;font-size:18px;margin-bottom:8px">Observaciones del cliente</label><textarea id="note" placeholder="Ej.: avísame por teléfono antes de entregar (opcional)" maxlength="200"></textarea></div>
       <div class="nota" id="priceNote"></div>
-      <div class="err" id="err"></div>
+      <div class="err" id="err" role="alert"></div>
     </div>
     <div class="tot"><span>Total aproximado</span><b id="total">0,00 €</b></div>
     <div class="box"><button class="big" id="confirm" type="button">Finalizar pedido →</button><button class="big sec" id="keep" type="button">← Seguir añadiendo productos</button></div>
@@ -224,7 +224,7 @@ function control(p) {
   if (p.unitsPerBox) {
     const sel = document.createElement("div"); sel.className = "ud"; sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Pedir en");
     for (const [u, t] of [["ud", "Uds"], ["caja", "Cajas"]]) {
-      const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.className = unit(p.id) === u ? "on" : "";
+      const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.className = unit(p.id) === u ? "on" : ""; b.setAttribute("aria-pressed", String(unit(p.id) === u));
       b.onclick = () => { unitOf.set(p.id, u); refresh(); };
       sel.appendChild(b);
     }
@@ -238,10 +238,10 @@ function control(p) {
     return box;
   }
   const st = document.createElement("div"); st.className = "step";
-  const minus = document.createElement("button"); minus.type = "button"; minus.textContent = "−"; minus.onclick = () => setQty(p.id, q - 1);
-  const inp = document.createElement("input"); inp.type = "number"; inp.inputMode = "numeric"; inp.min = 0; inp.value = q;
+  const minus = document.createElement("button"); minus.type = "button"; minus.textContent = "−"; minus.setAttribute("aria-label", "Quitar uno de " + p.name); minus.onclick = () => setQty(p.id, q - 1);
+  const inp = document.createElement("input"); inp.type = "number"; inp.inputMode = "numeric"; inp.min = 0; inp.value = q; inp.setAttribute("aria-label", "Cantidad de " + p.name);
   inp.onchange = () => setQty(p.id, inp.value);
-  const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.onclick = () => setQty(p.id, q + 1);
+  const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.setAttribute("aria-label", "Añadir uno de " + p.name); plus.onclick = () => setQty(p.id, q + 1);
   st.append(minus, inp, plus); box.appendChild(st);
   return box;
 }
@@ -268,7 +268,7 @@ function row(p) {
 
 // Catálogo por categorías (las de la web): categorías → subcategorías → productos. Con el buscador se ve todo junto.
 let nav = { cat: null, sub: null }; // sub: null = elegir subcategoría; "*" = todo lo de la categoría
-const irA = (cat, sub) => { nav = { cat, sub }; $("list").scrollTop = 0; renderList(); };
+const irA = (cat, sub) => { limite = 150; nav = { cat, sub }; $("list").scrollTop = 0; renderList(); };
 function renderCategorias(list) {
   const g = document.createElement("div"); g.className = "cats";
   for (const c of data.tree) {
@@ -299,6 +299,9 @@ function renderSubs(list, c) {
   list.appendChild(g);
 }
 
+// Búsqueda: cada palabra escrita debe aparecer en el nombre (sin acentos ni mayúsculas, en cualquier orden) o ser parte del código
+const coincide = (p, q) => { const n = norm(p.name); return q.split(/\s+/).every(w => n.includes(w) || p.id.includes(w)); };
+let limite = 150; // productos pintados a la vez; «Mostrar más» amplía
 let soloCantidad = false; // filtro de la pestaña de habituales: ocultar los artículos sin cantidad marcada
 function renderList() {
   const list = $("list"); list.innerHTML = "";
@@ -316,7 +319,7 @@ function renderList() {
     const s = c.subs.find(x => x.id === nav.sub);
     cabecera = () => migas(list, `Catálogo › ${esc(c.nombre)} › <b>${nav.sub === "*" ? "Todo" : esc(s ? s.nombre : "")}</b>`, () => (c.subs.length === 1 ? irA(null, null) : irA(c.id, null)));
   }
-  let items = data.products.filter(p => (tab === "all" || p.count > 0 || q) && (!q || norm(p.name).includes(q) || p.id.includes(q)) && (!filtra || qty.get(p.id) > 0)
+  let items = data.products.filter(p => (tab === "all" || p.count > 0 || q) && (!q || coincide(p, q)) && (!filtra || qty.get(p.id) > 0)
     && (!arbol || (p.cat === nav.cat && (nav.sub === "*" || p.sub === nav.sub))));
   $("fil").setAttribute("aria-pressed", String(soloCantidad));
   $("filinfo").textContent = filtra ? `Mostrando ${items.length} con cantidad` : "";
@@ -326,7 +329,12 @@ function renderList() {
     d.textContent = filtra ? "Aún no has marcado ninguna cantidad. Pulsa «Ver solo lo que he marcado» para volver a ver todos." : tab === "hab" && !q ? "Aún no tienes histórico. Mira el catálogo." : "No hay resultados.";
     list.appendChild(d); return;
   }
-  items.slice(0, 150).forEach(p => list.appendChild(row(p)));
+  items.slice(0, limite).forEach(p => list.appendChild(row(p)));
+  if (items.length > limite) {
+    const m = document.createElement("button"); m.type = "button"; m.className = "big sec"; m.style.margin = "12px 14px";
+    m.textContent = `Mostrar más (${items.length - limite} restantes)`; m.onclick = () => { limite += 150; renderList(); };
+    list.appendChild(m);
+  }
 }
 
 function renderCart() {
@@ -355,13 +363,13 @@ function refresh() {
 function showCart(on) { $("cart").hidden = !on; if (on) { $("err").textContent = ""; renderCart(); } }
 
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
-  tab = b.dataset.t;
+  tab = b.dataset.t; limite = 150;
   if (tab === "all") { nav = { cat: null, sub: null }; $("list").scrollTop = 0; } // «Catálogo» siempre empieza por las categorías
-  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".tab").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
   renderList();
 });
 $("fil").onclick = () => { soloCantidad = !soloCantidad; renderList(); }; // ida y vuelta
-$("q").oninput = e => { query = e.target.value; renderList(); };
+$("q").oninput = e => { query = e.target.value; limite = 150; renderList(); };
 $("verCarrito").onclick = $("cartIcon").onclick = () => count() && showCart(true);
 $("back").onclick = $("keep").onclick = () => showCart(false);
 
@@ -437,8 +445,8 @@ async function enviarPedido(delivery, errBox) {
 }
 
 (async () => {
-  const r = await fetch(location.pathname + "/datos");
-  if (!r.ok) { $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con tu teléfono y PIN</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
+  const r = await fetch(location.pathname + "/datos").catch(() => null);
+  if (!r || !r.ok) { $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 últimos caracteres de tu NIF</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
   data = await r.json();
   document.title = "Pedido a " + data.business;
   $("ttl").textContent = "Hola, " + data.customer.name;
