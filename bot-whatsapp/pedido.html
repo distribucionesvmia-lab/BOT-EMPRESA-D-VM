@@ -11,6 +11,11 @@
   body { font-family:-apple-system,"Segoe UI",Roboto,system-ui,sans-serif; font-size:17px; background:var(--fondo); color:var(--texto); display:flex; justify-content:center; }
   button, input, textarea { font-family:inherit; }
   button:focus-visible, input:focus-visible, textarea:focus-visible { outline:3px solid #a80000; outline-offset:2px; }
+  #toast { position:fixed; left:12px; right:12px; bottom:84px; z-index:20; background:#1d1d1f; color:#fff; border-radius:14px; padding:12px 14px; display:flex; gap:12px; align-items:center; justify-content:space-between; font-size:16px; box-shadow:0 6px 24px rgba(0,0,0,.3); }
+  #toast[hidden] { display:none; }
+  #toast button { border:0; background:#fff; color:var(--rojo-o); font-weight:800; font-size:16px; min-height:40px; padding:0 14px; border-radius:10px; cursor:pointer; }
+  .subl { margin:-4px 14px 6px; font-size:15px; color:var(--gris); }
+  .subl b { color:var(--texto); }
   .app { width:100%; max-width:none; height:100vh; height:100dvh; background:#fff; display:flex; flex-direction:column; position:relative; }
 
   /* Cabecera roja con el logo */
@@ -153,6 +158,7 @@
   <!-- Filtro de ida y vuelta, solo en la pestaña «Histórico» (data-t="hab") -->
   <div class="filbar" id="filbar" hidden><button class="fil" id="fil" type="button" aria-pressed="false">☑ Ver solo lo que he marcado</button><span id="filinfo"></span></div>
   <main id="list"></main>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
   <footer><button class="big" id="verCarrito" type="button" disabled>Añade productos para empezar</button></footer>
 
   <section class="screen" id="cart" hidden>
@@ -211,10 +217,51 @@ const lines = () => data.products.filter(p => qty.get(p.id) > 0).map(p => ({ ...
 const count = () => lines().length;
 const total = () => lines().reduce((t, l) => t + uds(l) * l.price, 0);
 
+let toastT = 0;
+function aviso(texto, deshacer) {
+  const t = $("toast"); t.innerHTML = ""; t.append(Object.assign(document.createElement("span"), { textContent: texto }));
+  if (deshacer) { const b = document.createElement("button"); b.type = "button"; b.textContent = "Deshacer"; b.onclick = () => { t.hidden = true; deshacer(); }; t.appendChild(b); }
+  t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), deshacer ? 7000 : 4000);
+}
 function setQty(id, n) {
-  n = Math.max(0, Math.min(999, Math.floor(Number(n) || 0)));
-  if (n) qty.set(id, n); else { qty.delete(id); unitOf.delete(id); notes.delete(id); }
+  const antes = qty.get(id) || 0, u = unitOf.get(id), nota = notes.get(id);
+  n = Math.max(0, Math.floor(Number(n) || 0));
+  if (n > 999) { n = 999; aviso("La cantidad máxima por artículo es 999."); }
+  if (n) qty.set(id, n); else {
+    qty.delete(id); unitOf.delete(id); notes.delete(id);
+    if (antes) aviso("Artículo quitado del pedido.", () => { qty.set(id, antes); if (u) unitOf.set(id, u); if (nota) notes.set(id, nota); refresh(); });
+  }
   refresh();
+}
+// Cambiar entre unidades y cajas conservando lo que se está pidiendo (nunca 24 uds → 24 cajas sin avisar)
+function cambiarUnidad(p, nueva) {
+  const q = qty.get(p.id) || 0, ant = unit(p.id);
+  if (!q || ant === nueva) { unitOf.set(p.id, nueva); return refresh(); }
+  const k = p.unitsPerBox || 1;
+  if (nueva === "ud") { unitOf.set(p.id, "ud"); return setQty(p.id, q * k); }
+  const cajas = Math.ceil(q / k);
+  if (q % k && !confirm(`${q} uds no son cajas completas (caja de ${k}). ¿Pedir ${cajas} ${cajas === 1 ? "caja" : "cajas"} (${cajas * k} uds)?`)) return;
+  unitOf.set(p.id, "caja"); setQty(p.id, cajas);
+}
+// Carrito guardado en este navegador (24 h) para no perderlo al recargar
+const HORAS = 24;
+const clave = () => "vm_carrito_" + (location.pathname.startsWith("/pedido/") ? token : "c_" + data.customer.name);
+function guardar() {
+  try {
+    if (!qty.size) return localStorage.removeItem(clave());
+    localStorage.setItem(clave(), JSON.stringify({ t: Date.now(), q: [...qty], u: [...unitOf], n: [...notes] }));
+  } catch {}
+}
+function recuperar() {
+  try {
+    const g = JSON.parse(localStorage.getItem(clave()) || "null");
+    if (!g || Date.now() - g.t > HORAS * 3600e3) return localStorage.removeItem(clave());
+    const ids = new Set(data.products.map(p => p.id));
+    for (const [id, n] of g.q) if (ids.has(id) && n > 0) qty.set(id, Math.min(999, n));
+    for (const [id, u] of g.u) if (qty.has(id) && (u === "ud" || u === "caja")) unitOf.set(id, u);
+    for (const [id, t] of g.n) if (qty.has(id)) notes.set(id, String(t).slice(0, 120));
+    if (qty.size) aviso("Hemos recuperado tu pedido sin terminar.");
+  } catch {}
 }
 
 function control(p) {
@@ -225,7 +272,7 @@ function control(p) {
     const sel = document.createElement("div"); sel.className = "ud"; sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Pedir en");
     for (const [u, t] of [["ud", "Uds"], ["caja", "Cajas"]]) {
       const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.className = unit(p.id) === u ? "on" : ""; b.setAttribute("aria-pressed", String(unit(p.id) === u));
-      b.onclick = () => { unitOf.set(p.id, u); refresh(); };
+      b.onclick = () => cambiarUnidad(p, u);
       sel.appendChild(b);
     }
     box.appendChild(sel);
@@ -341,9 +388,13 @@ function renderCart() {
   const box = $("cartLines"); box.innerHTML = "";
   lines().forEach(l => {
     box.appendChild(row(l));
+    const k = l.unitsPerBox || 1, cj = unit(l.id) === "caja";
+    const sl = document.createElement("div"); sl.className = "subl";
+    sl.innerHTML = `${cj ? `${l.qty} ${l.qty === 1 ? "caja" : "cajas"} × ${k} uds = ` : ""}<b>${uds(l)} uds</b> × ${eur(l.price)} = <b>${eur(uds(l) * l.price)}</b>`;
+    box.appendChild(sl);
     const ta = document.createElement("input"); ta.className = "lnote"; ta.maxLength = 120;
     ta.placeholder = "Observación para este artículo (opcional)"; ta.value = notes.get(l.id) || "";
-    ta.oninput = () => notes.set(l.id, ta.value);
+    ta.oninput = () => { notes.set(l.id, ta.value); guardar(); };
     box.appendChild(ta);
   });
   $("total").textContent = eur(total());
@@ -351,6 +402,7 @@ function renderCart() {
 }
 
 function refresh() {
+  guardar();
   const n = count();
   $("cnt").textContent = n;
   $("verCarrito").textContent = n ? `🛒 Ver carrito · ${n} artículo${n === 1 ? "" : "s"} · ${eur(total())}` : "Añade productos para empezar";
@@ -433,6 +485,7 @@ async function enviarPedido(delivery, errBox) {
     const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value, delivery }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "No se ha podido enviar el pedido");
+    qty.clear(); unitOf.clear(); notes.clear(); try { localStorage.removeItem(clave()); } catch {}
     $("doneP").textContent = j.message; $("when").hidden = true; $("done").hidden = false; $("backlink").hidden = parent !== window;
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
   } catch (e) {
@@ -455,6 +508,7 @@ async function enviarPedido(delivery, errBox) {
   $("priceNote").textContent = data.priceNote || "";
   if (data.used) { $("doneT").textContent = "Este pedido ya se envió"; $("doneP").textContent = "Vuelve al chat para hacer otro pedido."; $("done").hidden = false; return; }
   if (!data.products.some(p => p.count > 0)) { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); }
+  recuperar();
   refresh();
 })();
 </script>

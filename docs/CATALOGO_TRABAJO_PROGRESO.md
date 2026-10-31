@@ -33,6 +33,7 @@ Pantalla del cliente: `/` (`cliente.html`); catálogo: `/catalogo` (`pedido.html
 | 1 | 1.4 Registrar defectos con prioridad | Terminada (run 1b): D1–D18 |
 | 1 | 1.5 Pasada manual en navegador móvil 390 px con datos demo (confirmar D1–D18) | Pendiente (baja prioridad, hacer cuando sobre tiempo) |
 | 1 | 1.6 Correcciones rápidas de la auditoría (D4, D5 orden, D8, D10–D13) | Terminada (run 1b) |
+| 5/7 | 5.1, 7.1, 7.2 (D1, D2, D6, D7, D14) | Terminadas (run 1c), probadas en navegador móvil con cliente demo 00000001R |
 | 2 | Navegación y portada (Comprar/Explorar/Pedidos/Cuenta) | Pendiente |
 | 3 | Estructura del catálogo y revisión de clasificación | Pendiente |
 | 4 | Búsqueda y filtros | Pendiente |
@@ -101,10 +102,10 @@ Ver `docs/CATALOGO_AUDITORIA.md` (D1–D18). Abiertos más graves: D1 carrito no
 
 Cada ejecución coge 2–4. Marca terminada aquí y en la tabla. Ejecuta `npm test` antes de commitear.
 
-1. **5.1 (D2, D6, D14)** `pedido.html`: al cambiar Uds↔Cajas con cantidad puesta, convertir o confirmar; avisar al tope de 999; "Deshacer" al quitar una línea.
-2. **7.1 (D1)** Persistir el carrito en `localStorage` por token/cliente (try/catch, caduca a las 24 h, limpiar al enviar).
-3. **7.2 (D7)** Subtotal por línea en el carrito, con el detalle "N cajas × M uds".
-4. **7.3 (D3)** Paso de confirmación opcional antes de enviar (resumen + día elegido). Es decisión del cliente: implementarlo detrás de una constante `CONFIRMAR_ENVIO = true` y dejar la pregunta anotada.
+1. ~~5.1 (D2, D6, D14)~~ **Terminada (run 1c)**: cambio Uds↔Cajas convierte (confirma si no es exacto), aviso de tope 999, "Deshacer" al quitar línea.
+2. ~~7.1 (D1)~~ **Terminada (run 1c)**: carrito en `localStorage` (clave por cliente, 24 h, se borra al enviar).
+3. ~~7.2 (D7)~~ **Terminada (run 1c)**: subtotal por línea en el carrito.
+4. **7.3 (D3)** Paso de confirmación opcional antes de enviar (resumen + día elegido). Decisión del cliente: implementarlo detrás de una constante `CONFIRMAR_ENVIO = true` en `pedido.html` y dejar la pregunta anotada.
 5. **3.1 (D18)** Revisar `categorias.js` contra las categorías comerciales del plan; adaptar sin inventar subcategorías; mantener familias a3; informe de "sin clasificar" (script `node categorias-informe.js` sobre catalogo.sqlite, sin escribir datos).
 6. **2.1** Navegación inferior Comprar / Explorar / Pedidos / Cuenta (si encaja con lo ya decidido: sin "Mis pedidos" por ahora; proponer "Repetir" en su lugar) y orden de la portada.
 7. **4.1** Búsqueda: marca/EAN solo si existen columnas en datos reales; estados vacíos útiles ("prueba con menos palabras").
@@ -120,3 +121,4 @@ Cuando todo esto esté hecho, 1.5 (pasada manual) y revisar de nuevo la auditor�
 
 - Run 1: Fase 0 completa (0.1–0.4). Solo se creó este archivo; sin cambios funcionales.
 - Run 1b: Fase 1 (auditoría por código) + correcciones rápidas en pedido.html (búsqueda por palabras, "Mostrar más", etiquetas accesibles, foco, mensaje de sesión). 193 tests OK. Se creó docs/CATALOGO_AUDITORIA.md.
+- Run 1c: 5.1, 7.1, 7.2 hechas y probadas con Playwright (390 px, demo, NIF 00000001R): conversión Uds/Cajas, recuperación del carrito tras recargar, subtotales, deshacer. Sin errores JS. 193 tests OK. Ojo: cuando se prueba con Playwright, `NODE_PATH=$(npm root -g)` y cliente demo `00000001R`; `fuser -k 3911/tcp` para parar el servidor.
