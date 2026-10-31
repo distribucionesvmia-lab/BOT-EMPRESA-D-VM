@@ -28,7 +28,7 @@
   .cartbtn span { background:var(--rojo); color:#fff; min-width:26px; height:26px; border-radius:13px; display:inline-grid; place-items:center; font-size:15px; padding:0 6px; }
 
   /* Guía de pasos y pestañas grandes */
-  .paso { padding:10px 14px 0; font-size:14px; font-weight:700; color:var(--rojo-o); letter-spacing:.02em; text-transform:uppercase; }
+  .paso { padding:10px 14px 0; font-size:15px; font-weight:700; color:var(--rojo-o); letter-spacing:.02em; text-transform:uppercase; }
   .guia { padding:2px 14px 10px; color:var(--gris); font-size:16px; line-height:1.35; }
   .tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 14px 10px; }
   .tabs button.tab { border:2px solid var(--linea); background:#fff; min-height:52px; padding:8px 10px; border-radius:14px; font-size:16px; font-weight:700; color:var(--gris); cursor:pointer; line-height:1.15; }
@@ -589,7 +589,7 @@ async function enviarPedido(delivery, errBox) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "No se ha podido enviar el pedido");
     qty.clear(); unitOf.clear(); notes.clear(); try { localStorage.removeItem(clave()); } catch {}
-    $("doneP").textContent = j.message; $("when").hidden = true; $("resumen").hidden = true; $("done").hidden = false; $("backlink").hidden = parent !== window;
+    $("doneP").textContent = j.message; $("when").hidden = true; $("resumen").hidden = true; $("cart").hidden = true; $("done").hidden = false; $("backlink").hidden = parent !== window;
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
   } catch (e) {
     errBox.textContent = e.message; opts.forEach(o => (o.disabled = false)); btn.disabled = false; $("resOk").disabled = false;
@@ -600,6 +600,35 @@ async function enviarPedido(delivery, errBox) {
     }
   }
 }
+
+// Pantallas superpuestas (carrito, repetir, día de entrega, resumen, calendario): foco, tecla Esc y botón «Atrás» del móvil
+const CAPAS = ["cart", "repetir", "when", "resumen"], FONDO = ["header", ".paso", ".guia", ".tabs", ".buscar", ".filbar", ".repbar", "#list", "footer"];
+const abiertas = () => [...CAPAS.filter(id => !$(id).hidden), ...($("calFondo").hidden ? [] : ["calFondo"])];
+function cerrarArriba() {
+  if (!$("calFondo").hidden) $("calFondo").hidden = true;
+  else if (!$("resumen").hidden) $("resumen").hidden = true;
+  else if (!$("when").hidden) $("when").hidden = true;
+  else if (!$("repetir").hidden) $("repetir").hidden = true;
+  else if (!$("cart").hidden) showCart(false);
+}
+let prof = 0, silencio = false, foco = null, nPrev = 0;
+function capasCambian() {
+  const ab = abiertas(), n = ab.length;
+  FONDO.forEach(sel => document.querySelectorAll(".app > " + sel).forEach(e => (e.inert = n > 0))); // lo de detrás no se toca ni se lee
+  if (n > nPrev) { // se abrió una capa: foco dentro y una entrada en el historial para que «Atrás» la cierre
+    if (!nPrev) foco = document.activeElement;
+    const top = $(ab[n - 1]); setTimeout(() => (top.querySelector("button:not([disabled])") || top).focus(), 0);
+  } else if (!n && foco && document.contains(foco)) setTimeout(() => foco.focus(), 0);
+  nPrev = n;
+  try {
+    while (prof < n) { history.pushState({ capa: 1 }, ""); prof++; }
+    if (prof > n) { const d = prof - n; prof = n; silencio = true; history.go(-d); }
+  } catch {}
+}
+addEventListener("popstate", () => { if (silencio) { silencio = false; return; } if (prof > 0) { prof--; cerrarArriba(); } });
+addEventListener("keydown", e => { if (e.key === "Escape" && abiertas().length) { e.preventDefault(); cerrarArriba(); } });
+const obs = new MutationObserver(capasCambian);
+[...CAPAS, "calFondo"].forEach(id => obs.observe($(id), { attributes: true, attributeFilter: ["hidden"] }));
 
 (async () => {
   const r = await fetch(location.pathname + "/datos").catch(() => null);
