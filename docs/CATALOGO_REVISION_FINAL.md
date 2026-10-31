@@ -1,6 +1,10 @@
 # Revisión final del catálogo para publicación manual (borrador)
 
-Estado: BORRADOR. Nada está publicado ni desplegado. Esto NO es una declaración de "listo para producción": faltan datos reales y revisión humana (ver "Bloqueos").
+Estado a 2026-10-31 23:30 UTC: BORRADOR FINAL del plan de 8 horas (8 ejecuciones). 195 tests de servidor y 11 comprobaciones de navegador (demo) en verde.
+
+Estado de las fases: 0, 1, 5, 6 (favoritos y repetir pedido), 7 (carrito, resumen, totales), 10 (accesibilidad) y 11 (pruebas) HECHAS con datos de demostración. 3 (categorías) y 4 (marca/EAN) PARCIALES; 2 (navegación inferior) y 6.3 (listas con nombre) NO HECHAS; 8 y 9 sin cambios a propósito (sin datos reales).
+
+Estado: Nada está publicado ni desplegado. Esto NO es una declaración de "listo para producción": faltan datos reales y revisión humana (ver "Bloqueos").
 
 ## Qué incluye la rama `claude/eager-hamilton-gknalq` (catálogo)
 - Carrito persistente (24 h, en el navegador), conversión Uds↔Cajas con confirmación, aviso de tope y "Deshacer".
@@ -11,6 +15,12 @@ Estado: BORRADOR. Nada está publicado ni desplegado. Esto NO es una declaració
 - Favoritos privados por cliente (`cuentas.sqlite`, tabla `favorites`).
 - Accesibilidad: etiquetas, foco dentro de las pantallas superpuestas, Esc, botón Atrás del móvil, fondo inerte, zona viva.
 - `categorias-informe.js`: informe de solo lectura de clasificación.
+
+## Decisiones del cliente que siguen sin respuesta
+1. Categorías: mantener las suyas o pasar a las del plan (hasta entonces no se tocan).
+2. Total mostrado: sin IVA (hoy) o con IVA.
+3. Navegación inferior Comprar/Explorar/Cuenta: sí o no.
+4. Listas con nombre además de favoritos: sí o no.
 
 ## Bloqueos antes de publicar (los resuelve una persona)
 1. Excel real de productos (marca, EAN, formatos, familias) → habilita búsqueda por marca/EAN y revisar categorías con `node categorias-informe.js catalogo.sqlite`.
