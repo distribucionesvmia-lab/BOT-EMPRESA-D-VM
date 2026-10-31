@@ -21,7 +21,7 @@ Prioridad: A = puede causar un pedido erróneo o bloquear la compra · M = moles
 | D13 | B | Errores del carrito sin `role="alert"`; aviso de "llevas N artículos" sin zona viva. | código | **Corregido** |
 | D14 | M | Cantidades máximas: se recorta a 999 sin avisar. | código `setQty` | **Corregido** (aviso de tope) |
 | D15 | M | Textos pequeños (14 px, paso) y revisar contraste del gris `#5f6368` sobre fondos. | código | Pendiente (Fase 10) |
-| D16 | M | No hay favoritos, listas ni "repetir pedido" en la mini-app (solo en el chat). | código | Pendiente (Fase 6) |
+| D16 | M | No hay favoritos, listas ni "repetir pedido" en la mini-app (solo en el chat). | código | Parcial: **favoritos y repetir pedido hechos**; listas con nombre pendientes (opcional) |
 | D17 | M | Sin fotos: solo iniciales. Sin marca/formato/EAN en las fichas. | código | Pendiente; necesita datos reales (Fase 9) |
 | D18 | M | Las categorías no coinciden con la propuesta comercial del plan. | `categorias.js` | Pendiente (Fase 3) |
 | D19 | M | El total mostrado en el navegador (0,55 €) difiere del mensaje del servidor (0.50 €) con un producto demo; además el mensaje usa punto decimal. | prueba en navegador, run 1d | **Corregido** (el navegador ignoraba el descuento; ahora coincide con el servidor) |

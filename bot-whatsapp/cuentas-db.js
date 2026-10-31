@@ -82,6 +82,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   const addCol = (table, col, ddl) => {
     if (!db.prepare(`PRAGMA table_info(${table})`).all().some((x) => x.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`);
   };
+  // Favoritos del cliente (privados, por cliente; no los toca la sincronización con a3ERP)
+  db.exec("CREATE TABLE IF NOT EXISTS favorites (customer_id TEXT NOT NULL, product_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (customer_id, product_id))");
   addCol("registrations", "pin_hash", "TEXT");
   addCol("registrations", "matched", "TEXT");
   addCol("accounts", "verified", "INTEGER NOT NULL DEFAULT 1");
@@ -158,6 +160,16 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     },
 
     /** ¿Esta cuenta ya cambió el código del NIF por uno personal? Entonces el NIF deja de valer para entrar. */
+    /** Ids de los productos favoritos del cliente (los más recientes primero). */
+    favorites: (customerId) => db.prepare("SELECT product_id FROM favorites WHERE customer_id = ? ORDER BY created_at DESC, rowid DESC").all(String(customerId)).map((r) => r.product_id),
+    /** Marca o desmarca un favorito. Máximo 300 por cliente. Devuelve false si se pasa del máximo. */
+    setFavorite(customerId, productId, on, now = new Date().toISOString()) {
+      const c = String(customerId), p = String(productId);
+      if (!on) { db.prepare("DELETE FROM favorites WHERE customer_id = ? AND product_id = ?").run(c, p); return true; }
+      if (db.prepare("SELECT COUNT(*) AS n FROM favorites WHERE customer_id = ?").get(c).n >= 300) return false;
+      db.prepare("INSERT OR IGNORE INTO favorites (customer_id, product_id, created_at) VALUES (?, ?, ?)").run(c, p, now);
+      return true;
+    },
     hasOwnCode: (customerId) => !!byCustomer.get(String(customerId))?.code_key,
     /** Guarda la huella del código personal de la cuenta. { ok:true } o { error } si otro cliente ya usa ese código. */
     setCodeKey(accountId, key) {

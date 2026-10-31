@@ -36,6 +36,7 @@ Pantalla del cliente: `/` (`cliente.html`); catálogo: `/catalogo` (`pedido.html
 | 5/7 | 5.1, 7.1, 7.2 (D1, D2, D6, D7, D14) | Terminadas (run 1c), probadas en navegador móvil con cliente demo 00000001R |
 | 3/7 | 7.4 (D19) hecha; 3.1 parcial (informe sí, recategorizar pendiente de decisión) | run 2 |
 | 4/6 | 4.1 (estados vacíos) y 6.2 (repetir pedido) | Terminadas (run 3) |
+| 6 | 6.1 favoritos | Terminada (run 4), probada en navegador y con test (195 OK) |
 | 2 | Navegación y portada (Comprar/Explorar/Pedidos/Cuenta) | Pendiente |
 | 3 | Estructura del catálogo y revisión de clasificación | Pendiente |
 | 4 | Búsqueda y filtros | Pendiente |
@@ -112,7 +113,7 @@ Cada ejecución coge 2–4. Marca terminada aquí y en la tabla. Ejecuta `npm te
 5. **3.1 (D18) – PARCIAL (run 2)**: hecho `bot-whatsapp/categorias-informe.js` (informe de solo lectura: `node categorias-informe.js catalogo.sqlite`). **NO se han cambiado las categorías**: el cliente eligió explícitamente Café, Pascual, Vinos, Aguas, Despensa, Refrigerados y Congelados (+ Otros), y el plan propone otras (Bebidas, Café e infusiones, Lácteos…). **Pendiente de decisión del cliente** (ver docs/CATALOGO_AUDITORIA.md, sección «Decisiones por tomar»). Cuando el cliente tenga el Excel real: ejecutar el informe y afinar palabras en `categorias.js` (sin inventar subcategorías).
 6. **2.1 (DECISIÓN PREVIA: el cliente quitó «Mis pedidos»; proponer solo barra Comprar/Explorar/Cuenta o mantener las pestañas actuales y preguntar)**  Navegación inferior Comprar / Explorar / Pedidos / Cuenta (si encaja con lo ya decidido: sin "Mis pedidos" por ahora; proponer "Repetir" en su lugar) y orden de la portada.
 7. ~~4.1~~ **Terminada (run 3)**: sin resultados ahora explica y ofrece «Borrar la búsqueda»; marca/EAN siguen PENDIENTES de que el Excel real traiga esas columnas (no se inventan).
-8. **6.1** Favoritos y listas privadas por cliente (tabla nueva en `clientes-db.js`, sin tocar históricos).
+8. ~~6.1~~ **Terminada (run 4)**: favoritos privados por cliente (♡/♥ en cada producto). Guardados en `cuentas.sqlite` (tabla `favorites`, se copia en las copias de seguridad, no los toca la sincronización con a3ERP), máx. 300; ruta `POST /catalogo/favorito`; en Histórico los favoritos salen primero aunque no tengan historial. Demo del navegador: favoritos en memoria. NO hay «listas» con nombre todavía (6.3, opcional, solo si el cliente las pide).
 9. ~~6.2~~ **Terminada (run 3)**: botón «↻ Repetir un pedido anterior» en Histórico: pantalla con los últimos 5 pedidos, casillas por línea, se añade al carrito (en unidades) con aviso de revisar. Probado en navegador móvil con el cliente demo.
 10. **8.1 / 9.1** Recomendaciones sin inventar (solo "más pedido por ti"); placeholder de foto con iniciales ya existe; campo de imagen opcional si los datos lo traen.
 11. **10.1** Accesibilidad: foco en diálogos, Esc, botón Atrás (history.pushState), contraste, tamaños.
@@ -128,3 +129,4 @@ Cuando todo esto esté hecho, 1.5 (pasada manual) y revisar de nuevo la auditor�
 - Run 1d: 7.3 hecha (confirmación antes de enviar, decisión del cliente: sí). Probada con Playwright: 0 POST hasta confirmar. Detectada D19 (total navegador 0,55 € vs servidor 0.50 €), pendiente 7.4. 193 tests OK.
 - Run 2 (por petición del cliente + programada de las 16:24 UTC): 7.4 hecha (totales cuadran, coma decimal, test nuevo → 194 tests OK), 3.1 parcial (informe de clasificación). Demo del navegador reconstruido (demo-web/dist). Siguiente: 2.1, 4.1, 6.1, 6.2.
 - Run 3 (programada 17:24 UTC): 4.1 y 6.2 hechas y probadas en navegador (repbar visible, repetir añade 7 artículos, búsqueda vacía con botón). 194 tests OK. Siguiente: 6.1 favoritos/listas (necesita tabla en clientes-db.js + endpoints; atención a la demo del navegador), 2.1, 8.1/9.1, 10.1, 11.1, 12.1.
+- Run 4 (programada 18:24 UTC): 6.1 favoritos hecho (servidor + interfaz + demo + test). Siguiente: 2.1 (navegación; decidir con el cliente), 8.1/9.1, 10.1, 11.1, 12.1, 7.5 (IVA en total), 1.5.

@@ -403,6 +403,7 @@ async function appRoutes(req, res, url) {
       priceNote: BUSINESS.priceNote,
       customer: { name: customer.name, address: customer.address },
       used: false,
+      favs: getAccountsDb().favorites(account.customerId),
       products: webProducts(customer, catalogNow(), habitualProducts),
       history: webHistory(customer, catalogNow()),
       tree: webTree(catalogNow()),
@@ -410,6 +411,15 @@ async function appRoutes(req, res, url) {
       today: madridDay(),
       minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }),
     });
+  }
+  if (p === "/catalogo/favorito" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const body = await readJson(req);
+    const id = String(body?.id ?? "");
+    if (!catalogNow().some((x) => String(x.id) === id)) return void sendJson(res, 400, { error: "Producto no válido" });
+    if (!getAccountsDb().setFavorite(account.customerId, id, body?.on !== false)) return void sendJson(res, 400, { error: "Has llegado al máximo de favoritos (300)" });
+    return void sendJson(res, 200, { ok: true, favs: getAccountsDb().favorites(account.customerId) });
   }
   if (p === "/catalogo" && req.method === "POST") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });

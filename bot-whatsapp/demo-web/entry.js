@@ -29,6 +29,7 @@ const errorListeners = new Set();
 const emit = () => listeners.forEach((f) => { try { f(); } catch (e) { console.error(e); } });
 const report = (e) => { console.error(e); errorListeners.forEach((f) => f(e)); };
 const sessions = new Map();
+const favsDemo = new Map(); // favoritos de la demo (solo en memoria)
 const links = new Map();
 
 const activeCatalog = () =>
@@ -251,10 +252,19 @@ window.VM = {
     links.set(id, { customer: customerOf(currentAccount()), used: false });
     return id;
   },
+  miniFav(link, body) {
+    const customer = links.get(link)?.customer;
+    if (!customer) return { status: 410, json: { error: "Enlace no válido o caducado" } };
+    const id = String(body?.id ?? "");
+    if (!getCatalog().some((p) => String(p.id) === id)) return { status: 400, json: { error: "Producto no válido" } };
+    const set = favsDemo.get(customer.id) ?? new Set(); favsDemo.set(customer.id, set);
+    if (body?.on === false) set.delete(id); else set.add(id);
+    return { status: 200, json: { ok: true, favs: [...set] } };
+  },
   miniData(link) {
     const customer = links.get(link)?.customer;
     if (!customer) return { error: "Enlace no válido o caducado" };
-    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, products: webProducts(customer, getCatalog(), habitualProducts), history: webHistory(customer, getCatalog()), tree: webTree(getCatalog()), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) };
+    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, favs: [...(favsDemo.get(customer.id) ?? [])], products: webProducts(customer, getCatalog(), habitualProducts), history: webHistory(customer, getCatalog()), tree: webTree(getCatalog()), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) };
   },
   miniSubmit(link, body) {
     const customer = links.get(link)?.customer;

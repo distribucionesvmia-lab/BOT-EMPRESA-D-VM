@@ -81,6 +81,8 @@
   .sub:hover, .sub:focus-visible { border-color:var(--rojo); background:var(--rojo-s); outline:none; }
   .sub small { color:var(--gris); font-size:15px; font-weight:400; white-space:nowrap; }
   .sub.todo { background:var(--rojo-s); border-color:var(--rojo); color:var(--rojo-o); }
+  .favb { border:0; background:none; font-size:28px; line-height:1; min-width:48px; min-height:48px; cursor:pointer; color:#b9b9bd; flex:none; }
+  .favb[aria-pressed="true"] { color:var(--rojo); }
   .repbar { margin:0 14px 10px; }
   .repbar button { width:100%; min-height:52px; border:2px dashed var(--rojo); background:var(--rojo-s); color:var(--rojo-o); font-weight:800; font-size:17px; border-radius:14px; cursor:pointer; }
   .rep-o { border:2px solid var(--linea); border-radius:14px; margin-bottom:12px; overflow:hidden; }
@@ -231,6 +233,7 @@ const $ = id => document.getElementById(id);
 const COLORS = ["#2f8f6b", "#c0763a", "#5b7bd5", "#a1507c", "#8a8f2b", "#3c8fa6", "#b8523f", "#6c5ba8"];
 const eur = n => n.toFixed(2).replace(".", ",") + " €";
 let data = null, tab = "hab", query = "";
+const favs = new Set(); // favoritos del cliente (solo con sesión; en el enlace de pedido del chat no hay)
 // Clave de este pedido: si se reenvía (doble clic, fallo de red), el servidor no lo duplica
 const orderKey = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
 const qty = new Map(); // id -> cantidad (en cajas o en unidades, según unitOf)
@@ -340,10 +343,26 @@ function row(p) {
   }
   if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " uds" + (unit(p.id) === "caja" && qty.get(p.id) ? " → " + qty.get(p.id) * p.unitsPerBox + " uds" : "");
   info.append(n, c, pr);
-  el.append(av, info, control(p));
+  el.append(av, info);
+  if (data.favs) {
+    const f = document.createElement("button"); f.type = "button"; f.className = "favb"; const on = favs.has(p.id);
+    f.textContent = on ? "♥" : "♡"; f.setAttribute("aria-pressed", String(on)); f.setAttribute("aria-label", (on ? "Quitar de favoritos " : "Marcar como favorito ") + p.name);
+    f.onclick = () => marcarFav(p.id, !on);
+    el.appendChild(f);
+  }
+  el.append(control(p));
   return el;
 }
 
+async function marcarFav(id, on) {
+  if (on) favs.add(id); else favs.delete(id);
+  refresh();
+  try {
+    const r = await fetch("/catalogo/favorito", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, on }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "No se pudo guardar");
+  } catch (e) { if (on) favs.delete(id); else favs.add(id); refresh(); aviso(e.message); }
+}
 // Catálogo por categorías (las de la web): categorías → subcategorías → productos. Con el buscador se ve todo junto.
 let nav = { cat: null, sub: null }; // sub: null = elegir subcategoría; "*" = todo lo de la categoría
 const irA = (cat, sub) => { limite = 150; nav = { cat, sub }; $("list").scrollTop = 0; renderList(); };
@@ -398,17 +417,18 @@ function renderList() {
     const s = c.subs.find(x => x.id === nav.sub);
     cabecera = () => migas(list, `Catálogo › ${esc(c.nombre)} › <b>${nav.sub === "*" ? "Todo" : esc(s ? s.nombre : "")}</b>`, () => (c.subs.length === 1 ? irA(null, null) : irA(c.id, null)));
   }
-  let items = data.products.filter(p => (tab === "all" || p.count > 0 || q) && (!q || coincide(p, q)) && (!filtra || qty.get(p.id) > 0)
+  let items = data.products.filter(p => (tab === "all" || p.count > 0 || favs.has(p.id) || q) && (!q || coincide(p, q)) && (!filtra || qty.get(p.id) > 0)
     && (!arbol || (p.cat === nav.cat && (nav.sub === "*" || p.sub === nav.sub))));
   $("fil").setAttribute("aria-pressed", String(soloCantidad));
   $("filinfo").textContent = filtra ? `Mostrando ${items.length} con cantidad` : "";
   if (cabecera) cabecera();
   if (!items.length) {
     const d = document.createElement("div"); d.className = "vacio";
-    d.textContent = filtra ? "Aún no has marcado ninguna cantidad. Pulsa «Ver solo lo que he marcado» para volver a ver todos." : tab === "hab" && !q ? "Aún no tienes histórico. Mira el catálogo." : q ? `No hemos encontrado «${query.trim()}». Prueba con menos palabras o revisa cómo está escrito.` : "No hay resultados.";
+    d.textContent = filtra ? "Aún no has marcado ninguna cantidad. Pulsa «Ver solo lo que he marcado» para volver a ver todos." : tab === "hab" && !q ? "Aún no tienes histórico ni favoritos. Mira el catálogo y pulsa ♡ en lo que más pidas." : q ? `No hemos encontrado «${query.trim()}». Prueba con menos palabras o revisa cómo está escrito.` : "No hay resultados.";
     if (q) { const b = document.createElement("button"); b.type = "button"; b.className = "lnk"; b.textContent = "Borrar la búsqueda"; b.onclick = () => { $("q").value = ""; query = ""; renderList(); $("q").focus(); }; d.append(document.createElement("br"), b); }
     list.appendChild(d); return;
   }
+  if (tab === "hab" && !q) items = [...items.filter(p => favs.has(p.id)), ...items.filter(p => !favs.has(p.id))]; // los favoritos van primero
   items.slice(0, limite).forEach(p => list.appendChild(row(p)));
   if (items.length > limite) {
     const m = document.createElement("button"); m.type = "button"; m.className = "big sec"; m.style.margin = "12px 14px";
@@ -592,6 +612,7 @@ async function enviarPedido(delivery, errBox) {
   $("priceNote").textContent = data.priceNote || "";
   if (data.used) { $("doneT").textContent = "Este pedido ya se envió"; $("doneP").textContent = "Vuelve al chat para hacer otro pedido."; $("done").hidden = false; return; }
   if (!data.products.some(p => p.count > 0)) { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); }
+  (data.favs || []).forEach(id => favs.add(id));
   recuperar();
   refresh();
 })();

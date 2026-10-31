@@ -142,3 +142,19 @@ test("acceso con comprobación extra: si falla (nombre de empresa distinto) cuen
   for (let i = 0; i < MAX_FAILED; i++) db.login("600111222", "246810", undefined, exigeNombre("mal")); // adivinar el nombre también bloquea
   assert.deepEqual(db.login("600111222", "246810", undefined, exigeNombre("bar el ejemplo")), { ok: false, reason: "locked" });
 });
+
+test("favoritos: privados por cliente, sin duplicados, se quitan y tienen tope", () => {
+  const db = openAccountsDb(":memory:");
+  assert.deepEqual(db.favorites("1"), []);
+  assert.equal(db.setFavorite("1", "A", true, "2026-01-01T00:00:00Z"), true);
+  db.setFavorite("1", "B", true, "2026-01-02T00:00:00Z");
+  db.setFavorite("1", "A", true, "2026-01-03T00:00:00Z"); // repetido: no duplica
+  db.setFavorite("2", "Z", true);
+  assert.deepEqual(db.favorites("1"), ["B", "A"]);
+  assert.deepEqual(db.favorites("2"), ["Z"]);
+  db.setFavorite("1", "A", false);
+  assert.deepEqual(db.favorites("1"), ["B"]);
+  for (let i = 0; i < 299; i++) db.setFavorite("3", "P" + i, true);
+  assert.equal(db.setFavorite("3", "ULTIMO", true), true);
+  assert.equal(db.setFavorite("3", "UNO-MAS", true), false);
+});
