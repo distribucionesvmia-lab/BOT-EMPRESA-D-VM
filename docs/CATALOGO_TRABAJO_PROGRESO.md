@@ -35,6 +35,7 @@ Pantalla del cliente: `/` (`cliente.html`); catálogo: `/catalogo` (`pedido.html
 | 1 | 1.6 Correcciones rápidas de la auditoría (D4, D5 orden, D8, D10–D13) | Terminada (run 1b) |
 | 5/7 | 5.1, 7.1, 7.2 (D1, D2, D6, D7, D14) | Terminadas (run 1c), probadas en navegador móvil con cliente demo 00000001R |
 | 3/7 | 7.4 (D19) hecha; 3.1 parcial (informe sí, recategorizar pendiente de decisión) | run 2 |
+| 4/6 | 4.1 (estados vacíos) y 6.2 (repetir pedido) | Terminadas (run 3) |
 | 2 | Navegación y portada (Comprar/Explorar/Pedidos/Cuenta) | Pendiente |
 | 3 | Estructura del catálogo y revisión de clasificación | Pendiente |
 | 4 | Búsqueda y filtros | Pendiente |
@@ -109,10 +110,10 @@ Cada ejecución coge 2–4. Marca terminada aquí y en la tabla. Ejecuta `npm te
 4. ~~7.3 (D3)~~ **Terminada (run 1d)**: el cliente confirmó que SÍ quiere confirmación. Al elegir el día aparece "Confirma tu pedido" (día, dirección, líneas, observaciones, total) con "Confirmar y enviar" / "Cambiar el día". Probado: no se envía nada hasta confirmar.
 4b. ~~7.4 (D19)~~ **Terminada (run 2)**: causa = el navegador sumaba precio de lista × unidades e ignoraba el descuento (y el precio especial) que sí aplica el servidor. Ahora `webProducts` envía `price` (especial si existe) y `discount` con el mismo criterio que `pricing.js` y `pedido.html` calcula el importe igual (verificado: 0,50 € en pantalla y en el mensaje). No se tocaron reglas de precios. El mensaje de confirmación usa coma decimal. Observación abierta: el mensaje dice «total aprox.» SIN IVA, mientras que el correo de empresa dice «con IVA»; revisar con la gestoría qué quiere enseñar al cliente (tarea 7.5).
 5. **3.1 (D18) – PARCIAL (run 2)**: hecho `bot-whatsapp/categorias-informe.js` (informe de solo lectura: `node categorias-informe.js catalogo.sqlite`). **NO se han cambiado las categorías**: el cliente eligió explícitamente Café, Pascual, Vinos, Aguas, Despensa, Refrigerados y Congelados (+ Otros), y el plan propone otras (Bebidas, Café e infusiones, Lácteos…). **Pendiente de decisión del cliente** (ver docs/CATALOGO_AUDITORIA.md, sección «Decisiones por tomar»). Cuando el cliente tenga el Excel real: ejecutar el informe y afinar palabras en `categorias.js` (sin inventar subcategorías).
-6. **2.1** Navegación inferior Comprar / Explorar / Pedidos / Cuenta (si encaja con lo ya decidido: sin "Mis pedidos" por ahora; proponer "Repetir" en su lugar) y orden de la portada.
-7. **4.1** Búsqueda: marca/EAN solo si existen columnas en datos reales; estados vacíos útiles ("prueba con menos palabras").
+6. **2.1 (DECISIÓN PREVIA: el cliente quitó «Mis pedidos»; proponer solo barra Comprar/Explorar/Cuenta o mantener las pestañas actuales y preguntar)**  Navegación inferior Comprar / Explorar / Pedidos / Cuenta (si encaja con lo ya decidido: sin "Mis pedidos" por ahora; proponer "Repetir" en su lugar) y orden de la portada.
+7. ~~4.1~~ **Terminada (run 3)**: sin resultados ahora explica y ofrece «Borrar la búsqueda»; marca/EAN siguen PENDIENTES de que el Excel real traiga esas columnas (no se inventan).
 8. **6.1** Favoritos y listas privadas por cliente (tabla nueva en `clientes-db.js`, sin tocar históricos).
-9. **6.2** Repetir pedido anterior con revisión en la mini-app (`webHistory` ya existe).
+9. ~~6.2~~ **Terminada (run 3)**: botón «↻ Repetir un pedido anterior» en Histórico: pantalla con los últimos 5 pedidos, casillas por línea, se añade al carrito (en unidades) con aviso de revisar. Probado en navegador móvil con el cliente demo.
 10. **8.1 / 9.1** Recomendaciones sin inventar (solo "más pedido por ti"); placeholder de foto con iniciales ya existe; campo de imagen opcional si los datos lo traen.
 11. **10.1** Accesibilidad: foco en diálogos, Esc, botón Atrás (history.pushState), contraste, tamaños.
 12. **11.1** Tests nuevos para búsqueda, límites y persistencia; **12.1** revisión final para publicación manual (checklist, riesgos, datos pendientes).
@@ -126,3 +127,4 @@ Cuando todo esto esté hecho, 1.5 (pasada manual) y revisar de nuevo la auditor�
 - Run 1c: 5.1, 7.1, 7.2 hechas y probadas con Playwright (390 px, demo, NIF 00000001R): conversión Uds/Cajas, recuperación del carrito tras recargar, subtotales, deshacer. Sin errores JS. 193 tests OK. Ojo: cuando se prueba con Playwright, `NODE_PATH=$(npm root -g)` y cliente demo `00000001R`; `fuser -k 3911/tcp` para parar el servidor.
 - Run 1d: 7.3 hecha (confirmación antes de enviar, decisión del cliente: sí). Probada con Playwright: 0 POST hasta confirmar. Detectada D19 (total navegador 0,55 € vs servidor 0.50 €), pendiente 7.4. 193 tests OK.
 - Run 2 (por petición del cliente + programada de las 16:24 UTC): 7.4 hecha (totales cuadran, coma decimal, test nuevo → 194 tests OK), 3.1 parcial (informe de clasificación). Demo del navegador reconstruido (demo-web/dist). Siguiente: 2.1, 4.1, 6.1, 6.2.
+- Run 3 (programada 17:24 UTC): 4.1 y 6.2 hechas y probadas en navegador (repbar visible, repetir añade 7 artículos, búsqueda vacía con botón). 194 tests OK. Siguiente: 6.1 favoritos/listas (necesita tabla en clientes-db.js + endpoints; atención a la demo del navegador), 2.1, 8.1/9.1, 10.1, 11.1, 12.1.
