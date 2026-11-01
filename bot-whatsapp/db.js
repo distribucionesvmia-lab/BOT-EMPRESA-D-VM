@@ -140,6 +140,11 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
     /** Registra un mensaje de WhatsApp como procesado. Devuelve false si ya se había procesado (reenvío de Meta). */
     markMessage: (id) => insertMsg.run(String(id), new Date().toISOString()).changes === 1,
 
+    /** Pedidos hechos por la aplicación o el chat por un cliente (los más recientes primero), con las unidades de cada línea. */
+    ordersOf: (customerId, limit = 10) =>
+      db.prepare("SELECT * FROM orders WHERE customer_id = ? AND status != 'cancelled' ORDER BY id DESC LIMIT ?").all(String(customerId), limit).map(withLines)
+        .map((o) => ({ doc: o.ref ?? `W${o.id}`, date: String(o.created_at).slice(0, 10), lines: o.items.map((i) => ({ productId: String(i.product_id ?? i.id), qty: i.units ?? i.qty })).filter((l) => l.qty > 0) })),
+
     listOrders({ exportStatus, limit = 200 } = {}) {
       const rows = exportStatus
         ? db.prepare("SELECT * FROM orders WHERE export_status = ? ORDER BY id DESC LIMIT ?").all(exportStatus, limit)

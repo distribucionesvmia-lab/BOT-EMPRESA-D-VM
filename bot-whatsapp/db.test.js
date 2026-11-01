@@ -61,3 +61,13 @@ test("los pedidos sobreviven al reabrir la base de datos", async () => {
   assert.equal(db2.createOrder(pedido("k1")).duplicate, true);
   db2.close();
 });
+
+test("ordersOf: pedidos de un cliente con las unidades de cada línea, los más recientes primero", () => {
+  const db = openDb(":memory:");
+  db.createOrder({ key: "a", customerId: "C1", phone: "1", at: "2026-11-01T10:00:00Z", items: [{ id: "10", name: "X", price: 1, qty: 2, unit: "caja", units: 24 }] });
+  db.createOrder({ key: "b", customerId: "C2", phone: "2", at: "2026-11-01T11:00:00Z", items: [{ id: "10", name: "X", price: 1, qty: 1 }] });
+  db.createOrder({ key: "c", customerId: "C1", phone: "1", at: "2026-11-02T09:00:00Z", items: [{ id: "11", name: "Y", price: 1, qty: 3 }] });
+  const r = db.ordersOf("C1");
+  assert.deepEqual(r.map((o) => [o.date, o.lines]), [["2026-11-02", [{ productId: "11", qty: 3 }]], ["2026-11-01", [{ productId: "10", qty: 24 }]]]);
+  assert.deepEqual(db.ordersOf("C9"), []);
+});

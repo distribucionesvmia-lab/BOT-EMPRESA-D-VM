@@ -25,6 +25,20 @@ export function webProducts(customer, catalog, habitualProducts, imgOf = () => n
 /** Árbol de categorías del catálogo que ve el cliente (con cuántos productos tiene cada una). */
 export const webTree = (catalog) => arbolCategorias(catalog);
 
+/**
+ * Suma al historial de a3ERP los pedidos que el cliente ha hecho por la aplicación o el chat (y que a3ERP aún no ha facturado):
+ * solo los de fecha igual o posterior al último pedido de a3ERP, para no contarlos dos veces cuando después aparezcan en su historial.
+ */
+export function withOwnOrders(customer, ownOrders = []) {
+  if (!customer || !ownOrders.length) return customer;
+  const orders = customer.orders ?? [];
+  const lastA3 = orders.reduce((m, o) => (String(o.date) > m ? String(o.date) : m), "");
+  const seen = new Set(orders.map((o) => String(o.doc)));
+  const own = ownOrders.filter((o) => o.date >= lastA3 && !seen.has(String(o.doc)) && o.lines.length);
+  if (!own.length) return customer;
+  return { ...customer, orders: [...own, ...orders].sort((a, b) => String(b.date).localeCompare(String(a.date))) };
+}
+
 /** Últimos pedidos del cliente (los más recientes primero) con sus líneas, para volver a comprarlos o modificarlos. */
 export function webHistory(customer, catalogList, limit = 5) {
   const names = new Map(catalogList.map((p) => [String(p.id), p.name]));

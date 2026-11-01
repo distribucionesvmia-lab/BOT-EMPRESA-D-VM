@@ -9,7 +9,7 @@ import { getDb } from "./db.js";
 import { priceOrder } from "./pricing.js";
 import { createAuth } from "./auth.js";
 import { createAdmin } from "./admin.js";
-import { webProducts, webHistory, webTree, webOrderFromBody } from "./weborder.js";
+import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy } from "./delivery.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
@@ -246,7 +246,8 @@ function webOrderRoutes(req, res, url) {
 
   (async () => {
     const link = readToken(token);
-    const customer = link && ((link.c && (await getCustomerById(link.c))) || (await getCustomerByPhone(link.p)));
+    const customer0 = link && ((link.c && (await getCustomerById(link.c))) || (await getCustomerByPhone(link.p)));
+    const customer = customer0 && withOwnOrders(customer0, getDb().ordersOf(customer0.id));
     if (!customer) return json(res, { error: "Enlace no válido o caducado" }, 410);
 
     if (req.method === "GET") {
@@ -334,6 +335,8 @@ if (adminEnabled) {
 }
 const admin = createAdmin({ sync, mail: notificador, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
+// El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
+const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));
 // Fotos de producto: ficheros «<código>.png|jpg|webp» en la carpeta IMG_DIR (por defecto «imagenes»). Se listan al arrancar y cada 5 minutos.
 const IMG_DIR = process.env.IMG_DIR ?? new URL("./imagenes/", import.meta.url).pathname;
 const IMG_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
@@ -351,7 +354,7 @@ const sendJson = (res, code, data) => res.writeHead(code, { "Content-Type": "app
 
 // Conversación de un cliente con sesión: el cliente sale SIEMPRE de la cuenta (nunca de lo que envíe el navegador)
 async function accountChat(account, text, msgId) {
-  const customer = customerDirectory.getById(account.customerId);
+  const customer = clienteConPedidos(account.customerId);
   if (!customer) throw new Error("La cuenta no tiene cliente asociado");
   await refreshCatalog();
   const entry = chatSessions.get(account.id);
@@ -409,7 +412,7 @@ async function appRoutes(req, res, url) {
   }
   if (p === "/catalogo/datos" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
-    const customer = customerDirectory.getById(account.customerId);
+    const customer = clienteConPedidos(account.customerId);
     return void sendJson(res, 200, {
       business: BUSINESS.name,
       priceNote: BUSINESS.priceNote,
@@ -445,7 +448,7 @@ async function appRoutes(req, res, url) {
     const body = await readJson(req);
     const key = typeof body?.key === "string" && /^[\w-]{8,64}$/.test(body.key) ? body.key : null;
     if (!key) return void sendJson(res, 400, { error: "Solicitud no válida" });
-    const customer = customerDirectory.getById(account.customerId);
+    const customer = clienteConPedidos(account.customerId);
     const built = webOrderFromBody(body, customer, { key: `web:${account.id}:${key}`, phone: account.phone }, catalogNow());
     if (built.error) return void sendJson(res, 400, { error: built.error });
     const priced = priceOrder(holdIfUnconfirmed(account, built.order), customer, catalogNow());

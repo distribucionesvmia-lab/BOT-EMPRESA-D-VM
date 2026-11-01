@@ -64,3 +64,17 @@ test("el catálogo web añade la foto solo a los productos que la tienen", () =>
   assert.equal(p.find((x) => x.id === "1").img, "/img/1");
   assert.equal("img" in p.find((x) => x.id === "2"), false);
 });
+
+test("withOwnOrders: suma los pedidos hechos por la app solo si son posteriores al último de a3ERP", async () => {
+  const { withOwnOrders } = await import("./weborder.js");
+  const c = { id: "1", orders: [{ doc: "A2", date: "2026-10-20", lines: [{ productId: "1", qty: 5 }] }, { doc: "A1", date: "2026-10-01", lines: [] }] };
+  const propios = [
+    { doc: "W3", date: "2026-11-01", lines: [{ productId: "2", qty: 24 }] }, // nuevo: se suma
+    { doc: "W2", date: "2026-10-15", lines: [{ productId: "2", qty: 6 }] }, // anterior al último de a3ERP: se supone ya facturado
+    { doc: "W4", date: "2026-11-02", lines: [] }, // sin líneas: no cuenta
+  ];
+  const r = withOwnOrders(c, propios);
+  assert.deepEqual(r.orders.map((o) => o.doc), ["W3", "A2", "A1"]);
+  assert.equal(withOwnOrders(c, []), c); // sin pedidos propios: el mismo cliente
+  assert.deepEqual(withOwnOrders({ id: "2", orders: [] }, propios).orders.map((o) => o.doc), ["W2", "W3"].reverse().filter(() => true).length ? ["W3", "W2"] : []);
+});

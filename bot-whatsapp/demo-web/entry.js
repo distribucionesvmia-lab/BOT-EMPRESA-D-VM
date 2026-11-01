@@ -3,7 +3,7 @@
 // clientes, pedidos y exportaciones, que se guardan y se actualizan (base compartida de Claude, o el navegador).
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog, habitualProducts } from "../bot.js";
 import { priceOrder, totals } from "../pricing.js";
-import { webProducts, webHistory, webTree, webOrderFromBody } from "../weborder.js";
+import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders } from "../weborder.js";
 import { deliveryOptions, deliveryInfo, deliveryCalendarFrom, madridDay, puedeHoy } from "../delivery.js";
 import { findCustomers } from "../identify.js";
 import { FORMAT, madrid, madridTime } from "../export-format.js";
@@ -89,7 +89,10 @@ const currentAccount = () => {
   if (id?.startsWith("n")) { const c = cache.customers.find((x) => x.id === id.slice(1) && x.active !== false); return c ? nifAccount(c) : null; }
   return cache.accounts.find((a) => a.id === id && a.status === "active") ?? null;
 };
-const customerOf = (acc) => (acc ? cache.customers.find((c) => c.id === acc.customerId) ?? null : null);
+// El cliente con su historial MÁS lo que ha pedido en la demo (para «histórico» y «último pedido»)
+const propios = (id) => [...cache.orders].filter((o) => o.customer_id === id).sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 10)
+  .map((o) => ({ doc: o.id, date: String(o.created_at).slice(0, 10), lines: o.items.map((i) => ({ productId: String(i.id), qty: i.units ?? i.qty })).filter((l) => l.qty > 0) }));
+const customerOf = (acc) => { const c = acc ? cache.customers.find((x) => x.id === acc.customerId) ?? null : null; return c && withOwnOrders(c, propios(c.id)); };
 const phonesOf = (c) => (c.phones?.length ? c.phones : [phone9(c.phone)].filter(Boolean));
 // Compara una solicitud con la base de clientes. Acceso automático solo si hay UN cliente cuyo nombre (comercial o razón social)
 // coincide Y cuyo teléfono o correo guardados coinciden con los enviados.
