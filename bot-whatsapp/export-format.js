@@ -1,7 +1,7 @@
 // Formato del Excel de pedidos para que una persona los pase a a3ERP.
 //
 // Hoja «Pedidos»: un bloque por pedido, con tres partes:
-//   CARTEL    «PEDIDO VM-…» grande, en una fila combinada de toda la anchura
+//   CARTEL    grande: código de cliente a la izquierda y nombre comercial a la derecha (el Nº de pedido va en la cabecera de debajo)
 //   CABECERA  Nº pedido · Código cliente · Nombre comercial · Fecha recepción · Hora pedido
 //   LÍNEAS    Código artículo · Cajas · Descripción · Unidades · Precio · Dto. % · Importe · IVA % · Observaciones línea
 //   PIE       Total base imponible · Total IVA · Total R.E. · TOTAL PEDIDO · Observaciones del cliente
@@ -40,6 +40,14 @@ const LINE_HEAD = ["Código artículo", "Cajas", "Descripción", "Unidades", "Pr
 const WIDTHS = [18, 16, 46, 16, 12, 10, 12, 8, 40];
 const COLS = LINE_HEAD.length;
 
+// Cartel de cada pedido: «Cliente 9001» a la izquierda (columnas A-B) y el nombre comercial a la derecha (C-I)
+const bannerRow = (o) => {
+  const r = Array(COLS).fill({ v: null, s: STYLE.bannerRight });
+  r[0] = { v: `Cliente ${o.customer_id ?? "—"}`, s: STYLE.banner };
+  r[1] = { v: null, s: STYLE.banner };
+  r[2] = { v: o.name ?? "", s: STYLE.bannerRight };
+  return r;
+};
 const hdr = (cells) => cells.map((v) => ({ v, s: STYLE.header }));
 const pad = (cells, style) => [...cells, ...Array(COLS - cells.length).fill({ v: null, s: style })];
 const lineRow = (l) => [l.id, l.boxes ?? null, l.name, l.units ?? l.qty, { v: l.price ?? null, s: STYLE.price }, l.discount || null, { v: l.amount, s: STYLE.money }, l.vat_rate ?? null, l.note ?? null];
@@ -68,7 +76,7 @@ function orderBlock(o) {
   if (ob.style) for (let c = 2; c < COLS; c++) obs[c] = { v: c === 2 ? ob.text : null, s: ob.style }; // el color cubre toda la fila (columnas C a I)
   else obs[2] = ob.text;
   const rows = [
-    pad([{ v: `PEDIDO ${o.ref}`, s: STYLE.banner }], STYLE.banner), // cartel grande y combinado en toda la anchura (ver build)
+    bannerRow(o), // cartel grande: cliente a la izquierda, nombre a la derecha (ver build)
     hdr(HEAD),
     [o.ref, o.customer_id, o.name, madridDate(o.created_at), madridTime(o.created_at)],
     hdr(LINE_HEAD),
@@ -87,11 +95,11 @@ export const FORMAT = {
   name: "pedidos-v2",
   /** orders -> { sheets: [{ name, widths, rows }], lineCount } */
   build(orders) {
-    // Cada pedido empieza con un cartel grande («PEDIDO VM-2026-000001») combinado en toda la anchura y con la fila más alta,
+    // Cada pedido empieza con un cartel grande (código de cliente a la izquierda, nombre comercial a la derecha) y con la fila más alta,
     // para que no se confunda con una línea de pedido
     const blocks = [], merges = [], heights = {};
     for (const o of orders) {
-      merges.push(`A${blocks.length + 1}:${colName(COLS - 1)}${blocks.length + 1}`);
+      merges.push(`A${blocks.length + 1}:B${blocks.length + 1}`, `C${blocks.length + 1}:${colName(COLS - 1)}${blocks.length + 1}`);
       heights[blocks.length] = 38;
       const b = orderBlock(o);
       if (b.colored) merges.push(`C${blocks.length + b.obsIndex + 1}:${colName(COLS - 1)}${blocks.length + b.obsIndex + 1}`); // texto de entrega a lo ancho

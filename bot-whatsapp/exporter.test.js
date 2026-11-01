@@ -101,7 +101,7 @@ test("exportar solo los pedidos elegidos: los demás siguen pendientes y se pued
   assert.equal(r1.export.order_count, 2);
   const f = unzip(fs.readFileSync(r1.filePath));
   const rows = grid(f["xl/worksheets/sheet1.xml"]);
-  assert.deepEqual(rows.filter((r) => /^PEDIDO /.test(r[0] ?? "")).map((r) => r[0]), [`PEDIDO ${refs[0]}`, `PEDIDO ${refs[2]}`]);
+  assert.deepEqual(rows.filter((r) => /^Nº pedido$/.test(r[0] ?? "")).length, 2); // dos pedidos exportados, cada uno con su cabecera
   assert.deepEqual(db.listOrders().map((o) => [o.ref, o.export_status]).sort(), [[refs[0], "exported"], [refs[1], "pending"], [refs[2], "exported"]]);
   // una referencia que no existe o ya exportada no exporta nada
   assert.equal(runExport(db, { dir, refs: [refs[0], "VM-2026-999999"] }).export, null);
@@ -109,16 +109,17 @@ test("exportar solo los pedidos elegidos: los demás siguen pendientes y se pued
   assert.equal(runExport(db, { dir }).export.order_count, 1);
 });
 
-test("hoja «Pedidos»: el cartel «PEDIDO …» va combinado en toda la anchura, grande y con la fila más alta", () => {
+test("hoja «Pedidos»: el cartel lleva el código de cliente a la izquierda y el nombre comercial a la derecha, grande y con la fila más alta", () => {
   const db = openDb(":memory:"), dir = tmp();
   db.createOrder(pedido("k1", {}));
   db.createOrder(pedido("k2", {}));
   const xml = unzip(fs.readFileSync(runExport(db, { dir }).filePath))["xl/worksheets/sheet1.xml"];
   const merges = [...xml.matchAll(/<mergeCell ref="([A-Z0-9:]+)"/g)].map((m) => m[1]);
-  assert.equal(merges.length, 2);
-  assert.equal(merges[0], "A1:I1");
+  assert.equal(merges.length, 4); // por pedido: A:B (código) y C:I (nombre)
+  assert.deepEqual(merges.slice(0, 2), ["A1:B1", "C1:I1"]);
   assert.match(xml, /<row r="1" ht="38" customHeight="1"><c r="A1" s="7"/);
-  assert.match(xml, new RegExp(`<row r="${merges[1].match(/\d+/)[0]}" ht="38"`)); // el segundo pedido también
+  assert.match(xml, /<c r="C1" s="11"/); // el nombre, alineado a la derecha
+  assert.match(xml, new RegExp(`<row r="${merges[2].match(/\d+/)[0]}" ht="38"`)); // el segundo pedido también
 });
 
 test("hoja «Pedidos»: el día de entrega va en observaciones del cliente, en MAYÚSCULAS y con color (rojo hoy, amarillo mañana, verde más de 24 h)", () => {
@@ -131,7 +132,7 @@ test("hoja «Pedidos»: el día de entrega va en observaciones del cliente, en M
     const obs = rows.find((r) => r[0] === "Observaciones del cliente");
     assert.equal(obs[2], `${texto} · Llamar antes`);
     assert.match(xml, new RegExp(`<c r="C\\d+" s="${estilo}" t="inlineStr"><is><t xml:space="preserve">${texto}`));
-    assert.equal([...xml.matchAll(/<mergeCell ref="C(\d+):I\1"/g)].length, 1); // el color cubre de la C a la I
+    assert.equal([...xml.matchAll(/<mergeCell ref="C(\d+):I\1"/g)].length, 2); // el nombre del cartel y el texto de entrega van de la C a la I
   }
 });
 
@@ -140,7 +141,7 @@ test("hoja «Pedidos»: cabecera, líneas con cajas/unidades/precio/descuento y 
   db.createOrder(pedido("k1", { note: "Servir el jueves, los demás días estoy cerrado" }));
   const f = unzip(fs.readFileSync(runExport(db, { dir }).filePath));
   const rows = grid(f["xl/worksheets/sheet1.xml"]);
-  assert.deepEqual(rows[0][0], "PEDIDO VM-2026-000001");
+  assert.deepEqual([rows[0][0], rows[0][2]], ["Cliente C1", "Cliente de prueba"]);
   assert.deepEqual(rows[1], ["Nº pedido", "Código cliente", "Nombre comercial", "Fecha recepción", "Hora pedido"]);
   assert.deepEqual(rows[2], ["VM-2026-000001", "C1", "Cliente de prueba", "28/10/2026", "11:00"]);
   assert.deepEqual(rows[3], ["Código artículo", "Cajas", "Descripción", "Unidades", "Precio", "Dto. %", "Importe", "IVA %", "Observaciones línea"]);
