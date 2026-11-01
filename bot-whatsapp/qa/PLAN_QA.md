@@ -3,7 +3,7 @@
 Un clic/tarea cada 20 minutos. Estado: [ ] pendiente · [x] hecha · cada hallazgo en HALLAZGOS.md
 
 1. [x] Abrir /demo y saludar («hola»): ¿responde, pide el nombre del negocio?
-2. [ ] Identificación: nombre inexistente, nombre ambiguo («bar»), 3 fallos, «nuevo»
+2. [x] Identificación: nombre inexistente, nombre ambiguo («bar»), 3 fallos, «nuevo»
 3. [ ] Identificación correcta: «¡Identificado!» y productos habituales
 4. [ ] Hacer pedido por el chat (botones/lista, cajas o unidades, notas)
 5. [ ] Casos raros en el chat: cantidad 0, negativa, 99999, texto largo, emojis
