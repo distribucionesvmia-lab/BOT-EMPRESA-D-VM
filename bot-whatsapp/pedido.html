@@ -411,6 +411,7 @@ function row(p) {
   const c = document.createElement("div"); c.className = "c"; c.textContent = ""; // el código de producto no se muestra
   const pr = document.createElement("div"); pr.className = "pr";
   const price = document.createElement("b"); price.textContent = eur(p.price); pr.appendChild(price);
+  if (p.discount) { const dto = document.createElement("span"); dto.className = "dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} % dto.`; dto.style.cssText = "color:#0a7a3b;font-weight:700;font-size:14px;margin-left:4px"; pr.appendChild(dto); } // el descuento del cliente se ve ya en la fila
   if (p.lastQty) {
     const chip = document.createElement("button"); chip.type = "button"; chip.className = "chip";
     chip.textContent = "↻ Última vez: " + p.lastQty + (p.lastQty === 1 ? " ud" : " uds"); chip.title = "Pedir las mismas unidades";
@@ -475,7 +476,12 @@ function renderSubs(list, c) {
 }
 
 // Búsqueda: cada palabra escrita debe aparecer en el nombre (sin acentos ni mayúsculas, en cualquier orden) o ser parte del código
-const coincide = (p, q) => { const n = norm(p.name); return q.split(/\s+/).every(w => n.includes(w) || p.id.includes(w)); };
+// Distancia de edición (para perdonar una errata: «cervesa» encuentra «cerveza»)
+const dist = (a, b) => { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; };
+const coincide = (p, q) => {
+  const n = norm(p.name), toks = n.split(/[^a-z0-9]+/).filter(Boolean);
+  return q.split(/\s+/).every(w => n.includes(w) || p.id.includes(w) || (w.length >= 5 && toks.some(t => Math.abs(t.length - w.length) <= 1 && dist(w, t) <= 1)));
+};
 let limite = 150; // productos pintados a la vez; «Mostrar más» amplía
 let soloCantidad = false; // filtro de la pestaña de habituales: ocultar los artículos sin cantidad marcada
 // Entrada escalonada de lo que se ve (solo los primeros 12): se pide al cambiar de vista, no al cambiar una cantidad

@@ -94,3 +94,7 @@ Probado en 320×568 y 360×640 (táctil) en: `/` y `/cliente` (acceso), enlace d
 ### Arreglado: pareja 4 (F4-2 + F4-3)
 - F4-2: «¡Pedido recibido!» incluye ahora «🧾 Tu referencia: *VM-2026-00000N*» en el chat de WhatsApp/demo, en el chat con cuenta, en la mini-app del enlace y en el catálogo con cuenta (verificado: VM-2026-000004 en la web, VM-2026-000005 en el chat).
 - F4-3: «No he reconocido ese artículo» enseña lo que lleva el pedido («Por ahora tu pedido lleva: …») cuando el carrito no está vacío. Test nuevo. Tests: 214/214.
+
+### Arreglado: pareja 5 (F6-2 + F6-3)
+- F6-2: la fila del catálogo web muestra el descuento del cliente junto al precio («0,62 € · −5 % dto.»), así la barra del carrito (0,59 €) ya no sorprende.
+- F6-3: el buscador web perdona una errata de una letra en palabras de 5+ letras («cervesa», «cerbeza», «refrezco» encuentran el artículo; «vino» sigue sin falsos positivos; «zzzzz» no encuentra nada). No cubre intercambios de letras («pataats»). Verificado con navegador. Tests: 214/214 (la página no tiene tests de interfaz).
