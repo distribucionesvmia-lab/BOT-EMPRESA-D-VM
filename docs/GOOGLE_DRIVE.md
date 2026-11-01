@@ -44,7 +44,14 @@ Solo se usa la base de la empresa **VALENTIN** (Valentín Martín Gallego). Las 
    - **Historial:** líneas de factura de venta (`LINEFACT` + `CABEFACV`) de los últimos 12 meses desde la última factura de la copia, sin abonos.
 4. Los Excel llevan el NIF de los clientes: la carpeta de salida **no se sube a GitHub** (`salida-datos` está en `.gitignore`).
 
-### Cuando llega una copia nueva
+### Cuando llega una copia nueva (solo se aplican las diferencias)
+Con el artefacto de Claude «Pedidos por WhatsApp» la actualización es **incremental**: el cargador guarda una huella de cada producto y cliente (`cargas/hashes-*` en su base) y en cada carga escribe **solo lo nuevo o modificado** y retira lo que ya no está. La primera vez carga todo.
+1. Restaurar la copia nueva, extraer los Excel (`extraer-a3erp.js`) y preparar los datos: `node preparar-artefacto.js --entrada ./salida-datos --origen "copia a3ERP VALENTIN dd/mm/aaaa"`. Muestra cuántos registros son nuevos, modificados y retirados frente a la copia anterior.
+2. Publicar `productos.json`, `clientes.json` y `origen.json` como archivos del artefacto (`publish_files` en modo *patch*, sin tocar `index.html`).
+3. El propietario abre el artefacto con `#cargar-datos` al final de la dirección: la ventana dice cuántos cambios hay y, al pulsar **Aplicar cambios**, solo se escriben esos. Si no hay cambios, lo dice y no escribe nada.
+4. No se tocan pedidos, cuentas ni exportaciones. Los cambios hechos a mano en la web (p. ej. un precio editado) solo se pisan si ese mismo registro cambia en a3ERP.
+
+Orden general con una copia nueva (también para el servidor real):
 Orden obligatorio: **primero instalar la nueva, luego actualizar la web y solo después borrar la antigua.**
 1. Restaurar la copia nueva con otro nombre (p. ej. `VALENTIN_NUEVA`) **sin tocar** la antigua.
 2. Extraer los tres Excel de la nueva y comprobar que las cifras tienen sentido (clientes, productos y líneas parecidos a los de la copia anterior).
