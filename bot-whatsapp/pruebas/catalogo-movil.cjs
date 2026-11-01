@@ -25,9 +25,9 @@ if (!/^http:\/\/(127\.0\.0\.1|localhost)/.test(BASE)) { console.error("Solo cont
 
   // Subtotal por línea y total coherente
   await p.click("#verCarrito");
-  const subl = await p.$eval(".subl", (e) => e.textContent); assert.match(subl, /=.*€/); ok("subtotal por línea: " + subl);
+  const subl = await p.$eval(".cl .cimp", (e) => e.textContent); assert.match(subl, /€/); ok("importe por línea: " + subl);
   // Quitar y deshacer
-  await p.click("#cart .p .step button:nth-child(1)"); assert.match(await p.$eval("#toast", (e) => e.textContent), /Deshacer/);
+  await p.click("#cart .cl .hstep button:nth-child(1)"); assert.match(await p.$eval("#toast", (e) => e.textContent), /Deshacer/);
   await p.click("#toast button"); assert.equal(await p.$eval("#cnt", (e) => e.textContent), "1"); ok("quitar y deshacer");
 
   // Esc y foco
