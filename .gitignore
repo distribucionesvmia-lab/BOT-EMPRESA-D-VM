@@ -5,3 +5,7 @@ node_modules
 .DS_Store
 __MACOSX
 *.xlsx
+
+# Demo con la tarifa real (precios reales): nunca al repositorio
+bot-whatsapp/demo-web/dist-privado/
+bot-whatsapp/demo-web/productos-tarifa*.json

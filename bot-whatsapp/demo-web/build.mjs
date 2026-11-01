@@ -22,10 +22,12 @@ addEventListener("message",e=>{const d=e.data;if(d&&d.vmApiRes){const r=w.get(d.
 parent.postMessage({vmReady:true},"*");})();</script>`;
 const mini = fs.readFileSync(path.join(root, "pedido.html"), "utf8").replace("<head>", "<head>" + shim);
 
+// TARIFA_JSON=ruta.json (de tarifa-a-json.js): vista previa con productos reales. El resultado lleva precios reales: NO se sube al repositorio.
+const tarifa = process.env.TARIFA_JSON ? `window.__VM_TARIFA__=${fs.readFileSync(process.env.TARIFA_JSON, "utf8")};` : "";
 const safe = (s) => s.replace(/<\/script/gi, "<\\/script");
 const page = fs
   .readFileSync(path.join(here, "page.html"), "utf8")
-  .replace("/*__BUNDLE__*/", () => safe(fs.readFileSync(bundle, "utf8")))
+  .replace("/*__BUNDLE__*/", () => safe(tarifa + fs.readFileSync(bundle, "utf8")))
   .replace("/*__MINI__*/", () => safe(JSON.stringify(mini)));
 
 fs.writeFileSync(path.join(dist, "artifact.html"), page);

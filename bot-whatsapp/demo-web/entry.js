@@ -41,6 +41,8 @@ function onData(coll, rows) {
     const idx = rows.find((d) => d.id === "_nifindex")?.keys ?? {};
     rows = rows.filter((d) => d.id !== "_nifindex").map((c) => (c.nifKeys ? c : { ...c, nifKeys: idx[c.id] ?? [] }));
   }
+  // Vista previa con la tarifa real: si la página trae una (build con TARIFA_JSON), sustituye a los productos de ejemplo (solo lectura)
+  if (coll === "products" && globalThis.__VM_TARIFA__) rows = globalThis.__VM_TARIFA__.map((p) => ({ ...p, unitsPerBox: p.unitsPerBox ?? null, discount: p.discount ?? 0, updatedAt: null, changes: [] }));
   cache[coll] = rows;
   if (coll === "products" && rows.length) setCatalog(activeCatalog()); // el bot usa el precio nuevo al instante
   emit();
