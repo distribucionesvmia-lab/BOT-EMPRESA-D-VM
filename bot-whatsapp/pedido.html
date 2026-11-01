@@ -136,7 +136,10 @@
   .cats { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:14px; }
   .cat { border:2px solid var(--linea); border-radius:18px; background:#fff; padding:16px 12px; min-height:124px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; text-align:center; cursor:pointer; font:inherit; color:var(--texto); }
   .cat:hover, .cat:focus-visible { border-color:var(--rojo); background:var(--rojo-s); outline:none; }
-  .cat .ico { font-size:40px; line-height:1; } .cat b { font-size:19px; line-height:1.2; } .cat small { color:var(--gris); font-size:15px; }
+  .cat .ico { width:84px; height:84px; border-radius:16px; background:#fff; display:grid; place-items:center; overflow:hidden; color:#fff; font-weight:800; font-size:34px; }
+  .cat .ico img { width:100%; height:100%; object-fit:contain; }
+  .sub .th { width:44px; height:44px; border-radius:10px; object-fit:contain; background:#fff; flex:none; margin-right:10px; }
+  .sub .sl { display:flex; align-items:center; min-width:0; } .cat b { font-size:19px; line-height:1.2; } .cat small { color:var(--gris); font-size:15px; }
   .migas { display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid var(--linea); background:#fff; position:sticky; top:0; z-index:2; }
   .migas button { border:0; background:var(--rojo-s); color:var(--rojo-o); font-size:17px; font-weight:800; min-height:48px; padding:0 16px; border-radius:14px; cursor:pointer; flex:none; }
   .migas span { font-size:16px; color:var(--gris); line-height:1.25; } .migas b { color:var(--texto); }
@@ -444,11 +447,19 @@ async function marcarFav(id, on) {
 // Catálogo por categorías (las de la web): categorías → subcategorías → productos. Con el buscador se ve todo junto.
 let nav = { cat: null, sub: null }; // sub: null = elegir subcategoría; "*" = todo lo de la categoría
 const irA = (cat, sub) => { animarLista = true; limite = 150; nav = { cat, sub }; $("list").scrollTop = 0; renderList(); };
+// Foto representativa de una sección: un producto suyo con foto (se prefiere el más típico de la sección); sin foto, una letra de color
+const PREFIERE = { cafe: /capsula|molido|grano|natural/i, pascual: /leche/i, vinos: /ribera|crianza|reserva|verdejo|rueda|cava/i, aguas: /\bagua\b|bezoya/i, despensa: /aceite|oliva/i, refrigerados: /queso|jamon|chorizo|salchich/i, "f-hosteleria-y-menaje": /\bvaso|copa/i };
+function fotoDe(cat, sub) {
+  const ps = data.products.filter(p => p.img && p.cat === cat && (!sub || p.sub === sub));
+  return (PREFIERE[cat] && ps.find(p => PREFIERE[cat].test(p.name))) || ps[0] || null;
+}
 function renderCategorias(list) {
   const g = document.createElement("div"); g.className = "cats";
   for (const c of data.tree) {
     const b = document.createElement("button"); b.type = "button"; b.className = "cat";
-    const i = document.createElement("span"); i.className = "ico"; i.textContent = c.icono;
+    const i = document.createElement("span"); i.className = "ico"; i.style.background = hue(c.nombre); i.textContent = c.nombre[0].toUpperCase();
+    const ph = fotoDe(c.id, null);
+    if (ph) { const im = document.createElement("img"); im.src = ph.img; im.alt = ""; im.onerror = () => im.remove(); im.onload = () => { i.textContent = ""; i.style.background = "#fff"; i.appendChild(im); }; }
     const n = document.createElement("b"); n.textContent = c.nombre;
     const k = document.createElement("small"); k.textContent = c.count + (c.count === 1 ? " producto" : " productos");
     b.append(i, n, k); b.onclick = () => (c.subs.length === 1 ? irA(c.id, c.subs[0].id) : irA(c.id, null)); g.appendChild(b);
@@ -469,7 +480,8 @@ function renderSubs(list, c) {
   todo.innerHTML = `<span>Ver todo ${esc(c.nombre)}</span><small>${c.count}</small>`; todo.onclick = () => irA(c.id, "*"); g.appendChild(todo);
   for (const s of c.subs) {
     const b = document.createElement("button"); b.type = "button"; b.className = "sub";
-    b.innerHTML = `<span>${esc(s.nombre)}</span><small>${s.count} ›</small>`; b.onclick = () => irA(c.id, s.id); g.appendChild(b);
+    const ph = fotoDe(c.id, s.id);
+    b.innerHTML = `<span class="sl">${ph ? `<img class="th" src="${esc(ph.img)}" alt="" onerror="this.remove()">` : ""}<span>${esc(s.nombre)}</span></span><small>${s.count} ›</small>`; b.onclick = () => irA(c.id, s.id); g.appendChild(b);
   }
   list.appendChild(g);
 }
