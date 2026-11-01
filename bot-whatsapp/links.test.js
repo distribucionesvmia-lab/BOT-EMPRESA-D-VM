@@ -29,7 +29,8 @@ test("el enlace caduca a las 24 horas", () => {
 test("el saludo del cliente conocido ofrece el botón de enlace; sin enlace, la lista", () => {
   const cliente = { id: "1", name: "Bar", address: "x", orders: [{ doc: "A", date: "2026-01-01", lines: [{ productId: 1, qty: 3 }] }] };
   let r = handleMessage(newSession(cliente, "https://x.test/pedido/abc"), "hola");
-  assert.deepEqual(r.ui, { type: "link", title: "Hacer pedido", url: "https://x.test/pedido/abc" });
+  assert.deepEqual({ type: r.ui.type, title: r.ui.title, url: r.ui.url, home: r.ui.home }, { type: "link", title: "Hacer pedido", url: "https://x.test/pedido/abc", home: true });
+  assert.equal(r.ui.last.articulos, 1); // tarjeta de inicio: su último pedido para repetirlo en un toque
   assert.ok(r.ui.title.length <= 20);
   r = handleMessage(r.session, "lista"); // sigue pudiendo pedir dentro del chat
   assert.equal(r.ui.type, "list");

@@ -200,15 +200,17 @@ const greeting = (s, justIdentified = false) => {
   const saludo = `👋 ¡Hola, *${s.customer.name}*! Soy el asistente de *${BUSINESS.name}*.\n\n`;
   // opts.showHabitual: cliente con sesión iniciada: se le saluda y se le muestran sus habituales
   const hi = justIdentified ? identifiedIntro(s) : s.opts?.showHabitual ? saludo + habitualBlock(s) : saludo;
-  // Con enlace personal: se abre el catálogo de pedido. Sin él: lista y botones dentro del chat
+  // Con enlace personal: tarjeta de inicio (hacer pedido, repetir el último y lo que más pide). Sin él: lista y botones dentro del chat
   if (s.link) {
+    const ult = pedidosDe(s.customer).map((o) => ({ o, items: itemsFromLines(o.lines) })).find((x) => x.items.length);
+    const top = habitualProducts(s.customer).slice(0, 4).map((p) => p.name);
     return {
-      reply:
-        hi +
-        `🛒 Pulsa *Hacer pedido* para abrir tu catálogo con tu histórico, elegir las unidades y confirmar.\n\n` +
-        `También puedes escribirlo como lo dirías en persona (_"ponme 6 verdejo y media docena de coca cola zero para el lunes"_), decir *repetir* para repetir tu último pedido, ` +
-        `*lista* para elegir en el chat, o pedir *horarios* o *persona*.`,
-      ui: { type: "link", title: "Hacer pedido", url: s.link },
+      reply: justIdentified ? identifiedIntro(s).split("\n\n")[0] : `👋 ¡Hola, *${s.customer.name}*!`,
+      ui: {
+        type: "link", title: "Hacer pedido", url: s.link, home: true,
+        ...(ult ? { last: { date: fmtDateFull(ult.o.date), articulos: ult.items.length, total: Math.round(total(ult.items) * 100) / 100 } } : {}),
+        ...(top.length ? { top } : {}),
+      },
     };
   }
   return {
