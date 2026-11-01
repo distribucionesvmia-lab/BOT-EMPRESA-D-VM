@@ -45,7 +45,7 @@ export const CONSULTAS = {
   // Líneas de factura de venta de los últimos N meses (contados desde la última factura de la copia); los abonos (cantidad negativa) no entran.
   historial: {
     cabecera: ["Cód. cliente", "Fecha", "Documento", "Cód. artículo", "Cantidad"],
-    sql: (meses) => `SELECT ${T("c.CODCLI")}, CONVERT(varchar(10),c.FECHA,23), ${T("CONCAT(LTRIM(RTRIM(c.SERIE)),'-',c.NUMDOC)")}, ${T("l.CODART")}, CAST(l.UNIDADES AS varchar(30))
+    sql: (meses) => `SELECT ${T("c.CODCLI")}, CONVERT(varchar(10),c.FECHA,23), ${T("CONCAT(NULLIF(LTRIM(RTRIM(c.SERIE)),'')+'-',CAST(CAST(c.NUMDOC AS bigint) AS varchar(20)))")}, ${T("l.CODART")}, CAST(l.UNIDADES AS varchar(30))
       FROM LINEFACT l JOIN CABEFACV c ON c.IDFACV=l.IDFACV
       WHERE c.FECHA>=DATEADD(MONTH,-${Number(meses) | 0},(SELECT MAX(FECHA) FROM CABEFACV)) AND l.UNIDADES>0 AND ISNULL(LTRIM(RTRIM(l.CODART)),'')<>''
       ORDER BY c.CODCLI, c.FECHA, c.NUMDOC`,
