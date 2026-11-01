@@ -10,5 +10,5 @@ Un clic/tarea cada 20 minutos. Estado: [ ] pendiente · [x] hecha · cada hallaz
 6. [x] Catálogo web /catalogo: buscar, añadir, cajas/uds, favorito, total
 7. [x] Revisar y enviar pedido; doble clic (¿duplica?)
 8. [x] «último pedido» e «histórico»
-9. [ ] Panel empresa /distribuidor y exportación a Excel
+9. [x] Panel empresa /distribuidor y exportación a Excel
 10. [ ] Móvil (viewport pequeño) y «reducir movimiento»
