@@ -28,13 +28,10 @@ const decode = (s) =>
 const text = (xml) => [...xml.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map((m) => decode(m[1])).join("");
 const colIndex = (ref) => [...ref.replace(/\d+/g, "")].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
 
-/** Filas de la primera hoja: string[][] */
-export function readXlsx(buf) {
-  const files = unzip(buf, ["xl/sharedStrings.xml", "xl/worksheets/sheet1.xml"]);
-  if (!files["xl/worksheets/sheet1.xml"]) throw new Error("No se encuentra la primera hoja del Excel");
-  const shared = files["xl/sharedStrings.xml"] ? [...files["xl/sharedStrings.xml"].toString("utf8").matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => text(m[1])) : [];
+/** Filas de una hoja a partir de su XML: string[][] */
+function sheetRows(xml, shared) {
   const rows = [];
-  for (const r of files["xl/worksheets/sheet1.xml"].toString("utf8").matchAll(/<row [^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
+  for (const r of xml.matchAll(/<row [^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
     const row = [];
     for (const c of (r[1] ?? "").matchAll(/<c ([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const attrs = c[1];
@@ -51,4 +48,24 @@ export function readXlsx(buf) {
     rows.push(Array.from(row, (x) => x ?? ""));
   }
   return rows;
+}
+const sharedOf = (f) => (f["xl/sharedStrings.xml"] ? [...f["xl/sharedStrings.xml"].toString("utf8").matchAll(/<si>([\s\S]*?)<\/si>/g)].map((m) => text(m[1])) : []);
+
+/** TODAS las hojas del libro: [{ name, rows }] (para tarifas con una hoja por proveedor o familia). */
+export function readXlsxSheets(buf) {
+  const files = unzip(buf, ["xl/sharedStrings.xml", "xl/workbook.xml", "xl/_rels/workbook.xml.rels"]);
+  if (!files["xl/workbook.xml"] || !files["xl/_rels/workbook.xml.rels"]) throw new Error("El Excel no tiene la estructura esperada");
+  const rels = new Map([...files["xl/_rels/workbook.xml.rels"].toString("utf8").matchAll(/<Relationship\b[^>]*>/g)].map((m) => [/Id="([^"]+)"/.exec(m[0])?.[1], /Target="([^"]+)"/.exec(m[0])?.[1]]));
+  const sheets = [...files["xl/workbook.xml"].toString("utf8").matchAll(/<sheet\b[^>]*>/g)].map((m) => ({ name: decode(/name="([^"]*)"/.exec(m[0])?.[1] ?? ""), target: rels.get(/r:id="([^"]+)"/.exec(m[0])?.[1]) }));
+  const paths = sheets.map((x) => (x.target ?? "").replace(/^\/?(xl\/)?/, "xl/"));
+  const data = unzip(buf, paths);
+  const shared = sharedOf(files);
+  return sheets.map((x, i) => ({ name: x.name, rows: data[paths[i]] ? sheetRows(data[paths[i]].toString("utf8"), shared) : [] }));
+}
+
+/** Filas de la primera hoja: string[][] */
+export function readXlsx(buf) {
+  const files = unzip(buf, ["xl/sharedStrings.xml", "xl/worksheets/sheet1.xml"]);
+  if (!files["xl/worksheets/sheet1.xml"]) throw new Error("No se encuentra la primera hoja del Excel");
+  return sheetRows(files["xl/worksheets/sheet1.xml"].toString("utf8"), sharedOf(files));
 }

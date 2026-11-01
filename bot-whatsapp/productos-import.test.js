@@ -38,3 +38,13 @@ test("parseProductos: sin cabecera reconocible da un error claro", () => {
   assert.throws(() => parseProductos([["a", "b"], ["1", "2"]]), /cabecera/);
   assert.throws(() => parseProductos([["Código", "Descripción"], ["1", "x"]]), /cabecera/); // falta el precio
 });
+
+test("tarifa con una hoja por proveedor: «Artículo» es el nombre, códigos de IVA, '#N/A' sin precio y cabecera duplicada", async () => {
+  const { tipoIva } = await import("./productos-import.js");
+  const r = parseProductos([["Cód. artículo", "Artículo", "Precio venta", "Dto%", "Tipo IVA ventas", "Unidades paquete venta", "Bloqueado"], ["1", "VINO A", "10,97", "", "ORD21", "6", "No"], ["2", "VINO B", "#N/A", "", "ORD21", "6", "No"], ["3", "LECHE", "0,7", "", "SRE", "8", "Sí"]]);
+  assert.deepEqual(r.products.map((p) => [p.id, p.name, p.price, p.vat, p.unitsPerBox, p.active]), [["1", "VINO A", 10.97, 21, 6, true], ["3", "LECHE", 0.7, undefined, 8, false]]);
+  assert.equal(r.stats.sinPrecio, 1);
+  assert.deepEqual(["21", "RED10", "ORD21", "SRE", "x"].map(tipoIva), [21, 10, 21, null, null]);
+  const d = parseProductos([["Cód. artículo", "Cód. artículo", "Precio venta"], ["9", "PASTA", "1,35"]]);
+  assert.equal(d.products[0].name, "PASTA");
+});

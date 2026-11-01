@@ -20,9 +20,9 @@ export function parseNumber(v) {
 // Cada campo: expresiones que reconocen su cabecera (ya normalizada) y las que la descartan
 const FIELDS = [
   ["code", [/^(cod|codigo|ref|referencia|articulo|id)( art\w*| prod\w*)?$/], [/barra|ean|proveedor/]],
-  ["name", [/^(descrip|nombre|denomin)/], []],
+  ["name", [/^(descrip|nombre|denomin)/, /^articulo$/], []],
   ["price", [/(pvp|venta)/, /^(precio|tarifa)/], [/compra|coste|costo/]],
-  ["unitsPerBox", [/(ud|uds|unid\w*)\W*(por |\/ ?|x )?caja/, /^caja/, /^envase|^empaque/], []],
+  ["unitsPerBox", [/(ud|uds|unid\w*)\W*(por |\/ ?|x )?caja/, /^caja/, /^envase|^empaque/, /^(ud|uds|unid\w*) paquete/], []],
   ["vat", [/^(% ?)?iva|tipo iva|^impuesto/], [/recargo|r e/]],
   ["discount", [/^(dto|descuento|% ?dto)/], []],
   ["category", [/^(categoria|familia)$/], []],
@@ -30,6 +30,14 @@ const FIELDS = [
   ["blocked", [/^bloqueado/], []],
   ["obsolete", [/^obsoleto|^baja$/], []],
 ];
+
+/** Tipo de IVA: un porcentaje («21», «10 %») o un código de a3ERP que lo lleva escrito («ORD21», «RED10» → 21, 10). Otros códigos («SRE») → null: su tipo hay que confirmarlo, no se supone. */
+export function tipoIva(v) {
+  const n = parseNumber(v);
+  if (n !== null) return n;
+  const m = /^[A-Za-z]+(\d{1,2})$/.exec(String(v ?? "").trim());
+  return m ? Number(m[1]) : null;
+}
 
 /** Filas del Excel → { products, stats }. La primera fila con cabecera de código y de descripción es la cabecera. */
 export function parseProductos(rows) {
@@ -45,6 +53,8 @@ export function parseProductos(rows) {
   for (let i = 0; i < Math.min(rows.length, 30) && hi < 0; i++) {
     const hs = heads(rows[i]);
     const c = Object.fromEntries(FIELDS.map(([k, pats, bad]) => [k, find(hs, pats, bad)]));
+    // Hojas con la cabecera del nombre mal puesta (dos columnas «Cód. artículo» seguidas): la segunda es el nombre
+    if (c.code >= 0 && c.name < 0 && hs.indexOf(hs[c.code], c.code + 1) > 0) c.name = hs.indexOf(hs[c.code], c.code + 1);
     if (c.code >= 0 && c.name >= 0 && c.price >= 0) (hi = i), (col = c);
   }
   if (hi < 0) throw new Error("No encuentro la cabecera: el Excel de productos debe tener las columnas «Código», «Descripción» y «Precio».");
@@ -61,7 +71,7 @@ export function parseProductos(rows) {
     if (price === null || price < 0) { stats.sinPrecio++; continue; }
     seen.add(id);
     const p = { id, name, price, active: !(yes(get(r, "blocked")) || yes(get(r, "obsolete"))) };
-    const upb = parseNumber(get(r, "unitsPerBox")), vat = parseNumber(get(r, "vat")), dto = parseNumber(get(r, "discount"));
+    const upb = parseNumber(get(r, "unitsPerBox")), vat = tipoIva(get(r, "vat")), dto = parseNumber(get(r, "discount"));
     if (upb !== null && Number.isInteger(upb) && upb >= 1) p.unitsPerBox = upb;
     if (vat !== null && vat >= 0 && vat <= 100) p.vat = vat;
     if (dto !== null && dto >= 0 && dto <= 100) p.discount = dto;
