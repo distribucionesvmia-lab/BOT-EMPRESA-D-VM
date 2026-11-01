@@ -130,3 +130,62 @@ test("persona genera handoff y cancelar reinicia", () => {
   const r = say({ ...newSession(), state: "confirm" }, "cancelar");
   assert.equal(r.session.state, "menu");
 });
+
+// ---- Atajos del chat: abrir el catálogo, último pedido e histórico ----
+test("«hacer pedido» y frases parecidas abren el catálogo (con enlace) o la lista (sin enlace)", () => {
+  for (const t of ["hacer pedido", "Quiero hacer un pedido", "nuevo pedido", "abrir catálogo", "quiero pedir", "hola quiero hacer un pedido nuevo"]) {
+    const r = say(newSession(bar, "/catalogo"), t);
+    assert.equal(r.ui.type, "link", t);
+    assert.equal(r.ui.url, "/catalogo");
+    assert.equal(r.ui.open, true, t);
+  }
+  assert.equal(say(newSession(bar), "hacer pedido").ui.type, "list"); // sin enlace: la lista del chat
+});
+
+test("«hacer el pedido» con artículos en el carrito sigue siendo finalizar, no abrir el catálogo", () => {
+  let r = say(newSession(bar, "/catalogo"), "2 aguas");
+  r = say(r.session, "hacer el pedido");
+  assert.notEqual(r.ui?.type, "link");
+});
+
+test("«último pedido» enseña el último pedido con botones; no lo repite solo", () => {
+  for (const t of ["último pedido", "mi ultimo pedido", "qué pedí la última vez", "pedido anterior"]) {
+    const r = say(newSession(bar, "/catalogo"), t);
+    assert.match(r.reply, /Tu último pedido\* \(01\/10\/2026\)/, t);
+    assert.match(r.reply, /24 uds/);
+    assert.deepEqual(r.ui.buttons.map((b) => b.id), ["h:repeat1", "h:hist", "h:open"]);
+    assert.equal(r.session.state, "menu");
+  }
+});
+
+test("«histórico» enseña los pedidos anteriores con lo que pidió en cada uno", () => {
+  for (const t of ["histórico", "mis pedidos", "pedidos anteriores", "qué he pedido"]) {
+    const r = say(newSession(bar, "/catalogo"), t);
+    assert.match(r.reply, /Tu histórico de pedidos/, t);
+    assert.match(r.reply, /Pedido del 01\/10\/2026/);
+    assert.match(r.reply, /Pedido del 01\/09\/2026/);
+  }
+});
+
+test("los botones del último pedido: repetirlo lleva a confirmar y «Hacer pedido» abre el catálogo", () => {
+  let r = say(newSession(bar, "/catalogo"), "último pedido");
+  const rep = say(r.session, "h:repeat1");
+  assert.equal(rep.session.state, "confirm");
+  assert.match(rep.reply, /Revisa tu pedido/);
+  assert.equal(say(r.session, "h:open").ui.open, true);
+  assert.match(say(r.session, "h:hist").reply, /histórico/i);
+});
+
+test("«repite el último pedido» lo repite (con confirmación)", () => {
+  const r = say(newSession(bar, "/catalogo"), "repite el último pedido");
+  assert.equal(r.session.state, "confirm");
+});
+
+test("un cliente sin pedidos anteriores: último pedido e histórico lo dicen y ofrecen hacer uno", () => {
+  const nuevo = { id: "C-9", name: "Bar Nuevo", address: "x", orders: [] };
+  for (const t of ["último pedido", "histórico"]) {
+    const r = say(newSession(nuevo, "/catalogo"), t);
+    assert.match(r.reply, /Todavía no tengo pedidos/);
+    assert.equal(r.ui.type, "link");
+  }
+});

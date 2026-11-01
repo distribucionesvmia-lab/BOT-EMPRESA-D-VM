@@ -46,7 +46,17 @@ const STOP = new Set(
     "apuntame apunta anota sirveme porfa porfavor ademas luego si ser puede ponnos ponedme x eso esto mi nuestro nuestra").split(" ")
 );
 const UNITS = new Set(["cl", "ml", "l", "gr", "g", "kg", "lt"]);
-const REPEAT_PHRASES = ["como siempre", "lo de siempre", "lo habitual", "lo mismo", "repetir", "repetir pedido", "ultimo", "ultimo pedido"];
+const REPEAT_PHRASES = ["como siempre", "lo de siempre", "lo habitual", "lo mismo", "repetir", "repetir pedido"];
+
+// ── Atajos del chat: abrir el catálogo, ver el último pedido y ver el histórico ──
+const limpia = (t) => t.replace(/[.,!¡¿?]/g, " ").replace(/\s+/g, " ").trim();
+const PIDE_REPETIR = /\b(repet\w*|repite|igual|mismo|como siempre|de siempre)\b/;
+const OPEN_RE = /^(?:(?:hola|buenas|buenos dias|buenas tardes|por favor|porfa)\s+)*(?:(?:quiero|quisiera|queria|me gustaria|necesito|voy a|vamos a|puedo|podria|puedes|podeis|deseo|toca)\s+)*(?:(?:hacer|realizar|echar|abrir|ver|empezar|iniciar|crear|montar|preparar)\s+)?(?:(?:un|el|mi|tu|su|otro|nuevo)\s+){0,2}(?:nuevo\s+)?(?:pedido|catalogo|carta|tienda|comprar|pedir)(?:\s+nuevo)?(?:\s+(?:ahora|ya|otra vez|por favor|porfa))?$/;
+const esUltimo = (t) => !/\d/.test(t) && t.length <= 48 && !PIDE_REPETIR.test(t) && (t === "ultimo" || ["ultimo pedido", "pedido anterior", "ultima compra", "ultima vez", "lo ultimo que pedi", "lo ultimo que compre"].some((p) => t.includes(p)));
+const esHistorico = (t) => !/\d/.test(t) && t.length <= 52 && !PIDE_REPETIR.test(t) && ["historico", "historial", "mis pedidos", "pedidos anteriores", "pedidos pasados", "que he pedido", "lo que he pedido", "lo que pedi", "que pedi", "mis compras", "compras anteriores", "ultimos pedidos", "pedidos que he hecho", "anteriores pedidos"].some((p) => t.includes(p));
+const esAbrir = (t) => OPEN_RE.test(t);
+const esRepetirUltimo = (t) => !/\d/.test(t) && t.length <= 48 && PIDE_REPETIR.test(t) && /pedido|ultim|anterior|vez/.test(t);
+const cantidadH = (i) => (i.unit === "caja" ? `${i.qty} ${i.qty === 1 ? "caja" : "cajas"}` : `${i.qty} uds`);
 
 // ¿la palabra del cliente (q) corresponde a la del producto (t)? Acepta plurales y prefijos
 const wordMatch = (q, t) => q === t || (q.length >= 3 && t.startsWith(q)) || (t.length >= 4 && q.startsWith(t)) || (q.length >= 5 && t.length >= 5 && lev(q, t) <= 1); // perdona una errata: «cerbeza»
@@ -107,6 +117,8 @@ const itemsText = (items) =>
   (items.some((i) => i.unsure) ? `\n⚠️ _No estoy seguro de este artículo: escribe la marca o el formato exacto._` : "");
 
 const fmtDate = (iso) => iso.slice(8, 10) + "/" + iso.slice(5, 7);
+const fmtDateFull = (iso) => fmtDate(iso) + "/" + iso.slice(0, 4);
+const pedidosDe = (customer) => [...(customer?.orders ?? [])].sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
 /** Pedidos que el cliente puede repetir: lo habitual (si hay) y sus últimos pedidos. */
 export function repeatOptions(customer) {
@@ -280,6 +292,41 @@ function setCart(s, items) {
   s.orderText = s.cart.map((i) => `${i.qty} ${i.unit === "caja" ? "cajas de " : ""}${i.name}`).join(", ");
 }
 
+/** «Hacer pedido»: se abre el catálogo (con enlace) o, sin él, la lista del chat. */
+function openCatalog(s) {
+  if (s.link) {
+    return { reply: "🛒 *¡Abriendo tu catálogo!* Si no se abre solo, pulsa el botón.", session: s, ui: { type: "link", title: "Hacer pedido", url: s.link, open: true } };
+  }
+  return showList(s, 0, "🛒 Elige lo que quieres pedir:");
+}
+/** «Último pedido»: se enseña (no se repite solo) con botones para repetirlo, ver el histórico o hacer otro pedido. */
+function showLast(s) {
+  const o = pedidosDe(s.customer).find((x) => itemsFromLines(x.lines).length);
+  if (!o) return { reply: "Todavía no tengo pedidos tuyos anteriores. ¿Quieres hacer uno?", session: s, ui: s.link ? { type: "link", title: "Hacer pedido", url: s.link } : buttons(["h:open", "Hacer pedido"]) };
+  const items = itemsFromLines(o.lines);
+  return {
+    reply: `🧾 *Tu último pedido* (${fmtDateFull(o.date)})\n\n` + items.map((i) => `• ${cantidadH(i)} · ${i.name} = ${money(unitsOf(i) * i.price)}`).join("\n") + `\n*Total: ${money(total(items))}*\n\n_Precios de hoy._`,
+    session: s,
+    ui: buttons(["h:repeat1", "Repetir este pedido"], ["h:hist", "Ver histórico"], ["h:open", "Hacer pedido"]),
+  };
+}
+/** «Histórico»: sus últimos pedidos con lo que pidió en cada uno y lo que más compra. */
+function showHistory(s) {
+  const orders = pedidosDe(s.customer).map((o) => ({ o, items: itemsFromLines(o.lines) })).filter((x) => x.items.length).slice(0, 5);
+  if (!orders.length) return { reply: "Todavía no tengo pedidos tuyos anteriores. ¿Quieres hacer uno?", session: s, ui: s.link ? { type: "link", title: "Hacer pedido", url: s.link } : buttons(["h:open", "Hacer pedido"]) };
+  const bloque = ({ o, items }) =>
+    `📦 *Pedido del ${fmtDateFull(o.date)}* — ${items.length} artículo${items.length === 1 ? "" : "s"} · ${money(total(items))}\n` +
+    items.slice(0, 8).map((i) => `• ${cantidadH(i)} · ${i.name}`).join("\n") + (items.length > 8 ? `\n… y ${items.length - 8} más` : "");
+  const top = habitualProducts(s.customer).slice(0, 5);
+  return {
+    reply:
+      `📜 *Tu histórico de pedidos*\n\n` + orders.map(bloque).join("\n\n") +
+      (top.length ? `\n\n⭐ *Lo que más pides:*\n` + top.map((p) => `• ${p.name}`).join("\n") : ""),
+    session: s,
+    ui: buttons(["h:repeat1", "Repetir el último"], ["h:open", "Hacer pedido"]),
+  };
+}
+
 function repeatOrder(s, option) {
   if (!option) {
     return { reply: "No encuentro pedidos anteriores tuyos. Escribe lo que quieres pedir, por ejemplo _\"2 aguas y una cerveza\"_.", session: s };
@@ -414,6 +461,24 @@ export function handleMessage(session, rawText, ctx = {}) {
   }
   if (["asesor", "humano", "persona"].includes(text)) {
     return { reply: HUMAN_REPLY, session: s, handoff: true };
+  }
+  // Botones de «último pedido» e «histórico»
+  if (s.customer && text === "h:open") return openCatalog(s);
+  if (s.customer && text === "h:hist") return showHistory(s);
+  if (s.customer && text === "h:repeat1") {
+    const o = pedidosDe(s.customer).find((x) => itemsFromLines(x.lines).length);
+    return repeatOrder(s, o && { items: itemsFromLines(o.lines) });
+  }
+  // «hacer pedido», «último pedido», «histórico»… (con el carrito vacío; con artículos en el carrito «hacer el pedido» es finalizar)
+  if (s.customer && ["menu", "items"].includes(s.state) || s.customer && s.state === "cart" && !s.cart.length) {
+    const t1 = limpia(text);
+    if (esUltimo(t1)) return showLast(s);
+    if (esHistorico(t1)) return showHistory(s);
+    if (esAbrir(t1)) return openCatalog(s);
+    if (esRepetirUltimo(t1)) {
+      const o = pedidosDe(s.customer).find((x) => itemsFromLines(x.lines).length);
+      return repeatOrder(s, o && { items: itemsFromLines(o.lines) });
+    }
   }
   if (s.customer && ["menu", "items", "cart"].includes(s.state)) {
     // «lo de siempre», «repite el último pedido para el viernes»

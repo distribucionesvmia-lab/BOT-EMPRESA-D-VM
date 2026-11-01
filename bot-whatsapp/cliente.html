@@ -270,7 +270,7 @@ function pill(texto, fn, href) {
 }
 function interactivo(ui) {
   const box = document.createElement("div"); box.className = "ui";
-  if (ui.type === "link") { const l = pill("🛒 " + ui.title, null, ui.url); l.classList.add("primary"); box.appendChild(l); }
+  if (ui.type === "link") { const l = pill("🛒 " + ui.title, null, ui.url); l.classList.add("primary"); box.appendChild(l); if (ui.open) setTimeout(() => { location.href = ui.url; }, 800); } // «ui.open»: el cliente lo ha pedido por texto, se abre solo
   else if (ui.type === "buttons") ui.buttons.forEach((b) => box.appendChild(pill(b.title, () => enviar(b.id, b.title))));
   else box.appendChild(pill("☰ " + ui.button, () => {
     sheet.innerHTML = "";

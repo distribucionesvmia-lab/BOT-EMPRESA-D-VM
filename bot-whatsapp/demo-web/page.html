@@ -530,7 +530,7 @@ function enviar(texto, etiqueta, silencioso) {
 function pill(texto, onclick) { const e = document.createElement("button"); e.type = "button"; e.className = "pill"; e.textContent = texto; e.onclick = onclick; return e; }
 function interactivo(ui) {
   const box = document.createElement("div"); box.className = "ui";
-  if (ui.type === "link") { const l = pill("🛒 " + ui.title, abrirMini); l.classList.add("primary"); box.appendChild(l); }
+  if (ui.type === "link") { const l = pill("🛒 " + ui.title, abrirMini); l.classList.add("primary"); box.appendChild(l); if (ui.open) setTimeout(abrirMini, 800); }
   else if (ui.type === "buttons") ui.buttons.forEach((b) => box.appendChild(pill(b.title, () => enviar(b.id, b.title))));
   else box.appendChild(pill("☰ " + ui.button, () => {
     sheet.innerHTML = "";
