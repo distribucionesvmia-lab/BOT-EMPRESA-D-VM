@@ -402,7 +402,7 @@ async function appRoutes(req, res, url) {
     const text = typeof body?.text === "string" ? body.text.slice(0, 1000) : "";
     const msgId = typeof body?.id === "string" && /^[\w-]{8,64}$/.test(body.id) ? body.id : undefined;
     const out = await accountChat(account, text, msgId);
-    return void sendJson(res, 200, { reply: out.reply, ui: out.ui ?? null, handoff: !!out.handoff });
+    return void sendJson(res, 200, { reply: out.reply, ui: out.ui ?? null, handoff: !!out.handoff, cards: out.cards ?? null, short: out.short ?? null });
   }
 
   // Catálogo de pedido (la mini-aplicación) del cliente con sesión

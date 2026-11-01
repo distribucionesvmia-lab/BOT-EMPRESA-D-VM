@@ -56,7 +56,7 @@ const esUltimo = (t) => !/\d/.test(t) && t.length <= 48 && !PIDE_REPETIR.test(t)
 const esHistorico = (t) => !/\d/.test(t) && t.length <= 52 && !PIDE_REPETIR.test(t) && ["historico", "historial", "mis pedidos", "pedidos anteriores", "pedidos pasados", "que he pedido", "lo que he pedido", "lo que pedi", "que pedi", "mis compras", "compras anteriores", "ultimos pedidos", "pedidos que he hecho", "anteriores pedidos"].some((p) => t.includes(p));
 const esAbrir = (t) => OPEN_RE.test(t);
 const esRepetirUltimo = (t) => !/\d/.test(t) && t.length <= 48 && PIDE_REPETIR.test(t) && /pedido|ultim|anterior|vez/.test(t);
-const cantidadH = (i) => (i.unit === "caja" ? `${i.qty} ${i.qty === 1 ? "caja" : "cajas"}` : `${i.qty} uds`);
+const cantidadH = (i) => (i.unit === "caja" ? `${i.qty} ${i.qty === 1 ? "caja" : "cajas"}` : i.qty === 1 ? "1 ud" : `${i.qty} uds`);
 
 // ¿la palabra del cliente (q) corresponde a la del producto (t)? Acepta plurales y prefijos
 const wordMatch = (q, t) => q === t || (q.length >= 3 && t.startsWith(q)) || (t.length >= 4 && q.startsWith(t)) || (q.length >= 5 && t.length >= 5 && lev(q, t) <= 1); // perdona una errata: «cerbeza»
@@ -301,6 +301,12 @@ function openCatalog(s) {
   }
   return showList(s, 0, "🛒 Elige lo que quieres pedir:");
 }
+// Tabla de un pedido para la web (cantidad · producto · importe); el texto del mensaje sigue siendo el respaldo para WhatsApp
+const tablaPedido = (titulo, items, subtitulo = "") => ({
+  titulo, subtitulo,
+  filas: items.map((i) => ({ cant: cantidadH(i), nombre: i.name, importe: Math.round(unitsOf(i) * i.price * 100) / 100 })),
+  total: Math.round(total(items) * 100) / 100,
+});
 /** «Último pedido»: se enseña (no se repite solo) con botones para repetirlo, ver el histórico o hacer otro pedido. */
 function showLast(s) {
   const o = pedidosDe(s.customer).find((x) => itemsFromLines(x.lines).length);
@@ -308,6 +314,8 @@ function showLast(s) {
   const items = itemsFromLines(o.lines);
   return {
     reply: `🧾 *Tu último pedido* (${fmtDateFull(o.date)})\n\n` + items.map((i) => `• ${cantidadH(i)} · ${i.name} = ${money(unitsOf(i) * i.price)}`).join("\n") + `\n*Total: ${money(total(items))}*\n\n_Precios de hoy._`,
+    short: "🧾 *Tu último pedido*",
+    cards: [tablaPedido(`Pedido del ${fmtDateFull(o.date)}`, items, "Precios de hoy")],
     session: s,
     ui: buttons(["h:repeat1", "Repetir este pedido"], ["h:hist", "Ver histórico"], ["h:open", "Hacer pedido"]),
   };
@@ -324,6 +332,8 @@ function showHistory(s) {
     reply:
       `📜 *Tu histórico de pedidos*\n\n` + orders.map(bloque).join("\n\n") +
       (top.length ? `\n\n⭐ *Lo que más pides:*\n` + top.map((p) => `• ${p.name}`).join("\n") : ""),
+    short: "📜 *Tu histórico de pedidos*" + (top.length ? "\n⭐ Lo que más pides: " + top.map((p) => p.name).join(" · ") : ""),
+    cards: orders.map(({ o, items }) => tablaPedido(`Pedido del ${fmtDateFull(o.date)}`, items)),
     session: s,
     ui: buttons(["h:repeat1", "Repetir el último"], ["h:open", "Hacer pedido"]),
   };

@@ -248,7 +248,7 @@ window.VM = {
     sessions.set(acc.id, out.session);
     let saved = null;
     if (out.order) saved = saveOrder({ at: new Date().toISOString(), phone: acc.phone, key: `demo:${uid()}`, ...holdIfUnconfirmed(acc, out.order) }, customer);
-    return { reply: out.reply, ui: out.ui, handoff: !!out.handoff, saved };
+    return { reply: out.reply, ui: out.ui, handoff: !!out.handoff, saved, cards: out.cards ?? null, short: out.short ?? null };
   },
 
   // ---- Mini-aplicación de pedido (lo que abre «Hacer pedido») ----

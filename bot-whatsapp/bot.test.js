@@ -189,3 +189,16 @@ test("un cliente sin pedidos anteriores: último pedido e histórico lo dicen y 
     assert.equal(r.ui.type, "link");
   }
 });
+
+test("«último pedido» e «histórico» llevan además una tabla (cantidad, producto, importe, total) para la web", () => {
+  const r = say(newSession(bar, "/catalogo"), "último pedido");
+  assert.equal(r.cards.length, 1);
+  const t = r.cards[0];
+  assert.equal(t.titulo, "Pedido del 01/10/2026");
+  assert.deepEqual(t.filas.map((f) => [f.cant, f.nombre, f.importe]), [["24 uds", "Agua", 24], ["12 uds", "Cerveza Estrella Galicia", 9.6]]);
+  assert.equal(t.total, 33.6);
+  assert.match(r.reply, /Agua = 24\.00/); // el texto sigue siendo el respaldo para WhatsApp
+  assert.equal(r.short, "🧾 *Tu último pedido*");
+  const h = say(newSession(bar, "/catalogo"), "histórico");
+  assert.equal(h.cards.length, 2); // un pedido por tabla
+});
