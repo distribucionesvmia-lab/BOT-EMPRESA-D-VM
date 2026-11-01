@@ -77,3 +77,7 @@ Probado en 320×568 y 360×640 (táctil) en: `/` y `/cliente` (acceso), enlace d
 - ⚠️ F10-1 (baja) El enlace «Entrar con teléfono y PIN» (`#ir-pin`) de la portada mide 29 px de alto (< 44 px recomendados para dedo); es lo único pequeño que encontré.
 - ⚠️ F10-2 (baja) Con «reducir movimiento» y pantalla de 320 px, al abrir el carrito la página se ensancha un instante a 356 px (scrollWidth 356, +36 px) y vuelve a 320 al cabo de ~0,8 s; sin reducir movimiento no pasa. En un móvil real puede verse como un salto/zoom. No logré aislar el elemento (parece un panel que entra deslizándose); revisar en un móvil real.
 - ⚠️ F10-3 (baja) `empresa.html` (panel de la empresa) y `demo.html` no respetan `prefers-reduced-motion` (0 reglas); `cliente.html` y `pedido.html` sí.
+
+### Arreglado: pareja 1 (F9-1 + F9-2)
+- F9-1: el límite de intentos de la clave de empresa cuenta cada clave distinta una sola vez (las 7 peticiones del panel con la misma clave = 1 intento) y no cuenta las peticiones sin clave. Dos claves erróneas seguidas ya no bloquean: la correcta entra. Adivinar con 10 claves distintas sigue bloqueando (test existente). Test nuevo en server.test.js. 
+- F9-2: si el servidor responde 429, el login muestra «Demasiados intentos con una clave errónea. Espera unos minutos…» en lugar de «Sin conexión con el servidor».

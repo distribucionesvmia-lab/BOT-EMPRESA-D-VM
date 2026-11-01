@@ -105,6 +105,7 @@ const hora = (iso) => new Date(iso).toLocaleString("es-ES", { day: "2-digit", mo
 
 async function call(path, body, raw) {
   const r = await fetch(path, { method: body ? "POST" : "GET", headers: { Authorization: "Bearer " + clave, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 429) { clearInterval(timer); $("app").hidden = true; $("login").hidden = false; throw new Error("Demasiados intentos con una clave errónea. Espera unos minutos y vuelve a probar."); }
   if (r.status === 403) { try { sessionStorage.removeItem("vm_admin"); } catch {} clearInterval(timer); $("app").hidden = true; $("login").hidden = false; throw new Error("Clave incorrecta"); }
   if (raw) return r;
   const j = await r.json().catch(() => ({}));
@@ -271,7 +272,7 @@ async function avisos() {
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), clientes(), avisos(), sincronizacion(), correo()]); } catch (e) { if (e.message !== "Clave incorrecta") $("act").textContent = "Sin conexión con el servidor"; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), clientes(), avisos(), sincronizacion(), correo()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
