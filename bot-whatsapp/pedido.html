@@ -127,11 +127,13 @@
   .add { min-height:46px; border:0; border-radius:10px; background:var(--rojo); color:#fff; font-size:18px; font-weight:800; cursor:pointer; box-shadow:0 3px 0 var(--rojo-o); line-height:1.15; }
   .add:active { transform:translateY(2px); box-shadow:none; }
   .step { display:flex; flex-direction:row; align-items:stretch; border:2px solid var(--rojo); border-radius:10px; overflow:hidden; background:#fff; }
-  .step button { width:34px; height:46px; border:0; background:var(--rojo-s); font-size:24px; font-weight:700; color:var(--rojo-o); cursor:pointer; }
+  .step button { width:36px; height:46px; border:0; background:var(--rojo-s); font-size:24px; font-weight:700; color:var(--rojo-o); cursor:pointer; }
   .step button:active { background:#ffd9d9; }
-  .step input { flex:1; width:100%; min-width:0; height:46px; border:0; text-align:center; font-size:20px; font-weight:800; outline:none; -moz-appearance:textfield; }
+  .step input { flex:1; width:100%; min-width:0; height:46px; border:0; padding:0; text-align:center; font-size:19px; font-weight:800; outline:none; -moz-appearance:textfield; }
   .step input::-webkit-outer-spin-button, .step input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-  @media (max-width:480px) { .p { gap:10px; padding:12px 10px; } .av { width:64px; height:64px; font-size:22px; border-radius:14px; } .ctl { width:112px; } .info .n { font-size:17px; } }
+  @media (max-width:480px) { .p { gap:10px; padding:12px 10px; } .av { width:60px; height:60px; font-size:20px; border-radius:14px; } .ctl { width:128px; } .info .n { font-size:16px; } }
+  .cap { text-align:center; font-size:13px; font-weight:700; color:var(--rojo-o); line-height:1.15; padding:0 2px 2px; }
+  .p.sel .step { border-width:1px; }
   .ud { display:flex; border:2px solid var(--linea); border-radius:12px; overflow:hidden; }
   .ud button { flex:1; border:0; background:#fff; min-height:34px; padding:0 4px; font-size:15px; cursor:pointer; color:var(--gris); font-weight:700; }
   .ud button.on { background:var(--rojo); color:#fff; }
@@ -165,7 +167,8 @@
   .vacio { padding:48px 24px; text-align:center; color:var(--gris); font-size:18px; line-height:1.4; }
 
   /* Barra inferior: siempre a la vista, botón enorme */
-  footer { position:absolute; left:0; right:0; bottom:0; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(rgba(255,255,255,0), #fff 28%); }
+  footer { z-index:6; position:absolute; left:0; right:0; bottom:0; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(rgba(255,255,255,0), #fff 28%); }
+  #verCarrito { font-size:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .big { width:100%; border:0; border-radius:16px; background:var(--rojo); color:#fff; font-size:20px; font-weight:800; min-height:62px; padding:12px; cursor:pointer; box-shadow:0 4px 0 var(--rojo-o); }
   .big:active { transform:translateY(2px); box-shadow:none; }
   .big:disabled { background:#c9cbcf; box-shadow:none; cursor:default; }
@@ -400,6 +403,11 @@ function control(p) {
   inp.onchange = () => setQty(p.id, inp.value);
   const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.setAttribute("aria-label", "Añadir uno de " + p.name); plus.onclick = () => setQty(p.id, q + 1);
   st.append(minus, inp, plus); box.appendChild(st);
+  // Lo que lleva pedido, siempre a la vista: «3 uds» o «2 cajas · 12 uds»
+  const cap = document.createElement("div"); cap.className = "cap";
+  const enCajas = p.unitsPerBox && unit(p.id) === "caja";
+  cap.textContent = enCajas ? `${q} ${q === 1 ? "caja" : "cajas"} · ${q * p.unitsPerBox} uds` : `${q} ${q === 1 ? "unidad" : "unidades"}`;
+  box.appendChild(cap);
   return box;
 }
 
