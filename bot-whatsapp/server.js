@@ -281,7 +281,7 @@ function webOrderRoutes(req, res, url) {
       const priced = priceOrder(order, customer, catalogNow());
       const { duplicate } = await createOrder(priced);
       if (duplicate) return json(res, { error: "Este pedido ya se envió" }, 409); // doble clic o dos pestañas
-      const message = `🎉 ¡Pedido recibido, ${customer.name}! ${items.length} artículos, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.\n\n${BUSINESS.payment}`;
+      const message = `🎉 ¡Pedido recibido, ${customer.name}! ${items.length} ${items.length === 1 ? "artículo" : "artículos"}, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.\n\n${BUSINESS.payment}`;
       if (process.env.DEMO !== "1") {
         await send(link.p, message);
         if (OWNER_PHONE) await send(OWNER_PHONE, `🛒 Nuevo pedido de ${customer.name} (+${link.p})\n${order.text}\nTotal: ${priced.total.toFixed(2)}\n📍 ${customer.address}`);
@@ -458,7 +458,7 @@ async function appRoutes(req, res, url) {
     const priced = priceOrder(holdIfUnconfirmed(account, built.order), customer, catalogNow());
     const { duplicate } = await createOrder(priced);
     if (duplicate) return void sendJson(res, 409, { error: "Este pedido ya se envió" }); // doble clic o dos pestañas
-    return void sendJson(res, 200, { ok: true, message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} artículos, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.\n\n${BUSINESS.payment}` });
+    return void sendJson(res, 200, { ok: true, message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} ${priced.items.length === 1 ? "artículo" : "artículos"}, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.\n\n${BUSINESS.payment}` });
   }
   res.writeHead(404).end();
 }

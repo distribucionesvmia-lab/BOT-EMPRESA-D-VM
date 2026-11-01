@@ -85,3 +85,8 @@ Probado en 320×568 y 360×640 (táctil) en: `/` y `/cliente` (acceso), enlace d
 ### Arreglado: pareja 2 (F8-1 + F8-2)
 - F8-1: el chat de WhatsApp/demo (cliente por teléfono y por nombre) ya suma los pedidos hechos por el bot o la app (`withOwnOrders` en `handleIncoming` y en el buscador): «último pedido», «histórico» y «repetir» enseñan ya el pedido más reciente. Verificado contra la demo (01/11/2026 en vez de 20/10).
 - F8-2: en «Revisa tu pedido», un texto que no se entiende responde «No he entendido eso… Tu pedido sigue igual» y conserva las líneas; ya no se puede confirmar un pedido vacío por accidente. Test nuevo. Tests: 212/212.
+
+### Arreglado: pareja 3 (F7-1 + F7-2/F8-3)
+- F7-1: el paso 3 de la web ya no dice «Al tocarlo se envía tu pedido»; dice «Después podrás revisar el pedido y confirmarlo».
+- F7-2: «1 ud»/«1 uds» y «1 artículo»/«1 artículos» bien en el resumen y el carrito de la web, el mensaje de pedido recibido (web) y el chat (histórico, botones, «última vez»).
+- F8-3: el chat usa coma decimal y espacio como la web («3,30 €» en vez de «3.30€»). 4 tests ajustados al nuevo formato + 1 test nuevo. Tests: 213/213.

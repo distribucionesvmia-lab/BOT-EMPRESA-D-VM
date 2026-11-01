@@ -20,7 +20,7 @@ test("cliente nuevo: flujo completo con texto libre", () => {
   assert.match(r.reply, /Escribe directamente/);
   assert.equal(r.ui, undefined);
   r = say(r.session, "2 aguas y una cerveza");
-  assert.match(r.reply, /Total: 2\.80/);
+  assert.match(r.reply, /Total: 2,80/);
   r = say(r.session, "1");
   r = say(r.session, "Ana");
   r = say(r.session, "Calle Sol 5");
@@ -45,7 +45,7 @@ test("cliente nuevo: texto sin producto reconocido se guarda tal cual", () => {
 test("cliente nuevo: se puede añadir más texto antes de continuar", () => {
   let r = say(newSession(), "2 aguas");
   r = say(r.session, "y 3 cervezas");
-  assert.match(r.reply, /Total: 4\.40/);
+  assert.match(r.reply, /Total: 4,40/);
 });
 
 // ---- Cliente conocido: cuestionario con lista y botones ----

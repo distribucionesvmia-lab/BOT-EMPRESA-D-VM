@@ -266,7 +266,7 @@
   <section class="screen" id="when" hidden style="z-index:6">
     <div class="head"><button id="backWhen" type="button" aria-label="Volver al carrito">←</button><div><small>Paso 3 de 3</small><h2>¿Cuándo quieres recibirlo?</h2></div></div>
     <div class="body" style="padding:14px">
-      <p style="margin:0 0 14px;color:var(--gris);font-size:18px">Toca el día de entrega. <b>Al tocarlo se envía tu pedido.</b></p>
+      <p style="margin:0 0 14px;color:var(--gris);font-size:18px">Toca el día de entrega. <b>Después podrás revisar el pedido y confirmarlo.</b></p>
       <div id="whenOpts" style="display:grid;gap:12px"></div>
       <div class="err" id="errWhen" role="alert"></div>
     </div>
@@ -413,7 +413,7 @@ function row(p) {
   const price = document.createElement("b"); price.textContent = eur(p.price); pr.appendChild(price);
   if (p.lastQty) {
     const chip = document.createElement("button"); chip.type = "button"; chip.className = "chip";
-    chip.textContent = "↻ Última vez: " + p.lastQty + " uds"; chip.title = "Pedir las mismas unidades";
+    chip.textContent = "↻ Última vez: " + p.lastQty + (p.lastQty === 1 ? " ud" : " uds"); chip.title = "Pedir las mismas unidades";
     chip.onclick = () => { unitOf.set(p.id, "ud"); setQty(p.id, p.lastQty); }; // las de la última vez son unidades
     pr.appendChild(chip);
   }
@@ -614,7 +614,7 @@ $("repAbrir").onclick = () => {
     for (const l of lns) {
       const lab = document.createElement("label"), cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true;
       const t = document.createElement("span"); t.textContent = byId.get(l.id).name;
-      const q = document.createElement("span"); q.className = "rq"; q.textContent = l.qty + " uds";
+      const q = document.createElement("span"); q.className = "rq"; q.textContent = l.qty + (l.qty === 1 ? " ud" : " uds");
       lab.append(cb, t, q); w.appendChild(lab); repSel.push({ cb, id: l.id, qty: l.qty });
     }
     box.appendChild(w);
@@ -699,7 +699,7 @@ function resumen(day) {
     const k = l.unitsPerBox || 1, cj = unit(l.id) === "caja", d = document.createElement("div");
     d.className = "rl"; d.style.cssText = "display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--linea);font-size:16px";
     const a = document.createElement("span"), b = document.createElement("b");
-    a.textContent = `${cj ? l.qty + (l.qty === 1 ? " caja" : " cajas") + " (" + uds(l) + " uds)" : uds(l) + " uds"} · ${l.name}` + ((notes.get(l.id) || "").trim() ? ` — «${notes.get(l.id).trim()}»` : "");
+    a.textContent = `${cj ? l.qty + (l.qty === 1 ? " caja" : " cajas") + " (" + uds(l) + " uds)" : uds(l) + (uds(l) === 1 ? " ud" : " uds")} · ${l.name}` + ((notes.get(l.id) || "").trim() ? ` — «${notes.get(l.id).trim()}»` : "");
     b.textContent = eur(importe(l)); b.style.whiteSpace = "nowrap";
     d.append(a, b); box.appendChild(d);
   }

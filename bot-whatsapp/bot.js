@@ -3,7 +3,8 @@ import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRo
 import { isTooGeneric } from "./identify.js";
 import { deliveryAllowed, longDate, puedeHoy } from "./delivery.js";
 
-const money = (n) => `${n.toFixed(2)}${BUSINESS.currency}`;
+const money = (n) => `${n.toFixed(2).replace(".", ",")} ${BUSINESS.currency}`; // «3,30 €», como en la web
+const udsT = (n) => `${n} ${n === 1 ? "ud" : "uds"}`; // «1 ud», «6 uds»
 const norm = (s) =>
   s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 const tokenize = (s) => norm(s).split(/[^a-z0-9]+/).filter(Boolean);
@@ -60,7 +61,7 @@ const esUltimo = (t) => !/\d/.test(t) && t.length <= 48 && !PIDE_REPETIR.test(t)
 const esHistorico = (t) => !/\d/.test(t) && t.length <= 52 && !PIDE_REPETIR.test(t) && ["historico", "historial", "mis pedidos", "pedidos anteriores", "pedidos pasados", "que he pedido", "lo que he pedido", "lo que pedi", "que pedi", "mis compras", "compras anteriores", "ultimos pedidos", "pedidos que he hecho", "anteriores pedidos"].some((p) => t.includes(p));
 const esAbrir = (t) => OPEN_RE.test(t);
 const esRepetirUltimo = (t) => !/\d/.test(t) && t.length <= 48 && PIDE_REPETIR.test(t) && /pedido|ultim|anterior|vez/.test(t);
-const cantidadH = (i) => (i.unit === "caja" ? `${i.qty} ${i.qty === 1 ? "caja" : "cajas"}` : `${i.qty} uds`);
+const cantidadH = (i) => (i.unit === "caja" ? `${i.qty} ${i.qty === 1 ? "caja" : "cajas"}` : udsT(i.qty));
 
 // ¿la palabra del cliente (q) corresponde a la del producto (t)? Acepta plurales y prefijos
 const wordMatch = (q, t) => q === t || (q.length >= 3 && t.startsWith(q)) || (t.length >= 4 && q.startsWith(t)) || (q.length >= 5 && t.length >= 5 && lev(q, t) <= 1); // perdona una errata: «cerbeza»
@@ -167,7 +168,7 @@ function listUi(s, page = 0) {
   const rows = all.slice(start, start + PAGE).map((p) => ({
     id: `p:${p.id}`,
     title: trunc(p.name, 24),
-    description: trunc(`${p.name} · última vez: ${p.lastQty} uds`, 72),
+    description: trunc(`${p.name} · última vez: ${udsT(p.lastQty)}`, 72),
   }));
   if (!rows.length) return undefined;
   if (start + PAGE < all.length) rows.push({ id: `more:${page + 1}`, title: "Ver más artículos", description: `Quedan ${all.length - start - PAGE} por ver` });
@@ -193,7 +194,7 @@ const WHO_PROMPT =
 const habitualBlock = (s) => {
   const top = habitualProducts(s.customer).slice(0, 6);
   return top.length
-    ? `⭐ *Tu histórico de productos* (según tus últimos pedidos):\n` + top.map((p) => `• ${p.name} — última vez: ${p.lastQty} uds`).join("\n") + `\n\n`
+    ? `⭐ *Tu histórico de productos* (según tus últimos pedidos):\n` + top.map((p) => `• ${p.name} — última vez: ${udsT(p.lastQty)}`).join("\n") + `\n\n`
     : `Todavía no tengo pedidos tuyos anteriores.\n\n`;
 };
 // Tras identificar al cliente por su nombre: confirmación + sus productos habituales
@@ -370,7 +371,7 @@ function askUnitReply(s, lead = "") {
   return {
     reply: `${lead}*${f.name}*\nEscribiste ${f.qty}. Este artículo se vende en cajas de ${f.upb} unidades: ¿lo quieres en *cajas* o en *unidades*?`,
     session: s,
-    ui: buttons(["ui:caja", cajas], ["ui:ud", `${f.qty} uds`], ["ui:no", "No lo quiero"]),
+    ui: buttons(["ui:caja", cajas], ["ui:ud", udsT(f.qty)], ["ui:no", "No lo quiero"]),
   };
 }
 
@@ -385,8 +386,8 @@ function askQty(s) {
   }
   const last = p.lastQty ?? 1;
   return {
-    reply: `*${p.name}*\n${money(priceOf(p))} por unidad${p.lastQty ? ` · última vez: ${last} uds` : ""}.\n\n¿Cuántas unidades quieres? Pulsa un botón o escribe el número.`,
-    ui: buttons([`q:${last}`, `${last} uds (igual)`], [`q:${last * 2}`, `${last * 2} uds (doble)`], ["q:0", "No lo quiero"]),
+    reply: `*${p.name}*\n${money(priceOf(p))} por unidad${p.lastQty ? ` · última vez: ${udsT(last)}` : ""}.\n\n¿Cuántas unidades quieres? Pulsa un botón o escribe el número.`,
+    ui: buttons([`q:${last}`, `${udsT(last)} (igual)`], [`q:${last * 2}`, `${udsT(last * 2)} (doble)`], ["q:0", "No lo quiero"]),
   };
 }
 

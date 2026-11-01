@@ -107,7 +107,7 @@ test("chat: artículo en cajas pregunta cajas o unidades y calcula las unidades"
   r = handleMessage(r.session, "u:caja");
   assert.match(r.reply, /Cuántas \*cajas\*/);
   r = handleMessage(r.session, "q:2");
-  assert.match(r.reply, /2 cajas \(12 uds\) × AGUA GAS LIMON VIDRIO 250 = 41\.52/);
+  assert.match(r.reply, /2 cajas \(12 uds\) × AGUA GAS LIMON VIDRIO 250 = 41,52/);
   r = handleMessage(r.session, "act:done");
   r = handleMessage(r.session, "c:ok");
   assert.deepEqual(r.order.items.map((i) => [i.id, i.qty, i.unit]), [["A1", 2, "caja"]]);
@@ -292,7 +292,7 @@ test("chat: se enseñan los precios especiales del cliente, no los de tarifa", (
   const a = handleMessage(newSession(c), "6 agua gas uds");
   const b = handleMessage(newSession(tarifa), "6 agua gas uds");
   assert.notEqual(a.reply, b.reply);
-  assert.match(a.reply, /0\.60€/); // 6 × 0,10
+  assert.match(a.reply, /0,60 €/); // 6 × 0,10
 });
 
 test("chat: cantidades negativas, cero, enormes y escritas con letra", () => {
@@ -322,4 +322,12 @@ test("chat: en «Revisa tu pedido», un texto que no se entiende NO borra las l�
   // y sigue pudiendo cambiar cantidades escribiendo
   const y = handleMessage(r.session, "7 uds de agua gas");
   assert.match(y.reply, /7 × AGUA GAS/);
+});
+
+test("chat: singular («1 ud», «1 artículo») y dinero con coma como en la web", () => {
+  const c = conCajas();
+  const r = handleMessage(newSession(c), "1 jamon serrano");
+  assert.match(r.reply, /,\d\d €/);
+  assert.doesNotMatch(r.reply, /\d\.\d\d ?€/);
+  assert.doesNotMatch(r.reply, /\b1 uds\b/);
 });
