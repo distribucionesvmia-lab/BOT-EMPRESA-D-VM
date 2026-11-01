@@ -17,3 +17,8 @@
 - F2-2: «bar», «cafetería», «S.L.»… responden «demasiado general, escribe el nombre completo» y no cuentan como fallo.
 - F2-3: «nuevo» avisa a una persona (handoff) y explica que su pedido se revisará; sigue pudiendo ver productos y pedir.
 - Tests: 207/207. Verificado a mano contra la demo.
+
+## Tarea 3 (identificación correcta) — 2 observaciones
+- OK: «Bar El Ejemplo», «bar el ejemplo», «BAR EL EJEMPLO (FICTICIO)», «soy el bar el ejemplo», «Bar Ejemplo» y el código «9001» identifican al cliente correcto. Sin errores de consola.
+- ⚠️ F3-1 (ALTA, privacidad) Quien escriba el nombre de un negocio desde cualquier teléfono ve su «histórico de productos» (qué compra y cuántas unidades). `identifiedIntro` (bot.js) muestra `habitualBlock` siempre; `holdUnverified` solo retiene el pedido, no oculta el historial. Contradice la idea del README de que un cliente nunca ve datos de otro. Propuesta: si el teléfono no coincide con el del cliente (en producción), no mostrar el histórico (solo saludo y catálogo) hasta verificar.
+- ⚠️ F3-2 (baja) «ejemplo» o «el ejemplo» (solo la palabra distintiva) no identifica: cobertura 50 % < 60 % porque «bar» cuenta. Es una decisión de seguridad, pero el mensaje no sugiere añadir más palabras; con «Bar Ejemplo» sí funciona.
