@@ -4,7 +4,7 @@ import { categorizar, arbolCategorias } from "./categorias.js";
 // Lógica de la mini-aplicación de pedido, sin red ni disco (la comparten el servidor y la demo del navegador).
 
 /** Catálogo que ve el cliente: sus habituales primero, con las unidades de la última vez y las unidades por caja. */
-export function webProducts(customer, catalog, habitualProducts) {
+export function webProducts(customer, catalog, habitualProducts, imgOf = () => null) {
   const habit = new Map(habitualProducts(customer).map((p) => [p.id, p]));
   return catalog
     .map((p) => ({
@@ -15,6 +15,7 @@ export function webProducts(customer, catalog, habitualProducts) {
       discount: customer?.discounts?.[String(p.id)] ?? p.discount ?? 0,
       unitsPerBox: Number.isInteger(p.unitsPerBox) && p.unitsPerBox > 1 ? p.unitsPerBox : null,
       ...(({ cat, sub }) => ({ cat, sub }))(categorizar(p)), // categoría y subcategoría (ids) para navegar el catálogo
+      ...((img) => (img ? { img } : {}))(imgOf(String(p.id))), // foto del producto (si hay)
       lastQty: habit.get(p.id)?.lastQty ?? null,
       count: habit.get(p.id)?.count ?? 0,
     }))

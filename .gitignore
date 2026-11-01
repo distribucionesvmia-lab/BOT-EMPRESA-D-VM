@@ -9,3 +9,4 @@ __MACOSX
 # Demo con la tarifa real (precios reales): nunca al repositorio
 bot-whatsapp/demo-web/dist-privado/
 bot-whatsapp/demo-web/productos-tarifa*.json
+bot-whatsapp/imagenes/

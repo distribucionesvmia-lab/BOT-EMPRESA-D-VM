@@ -57,3 +57,10 @@ test("el catálogo web lleva el precio y el descuento que aplicará el servidor 
   assert.deepEqual([p[2].price, p[2].discount], [0.8, 0]);
   assert.deepEqual([p[3].price, p[3].discount], [5, 0]);
 });
+
+test("el catálogo web añade la foto solo a los productos que la tienen", () => {
+  const cat = [{ id: "1", name: "A", price: 1 }, { id: "2", name: "B", price: 1 }];
+  const p = webProducts({ id: "C" }, cat, () => [], (id) => (id === "1" ? "/img/1" : null));
+  assert.equal(p.find((x) => x.id === "1").img, "/img/1");
+  assert.equal("img" in p.find((x) => x.id === "2"), false);
+});

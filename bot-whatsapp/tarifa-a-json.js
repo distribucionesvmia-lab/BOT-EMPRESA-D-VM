@@ -1,10 +1,10 @@
 // Convierte la tarifa de productos de varias hojas (una por proveedor o familia) en una lista de productos lista para cargar.
 // SOLO LECTURA del Excel; escribe un JSON donde se le indique (fuera del repositorio: son precios reales).
-// Uso:  node tarifa-a-json.js <tarifa.xlsx> <salida.json>
+// Uso:  node tarifa-a-json.js <tarifa.xlsx> <salida.json> [--fotos]   (con --fotos saca también las imágenes incrustadas)
 // Reglas: se descartan los artículos sin precio numérico, bloqueados y repetidos; el «Dto%» viene como fracción (0,29 = 29 %);
 // el IVA «SRE» queda sin tipo (no se supone); la categoría se fija por hoja.
 import fs from "node:fs";
-import { readXlsxSheets } from "./xlsx-read.js";
+import { readXlsxSheets, fotosPorFila } from "./xlsx-read.js";
 import { parseProductos } from "./productos-import.js";
 
 // hoja → [categoría, subcategoría]  (las categorías del cliente: Café, Pascual, Vinos, Aguas, Despensa, Refrigerados; el resto, Hostelería y menaje)
@@ -17,15 +17,16 @@ export const HOJAS = {
   cuberteria_sartenes: ["Hostelería y menaje", "Cubertería y sartenes"], "vasos y copas": ["Hostelería y menaje", "Vasos y copas"],
 };
 
-export function tarifaAProductos(buf) {
-  const out = [], vistos = new Set(), avisos = { hojaDesconocida: [], sinPrecio: 0, repetidos: 0, filasRaras: 0 };
+export function tarifaAProductos(buf, conFotos = false) {
+  const out = [], fotos = new Map(), vistos = new Set(), avisos = { hojaDesconocida: [], sinPrecio: 0, repetidos: 0, filasRaras: 0 };
+  const porHoja = conFotos ? fotosPorFila(buf) : new Map();
   for (const h of readXlsxSheets(buf)) {
     const destino = HOJAS[h.name.trim().toLowerCase()];
     if (!destino) { avisos.hojaDesconocida.push(h.name.trim()); continue; }
     let r;
     try { r = parseProductos(h.rows); } catch { continue; }
     avisos.sinPrecio += r.stats.sinPrecio;
-    for (const p of r.products) {
+    for (const [k, p] of r.products.entries()) {
       if (!p.active) continue;
       if (!(p.price > 0) || /^[\d\s.,]*$/.test(p.name) || p.id === "0") { avisos.filasRaras++; continue; } // precio 0, nombre sin letras o código 0: restos de la hoja, no productos
       if (vistos.has(p.id)) { avisos.repetidos++; continue; }
@@ -36,16 +37,25 @@ export function tarifaAProductos(buf) {
       if (p.vat !== undefined) q.vat = p.vat;
       if (p.discount) q.discount = Math.round((p.discount <= 1 ? p.discount * 100 : p.discount) * 100) / 100;
       out.push(q);
+      const foto = porHoja.get(h.name)?.get(r.rowOf[k]);
+      if (foto) fotos.set(q.id, foto);
     }
   }
-  return { products: out, avisos };
+  return { products: out, avisos, fotos };
 }
 
 if (process.argv[1]?.endsWith("tarifa-a-json.js")) {
   const [, , entrada, salida] = process.argv;
-  if (!entrada || !salida) { console.error("Uso: node tarifa-a-json.js <tarifa.xlsx> <salida.json>"); process.exit(1); }
-  const { products, avisos } = tarifaAProductos(fs.readFileSync(entrada));
+  if (!entrada || !salida) { console.error("Uso: node tarifa-a-json.js <tarifa.xlsx> <salida.json> [--fotos]"); process.exit(1); }
+  const conFotos = process.argv.includes("--fotos");
+  const { products, avisos, fotos } = tarifaAProductos(fs.readFileSync(entrada), conFotos);
   fs.writeFileSync(salida, JSON.stringify(products));
+  if (conFotos) { // las fotos van junto al JSON, en la carpeta «imagenes» (<código>.<ext>); nunca al repositorio
+    const dir = salida.replace(/\.json$/, "") + "-imagenes";
+    fs.mkdirSync(dir, { recursive: true });
+    for (const [id, f] of fotos) fs.writeFileSync(`${dir}/${id}.${f.ext === "jpeg" ? "jpg" : f.ext}`, f.data);
+    console.log(`Fotos: ${fotos.size} de ${products.length} productos → ${dir}`);
+  }
   const porCat = {}; for (const p of products) porCat[p.category] = (porCat[p.category] ?? 0) + 1;
   console.log(`Productos: ${products.length}`, porCat, `· sin IVA conocido (SRE): ${products.filter((p) => p.vat === undefined).length} · con descuento: ${products.filter((p) => p.discount).length}`);
   console.log("Descuentos distintos (%):", [...new Set(products.map((p) => p.discount).filter(Boolean))].sort((a, b) => a - b).join(", "));

@@ -59,9 +59,9 @@ export function parseProductos(rows) {
   }
   if (hi < 0) throw new Error("No encuentro la cabecera: el Excel de productos debe tener las columnas «Código», «Descripción» y «Precio».");
   const get = (r, k) => (col[k] >= 0 ? r[col[k]] : undefined);
-  const products = [], seen = new Set();
+  const products = [], rowOf = [], seen = new Set(); // rowOf: nº de fila de Excel de cada producto (para emparejar imágenes)
   const stats = { filas: 0, importados: 0, sinPrecio: 0, duplicados: 0, inactivos: 0, descartadas: 0 };
-  for (const r of rows.slice(hi + 1)) {
+  for (const [k, r] of rows.slice(hi + 1).entries()) {
     if (!r.some((c) => String(c).trim())) continue;
     stats.filas++;
     const id = String(get(r, "code") ?? "").trim(), name = String(get(r, "name") ?? "").trim();
@@ -79,10 +79,11 @@ export function parseProductos(rows) {
     if (cat) p.category = cat;
     if (sub) p.subcategory = sub;
     products.push(p);
+    rowOf.push(hi + 2 + k);
     stats.importados++;
     if (!p.active) stats.inactivos++;
   }
-  return { products, stats };
+  return { products, stats, rowOf };
 }
 
 export const parseProductosXlsx = (buf) => parseProductos(readXlsx(buf));

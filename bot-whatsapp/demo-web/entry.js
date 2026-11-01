@@ -266,7 +266,7 @@ window.VM = {
   miniData(link) {
     const customer = links.get(link)?.customer;
     if (!customer) return { error: "Enlace no válido o caducado" };
-    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, favs: [...(favsDemo.get(customer.id) ?? [])], products: webProducts(customer, getCatalog(), habitualProducts), history: webHistory(customer, getCatalog()), tree: webTree(getCatalog()), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) };
+    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, favs: [...(favsDemo.get(customer.id) ?? [])], products: webProducts(customer, getCatalog(), habitualProducts, (id) => globalThis.__VM_FOTOS__?.[id] ?? null), history: webHistory(customer, getCatalog()), tree: webTree(getCatalog()), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) };
   },
   miniSubmit(link, body) {
     const customer = links.get(link)?.customer;

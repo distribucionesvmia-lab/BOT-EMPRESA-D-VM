@@ -24,10 +24,17 @@ const mini = fs.readFileSync(path.join(root, "pedido.html"), "utf8").replace("<h
 
 // TARIFA_JSON=ruta.json (de tarifa-a-json.js): vista previa con productos reales. El resultado lleva precios reales: NO se sube al repositorio.
 const tarifa = process.env.TARIFA_JSON ? `window.__VM_TARIFA__=${fs.readFileSync(process.env.TARIFA_JSON, "utf8")};` : "";
+// FOTOS_DIR=carpeta (de tarifa-a-json.js --fotos): se incrustan como imágenes en la página (precio en tamaño: unos 7 MB)
+let fotos = "";
+if (process.env.FOTOS_DIR) {
+  const mt = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" }, m = {};
+  for (const f of fs.readdirSync(process.env.FOTOS_DIR)) { const [id, ext] = [f.replace(/\.[^.]+$/, ""), f.split(".").pop().toLowerCase()]; if (mt[ext]) m[id] = `data:${mt[ext]};base64,` + fs.readFileSync(path.join(process.env.FOTOS_DIR, f)).toString("base64"); }
+  fotos = `window.__VM_FOTOS__=${JSON.stringify(m)};`;
+}
 const safe = (s) => s.replace(/<\/script/gi, "<\\/script");
 const page = fs
   .readFileSync(path.join(here, "page.html"), "utf8")
-  .replace("/*__BUNDLE__*/", () => safe(tarifa + fs.readFileSync(bundle, "utf8")))
+  .replace("/*__BUNDLE__*/", () => safe(tarifa + fotos + fs.readFileSync(bundle, "utf8")))
   .replace("/*__MINI__*/", () => safe(JSON.stringify(mini)));
 
 fs.writeFileSync(path.join(dist, "artifact.html"), page);

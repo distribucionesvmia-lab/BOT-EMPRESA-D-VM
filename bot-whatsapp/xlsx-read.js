@@ -14,7 +14,7 @@ function unzip(buf, want) {
     const method = buf.readUInt16LE(p + 10), csize = buf.readUInt32LE(p + 20), nl = buf.readUInt16LE(p + 28), el = buf.readUInt16LE(p + 30), cl = buf.readUInt16LE(p + 32), off = buf.readUInt32LE(p + 42);
     const name = buf.toString("utf8", p + 46, p + 46 + nl);
     p += 46 + nl + el + cl;
-    if (!want.includes(name)) continue;
+    if (!(typeof want === "function" ? want(name) : want.includes(name))) continue;
     const lnl = buf.readUInt16LE(off + 26), lel = buf.readUInt16LE(off + 28);
     const data = buf.subarray(off + 30 + lnl + lel, off + 30 + lnl + lel + csize);
     out[name] = method === 8 ? zlib.inflateRawSync(data) : data;
@@ -31,8 +31,11 @@ const colIndex = (ref) => [...ref.replace(/\d+/g, "")].reduce((n, ch) => n * 26 
 /** Filas de una hoja a partir de su XML: string[][] */
 function sheetRows(xml, shared) {
   const rows = [];
-  for (const r of xml.matchAll(/<row [^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {
+  const filas = [...xml.matchAll(/<row [^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)];
+  for (const r of filas) {
     const row = [];
+    const nFila = Number(/\br="(\d+)"/.exec(r[0].slice(0, r[0].indexOf(">") + 1))?.[1]) || rows.length + 1;
+    while (rows.length < nFila - 1) rows.push([]); // las filas vacías no vienen en el XML: se conserva el número de fila real de Excel
     for (const c of (r[1] ?? "").matchAll(/<c ([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const attrs = c[1];
       const ref = /r="([A-Z]+\d+)"/.exec(attrs)?.[1];
@@ -53,6 +56,11 @@ const sharedOf = (f) => (f["xl/sharedStrings.xml"] ? [...f["xl/sharedStrings.xml
 
 /** TODAS las hojas del libro: [{ name, rows }] (para tarifas con una hoja por proveedor o familia). */
 export function readXlsxSheets(buf) {
+  return libro(buf).sheets.map(({ name, rows }) => ({ name, rows }));
+}
+
+/** Libro completo: hojas con su ruta interna ({ name, path, rows }) y el contenido ya descomprimido de lo que se pidió. */
+export function libro(buf) {
   const files = unzip(buf, ["xl/sharedStrings.xml", "xl/workbook.xml", "xl/_rels/workbook.xml.rels"]);
   if (!files["xl/workbook.xml"] || !files["xl/_rels/workbook.xml.rels"]) throw new Error("El Excel no tiene la estructura esperada");
   const rels = new Map([...files["xl/_rels/workbook.xml.rels"].toString("utf8").matchAll(/<Relationship\b[^>]*>/g)].map((m) => [/Id="([^"]+)"/.exec(m[0])?.[1], /Target="([^"]+)"/.exec(m[0])?.[1]]));
@@ -60,7 +68,32 @@ export function readXlsxSheets(buf) {
   const paths = sheets.map((x) => (x.target ?? "").replace(/^\/?(xl\/)?/, "xl/"));
   const data = unzip(buf, paths);
   const shared = sharedOf(files);
-  return sheets.map((x, i) => ({ name: x.name, rows: data[paths[i]] ? sheetRows(data[paths[i]].toString("utf8"), shared) : [] }));
+  return { sheets: sheets.map((x, i) => ({ name: x.name, path: paths[i], rows: data[paths[i]] ? sheetRows(data[paths[i]].toString("utf8"), shared) : [] })) };
+}
+
+/** Imágenes incrustadas por hoja: Map(nombre de hoja → Map(nº de fila de Excel → { ext, data })). Solo lee; no escribe nada. */
+export function fotosPorFila(buf) {
+  const f = unzip(buf, (n) => /^xl\/(worksheets\/_rels|drawings|drawings\/_rels|media)\//.test(n) || n === "xl/workbook.xml" || n === "xl/_rels/workbook.xml.rels");
+  const rel = (b) => new Map([...(b?.toString("utf8") ?? "").matchAll(/<Relationship\b[^>]*>/g)].map((m) => [/Id="([^"]+)"/.exec(m[0])?.[1], /Target="([^"]+)"/.exec(m[0])?.[1]]));
+  const norm = (base, t) => { const parts = (t.startsWith("/") ? t.slice(1) : base.split("/").slice(0, -1).join("/") + "/" + t).split("/"); const o = []; for (const p of parts) p === ".." ? o.pop() : o.push(p); return o.join("/"); };
+  const { sheets } = libro(buf), out = new Map();
+  for (const h of sheets) {
+    const sr = f[h.path.replace("worksheets/", "worksheets/_rels/") + ".rels"];
+    const draw = [...rel(sr).values()].find((t) => /drawings\/drawing\d+\.xml$/.test(t ?? ""));
+    const porFila = new Map();
+    out.set(h.name, porFila);
+    if (!draw) continue;
+    const dp = norm(h.path, draw), dx = f[dp]?.toString("utf8");
+    if (!dx) continue;
+    const dr = rel(f[dp.replace("drawings/", "drawings/_rels/") + ".rels"]);
+    for (const a of dx.matchAll(/<xdr:(?:two|one)CellAnchor[\s\S]*?<\/xdr:(?:two|one)CellAnchor>/g)) {
+      const row = /<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/.exec(a[0])?.[1], emb = /r:embed="([^"]+)"/.exec(a[0])?.[1];
+      const mp = emb && dr.get(emb) ? norm(dp, dr.get(emb)) : null;
+      if (row === undefined || !mp || !f[mp]) continue;
+      porFila.set(Number(row) + 1, { ext: mp.split(".").pop().toLowerCase(), data: f[mp] });
+    }
+  }
+  return out;
 }
 
 /** Filas de la primera hoja: string[][] */

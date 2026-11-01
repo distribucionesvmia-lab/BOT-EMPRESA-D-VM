@@ -250,7 +250,7 @@ function webOrderRoutes(req, res, url) {
     if (!customer) return json(res, { error: "Enlace no válido o caducado" }, 410);
 
     if (req.method === "GET") {
-      const products = webProducts(customer, catalogNow(), habitualProducts);
+      const products = webProducts(customer, catalogNow(), habitualProducts, imgUrl);
       return json(res, {
         business: BUSINESS.name,
         priceNote: BUSINESS.priceNote,
@@ -334,6 +334,18 @@ if (adminEnabled) {
 }
 const admin = createAdmin({ sync, mail: notificador, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
+// Fotos de producto: ficheros «<código>.png|jpg|webp» en la carpeta IMG_DIR (por defecto «imagenes»). Se listan al arrancar y cada 5 minutos.
+const IMG_DIR = process.env.IMG_DIR ?? new URL("./imagenes/", import.meta.url).pathname;
+const IMG_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
+let imgIndex = new Map(), imgAt = 0;
+function imgs() {
+  if (Date.now() - imgAt > 300_000) {
+    imgAt = Date.now();
+    try { imgIndex = new Map(fs.readdirSync(IMG_DIR).map((f) => /^([\w-]{1,40})\.(png|jpe?g|webp)$/i.exec(f)).filter(Boolean).map((m) => [m[1], m[0]])); } catch { imgIndex = new Map(); }
+  }
+  return imgIndex;
+}
+const imgUrl = (id) => (imgs().has(id) ? `/img/${encodeURIComponent(id)}` : null);
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" };
 const sendJson = (res, code, data) => res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify(data));
 
@@ -404,13 +416,19 @@ async function appRoutes(req, res, url) {
       customer: { name: customer.name, address: customer.address },
       used: false,
       favs: getAccountsDb().favorites(account.customerId),
-      products: webProducts(customer, catalogNow(), habitualProducts),
+      products: webProducts(customer, catalogNow(), habitualProducts, imgUrl),
       history: webHistory(customer, catalogNow()),
       tree: webTree(catalogNow()),
       delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }),
       today: madridDay(),
       minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }),
     });
+  }
+  if (p.startsWith("/img/") && req.method === "GET") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const file = imgs().get(decodeURIComponent(p.slice(5)));
+    if (!file) return void sendJson(res, 404, { error: "Sin foto" });
+    return void res.writeHead(200, { "Content-Type": IMG_TYPES[file.split(".").pop().toLowerCase()], "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" }).end(fs.readFileSync(IMG_DIR + file));
   }
   if (p === "/catalogo/favorito" && req.method === "POST") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
@@ -441,7 +459,7 @@ async function appRoutes(req, res, url) {
 http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://x");
-    if (url.pathname === "/" || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo")) {
+    if (url.pathname === "/" || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/img/")) {
       appRoutes(req, res, url).catch((err) => {
         console.error(err);
         if (!res.headersSent) res.writeHead(500).end();
