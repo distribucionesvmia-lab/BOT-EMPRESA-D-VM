@@ -13,7 +13,7 @@ a3ERP ──► script de copia ──► carpeta «copias»  (PRIVADA, copias p
 ```
 
 - **Las copias pesadas de a3 nunca las lee el bot.** Se quedan en una carpeta «copias» que **no se comparte con la cuenta de servicio**. El bot solo ve la carpeta «datos», con tres Excel pequeños: así no baja gigas cada 15 minutos y, si alguien entrara en el bot, no tendría acceso a la contabilidad.
-- El **paso de extracción** (en el servidor de la oficina, después de la copia) abre la copia en modo solo lectura y deja esos tres Excel. Se prepara aparte, cuando se conozca el formato de la copia y las tablas de a3.
+- El **paso de extracción** (`bot-whatsapp/extraer-a3erp.js`) abre la copia restaurada en modo solo lectura y deja esos tres Excel. Ya está hecho y probado con la copia real de la empresa `VALENTIN` (ver «Extraer los Excel de una copia de a3ERP» más abajo).
 - Si el bot está en internet, usa la **Opción A** de abajo (cuenta de servicio). La opción B (carpeta local) es para cuando el bot corre en el mismo servidor.
 
 ## Los tres Excel que lee el bot (carpeta «datos»)
@@ -33,6 +33,23 @@ La empresa deja en **una carpeta de Google Drive** los Excel que exporta a3ERP (
 - **Productos:** crea y actualiza (código, descripción, precio, unidades por caja, IVA, descuento, bloqueado/obsoleto). Cada cambio de precio queda en el historial del producto. Los que falten en el fichero **no se borran**.
 - **Protecciones:** un Excel de clientes con menos del 70 % de los clientes que ya hay se **rechaza** (suele ser un fichero a medias). Si un fichero falla, el otro se importa igual y el motivo se ve en la pestaña *Clientes* de la aplicación de la empresa; se reintenta en la siguiente revisión. Un fichero que no ha cambiado no se vuelve a importar.
 - Las columnas se reconocen por su cabecera: clientes («Cód. cliente», «Organización», «Razón social», «Población», «Dirección fiscal», «Teléfono», «E-Mail», «NIF», «Bloqueado», «Obsoleto») y productos («Código», «Descripción», «Precio» y, si las hay, «Uds. por caja», «% IVA», «Dto.», «Categoría» o «Familia», «Subcategoría» o «Subfamilia», «Bloqueado»). **Hay que probarlo con el Excel real de productos de a3ERP**: si alguna columna no se reconoce, el panel lo dirá y se ajusta.
+
+## Extraer los Excel de una copia de a3ERP
+Solo se usa la base de la empresa **VALENTIN** (Valentín Martín Gallego). Las demás bases de la copia (sistema de a3ERP, FAS, OrdersCE, MedinaSuper, ALVAREZ) se ignoran.
+1. Restaurar el `.bak` en un SQL Server (`RESTORE DATABASE … WITH MOVE …`).
+2. `SQLCMD_JSON='["sqlcmd","-S",".","-E","-C"]' node extraer-a3erp.js --db VALENTIN --salida ./salida-datos --meses 12`
+3. Deja `clientes.xlsx`, `productos.xlsx` e `historial-ventas.xlsx`. De dónde sale cada dato en a3ERP:
+   - **Clientes:** `__CLIENTES` + `__ORGANIZACION` (nombre, razón social, población, **código de municipio**, dirección fiscal, teléfonos, correos, NIF, bloqueado/obsoleto).
+   - **Productos:** `ARTICULO`. Precio = `PRCVENTA` (todos los clientes usan la «Tarifa al por mayor»; `TARIFAVE` solo tiene la de venta a domicilio), unidades por caja = `UNIPAQV`, IVA: `ORD21` = 21 %, `RED10` = 10 %, `SRE` = 4 %, descuento = `DESC1`.
+   - **Historial:** líneas de factura de venta (`LINEFACT` + `CABEFACV`) de los últimos 12 meses desde la última factura de la copia, sin abonos.
+4. Los Excel llevan el NIF de los clientes: la carpeta de salida **no se sube a GitHub** (`salida-datos` está en `.gitignore`).
+
+### Cuando llega una copia nueva
+Orden obligatorio: **primero instalar la nueva, luego actualizar la web y solo después borrar la antigua.**
+1. Restaurar la copia nueva con otro nombre (p. ej. `VALENTIN_NUEVA`) **sin tocar** la antigua.
+2. Extraer los tres Excel de la nueva y comprobar que las cifras tienen sentido (clientes, productos y líneas parecidos a los de la copia anterior).
+3. Subirlos a la carpeta «datos» de Drive y esperar a que la web los cargue (o pulsar *Sincronizar ahora* en la aplicación de la empresa); comprobar el resultado en la pestaña *Clientes*.
+4. Solo si la web cargó bien: eliminar la base antigua (`DROP DATABASE`) y el `.bak` antiguo. Si algo falla, la antigua sigue ahí para volver atrás.
 
 ## Opción A · Directo desde Google Drive (cuenta de servicio)
 1. En Drive, crea una carpeta (p. ej. «VM datos») y sube `clientes.xlsx` y `productos.xlsx`. Para actualizar, **sustituye** el fichero (o sube uno nuevo con la fecha en el nombre).
