@@ -742,7 +742,7 @@ function handleMessageInner(session, rawText, ctx = {}) {
           return showCart(s, lead + "Anotado ✅\n\n");
         }
         if (dd.set || dd.notice) return s.cart.length ? showCart(s, lead) : { reply: lead + "Ahora dime qué quieres pedir.", session: s };
-        return showList(s, 0, "No he reconocido ese artículo. Elige de la lista, o escríbelo de otra forma (por ejemplo _\"6 verdejo\"_):");
+        return showList(s, 0, `No he reconocido ese artículo. Elige de la lista, o escríbelo de otra forma (por ejemplo _"6 verdejo"_)${s.cart.length ? `.\n\n🛒 Por ahora tu pedido lleva:\n${itemsText(s.cart)}\n\n` : ":"}`);
       }
       // Cualquier otro texto se toma como el pedido (se conserva tal cual; si dice cuándo lo quiere, además se apunta el día)
       const dd = takeDate(s, rawText, now);

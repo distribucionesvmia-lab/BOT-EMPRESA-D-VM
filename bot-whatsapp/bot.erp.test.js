@@ -331,3 +331,15 @@ test("chat: singular («1 ud», «1 artículo») y dinero con coma como en la we
   assert.doesNotMatch(r.reply, /\d\.\d\d ?€/);
   assert.doesNotMatch(r.reply, /\b1 uds\b/);
 });
+
+test("chat: «No he reconocido ese artículo» recuerda lo que lleva el pedido", () => {
+  const c = conCajas();
+  let r = handleMessage(newSession(c), "5 uds de agua gas");
+  const x = handleMessage(r.session, "blablabla");
+  assert.match(x.reply, /No he reconocido ese artículo/);
+  assert.match(x.reply, /tu pedido lleva/);
+  assert.match(x.reply, /5 × AGUA GAS/);
+  // sin nada en el carrito, el mensaje sigue siendo el de siempre
+  const y = handleMessage(newSession(c), "blablabla");
+  assert.doesNotMatch(y.reply, /tu pedido lleva/);
+});

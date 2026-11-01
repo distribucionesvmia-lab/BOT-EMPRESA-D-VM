@@ -90,3 +90,7 @@ Probado en 320×568 y 360×640 (táctil) en: `/` y `/cliente` (acceso), enlace d
 - F7-1: el paso 3 de la web ya no dice «Al tocarlo se envía tu pedido»; dice «Después podrás revisar el pedido y confirmarlo».
 - F7-2: «1 ud»/«1 uds» y «1 artículo»/«1 artículos» bien en el resumen y el carrito de la web, el mensaje de pedido recibido (web) y el chat (histórico, botones, «última vez»).
 - F8-3: el chat usa coma decimal y espacio como la web («3,30 €» en vez de «3.30€»). 4 tests ajustados al nuevo formato + 1 test nuevo. Tests: 213/213.
+
+### Arreglado: pareja 4 (F4-2 + F4-3)
+- F4-2: «¡Pedido recibido!» incluye ahora «🧾 Tu referencia: *VM-2026-00000N*» en el chat de WhatsApp/demo, en el chat con cuenta, en la mini-app del enlace y en el catálogo con cuenta (verificado: VM-2026-000004 en la web, VM-2026-000005 en el chat).
+- F4-3: «No he reconocido ese artículo» enseña lo que lleva el pedido («Por ahora tu pedido lleva: …») cuando el carrito no está vacío. Test nuevo. Tests: 214/214.
