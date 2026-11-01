@@ -98,3 +98,8 @@ Probado en 320×568 y 360×640 (táctil) en: `/` y `/cliente` (acceso), enlace d
 ### Arreglado: pareja 5 (F6-2 + F6-3)
 - F6-2: la fila del catálogo web muestra el descuento del cliente junto al precio («0,62 € · −5 % dto.»), así la barra del carrito (0,59 €) ya no sorprende.
 - F6-3: el buscador web perdona una errata de una letra en palabras de 5+ letras («cervesa», «cerbeza», «refrezco» encuentran el artículo; «vino» sigue sin falsos positivos; «zzzzz» no encuentra nada). No cubre intercambios de letras («pataats»). Verificado con navegador. Tests: 214/214 (la página no tiene tests de interfaz).
+
+### Arreglado: pareja 6 (F10-1 + F10-2 + F10-3)
+- F10-1: los enlaces `.vm-link` de la portada (p. ej. «Entrar con teléfono y PIN») miden ya ≥ 44 px de alto (antes 29 px). Comprobado a 320 y 360 px: ningún elemento interactivo < 36 px.
+- F10-2 (causa encontrada): la animación `entrar` de las pantallas (`.screen`, posicionadas en absoluto) las desplaza 36 px a la derecha al empezar y ensanchaba la página ~100 ms. Arreglo: `.app { overflow:hidden }` y, con «reducir movimiento», sin animación de entrada. Comprobado con muestreo por fotograma: 0 desbordamientos en ambos modos.
+- F10-3: `empresa.html` y `demo.html` respetan ya `prefers-reduced-motion`. Tests: 214/214.

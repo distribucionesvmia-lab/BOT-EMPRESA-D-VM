@@ -77,8 +77,9 @@
   .big { transition:transform .12s var(--ease), box-shadow .12s, background-color .2s; }
   .cartbtn { transition:transform .14s var(--ease); } .cartbtn:active { transform:scale(.96); }
   #cart.nuevo .card { animation:subir .38s var(--ease) both; animation-delay:calc(var(--i, 0) * 45ms); }
+  @media (prefers-reduced-motion: reduce) { .screen:not([hidden]) { animation:none !important; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-delay:0s !important; transition-duration:.01ms !important; } }
-  .app { width:100%; max-width:none; height:100vh; height:100dvh; background:#fff; display:flex; flex-direction:column; position:relative; }
+  .app { width:100%; max-width:none; height:100vh; height:100dvh; background:#fff; display:flex; flex-direction:column; position:relative; overflow:hidden; }
 
   /* Cabecera roja con el logo */
   header { display:flex; align-items:center; gap:12px; padding:10px 14px; background:var(--rojo); color:#fff; }
