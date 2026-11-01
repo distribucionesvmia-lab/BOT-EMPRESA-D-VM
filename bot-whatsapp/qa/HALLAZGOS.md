@@ -43,3 +43,11 @@ Flujo probado: identificar → lista → artículo → cajas/unidades → cantid
 - F5-2: >999 explica el máximo (999) y ofrece «persona»; «doce» vale; el mensaje genérico dice «entero de 1 a 999».
 - F5-4: el aviso de «cajas o unidades» menciona `menu`.
 - Tests: 210/210. NO tocado: F4-2 (referencia en «Pedido recibido»), F4-3, F5-3.
+
+## Tarea 6 (catálogo web: buscar, añadir, cajas/uds, favorito, total) — funciona; 4 observaciones
+Probado en móvil (390 px) con el enlace del chat (`/pedido/…`) y con `/catalogo` (acceso con 6 últimos del NIF). Sin errores de consola ni respuestas HTTP ≥ 400.
+- OK: «+ Añadir» / «+» / «−» (al llegar a 0 vuelve «+ Añadir» y la barra a «Añade productos para empezar»); Uds↔Cajas (1 caja de agua = 6 uds = 2,52 €); descuento del 5 % de la cerveza bien redondeado (24 × 0,62 − 5 % = 14,14 €); buscador («agua», «vino», sin resultados con mensaje claro); pestañas Histórico/Catálogo con categorías; ♡ favorito se marca, persiste al recargar y se quita.
+- ⚠️ F6-1 (a confirmar, datos) «VINO BLANCO VERDEJO 75 CL (CAJA 6)» sale como «Caja de 6 uds» a 21,00 €: el nombre ya dice «caja 6» y además hay «caja de 6». ¿21 € es por botella o por caja? Si es por caja, «1 caja» costaría 126 €.
+- ⚠️ F6-2 (baja) En la fila la cerveza figura a 0,62 € pero al añadir 1 ud la barra marca 0,59 € (descuento 5 % del cliente); la fila no indica el descuento, solo el carrito.
+- ⚠️ F6-3 (baja) El buscador de la web no tolera erratas («cervesa» → «No hemos encontrado»), mientras que el chat sí («cerbeza»). Inconsistente.
+- ℹ️ El ♡ solo existe en `/catalogo` (con cuenta), no en el enlace del chat (`/pedido`), por diseño (comentario en pedido.html:306).
