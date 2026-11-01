@@ -45,6 +45,18 @@
   .vm .hero img { width:min(260px,70%); height:auto; display:block; margin:0 auto 6px; }
   .vm .hero h1 { margin:6px 0 4px; font-size:clamp(24px,7vw,30px); line-height:1.15; color:#fff; letter-spacing:-.01em; }
   .vm .hero p { margin:0; color:rgba(255,255,255,.9); font-size:15px; }
+  /* Movimiento suave (se desactiva si el sistema pide menos movimiento) */
+  @keyframes vm-sube { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:none; } }
+  @keyframes vm-sacude { 0%,100% { transform:none; } 20% { transform:translateX(-8px); } 40% { transform:translateX(8px); } 60% { transform:translateX(-5px); } 80% { transform:translateX(5px); } }
+  @keyframes vm-pop { from { opacity:0; transform:scale(.92); } to { opacity:1; transform:none; } }
+  .vm > .vm-card, .vm > section.vm-card { animation:vm-sube .5s cubic-bezier(.2,.8,.2,1) both; }
+  .vm > .vm-card:nth-of-type(2) { animation-delay:.08s; } .vm > .vm-card:nth-of-type(3) { animation-delay:.16s; }
+  .vm-modal:not([hidden]) { animation:aparece-vm .2s ease both; } @keyframes aparece-vm { from { opacity:0; } to { opacity:1; } }
+  .vm-modal:not([hidden]) .vm-card { animation:vm-pop .28s cubic-bezier(.34,1.56,.64,1) both; }
+  .vm .err:not(:empty) { animation:vm-sube .25s ease both; }
+  .vm-card.sacude { animation:vm-sacude .4s ease; }
+  .vm-btn { transition:transform .12s cubic-bezier(.2,.8,.2,1), background-color .2s, opacity .2s; } .vm-btn:active { transform:scale(.97); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-delay:0s !important; transition-duration:.01ms !important; } }
   .vm .vm-card { background:#fff; color:var(--ink); border-radius:20px; padding:20px; display:flex; flex-direction:column; gap:12px; box-shadow:0 10px 30px rgba(0,0,0,.22); }
   .vm .vm-card h2 { margin:0; font-size:18px; color:var(--ink); }
   .vm .vm-card p { margin:0; color:var(--mute); font-size:14.5px; line-height:1.45; }
@@ -229,7 +241,7 @@ $("f-acceso").onsubmit = async (e) => {
   const r = await post("/api/acceso", body);
   const j = await r.json().catch(() => ({}));
   if (j.necesitaNombre) { $("l-emp").hidden = false; $("a-emp").focus(); $("a-err").textContent = j.error; return; } // mismo NIF en varios negocios: pide el nombre
-  if (!r.ok) { $("a-err").textContent = j.error || "No se pudo entrar."; $("a-pin").value = ""; $("a-nif").value = ""; return; }
+  if (!r.ok) { const f = $("f-acceso"); f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); $("a-err").textContent = j.error || "No se pudo entrar."; $("a-pin").value = ""; $("a-nif").value = ""; return; }
   $("f-acceso").reset(); entrar(j.cliente.nombre);
 };
 $("cambiar").onclick = () => { $("c-err").textContent = ""; $("c-ok").textContent = ""; $("f-codigo").reset(); $("m-codigo").hidden = false; $("c-nuevo").focus(); };

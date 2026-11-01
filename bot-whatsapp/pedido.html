@@ -49,6 +49,35 @@
   .keepbtn { width:100%; border:0; background:none; color:var(--rojo-o); font-weight:800; font-size:17px; min-height:48px; margin-top:4px; cursor:pointer; }
   .subl { margin:-4px 14px 6px; font-size:15px; color:var(--gris); }
   .subl b { color:var(--texto); }
+  /* ── Movimiento: transiciones cortas y con sentido (se desactivan si el sistema pide menos movimiento) ── */
+  :root { --ease:cubic-bezier(.2,.8,.2,1); --muelle:cubic-bezier(.34,1.56,.64,1); }
+  @keyframes subir { from { opacity:0; transform:translateY(22px); } to { opacity:1; transform:none; } }
+  @keyframes entrar { from { opacity:.6; transform:translateX(36px); } to { opacity:1; transform:none; } }
+  @keyframes aparecer { from { opacity:0; } to { opacity:1; } }
+  @keyframes pop { 0% { transform:scale(1); } 40% { transform:scale(1.16); } 100% { transform:scale(1); } }
+  @keyframes latido { 0% { transform:scale(1); } 30% { transform:scale(1.32); } 60% { transform:scale(.92); } 100% { transform:scale(1); } }
+  @keyframes tic { 0% { transform:scale(.2); opacity:0; } 60% { transform:scale(1.12); opacity:1; } 100% { transform:scale(1); } }
+  @keyframes onda { 0% { box-shadow:0 0 0 0 rgba(11,122,62,.45); } 100% { box-shadow:0 0 0 28px rgba(11,122,62,0); } }
+  .screen:not([hidden]) { animation:entrar .32s var(--ease) both; }
+  #when:not([hidden]), #resumen:not([hidden]) { animation:subir .34s var(--ease) both; }
+  .cal-fondo:not([hidden]) { animation:aparecer .2s ease both; }
+  .cal-fondo:not([hidden]) .cal { animation:subir .3s var(--ease) both; }
+  #toast:not([hidden]) { animation:subir .25s var(--ease) both; }
+  .p.in, .cat.in, .sub.in { animation:subir .38s var(--ease) both; animation-delay:calc(var(--i, 0) * 32ms); }
+  .bump { animation:pop .32s var(--muelle); }
+  .favb.bump { animation:latido .42s var(--muelle); }
+  .pulse { animation:pop .35s var(--muelle); }
+  .ok .tick { animation:tic .6s var(--muelle) both, onda 1.2s .5s ease-out 1; }
+  .ok h2, .ok p { animation:subir .5s .25s var(--ease) both; }
+  .opt, .cat, .sub, .chip, .fil, .tabs button.tab, .keepbtn, .cl .cx, .favb { transition:transform .14s var(--ease), background-color .2s, border-color .2s, color .2s; }
+  .opt:active, .cat:active, .sub:active, .chip:active, .fil:active, .tabs button.tab:active, .keepbtn:active, .cl .cx:active { transform:scale(.97); }
+  .opt:hover, .cat:hover { border-color:var(--rojo); }
+  .step button, .hstep button, .ud button { transition:background-color .15s, color .15s, transform .12s var(--ease); }
+  .step button:active, .hstep button:active { transform:scale(.92); }
+  .big { transition:transform .12s var(--ease), box-shadow .12s, background-color .2s; }
+  .cartbtn { transition:transform .14s var(--ease); } .cartbtn:active { transform:scale(.96); }
+  #cart.nuevo .card { animation:subir .38s var(--ease) both; animation-delay:calc(var(--i, 0) * 45ms); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-delay:0s !important; transition-duration:.01ms !important; } }
   .app { width:100%; max-width:none; height:100vh; height:100dvh; background:#fff; display:flex; flex-direction:column; position:relative; }
 
   /* Cabecera roja con el logo */
@@ -292,7 +321,7 @@ const count = () => lines().length;
 const importe = l => Math.round((uds(l) * l.price * (1 - (l.discount || 0) / 100) + Number.EPSILON) * 100) / 100;
 const total = () => Math.round(lines().reduce((t, l) => t + importe(l), 0) * 100) / 100;
 
-let toastT = 0;
+let toastT = 0, animarLista = true, bumpId = null, bumpFav = null, nPrev0 = 0; // animarLista: solo al cambiar de pestaña, categoría o al cargar; no con cada cambio de cantidad
 function aviso(texto, deshacer) {
   const t = $("toast"); t.innerHTML = ""; t.append(Object.assign(document.createElement("span"), { textContent: texto }));
   if (deshacer) { const b = document.createElement("button"); b.type = "button"; b.textContent = "Deshacer"; b.onclick = () => { t.hidden = true; deshacer(); }; t.appendChild(b); }
@@ -300,6 +329,7 @@ function aviso(texto, deshacer) {
 }
 function setQty(id, n) {
   const antes = qty.get(id) || 0, u = unitOf.get(id), nota = notes.get(id);
+  bumpId = id;
   n = Math.max(0, Math.floor(Number(n) || 0));
   if (n > 999) { n = 999; aviso("La cantidad máxima por artículo es 999."); }
   if (n) qty.set(id, n); else {
@@ -394,15 +424,17 @@ function row(p) {
     const f = document.createElement("button"); f.type = "button"; f.className = "favb"; const on = favs.has(p.id);
     f.textContent = on ? "♥" : "♡"; f.setAttribute("aria-pressed", String(on)); f.setAttribute("aria-label", (on ? "Quitar de favoritos " : "Marcar como favorito ") + p.name);
     f.onclick = () => marcarFav(p.id, !on);
+    if (bumpFav === p.id) f.classList.add("bump");
     const top = document.createElement("div"); top.className = "ntop"; n.replaceWith(top); top.append(n, f);
   }
-  el.append(av, info, control(p));
+  const ctl = control(p); if (bumpId === p.id) ctl.firstElementChild && ctl.classList.add("bump");
+  el.append(av, info, ctl);
   return el;
 }
 
 async function marcarFav(id, on) {
   if (on) favs.add(id); else favs.delete(id);
-  refresh();
+  bumpFav = id; refresh();
   try {
     const r = await fetch("/catalogo/favorito", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, on }) });
     const j = await r.json();
@@ -411,7 +443,7 @@ async function marcarFav(id, on) {
 }
 // Catálogo por categorías (las de la web): categorías → subcategorías → productos. Con el buscador se ve todo junto.
 let nav = { cat: null, sub: null }; // sub: null = elegir subcategoría; "*" = todo lo de la categoría
-const irA = (cat, sub) => { limite = 150; nav = { cat, sub }; $("list").scrollTop = 0; renderList(); };
+const irA = (cat, sub) => { animarLista = true; limite = 150; nav = { cat, sub }; $("list").scrollTop = 0; renderList(); };
 function renderCategorias(list) {
   const g = document.createElement("div"); g.className = "cats";
   for (const c of data.tree) {
@@ -446,6 +478,12 @@ function renderSubs(list, c) {
 const coincide = (p, q) => { const n = norm(p.name); return q.split(/\s+/).every(w => n.includes(w) || p.id.includes(w)); };
 let limite = 150; // productos pintados a la vez; «Mostrar más» amplía
 let soloCantidad = false; // filtro de la pestaña de habituales: ocultar los artículos sin cantidad marcada
+// Entrada escalonada de lo que se ve (solo los primeros 12): se pide al cambiar de vista, no al cambiar una cantidad
+function entrada(list, sel) {
+  if (!animarLista) return;
+  animarLista = false;
+  [...list.querySelectorAll(sel)].slice(0, 12).forEach((e, i) => { e.style.setProperty("--i", i); e.classList.add("in"); });
+}
 function renderList() {
   const list = $("list"); list.innerHTML = "";
   $("filbar").hidden = tab !== "hab";
@@ -456,10 +494,10 @@ function renderList() {
   const arbol = tab === "all" && !q && (data.tree || []).length > 0;
   let cabecera = null;
   if (arbol) {
-    if (!nav.cat) return renderCategorias(list);
+    if (!nav.cat) { renderCategorias(list); return entrada(list, ".cat"); }
     const c = data.tree.find(x => x.id === nav.cat);
     if (!c) { nav = { cat: null, sub: null }; return renderCategorias(list); }
-    if (nav.sub === null) return renderSubs(list, c);
+    if (nav.sub === null) { renderSubs(list, c); return entrada(list, ".sub"); }
     const s = c.subs.find(x => x.id === nav.sub);
     cabecera = () => migas(list, `Catálogo › ${esc(c.nombre)} › <b>${nav.sub === "*" ? "Todo" : esc(s ? s.nombre : "")}</b>`, () => (c.subs.length === 1 ? irA(null, null) : irA(c.id, null)));
   }
@@ -476,6 +514,7 @@ function renderList() {
   }
   if (tab === "hab" && !q) items = [...items.filter(p => favs.has(p.id)), ...items.filter(p => !favs.has(p.id))]; // los favoritos van primero
   items.slice(0, limite).forEach(p => list.appendChild(row(p)));
+  entrada(list, ".p");
   if (items.length > limite) {
     const m = document.createElement("button"); m.type = "button"; m.className = "big sec"; m.style.margin = "12px 14px";
     m.textContent = `Mostrar más (${items.length - limite} restantes)`; m.onclick = () => { limite += 150; renderList(); };
@@ -483,12 +522,21 @@ function renderList() {
   }
 }
 
+// El total «cuenta» hasta el nuevo importe (260 ms)
+let totalMostrado = 0;
+function tween(el, hasta) {
+  const desde = totalMostrado, t0 = performance.now(), dur = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 260;
+  totalMostrado = hasta;
+  if (!dur || desde === hasta) { el.textContent = eur(hasta); return; }
+  const paso = ahora => { const k = Math.min(1, (ahora - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = eur(desde + (hasta - desde) * e); if (k < 1 && totalMostrado === hasta) requestAnimationFrame(paso); };
+  requestAnimationFrame(paso);
+}
 function renderCart() {
   const box = $("cartLines"); box.innerHTML = "";
   const ls = lines(), nUds = ls.reduce((t, l) => t + uds(l), 0);
   $("cartCount").textContent = `${ls.length} artículo${ls.length === 1 ? "" : "s"} · ${nUds} unidad${nUds === 1 ? "" : "es"}`;
   ls.forEach(l => {
-    const card = document.createElement("div"); card.className = "card cl";
+    const card = document.createElement("div"); card.className = "card cl" + (bumpId === l.id ? " nocard" : ""); card.style.setProperty("--i", ls.indexOf(l));
     const av = document.createElement("div"); av.className = "av"; av.style.background = hue(l.name); av.textContent = initials(l.name);
     if (l.img) { const im = document.createElement("img"); im.src = l.img; im.alt = ""; im.onerror = () => im.remove(); av.appendChild(im); }
     const info = document.createElement("div");
@@ -511,6 +559,7 @@ function renderCart() {
     const minus = document.createElement("button"); minus.type = "button"; minus.textContent = "−"; minus.setAttribute("aria-label", "Quitar uno de " + l.name); minus.onclick = () => setQty(l.id, l.qty - 1);
     const inp = document.createElement("input"); inp.type = "number"; inp.inputMode = "numeric"; inp.min = 0; inp.value = l.qty; inp.setAttribute("aria-label", "Cantidad de " + l.name); inp.onchange = () => setQty(l.id, inp.value);
     const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.setAttribute("aria-label", "Añadir uno de " + l.name); plus.onclick = () => setQty(l.id, l.qty + 1);
+    if (bumpId === l.id) st.classList.add("bump");
     st.append(minus, inp, plus); mid.appendChild(st);
     const imp = document.createElement("div"); imp.className = "cimp";
     const ib = document.createElement("b"); ib.textContent = eur(importe(l));
@@ -527,13 +576,15 @@ function renderCart() {
     card.append(av, info, x, mid, ob);
     box.appendChild(card);
   });
-  $("total").textContent = eur(total());
+  tween($("total"), total());
   if (!count()) showCart(false);
 }
 
 function refresh() {
   guardar();
   const n = count();
+  if (n > nPrev0) { for (const el of [$("cnt"), $("verCarrito")]) { el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse"); } }
+  nPrev0 = n;
   $("cnt").textContent = n;
   $("verCarrito").textContent = n ? `🛒 Ver carrito · ${n} artículo${n === 1 ? "" : "s"} · ${eur(total())}` : "Añade productos para empezar";
   $("guia").innerHTML = n ? `✔ Llevas <b>${n} artículo${n === 1 ? "" : "s"}</b>. Cuando termines, pulsa el botón rojo de abajo.` : "Toca <b>«+ Añadir»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.";
@@ -541,11 +592,12 @@ function refresh() {
   const scroll = $("list").scrollTop;
   renderList(); $("list").scrollTop = scroll;
   if (!$("cart").hidden) renderCart();
+  bumpId = null; bumpFav = null;
 }
-function showCart(on) { $("cart").hidden = !on; if (on) { $("err").textContent = ""; renderCart(); } }
+function showCart(on) { $("cart").hidden = !on; $("cart").classList.toggle("nuevo", on); if (on) { $("err").textContent = ""; renderCart(); setTimeout(() => $("cart").classList.remove("nuevo"), 900); } }
 
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
-  tab = b.dataset.t; limite = 150;
+  tab = b.dataset.t; limite = 150; animarLista = true;
   if (tab === "all") { nav = { cat: null, sub: null }; $("list").scrollTop = 0; } // «Catálogo» siempre empieza por las categorías
   document.querySelectorAll(".tab").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
   renderList();
