@@ -306,3 +306,20 @@ test("chat: cantidades negativas, cero, enormes y escritas con letra", () => {
   assert.match(handleMessage(r.session, "abc").reply, /entero de 1 a 999/);
   assert.match(handleMessage(r.session, "doce").reply, /12 ×|× AGUA/);
 });
+
+test("chat: en «Revisa tu pedido», un texto que no se entiende NO borra las líneas del pedido", () => {
+  const c = conCajas();
+  let r = handleMessage(newSession(c), "5 uds de agua gas");
+  r = handleMessage(r.session, "act:done");
+  assert.equal(r.session.state, "confirm");
+  const antes = JSON.stringify(r.session.items ?? r.session.cart);
+  for (const t of ["ultimo", "que pedí la última vez", "mi historial"]) {
+    const x = handleMessage(r.session, t);
+    assert.match(x.reply, /No he entendido eso/, t);
+    assert.match(x.reply, /5 × AGUA GAS/, t); // las líneas siguen ahí
+    assert.equal(JSON.stringify(x.session.items ?? x.session.cart), antes, t);
+  }
+  // y sigue pudiendo cambiar cantidades escribiendo
+  const y = handleMessage(r.session, "7 uds de agua gas");
+  assert.match(y.reply, /7 × AGUA GAS/);
+});

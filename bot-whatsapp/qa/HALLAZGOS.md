@@ -81,3 +81,7 @@ Probado en 320×568 y 360×640 (táctil) en: `/` y `/cliente` (acceso), enlace d
 ### Arreglado: pareja 1 (F9-1 + F9-2)
 - F9-1: el límite de intentos de la clave de empresa cuenta cada clave distinta una sola vez (las 7 peticiones del panel con la misma clave = 1 intento) y no cuenta las peticiones sin clave. Dos claves erróneas seguidas ya no bloquean: la correcta entra. Adivinar con 10 claves distintas sigue bloqueando (test existente). Test nuevo en server.test.js. 
 - F9-2: si el servidor responde 429, el login muestra «Demasiados intentos con una clave errónea. Espera unos minutos…» en lugar de «Sin conexión con el servidor».
+
+### Arreglado: pareja 2 (F8-1 + F8-2)
+- F8-1: el chat de WhatsApp/demo (cliente por teléfono y por nombre) ya suma los pedidos hechos por el bot o la app (`withOwnOrders` en `handleIncoming` y en el buscador): «último pedido», «histórico» y «repetir» enseñan ya el pedido más reciente. Verificado contra la demo (01/11/2026 en vez de 20/10).
+- F8-2: en «Revisa tu pedido», un texto que no se entiende responde «No he entendido eso… Tu pedido sigue igual» y conserva las líneas; ya no se puede confirmar un pedido vacío por accidente. Test nuevo. Tests: 212/212.

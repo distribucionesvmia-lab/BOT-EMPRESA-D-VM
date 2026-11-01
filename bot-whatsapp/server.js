@@ -55,7 +55,9 @@ const hasCredentials = () => WHATSAPP_TOKEN && PHONE_NUMBER_ID;
 // Enlace personal (caduca en 24 h) para abrir el catálogo de pedido del cliente
 const linkFor = (customer, phone, flags = {}) => `${PUBLIC_URL}/pedido/${makeToken(phone, customer.id, Date.now(), flags)}`;
 const digits9 = (p) => String(p ?? "").replace(/\D/g, "").slice(-9);
-setCustomerFinder((query) => findCustomers(query));
+// El cliente del chat de WhatsApp lleva su historial de a3ERP MÁS lo que ha pedido por el bot o la app (para «último pedido», «histórico» y «repetir»)
+const conSusPedidos = (c) => (c ? withOwnOrders(c, getDb().ordersOf(c.id)) : c);
+setCustomerFinder((query) => (findCustomers(query) ?? []).map(conSusPedidos));
 // Quien se identifica por nombre desde un teléfono que no es el del cliente: su pedido de la mini-app queda retenido
 setLinkMaker((customer, session) =>
   linkFor(customer, session.opts?.phone ?? "", session.opts?.holdUnverified && digits9(session.opts?.phone) !== digits9(customer.phone) ? { u: 1 } : {}),
@@ -102,7 +104,7 @@ async function handleIncoming(from, text, msgId = null) {
   if (!current) {
     let customer = null;
     try {
-      customer = await getCustomerByPhone(from);
+      customer = conSusPedidos(await getCustomerByPhone(from));
     } catch (err) {
       console.error("No se pudo consultar la base de clientes; se pregunta quién es:", err.message);
     }

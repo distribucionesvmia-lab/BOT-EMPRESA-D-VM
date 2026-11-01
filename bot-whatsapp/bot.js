@@ -800,13 +800,19 @@ function handleMessageInner(session, rawText, ctx = {}) {
         // Cliente conocido que cambia cantidades o el día: se rehace el pedido con lo que escribe
         const dd = takeDate(s, rawText, now);
         const found = parseItems(dd.rest, s.customer);
+        let unknown = "";
         if (found.length) setCart(s, found);
         else if (!dd.set && !dd.notice) {
-          s.orderText = rawText.trim().slice(0, 500);
-          s.items = null;
+          if (getItems(s).length) {
+            // No lo he entendido: el pedido se queda como estaba (antes se borraban las líneas y se enviaba un pedido vacío)
+            unknown = "No he entendido eso 🤔. Tu pedido sigue igual. Escribe los cambios (por ejemplo _\"6 verdejo\"_), pulsa *Confirmar* o *Cancelar*, o escribe *menu* para volver al inicio.\n\n";
+          } else {
+            s.orderText = rawText.trim().slice(0, 500);
+            s.items = null;
+          }
         }
         const c = confirmReply(s);
-        return { ...c, reply: (dd.notice ? dd.notice + "\n\n" : "") + c.reply, session: s };
+        return { ...c, reply: unknown + (dd.notice ? dd.notice + "\n\n" : "") + c.reply, session: s };
       }
       return { reply: "Escribe *1* para confirmar o *2* para cancelar.", session: s };
     }
