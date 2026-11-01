@@ -64,6 +64,7 @@
   .step button:active { background:#ffd9d9; }
   .step input { width:100%; min-width:0; height:50px; border:0; text-align:center; font-size:24px; font-weight:800; outline:none; -moz-appearance:textfield; }
   .step input::-webkit-outer-spin-button, .step input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  @media (max-width:480px) { .p { gap:10px; padding:12px 10px; } .av { width:64px; height:64px; font-size:22px; border-radius:14px; } .ctl { width:112px; } .info .n { font-size:17px; } }
   .ud { display:flex; border:2px solid var(--linea); border-radius:12px; overflow:hidden; }
   .ud button { flex:1; border:0; background:#fff; min-height:44px; padding:0 4px; font-size:15px; cursor:pointer; color:var(--gris); font-weight:700; }
   .ud button.on { background:var(--rojo); color:#fff; }
@@ -81,7 +82,9 @@
   .sub:hover, .sub:focus-visible { border-color:var(--rojo); background:var(--rojo-s); outline:none; }
   .sub small { color:var(--gris); font-size:15px; font-weight:400; white-space:nowrap; }
   .sub.todo { background:var(--rojo-s); border-color:var(--rojo); color:var(--rojo-o); }
-  .favb { border:0; background:none; font-size:28px; line-height:1; min-width:48px; min-height:48px; cursor:pointer; color:#b9b9bd; flex:none; }
+  .ntop { display:flex; align-items:flex-start; gap:4px; }
+  .ntop .n { flex:1; min-width:0; }
+  .favb { border:0; background:none; font-size:28px; line-height:1; min-width:44px; min-height:44px; margin:-8px -8px 0 0; cursor:pointer; color:#b9b9bd; flex:none; }
   .favb[aria-pressed="true"] { color:var(--rojo); }
   .repbar { margin:0 14px 10px; }
   .repbar button { width:100%; min-height:52px; border:2px dashed var(--rojo); background:var(--rojo-s); color:var(--rojo-o); font-weight:800; font-size:17px; border-radius:14px; cursor:pointer; }
@@ -343,14 +346,14 @@ function row(p) {
   }
   if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " uds" + (unit(p.id) === "caja" && qty.get(p.id) ? " → " + qty.get(p.id) * p.unitsPerBox + " uds" : "");
   info.append(n, c, pr);
-  el.append(av, info);
+  // Columnas: foto · datos (nombre con el corazón de favorito) · Uds/Cajas y «Añadir» siempre a la derecha
   if (data.favs) {
     const f = document.createElement("button"); f.type = "button"; f.className = "favb"; const on = favs.has(p.id);
     f.textContent = on ? "♥" : "♡"; f.setAttribute("aria-pressed", String(on)); f.setAttribute("aria-label", (on ? "Quitar de favoritos " : "Marcar como favorito ") + p.name);
     f.onclick = () => marcarFav(p.id, !on);
-    el.appendChild(f);
+    const top = document.createElement("div"); top.className = "ntop"; n.replaceWith(top); top.append(n, f);
   }
-  el.append(control(p));
+  el.append(av, info, control(p));
   return el;
 }
 
