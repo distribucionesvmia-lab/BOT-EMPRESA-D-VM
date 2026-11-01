@@ -215,6 +215,24 @@ test("identificación: nombre desconocido, reintentos y derivación a una person
   r = handleMessage(r.session, "Tampoco");
   assert.equal(r.handoff, true);
   assert.match(r.reply, /No consigo identificarte/);
+  // Tras avisar a una persona, no se sigue pidiendo el nombre
+  r = handleMessage(r.session, "xx");
+  assert.match(r.reply, /Ya hemos avisado a una persona/);
+  assert.doesNotMatch(r.reply, /No encuentro ese nombre/);
+  assert.notEqual(r.handoff, true); // no se avisa dos veces
+  // «menu» permite volver a intentarlo
+  r = handleMessage(r.session, "menu");
+  assert.match(r.reply, /nombre de tu negocio/);
+});
+
+test("identificación: un nombre demasiado general («bar») se explica y no cuenta como intento", () => {
+  let r = handleMessage(conIdentificacion(), "bar");
+  assert.match(r.reply, /demasiado general/);
+  for (const t of ["Bar", "cafetería", "el bar", "S.L."]) r = handleMessage(r.session, t);
+  assert.equal(r.session.attempts, 0);
+  assert.notEqual(r.handoff, true);
+  r = handleMessage(r.session, "Bar El Ejemplo"); // el nombre completo sigue funcionando
+  assert.match(r.reply, /Identificado/);
 });
 
 test("identificación: si varios encajan, pide el código y solo vale el de uno de ellos", () => {
@@ -230,6 +248,8 @@ test("identificación: si varios encajan, pide el código y solo vale el de uno 
 test("identificación: «nuevo» sigue el flujo de cliente nuevo y no vuelve a preguntar", () => {
   let r = handleMessage(conIdentificacion(), "nuevo");
   assert.match(r.reply, /Bienvenido/);
+  assert.match(r.reply, /cliente nuevo, avisamos a una persona/);
+  assert.equal(r.handoff, true); // la empresa se entera para darle de alta
   r = handleMessage(r.session, "hola");
   assert.match(r.reply, /Bienvenido/);
 });

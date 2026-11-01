@@ -1,5 +1,6 @@
 import { BUSINESS, PRODUCTS } from "./config.js";
 import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRows, isYes, isNo, isDone, parseRemove, parseChangeQty, lev } from "./nlu.js";
+import { isTooGeneric } from "./identify.js";
 import { deliveryAllowed, longDate, puedeHoy } from "./delivery.js";
 
 const money = (n) => `${n.toFixed(2)}${BUSINESS.currency}`;
@@ -417,6 +418,9 @@ const findLines = (lines, query) => {
   return lines.filter((i) => q.length && q.every((w) => tokensOf(i).some((t) => wordMatch(w, t))));
 };
 
+const NEW_CUSTOMER_NOTE =
+  "👋 ¡Bienvenido! Como eres cliente nuevo, avisamos a una persona del equipo para darte de alta. Mientras tanto puedes ver productos y dejar tu pedido: lo revisaremos antes de prepararlo.";
+
 const HUMAN_REPLY =
   "👤 Avisamos a una persona del equipo, te responderá en cuanto pueda. Mientras tanto, escribe *menu* si necesitas algo más.";
 
@@ -508,18 +512,33 @@ export function handleMessage(session, rawText, ctx = {}) {
     return askDelivery(s, now, notice || "No he entendido el día 🤔.\n\n");
   }
 
+  // Ya se avisó a una persona del equipo: no se vuelve a pedir el nombre, se espera o se reinicia con «menu»
+  if (s.state === "derivado" && text) {
+    return { reply: "👤 Ya hemos avisado a una persona del equipo, te responderá en cuanto pueda. Si quieres volver a intentarlo, escribe *menu*.", session: s };
+  }
+
   // Identificación: el cliente dice quién es y se busca en la base de datos de clientes
   if ((s.state === "who" || s.state === "who2") && text) {
     if (text === "nuevo") {
       s.opts = { ...s.opts, identify: false };
       s.state = "menu";
-      return { ...greeting(s), session: s };
+      // Avisamos a la empresa para que lo dé de alta; mientras, puede ver productos y pedir (su pedido queda por revisar)
+      return {
+        ...greeting(s),
+        reply: `${NEW_CUSTOMER_NOTE}\n\n${greeting(s).reply}`,
+        session: s,
+        handoff: true,
+      };
+    }
+    if (s.state === "who" && isTooGeneric(rawText)) {
+      // «bar», «cafetería»…: no es un nombre. Se pide completo y no cuenta como intento fallido
+      return { reply: `«${String(rawText).trim().slice(0, 40)}» es demasiado general 🙂. Escribe el *nombre completo* de tu negocio tal y como nos compras (por ejemplo: _Bar El Ejemplo_) o tu *código de cliente*.`, session: s };
     }
     const fail = (msg) => {
       s.attempts = (s.attempts ?? 0) + 1;
       if (s.attempts >= MAX_ATTEMPTS) {
         s.attempts = 0;
-        s.state = "who";
+        s.state = "derivado"; // ya está avisada una persona: no seguimos pidiendo el nombre
         s.candidates = null;
         return { reply: `No consigo identificarte 😕. Aviso a una persona del equipo para que te atienda.\n\n${HUMAN_REPLY}`, session: s, handoff: true };
       }
