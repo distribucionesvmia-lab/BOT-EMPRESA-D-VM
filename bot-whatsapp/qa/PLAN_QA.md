@@ -8,7 +8,7 @@ Un clic/tarea cada 20 minutos. Estado: [ ] pendiente · [x] hecha · cada hallaz
 4. [x] Hacer pedido por el chat (botones/lista, cajas o unidades, notas)
 5. [x] Casos raros en el chat: cantidad 0, negativa, 99999, texto largo, emojis
 6. [x] Catálogo web /catalogo: buscar, añadir, cajas/uds, favorito, total
-7. [ ] Revisar y enviar pedido; doble clic (¿duplica?)
+7. [x] Revisar y enviar pedido; doble clic (¿duplica?)
 8. [ ] «último pedido» e «histórico»
 9. [ ] Panel empresa /distribuidor y exportación a Excel
 10. [ ] Móvil (viewport pequeño) y «reducir movimiento»

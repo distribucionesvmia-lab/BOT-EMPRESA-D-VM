@@ -51,3 +51,9 @@ Probado en móvil (390 px) con el enlace del chat (`/pedido/…`) y con `/catalo
 - ⚠️ F6-2 (baja) En la fila la cerveza figura a 0,62 € pero al añadir 1 ud la barra marca 0,59 € (descuento 5 % del cliente); la fila no indica el descuento, solo el carrito.
 - ⚠️ F6-3 (baja) El buscador de la web no tolera erratas («cervesa» → «No hemos encontrado»), mientras que el chat sí («cerbeza»). Inconsistente.
 - ℹ️ El ♡ solo existe en `/catalogo` (con cuenta), no en el enlace del chat (`/pedido`), por diseño (comentario en pedido.html:306).
+
+## Tarea 7 (revisar y enviar pedido, doble clic) — sin duplicados; 2 observaciones de textos
+Recorrido: añadir 2 artículos → «Ver carrito» (paso 2) → «Elegir el día de entrega» (paso 3) → día «Mañana» → «Confirma tu pedido» → «✓ Confirmar y enviar pedido».
+- OK (lo importante): **doble clic rápido en «Confirmar y enviar» = 1 solo POST y 1 solo pedido** (VM-2026-000002, 21,42 €, entrega 2026-11-02). 3 POST directos simultáneos tras enviar → los 3 responden 409 «Este pedido ya se envió». Reabrir el enlace gastado muestra «Este pedido ya se envió · Vuelve al chat para hacer otro pedido». Total del resumen = total guardado. Sin errores de consola ni HTTP ≥ 400.
+- ⚠️ F7-1 (media, textos) El paso 3 dice «Toca el día de entrega. **Al tocarlo se envía tu pedido.**» (pedido.html:269), pero al tocar el día se abre otra pantalla «Confirma tu pedido» y el pedido NO se envía hasta pulsar «Confirmar y enviar». El texto es falso y puede hacer creer al cliente que ya ha enviado.
+- ⚠️ F7-2 (baja, gramática) «1 uds · AGUA MINERAL…» en el resumen y «1 artículos, total aprox.» en el mensaje de confirmación: falta el singular.
