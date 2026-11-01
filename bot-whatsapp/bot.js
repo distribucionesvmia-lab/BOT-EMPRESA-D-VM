@@ -571,7 +571,7 @@ function handleMessageInner(session, rawText, ctx = {}) {
       s.state = "who2";
       return { reply: "Hay varios clientes con un nombre parecido. Para distinguirte, escribe tu *código de cliente*.", session: s };
     } else if (!found.length) {
-      return fail("No encuentro ese nombre 🤔. Escríbelo otra vez como figura en tus facturas, o escribe tu código de cliente. Si eres cliente nuevo, escribe *nuevo*.");
+      return fail("No encuentro ese nombre 🤔. Escríbelo otra vez como figura en tus facturas, con todas sus palabras (por ejemplo _Bar El Ejemplo_ mejor que solo _Ejemplo_), o escribe tu código de cliente. Si eres cliente nuevo, escribe *nuevo*.");
     } else hit = found[0];
     // Quien se identifica solo por el nombre desde un teléfono que no es el del cliente NO ve su histórico, precios ni dirección:
     // sus pedidos quedan retenidos y los revisa una persona
@@ -725,6 +725,8 @@ function handleMessageInner(session, rawText, ctx = {}) {
       if (s.customer) {
         // Cliente conocido que escribe lo que quiere: se suma al pedido (y, si dice cuándo lo quiere, se apunta el día)
         if (/(?:^|[\s,;+])-\s*\d/.test(rawText)) return { reply: "Las cantidades no pueden ser negativas. Escribe, por ejemplo, _\"3 aguas\"_; para quitar algo usa *Vaciar pedido* o *Cambiar*.", session: s };
+        // Un número suelto («1.5», «5»): no es un artículo (antes «1.5» se tomaba por «AGUA MINERAL 1,5 L»)
+        if (/^\s*\d+(?:[.,]\d+)?\s*$/.test(rawText) && !/^q:/.test(text)) return { reply: "Me falta el artículo 🙂. Escribe la cantidad y lo que quieres, por ejemplo _\"6 aguas\"_ o _\"2 cajas de cerveza\"_. Las cantidades son números enteros.", session: s };
         if (/(?:^|[\s,;+y])0+\s+[a-zñ]/i.test(norm(rawText))) return { reply: "La cantidad tiene que ser mayor que 0. Escribe, por ejemplo, _\"3 aguas\"_.", session: s };
         const dd = takeDate(s, rawText, now);
         const found = parseItems(dd.rest, s.customer);

@@ -103,3 +103,9 @@ Probado en 320×568 y 360×640 (táctil) en: `/` y `/cliente` (acceso), enlace d
 - F10-1: los enlaces `.vm-link` de la portada (p. ej. «Entrar con teléfono y PIN») miden ya ≥ 44 px de alto (antes 29 px). Comprobado a 320 y 360 px: ningún elemento interactivo < 36 px.
 - F10-2 (causa encontrada): la animación `entrar` de las pantallas (`.screen`, posicionadas en absoluto) las desplaza 36 px a la derecha al empezar y ensanchaba la página ~100 ms. Arreglo: `.app { overflow:hidden }` y, con «reducir movimiento», sin animación de entrada. Comprobado con muestreo por fotograma: 0 desbordamientos en ambos modos.
 - F10-3: `empresa.html` y `demo.html` respetan ya `prefers-reduced-motion`. Tests: 214/214.
+
+### Arreglado: pareja 7 (F5-3 + F3-2) — fin de los arreglos
+- F5-3: un número suelto («1.5», «1,5», «5») ya no se toma por un artículo: «Me falta el artículo… Las cantidades son números enteros». «0 aguas» ya decía «La cantidad tiene que ser mayor que 0» (arreglado en la tarea 5).
+- F3-2: «ejemplo» → «No encuentro ese nombre… con todas sus palabras (por ejemplo Bar El Ejemplo mejor que solo Ejemplo)».
+- Tests: 216/216.
+- Pendiente: F6-1 (vino «(CAJA 6)» a 21 €: ¿precio por botella o por caja?), espera la respuesta del usuario.

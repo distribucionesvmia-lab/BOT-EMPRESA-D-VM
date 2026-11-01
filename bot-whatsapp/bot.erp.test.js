@@ -343,3 +343,21 @@ test("chat: «No he reconocido ese artículo» recuerda lo que lleva el pedido",
   const y = handleMessage(newSession(c), "blablabla");
   assert.doesNotMatch(y.reply, /tu pedido lleva/);
 });
+
+test("chat: un número suelto no se toma por un artículo («1.5» ≠ AGUA 1,5 L) y «0 aguas» explica el motivo", () => {
+  const c = conCajas();
+  for (const t of ["1.5", "1,5", "5"]) {
+    const r = handleMessage(newSession(c), t);
+    assert.match(r.reply, /Me falta el artículo/, t);
+    assert.deepEqual(r.session.cart, [], t);
+  }
+  assert.match(handleMessage(newSession(c), "0 agua gas").reply, /mayor que 0/);
+});
+
+test("identificación: si escribe solo una palabra del nombre, se le sugiere el nombre completo", () => {
+  let r = handleMessage(conIdentificacion(), "ejemplo");
+  assert.match(r.reply, /No encuentro ese nombre/);
+  assert.match(r.reply, /con todas sus palabras/);
+  r = handleMessage(r.session, "Bar El Ejemplo");
+  assert.match(r.reply, /Identificado/);
+});
