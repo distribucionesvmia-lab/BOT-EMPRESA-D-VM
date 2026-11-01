@@ -250,22 +250,18 @@
   #c-chat #chat .pill { background:#fff; color:#a80000; border:2px solid #f2c9c9; box-shadow:none; font-weight:700; min-height:50px; border-radius:14px; transition:transform .12s, background .2s, border-color .2s; }
   #c-chat #chat .pill:hover { background:#fff1f1; border-color:#d90000; } #chat .pill:active { transform:scale(.97); }
   #c-chat #chat .pill.primary { background:linear-gradient(135deg,#e60000,#b80000); color:#fff; border:0; box-shadow:0 6px 16px rgba(190,0,0,.35); }
-  /* Tarjeta de inicio */
-  #c-chat .vm-inicio { background:#fff; border-radius:22px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,.1); align-self:stretch; max-width:520px; animation:vm-sube .45s cubic-bezier(.2,.8,.2,1) both; }
-  #c-chat .vm-inicio .h-hero { background:linear-gradient(135deg,#e60000 0%,#a80000 100%); color:#fff; padding:18px 18px 32px; }
-  #c-chat .vm-inicio .h-hero b { display:block; font-size:21px; letter-spacing:-.01em; } .vm-inicio .h-hero small { opacity:.92; font-size:14.5px; }
-  #c-chat .vm-inicio .h-cta { border:0; font-family:inherit; width:calc(100% - 28px); cursor:pointer; text-align:left; display:flex; align-items:center; justify-content:space-between; gap:10px; margin:-16px 14px 0; background:#fff; color:#a80000; border-radius:16px; padding:16px 18px; text-decoration:none; font-weight:800; font-size:19px; box-shadow:0 8px 22px rgba(0,0,0,.18); position:relative; transition:transform .12s; }
-  #c-chat .vm-inicio .h-cta:active { transform:scale(.98); } .vm-inicio .h-cta span { font-size:14px; color:#5f6368; font-weight:600; }
-  #c-chat .vm-inicio .h-last { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:14px 14px 0; padding:12px 14px; border:2px dashed #f0b9b9; border-radius:14px; background:#fff8f8; }
-  #c-chat .vm-inicio .h-last small { display:block; color:#5f6368; font-size:13px; } .vm-inicio .h-last b { font-size:16px; }
-  #c-chat .vm-inicio .h-last button { border:0; background:#d90000; color:#fff; font:inherit; font-weight:800; border-radius:12px; padding:0 16px; min-height:46px; cursor:pointer; box-shadow:0 3px 0 #a80000; flex:none; }
-  #c-chat .vm-inicio .h-last button:active { transform:translateY(2px); box-shadow:none; }
-  #c-chat .vm-inicio .h-top3 { padding:14px 14px 16px; } .vm-inicio .h-top3 small { display:block; color:#5f6368; font-size:13px; margin-bottom:8px; font-weight:600; }
-  #c-chat .vm-inicio .chips { display:flex; flex-wrap:wrap; gap:8px; } .vm-inicio .chips span { background:#f3f4f6; border-radius:999px; padding:7px 12px; font-size:13.5px; color:#1d1d1f; }
+  /* Inicio: dos filas sencillas, cada una con su botón a la derecha */
+  #c-chat .vm-inicio { background:#fff; border-radius:18px; box-shadow:0 2px 10px rgba(0,0,0,.08); animation:vm-sube .4s cubic-bezier(.2,.8,.2,1) both; align-self:stretch; max-width:520px; }
+  #c-chat .vm-inicio .fila { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; }
+  #c-chat .vm-inicio .fila + .fila { border-top:1px solid #eceef0; }
+  #c-chat .vm-inicio .fila small { display:block; color:#5f6368; font-size:13px; }
+  #c-chat .vm-inicio .fila b { font-size:16.5px; display:block; }
+  #c-chat .vm-inicio .fila button { border:0; background:#d90000; color:#fff; font:inherit; font-weight:800; font-size:16px; border-radius:12px; padding:0 18px; min-height:48px; cursor:pointer; box-shadow:0 3px 0 #a80000; flex:none; transition:transform .1s; }
+  #c-chat .vm-inicio .fila button:active { transform:translateY(2px); box-shadow:none; }
   /* Atajos fijos sobre el cuadro de texto */
-  #c-chat .quick { display:flex; gap:8px; overflow-x:auto; padding:10px 12px 2px; background:#fff; border-top:1px solid #e7e8ea; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+  #c-chat .quick { display:flex; gap:6px; overflow-x:auto; padding:10px 12px 2px; background:#fff; border-top:1px solid #e7e8ea; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
   #c-chat .quick::-webkit-scrollbar { display:none; }
-  #c-chat .quick button { flex:none; border:2px solid #f0c4c4; background:#fff; color:#a80000; font:inherit; font-weight:700; font-size:14.5px; border-radius:999px; padding:0 14px; min-height:42px; cursor:pointer; white-space:nowrap; transition:transform .12s, background .2s; }
+  #c-chat .quick button { flex:none; border:2px solid #f0c4c4; background:#fff; color:#a80000; font:inherit; font-weight:700; font-size:14px; border-radius:999px; padding:0 11px; min-height:42px; cursor:pointer; white-space:nowrap; transition:transform .12s, background .2s; }
   #c-chat .quick button:active { transform:scale(.96); } .quick button:hover { background:#fff1f1; }
   #c-chat .quick button.main { background:linear-gradient(135deg,#e60000,#b80000); color:#fff; border-color:transparent; box-shadow:0 3px 10px rgba(190,0,0,.3); }
   #c-chat form.send { background:#fff !important; border-top:0 !important; }
@@ -378,11 +374,10 @@
           <div id="sheet" class="sheet" hidden></div>
           <div id="web" class="web" hidden></div>
           <nav class="quick" id="quick" aria-label="Atajos">
-            <button type="button" data-q="hacer pedido" class="main">🛒 Hacer pedido</button>
-            <button type="button" data-q="último pedido">🧾 Último pedido</button>
-            <button type="button" data-q="histórico">📜 Histórico</button>
-            <button type="button" data-q="repite el último pedido">↻ Repetir</button>
-            <button type="button" data-q="persona">🙋 Hablar con una persona</button>
+            <button type="button" data-q="hacer pedido" class="main">Hacer pedido</button>
+            <button type="button" data-q="último pedido">Último pedido</button>
+            <button type="button" data-q="histórico">Histórico</button>
+            <button type="button" data-q="repite el último pedido">Repetir</button>
           </nav>
           <form class="send" id="f"><input id="t" autocomplete="off" placeholder="Escribe un mensaje" aria-label="Mensaje"><button aria-label="Enviar">➤</button></form>
         </div>
@@ -543,7 +538,7 @@ function avisos() {
   if (!bar || !span) return;
   const m = document.createElement("div"); m.className = "bmenu";
   m.innerHTML = '<button type="button" id="mbtn" aria-label="Menú" aria-expanded="false" aria-controls="mpop">⋮</button><div class="mpop" id="mpop" hidden></div>';
-  $("cambiar").textContent = "🔑 Cambiar PIN"; $("salir").textContent = "↩ Salir";
+  $("cambiar").textContent = "Cambiar PIN"; $("salir").textContent = "Salir";
   m.querySelector("#mpop").append($("cambiar"), $("salir")); bar.appendChild(m); span.remove();
   const mbtn = m.querySelector("#mbtn"), mpop = m.querySelector("#mpop");
   const menu = (abrir) => { mpop.hidden = !abrir; mbtn.setAttribute("aria-expanded", String(abrir)); };
@@ -602,7 +597,7 @@ function burbuja(texto, clase) {
   if (clase === "in") { const av = document.createElement("div"); av.className = "av"; av.textContent = "VM"; av.setAttribute("aria-hidden", "true"); fila.appendChild(av); }
   const d = document.createElement("div"); d.className = "m " + clase;
   const esc = texto.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-  d.innerHTML = esc.replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/_([^_\n]+)_/g, "<i>$1</i>");
+  d.innerHTML = sinEmoji(esc).replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/_([^_\n]+)_/g, "<i>$1</i>");
   const t = document.createElement("time"); t.textContent = hora(); d.appendChild(t);
   fila.appendChild(d); chat.appendChild(fila); chat.scrollTop = chat.scrollHeight;
 }
@@ -631,7 +626,7 @@ function enviar(texto, etiqueta, silencioso) {
 function tarjetaTabla(card) {
   const c = document.createElement("div"); c.className = "tcard";
   const h = document.createElement("div"); h.className = "t-head"; h.innerHTML = "<b></b><span></span>";
-  h.firstChild.textContent = "🧾 " + card.titulo; h.lastChild.textContent = card.subtitulo || "";
+  h.firstChild.textContent = card.titulo; h.lastChild.textContent = card.subtitulo || "";
   const t = document.createElement("table"); t.setAttribute("aria-label", card.titulo);
   const th = t.createTHead().insertRow();
   [["Cant.", "c-cant"], ["Producto", ""], ["Importe", "c-imp"]].forEach(([x, k]) => { const e = document.createElement("th"); e.scope = "col"; e.textContent = x; if (k) e.className = k; th.appendChild(e); });
@@ -640,34 +635,28 @@ function tarjetaTabla(card) {
   const ft = t.createTFoot().insertRow(); const a = ft.insertCell(); a.colSpan = 2; a.textContent = "Total"; const b = ft.insertCell(); b.className = "c-imp"; b.textContent = eur(card.total);
   c.append(h, t); chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
 }
-// Tarjeta de inicio: botón grande para pedir, el último pedido en un toque y lo que más pide
+// Inicio: «Hacer pedido» y «Repetir el último», cada uno en su fila con su botón
 function inicio(ui) {
   const c = document.createElement("div"); c.className = "vm-inicio";
-  const h = document.createElement("div"); h.className = "h-hero"; h.innerHTML = "<b>¿Qué necesitas hoy?</b><small>Haz tu pedido en un momento</small>";
-  const cta = document.createElement("button"); cta.type = "button"; cta.className = "h-cta"; cta.innerHTML = "<div>🛒 Hacer pedido</div><span>Abrir catálogo →</span>"; cta.onclick = abrirMini;
-  c.append(h, cta);
-  if (ui.last) {
-    const l = document.createElement("div"); l.className = "h-last";
-    const t = document.createElement("div"); t.innerHTML = "<small>Tu último pedido · " + ui.last.date + "</small>";
-    const b = document.createElement("b"); b.textContent = ui.last.articulos + (ui.last.articulos === 1 ? " artículo" : " artículos") + " · " + eur(ui.last.total); t.appendChild(b);
-    const r = document.createElement("button"); r.type = "button"; r.textContent = "↻ Repetir"; r.onclick = () => enviar("h:repeat1", "Repetir mi último pedido");
-    l.append(t, r); c.appendChild(l);
-  }
-  if (ui.top?.length) {
-    const t = document.createElement("div"); t.className = "h-top3"; t.innerHTML = "<small>⭐ Lo que más pides</small>";
-    const ch = document.createElement("div"); ch.className = "chips"; ui.top.forEach((n) => { const s = document.createElement("span"); s.textContent = n; ch.appendChild(s); });
-    t.appendChild(ch); c.appendChild(t);
-  }
+  const fila = (peque, grande, boton, accion) => {
+    const f = document.createElement("div"); f.className = "fila";
+    const t = document.createElement("div"); const s = document.createElement("small"); s.textContent = peque; const b = document.createElement("b"); b.textContent = grande; t.append(s, b);
+    const bt = document.createElement("button"); bt.type = "button"; bt.textContent = boton; bt.onclick = accion;
+    f.append(t, bt); c.appendChild(f);
+  };
+  fila("Pedido nuevo", "Elige del catálogo", "Hacer pedido", abrirMini);
+  if (ui.last) fila("Tu último pedido · " + ui.last.date, ui.last.articulos + (ui.last.articulos === 1 ? " artículo" : " artículos") + " · " + eur(ui.last.total), "Repetir", () => enviar("h:repeat1", "Repetir mi último pedido"));
   chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
 }
-document.querySelectorAll("#quick button").forEach((b) => (b.onclick = () => enviar(b.dataset.q, b.textContent.replace(/^\S+\s/, ""))));
-function pill(texto, onclick) { const e = document.createElement("button"); e.type = "button"; e.className = "pill"; e.textContent = texto; e.onclick = onclick; return e; }
+const sinEmoji = (t) => String(t ?? "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim();
+document.querySelectorAll("#quick button").forEach((b) => (b.onclick = () => enviar(b.dataset.q, b.textContent)));
+function pill(texto, onclick) { const e = document.createElement("button"); e.type = "button"; e.className = "pill"; e.textContent = sinEmoji(texto); e.onclick = onclick; return e; }
 function interactivo(ui) {
   const box = document.createElement("div"); box.className = "ui";
   if (ui.type === "link" && ui.home) { inicio(ui); if (ui.open) setTimeout(abrirMini, 800); return; }
-  if (ui.type === "link") { const l = pill("🛒 " + ui.title, abrirMini); l.classList.add("primary"); box.appendChild(l); if (ui.open) setTimeout(abrirMini, 800); }
+  if (ui.type === "link") { const l = pill(ui.title, abrirMini); l.classList.add("primary"); box.appendChild(l); if (ui.open) setTimeout(abrirMini, 800); }
   else if (ui.type === "buttons") ui.buttons.forEach((b) => box.appendChild(pill(b.title, () => enviar(b.id, b.title))));
-  else box.appendChild(pill("☰ " + ui.button, () => {
+  else box.appendChild(pill(ui.button, () => {
     sheet.innerHTML = "";
     const h = el("div", "", { className: "sheet-h" }); const tt = el("span", ui.section); const x = el("span", "✕"); x.onclick = () => (sheet.hidden = true); h.append(tt, x); sheet.appendChild(h);
     ui.rows.forEach((r) => { const row = el("div", "", { className: "row" }); row.append(el("b", r.title), el("small", r.description)); row.onclick = () => enviar(r.id, r.title); sheet.appendChild(row); });

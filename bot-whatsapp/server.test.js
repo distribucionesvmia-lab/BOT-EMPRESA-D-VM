@@ -140,11 +140,13 @@ test("AISLAMIENTO: cada cliente ve solo su conversación y su catálogo habitual
   assert.match(b.reply, /Tienda Ficticia/);
   assert.doesNotMatch(b.reply, /Bar El Ejemplo/);
   // lo que cada uno compra habitualmente es suyo: A compra cola (1002) y B aceite (1008)
-  const topA = (a.ui.top ?? []).join("|"), topB = (b.ui.top ?? []).join("|"); // los habituales salen en la tarjeta de inicio
-  assert.match(topA, /REFRESCO COLA/);
-  assert.doesNotMatch(topA, /ACEITE OLIVA/);
-  assert.match(topB, /ACEITE OLIVA/);
-  assert.doesNotMatch(topB, /REFRESCO COLA/);
+  // lo que cada uno compró es suyo: se comprueba con «último pedido»
+  const ultimo = async (who) => JSON.stringify((await call("POST", "/api/chat", { cookie: who.cookie, body: { text: "último pedido", id: "id-" + Math.random().toString(36).slice(2) } })).json);
+  const uA = await ultimo(A), uB = await ultimo(B);
+  assert.match(uA, /REFRESCO COLA/);
+  assert.doesNotMatch(uA, /ACEITE OLIVA/);
+  assert.match(uB, /ACEITE OLIVA/);
+  assert.doesNotMatch(uB, /REFRESCO COLA/);
   const datosA = (await call("GET", "/catalogo/datos", { cookie: A.cookie })).json;
   const datosB = (await call("GET", "/catalogo/datos", { cookie: B.cookie })).json;
   assert.equal(datosA.customer.name, "Bar El Ejemplo (ficticio)");

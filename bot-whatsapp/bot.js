@@ -203,13 +203,11 @@ const greeting = (s, justIdentified = false) => {
   // Con enlace personal: tarjeta de inicio (hacer pedido, repetir el último y lo que más pide). Sin él: lista y botones dentro del chat
   if (s.link) {
     const ult = pedidosDe(s.customer).map((o) => ({ o, items: itemsFromLines(o.lines) })).find((x) => x.items.length);
-    const top = habitualProducts(s.customer).slice(0, 4).map((p) => p.name);
     return {
       reply: justIdentified ? identifiedIntro(s).split("\n\n")[0] : `👋 ¡Hola, *${s.customer.name}*!`,
       ui: {
         type: "link", title: "Hacer pedido", url: s.link, home: true,
         ...(ult ? { last: { date: fmtDateFull(ult.o.date), articulos: ult.items.length, total: Math.round(total(ult.items) * 100) / 100 } } : {}),
-        ...(top.length ? { top } : {}),
       },
     };
   }
@@ -327,12 +325,9 @@ function showHistory(s) {
   const bloque = ({ o, items }) =>
     `📦 *Pedido del ${fmtDateFull(o.date)}* — ${items.length} artículo${items.length === 1 ? "" : "s"} · ${money(total(items))}\n` +
     items.slice(0, 8).map((i) => `• ${cantidadH(i)} · ${i.name}`).join("\n") + (items.length > 8 ? `\n… y ${items.length - 8} más` : "");
-  const top = habitualProducts(s.customer).slice(0, 5);
   return {
-    reply:
-      `📜 *Tu histórico de pedidos*\n\n` + orders.map(bloque).join("\n\n") +
-      (top.length ? `\n\n⭐ *Lo que más pides:*\n` + top.map((p) => `• ${p.name}`).join("\n") : ""),
-    short: "📜 *Tu histórico de pedidos*" + (top.length ? "\n⭐ Lo que más pides: " + top.map((p) => p.name).join(" · ") : ""),
+    reply: `📜 *Tu histórico de pedidos*\n\n` + orders.map(bloque).join("\n\n"),
+    short: "📜 *Tu histórico de pedidos*",
     cards: orders.map(({ o, items }) => tablaPedido(`Pedido del ${fmtDateFull(o.date)}`, items)),
     session: s,
     ui: buttons(["h:repeat1", "Repetir el último"], ["h:open", "Hacer pedido"]),
