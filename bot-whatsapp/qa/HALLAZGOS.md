@@ -35,3 +35,11 @@ Flujo probado: identificar → lista → artículo → cajas/unidades → cantid
 - ⚠️ F5-2 (media) En el prompt de cantidad, 99999 / 1000000 (y «doce», «1.5», «12 y 3») dan «Escribe solo el número (por ejemplo 6)…», que es engañoso: el límite real es 3 cifras (bot.js:660, `\d{1,3}`) y no se dice. Un cliente que quiera 1000 latas recibe un mensaje que no explica el motivo. «doce» tampoco vale aunque en otros sitios entiende «media docena».
 - ⚠️ F5-3 (baja) «1.5» suelto desde el menú se interpreta como el artículo «AGUA MINERAL 1,5 L» ×1 (coincide con el nombre del producto). Y «0 aguas» responde «No he reconocido ese artículo» (debería decir que 0 no es una cantidad válida).
 - ⚠️ F5-4 (baja) Callejón: con la pregunta «¿cajas o unidades?» pendiente, cualquier otro texto (un pedido nuevo, «3 cervezas», un número) repite la misma pregunta sin ofrecer salida; solo valen los botones, «cajas/unidades», «menu» o «cancelar», y el mensaje no los menciona.
+
+### Arreglados tras las tareas 3, 4 y 5 (por petición del usuario)
+- F3-1 (privacidad): quien se identifica por nombre desde un teléfono que no es el del cliente (producción, `holdUnverified`) ya no ve histórico, precios especiales, código ni dirección: ni en el chat (lista, «último pedido», «histórico», «repetir») ni en la mini-app (`/pedido/…/datos` con `u:1`). Su pedido sigue retenido para revisión. Verificado con token real: historial 5 → 0, precio 0,50 → 0,55 (tarifa), dirección oculta.
+- F4-1: el chat enseña el precio especial del cliente (0,50 €) en el artículo, el carrito y el resumen: ya coincide con lo que se guarda.
+- F5-1: «-3 aguas» → «Las cantidades no pueden ser negativas»; «0 aguas» → «La cantidad tiene que ser mayor que 0».
+- F5-2: >999 explica el máximo (999) y ofrece «persona»; «doce» vale; el mensaje genérico dice «entero de 1 a 999».
+- F5-4: el aviso de «cajas o unidades» menciona `menu`.
+- Tests: 210/210. NO tocado: F4-2 (referencia en «Pedido recibido»), F4-3, F5-3.

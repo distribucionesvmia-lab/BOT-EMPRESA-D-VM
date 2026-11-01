@@ -267,3 +267,42 @@ test("identificación: un pedido de quien se identificó por nombre con otro tel
   assert.equal(flujo({ identify: true, phone: "34600000001", holdUnverified: true }).order.review, false); // su teléfono: verificado
   assert.equal(flujo({ identify: true, phone: "34611111111", holdUnverified: false }).order.review, false); // regla desactivada (demo)
 });
+
+// ---- Privacidad: identificarse solo por el nombre desde otro teléfono ----
+test("identificación: desde un teléfono que no es el del cliente NO se enseña su histórico, ni se puede ver por el chat", () => {
+  const ajeno = { identify: true, phone: "34611111111", holdUnverified: true };
+  let r = handleMessage(conIdentificacion(ajeno), "Bar El Ejemplo");
+  assert.match(r.reply, /revisará tu pedido/);
+  assert.doesNotMatch(r.reply, /histórico de productos|AGUA GAS|9001|última vez/);
+  assert.equal(r.session.unverified, true);
+  for (const t of ["lista", "último pedido", "histórico", "repetir"]) {
+    const x = handleMessage(r.session, t);
+    assert.doesNotMatch(x.reply + JSON.stringify(x.ui ?? {}), /AGUA GAS|JAMON|última vez|Calle 1/, t);
+  }
+  // su teléfono: verificado, sí ve su histórico
+  r = handleMessage(conIdentificacion({ identify: true, phone: "34600000001", holdUnverified: true }), "Bar El Ejemplo");
+  assert.match(r.reply, /Identificado/);
+  assert.match(r.reply, /AGUA GAS/);
+  assert.equal(r.session.unverified, false);
+});
+
+test("chat: se enseñan los precios especiales del cliente, no los de tarifa", () => {
+  const c = { ...conCajas(), specialPrices: { A1: 0.1 } };
+  const tarifa = conCajas();
+  const a = handleMessage(newSession(c), "6 agua gas uds");
+  const b = handleMessage(newSession(tarifa), "6 agua gas uds");
+  assert.notEqual(a.reply, b.reply);
+  assert.match(a.reply, /0\.60€/); // 6 × 0,10
+});
+
+test("chat: cantidades negativas, cero, enormes y escritas con letra", () => {
+  const c = conCajas();
+  assert.match(handleMessage(newSession(c), "-3 agua gas").reply, /no pueden ser negativas/);
+  assert.match(handleMessage(newSession(c), "0 agua gas").reply, /mayor que 0/);
+  let r = handleMessage(newSession(c), "p:a1");
+  r = handleMessage(r.session, "u:ud");
+  assert.match(handleMessage(r.session, "99999").reply, /máxima por artículo es \*999\*/);
+  assert.match(handleMessage(r.session, "-5").reply, /no puede ser negativa/);
+  assert.match(handleMessage(r.session, "abc").reply, /entero de 1 a 999/);
+  assert.match(handleMessage(r.session, "doce").reply, /12 ×|× AGUA/);
+});

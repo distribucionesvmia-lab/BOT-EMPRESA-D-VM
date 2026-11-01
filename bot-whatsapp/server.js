@@ -251,14 +251,16 @@ function webOrderRoutes(req, res, url) {
     if (!customer) return json(res, { error: "Enlace no válido o caducado" }, 410);
 
     if (req.method === "GET") {
-      const products = webProducts(customer, catalogNow(), habitualProducts, imgUrl);
+      // Identificado solo por nombre (link.u): no se enseña histórico, precios especiales ni dirección de ese cliente
+      const view = link.u ? { ...customer, orders: [], usual: [], frequent: [], specialPrices: {}, discounts: {}, address: "" } : customer;
+      const products = webProducts(view, catalogNow(), habitualProducts, imgUrl);
       return json(res, {
         business: BUSINESS.name,
         priceNote: BUSINESS.priceNote,
-        customer: { name: customer.name, address: customer.address },
+        customer: { name: view.name, address: view.address },
         used: getDb().hasOrderKey(linkKey(link)),
         products,
-        history: webHistory(customer, catalogNow()),
+        history: webHistory(view, catalogNow()),
         tree: webTree(catalogNow()),
         delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }),
         today: madridDay(),
