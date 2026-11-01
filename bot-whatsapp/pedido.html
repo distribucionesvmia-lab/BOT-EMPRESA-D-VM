@@ -448,16 +448,32 @@ async function marcarFav(id, on) {
 }
 // Catálogo por categorías (las de la web): categorías → subcategorías → productos. Con el buscador se ve todo junto.
 let nav = { cat: null, sub: null }; // sub: null = elegir subcategoría; "*" = todo lo de la categoría
-// Cabecera plegable: se oculta al bajar y reaparece al subir o al llegar arriba
+// Cabecera plegable: se oculta al bajar y reaparece al subir un poco o al llegar arriba.
+// Para que no «tiemble» al llegar al final: al plegar o desplegar se ignoran los avisos de scroll mientras dura la animación,
+// no se pliega si queda poco recorrido (el cambio de altura movería el final) y, si se estaba al final (el rebote del móvil
+// cuenta como subida), hace falta subir bastante para que vuelva la cabecera.
 (() => {
   const app = document.querySelector(".app"), lista = $("list");
-  let ult = 0;
-  lista.addEventListener("scroll", () => {
-    const t = lista.scrollTop, d = t - ult;
-    if (t < 24 || d < -6) app.classList.remove("compacto");
-    else if (d > 6 && t > 80 && lista.scrollHeight - lista.clientHeight > 140) app.classList.add("compacto");
+  let ult = 0, subida = 0, bloqueoHasta = 0, desdeFinal = false, esperando = false;
+  const cambia = (compacto) => { app.classList.toggle("compacto", compacto); bloqueoHasta = performance.now() + 420; subida = 0; };
+  const revisa = () => {
+    esperando = false;
+    if (performance.now() < bloqueoHasta) { ult = lista.scrollTop; return; }
+    const t = Math.max(0, lista.scrollTop), max = lista.scrollHeight - lista.clientHeight, d = t - ult;
     ult = t;
-  }, { passive: true });
+    const compacto = app.classList.contains("compacto");
+    if (t < 24) { if (compacto) cambia(false); desdeFinal = false; return; }
+    if (d > 0) {
+      subida = 0;
+      desdeFinal = t >= max - 4;
+      // solo se pliega con margen de sobra hasta el final y yendo hacia abajo con ganas
+      if (!compacto && d > 6 && t > 80 && max - t > 260) cambia(true);
+    } else if (d < 0) {
+      subida += -d;
+      if (compacto && subida > (desdeFinal ? 90 : 36)) { cambia(false); desdeFinal = false; }
+    }
+  };
+  lista.addEventListener("scroll", () => { if (!esperando) { esperando = true; requestAnimationFrame(revisa); } }, { passive: true });
 })();
 const irA = (cat, sub) => { animarLista = true; limite = 150; nav = { cat, sub }; $("list").scrollTop = 0; renderList(); };
 // Foto representativa de una sección: un producto suyo con foto (se prefiere el más típico de la sección); sin foto, una letra de color
