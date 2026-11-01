@@ -204,7 +204,13 @@ const greeting = (s, justIdentified = false) => {
   if (s.link) {
     const ult = pedidosDe(s.customer).map((o) => ({ o, items: itemsFromLines(o.lines) })).find((x) => x.items.length);
     return {
-      reply: justIdentified ? identifiedIntro(s).split("\n\n")[0] : `👋 ¡Hola, *${s.customer.name}*!`,
+      reply:
+        (justIdentified ? identifiedIntro(s).split("\n\n")[0] : `👋 ¡Hola, *${s.customer.name}*!`) +
+        `\n\nHacer tu pedido es muy fácil:\n` +
+        `• Pulsa *Hacer pedido* y elige tus productos del catálogo, con los precios al día.\n` +
+        (ult ? `• ¿Lo de siempre? Pulsa *Repetir* y se carga tu último pedido.\n` : "") +
+        `• También puedes escribir lo que necesitas, por ejemplo _"6 aguas y 2 cervezas"_.\n` +
+        `• Elige el día de entrega, confirma y listo.`,
       ui: {
         type: "link", title: "Hacer pedido", url: s.link, home: true,
         ...(ult ? { last: { date: fmtDateFull(ult.o.date), articulos: ult.items.length, total: Math.round(total(ult.items) * 100) / 100 } } : {}),

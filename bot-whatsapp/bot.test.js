@@ -202,3 +202,13 @@ test("«último pedido» e «histórico» llevan además una tabla (cantidad, pr
   const h = say(newSession(bar, "/catalogo"), "histórico");
   assert.equal(h.cards.length, 2); // un pedido por tabla
 });
+
+test("el saludo explica en puntos lo fácil que es pedir (y solo ofrece «Repetir» si hay un pedido anterior)", () => {
+  const r = say(newSession(bar, "/catalogo"), "hola");
+  assert.match(r.reply, /Hacer tu pedido es muy fácil/);
+  assert.match(r.reply, /• Pulsa \*Hacer pedido\*/);
+  assert.match(r.reply, /• ¿Lo de siempre\? Pulsa \*Repetir\*/);
+  assert.match(r.reply, /• Elige el día de entrega/);
+  const nuevo = say(newSession({ id: "C-9", name: "Bar Nuevo", address: "x", orders: [] }, "/catalogo"), "hola");
+  assert.doesNotMatch(nuevo.reply, /Repetir/);
+});
