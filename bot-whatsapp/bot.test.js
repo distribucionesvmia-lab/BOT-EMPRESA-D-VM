@@ -212,3 +212,17 @@ test("el saludo explica en puntos lo fácil que es pedir (y solo ofrece «Repeti
   const nuevo = say(newSession({ id: "C-9", name: "Bar Nuevo", address: "x", orders: [] }, "/catalogo"), "hola");
   assert.doesNotMatch(nuevo.reply, /Repetir/);
 });
+
+test("lo que no es pedir, último pedido, histórico o repetir recibe una respuesta clara con el botón de hacer pedido", () => {
+  for (const t of ["qué tal", "gracias", "buenas tardes", "agua", "quiero hablar", "cuánto vale la cerveza"]) {
+    const r = say(newSession(bar, "/catalogo"), t);
+    assert.equal(r.reply, "No estoy diseñado para responderte a eso. Te puedo ayudar a hacer un pedido rápido.", t);
+    assert.equal(r.ui.type, "link");
+    assert.equal(r.session.cart.length, 0, t); // y no se apunta nada al pedido
+  }
+  // sin enlace (otro canal): botón «Hacer pedido» dentro del chat
+  assert.deepEqual(say(newSession(bar), "qué tal").ui.buttons.map((b) => b.title), ["Hacer pedido"]);
+  // pedir con cantidad sigue funcionando
+  const ok = say(newSession(bar, "/catalogo"), "2 aguas");
+  assert.match(ok.reply, /Anotado/);
+});

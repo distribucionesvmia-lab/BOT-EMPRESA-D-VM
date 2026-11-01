@@ -298,6 +298,14 @@ function setCart(s, items) {
   s.orderText = s.cart.map((i) => `${i.qty} ${i.unit === "caja" ? "cajas de " : ""}${i.name}`).join(", ");
 }
 
+/** Todo lo que no sea pedir, último pedido, histórico o repetir: se dice claro y se ofrece hacer un pedido rápido. */
+function noEntiendo(s) {
+  return {
+    reply: "No estoy diseñado para responderte a eso. Te puedo ayudar a hacer un pedido rápido.",
+    session: s,
+    ui: s.link ? { type: "link", title: "Hacer pedido", url: s.link } : buttons(["h:open", "Hacer pedido"]),
+  };
+}
 /** «Hacer pedido»: se abre el catálogo (con enlace) o, sin él, la lista del chat. */
 function openCatalog(s) {
   if (s.link) {
@@ -697,7 +705,9 @@ export function handleMessage(session, rawText, ctx = {}) {
         const dd = takeDate(s, rawText, now);
         const found = parseItems(dd.rest, s.customer);
         const lead = (dd.notice ? dd.notice + "\n\n" : "") + (dd.set ? `📅 Entrega apuntada: *${longDate(s.delivery)}*\n\n` : "");
-        if (found.length) {
+        // Solo se toma como pedido si dice cuántas quiere («6 aguas», «una cerveza»): «qué tal» o «agua» sueltos no se anotan
+        const conCantidad = /\d/.test(numberWords(dd.rest));
+        if (found.length && conCantidad) {
           const ask = [];
           for (const { unitStated, ...f } of found) {
             if (f.upb && !unitStated) ask.push(f);
@@ -710,7 +720,7 @@ export function handleMessage(session, rawText, ctx = {}) {
           return showCart(s, lead + "Anotado ✅\n\n");
         }
         if (dd.set || dd.notice) return s.cart.length ? showCart(s, lead) : { reply: lead + "Ahora dime qué quieres pedir.", session: s };
-        return showList(s, 0, "No he reconocido ese artículo. Elige de la lista, o escríbelo de otra forma (por ejemplo _\"6 verdejo\"_):");
+        return noEntiendo(s);
       }
       // Cualquier otro texto se toma como el pedido (se conserva tal cual; si dice cuándo lo quiere, además se apunta el día)
       const dd = takeDate(s, rawText, now);
