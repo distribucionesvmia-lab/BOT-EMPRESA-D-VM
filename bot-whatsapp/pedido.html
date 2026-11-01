@@ -63,6 +63,10 @@
   .cal-fondo:not([hidden]) { animation:aparecer .2s ease both; }
   .cal-fondo:not([hidden]) .cal { animation:subir .3s var(--ease) both; }
   #toast:not([hidden]) { animation:subir .25s var(--ease) both; }
+  /* Al bajar por la lista se pliegan cabecera, paso y pestañas para ver más productos; al subir vuelven */
+  header, .paso, .tabs { transition:max-height .25s var(--ease), opacity .2s, padding .25s var(--ease), margin .25s var(--ease); }
+  header { max-height:90px; } .paso { max-height:36px; } .tabs { max-height:60px; }
+  .app.compacto header, .app.compacto .paso, .app.compacto .tabs { max-height:0; opacity:0; overflow:hidden; padding-top:0; padding-bottom:0; margin:0; pointer-events:none; }
   .p.in, .cat.in, .sub.in { animation:subir .38s var(--ease) both; animation-delay:calc(var(--i, 0) * 32ms); }
   .bump { animation:pop .32s var(--muelle); }
   .favb.bump { animation:latido .42s var(--muelle); }
@@ -91,45 +95,45 @@
 
   /* Guía de pasos y pestañas grandes */
   .paso { padding:10px 14px 0; font-size:15px; font-weight:700; color:var(--rojo-o); letter-spacing:.02em; text-transform:uppercase; }
-  .guia { padding:2px 14px 10px; color:var(--gris); font-size:16px; line-height:1.35; }
+  .guia { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); padding:0 !important; } /* se sigue anunciando a lectores de pantalla */
   .tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 14px 10px; }
-  .tabs button.tab { border:2px solid var(--linea); background:#fff; min-height:52px; padding:8px 10px; border-radius:14px; font-size:16px; font-weight:700; color:var(--gris); cursor:pointer; line-height:1.15; }
+  .tabs button.tab { border:2px solid var(--linea); background:#fff; min-height:44px; padding:8px 10px; border-radius:14px; font-size:16px; font-weight:700; color:var(--gris); cursor:pointer; line-height:1.15; }
   .tabs button.tab.on { background:var(--rojo-s); border-color:var(--rojo); color:var(--rojo-o); }
   .buscar { padding:0 14px 10px; position:relative; }
-  .buscar input { width:100%; min-height:54px; border:2px solid var(--linea); border-radius:14px; padding:0 14px 0 46px; font-size:18px; background:#fff; }
+  .buscar input { width:100%; min-height:46px; border:2px solid var(--linea); border-radius:14px; padding:0 14px 0 46px; font-size:18px; background:#fff; }
   .buscar input:focus { border-color:var(--rojo); outline:none; }
-  .buscar::before { content:"🔍"; position:absolute; left:calc(max(14px, (100% - 860px) / 2) + 14px); top:13px; font-size:20px; }
+  .buscar::before { content:"🔍"; position:absolute; left:calc(max(14px, (100% - 860px) / 2) + 14px); top:9px; font-size:20px; }
   .filbar { display:flex; align-items:center; gap:12px; padding:0 14px 10px; flex-wrap:wrap; }
   .filbar[hidden] { display:none; }
-  .filbar .fil { border:2px solid var(--linea); background:#fff; min-height:48px; padding:0 16px; border-radius:14px; font-size:16px; font-weight:700; color:var(--gris); cursor:pointer; }
+  .filbar .fil { border:2px solid var(--linea); background:#fff; min-height:40px; padding:0 16px; border-radius:14px; font-size:16px; font-weight:700; color:var(--gris); cursor:pointer; }
   .filbar .fil[aria-pressed="true"] { background:var(--rojo); border-color:var(--rojo); color:#fff; }
   .filbar span { color:var(--gris); font-size:15px; }
   main { flex:1; overflow-y:auto; padding-bottom:110px; border-top:1px solid var(--linea); }
 
   /* Productos: grandes y claros; lo ya añadido se destaca */
-  .p { display:grid; grid-template-columns:auto 1fr auto; gap:14px; padding:16px 14px; border-bottom:1px solid var(--linea); align-items:center; border-left:6px solid transparent; }
+  .p { display:grid; grid-template-columns:auto 1fr auto; gap:12px; padding:10px 14px; border-bottom:1px solid var(--linea); align-items:center; border-left:6px solid transparent; }
   .p.sel { background:#fff8f8; border-left-color:var(--rojo); }
   .av img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#fff; border-radius:18px; }
-  .av { position:relative; overflow:hidden; width:96px; height:96px; border-radius:18px; display:grid; place-items:center; color:#fff; font-weight:800; font-size:30px; }
+  .av { position:relative; overflow:hidden; width:76px; height:76px; border-radius:18px; display:grid; place-items:center; color:#fff; font-weight:800; font-size:30px; }
   .info { min-width:0; align-self:start; }
-  .info .n { font-weight:700; font-size:18px; line-height:1.25; overflow-wrap:anywhere; }
+  .info .n { font-weight:700; font-size:16.5px; line-height:1.2; overflow-wrap:anywhere; }
   .info .c { color:var(--gris); font-size:14px; margin-top:3px; }
-  .info .pr { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-top:6px; }
-  .pr b { font-size:22px; }
+  .info .pr { display:flex; flex-direction:row; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:4px; }
+  .pr b { font-size:19px; }
   .chip { background:var(--chip); color:var(--chip-t); border:0; border-radius:10px; font-size:14px; font-weight:700; min-height:40px; padding:6px 10px; cursor:pointer; text-align:left; line-height:1.2; }
   /* Recuadro de compra a la derecha: unidades/cajas, botón añadir o cantidad */
-  .ctl { display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:8px; width:124px; padding:8px; border:2px solid var(--linea); border-radius:16px; background:#fff; }
+  .ctl { display:flex; flex-direction:column; align-items:stretch; justify-content:center; gap:6px; width:124px; padding:6px; border:2px solid var(--linea); border-radius:14px; background:#fff; }
   .p.sel .ctl { border-color:var(--rojo); background:#fff; }
-  .add { min-height:64px; border:0; border-radius:12px; background:var(--rojo); color:#fff; font-size:18px; font-weight:800; cursor:pointer; box-shadow:0 3px 0 var(--rojo-o); line-height:1.15; }
+  .add { min-height:46px; border:0; border-radius:10px; background:var(--rojo); color:#fff; font-size:18px; font-weight:800; cursor:pointer; box-shadow:0 3px 0 var(--rojo-o); line-height:1.15; }
   .add:active { transform:translateY(2px); box-shadow:none; }
-  .step { display:flex; flex-direction:column; align-items:stretch; border:2px solid var(--rojo); border-radius:12px; overflow:hidden; background:#fff; }
-  .step button { height:52px; border:0; background:var(--rojo-s); font-size:30px; font-weight:700; color:var(--rojo-o); cursor:pointer; }
+  .step { display:flex; flex-direction:row; align-items:stretch; border:2px solid var(--rojo); border-radius:10px; overflow:hidden; background:#fff; }
+  .step button { width:34px; height:46px; border:0; background:var(--rojo-s); font-size:24px; font-weight:700; color:var(--rojo-o); cursor:pointer; }
   .step button:active { background:#ffd9d9; }
-  .step input { width:100%; min-width:0; height:50px; border:0; text-align:center; font-size:24px; font-weight:800; outline:none; -moz-appearance:textfield; }
+  .step input { flex:1; width:100%; min-width:0; height:46px; border:0; text-align:center; font-size:20px; font-weight:800; outline:none; -moz-appearance:textfield; }
   .step input::-webkit-outer-spin-button, .step input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
   @media (max-width:480px) { .p { gap:10px; padding:12px 10px; } .av { width:64px; height:64px; font-size:22px; border-radius:14px; } .ctl { width:112px; } .info .n { font-size:17px; } }
   .ud { display:flex; border:2px solid var(--linea); border-radius:12px; overflow:hidden; }
-  .ud button { flex:1; border:0; background:#fff; min-height:44px; padding:0 4px; font-size:15px; cursor:pointer; color:var(--gris); font-weight:700; }
+  .ud button { flex:1; border:0; background:#fff; min-height:34px; padding:0 4px; font-size:15px; cursor:pointer; color:var(--gris); font-weight:700; }
   .ud button.on { background:var(--rojo); color:#fff; }
   .lnote { width:calc(100% - 28px); margin:0 14px 14px; border:2px solid var(--linea); border-radius:12px; padding:12px; font:inherit; font-size:16px; }
   /* Catálogo por categorías: tarjetas grandes de categoría y subcategoría */
@@ -140,20 +144,18 @@
   .cat .ico img { width:100%; height:100%; object-fit:contain; }
   .sub .th { width:44px; height:44px; border-radius:10px; object-fit:contain; background:#fff; flex:none; margin-right:10px; }
   .sub .sl { display:flex; align-items:center; min-width:0; } .cat b { font-size:19px; line-height:1.2; } .cat small { color:var(--gris); font-size:15px; }
-  .migas { display:flex; align-items:center; gap:12px; padding:12px 14px; border-bottom:1px solid var(--linea); background:#fff; position:sticky; top:0; z-index:2; }
-  .migas button { border:0; background:var(--rojo-s); color:var(--rojo-o); font-size:17px; font-weight:800; min-height:48px; padding:0 16px; border-radius:14px; cursor:pointer; flex:none; }
-  .migas span { font-size:16px; color:var(--gris); line-height:1.25; } .migas b { color:var(--texto); }
+  .migas { display:flex; align-items:center; gap:10px; padding:8px 14px; border-bottom:1px solid var(--linea); background:#fff; position:sticky; top:0; z-index:2; }
+  .migas button { border:0; background:var(--rojo-s); color:var(--rojo-o); font-size:16px; font-weight:800; min-height:40px; padding:0 12px; border-radius:14px; cursor:pointer; flex:none; }
+  .migas span { font-size:14px; color:var(--gris); line-height:1.2; } .migas b { color:var(--texto); }
   .subs { display:grid; gap:10px; padding:14px; }
   .sub { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; text-align:left; border:2px solid var(--linea); border-radius:16px; background:#fff; padding:16px; min-height:68px; font:inherit; font-size:19px; font-weight:700; color:var(--texto); cursor:pointer; }
   .sub:hover, .sub:focus-visible { border-color:var(--rojo); background:var(--rojo-s); outline:none; }
   .sub small { color:var(--gris); font-size:15px; font-weight:400; white-space:nowrap; }
   .sub.todo { background:var(--rojo-s); border-color:var(--rojo); color:var(--rojo-o); }
-  .ntop { display:flex; align-items:flex-start; gap:4px; }
-  .ntop .n { flex:1; min-width:0; }
-  .favb { border:0; background:none; font-size:28px; line-height:1; min-width:44px; min-height:44px; margin:-8px -8px 0 0; cursor:pointer; color:#b9b9bd; flex:none; }
+  .favb { position:absolute; left:3px; top:3px; z-index:2; width:30px; height:30px; padding:0; border:0; border-radius:50%; background:rgba(255,255,255,.92); box-shadow:0 1px 3px rgba(0,0,0,.2); font-size:19px; line-height:1; cursor:pointer; color:#9a9ea4; flex:none; }
   .favb[aria-pressed="true"] { color:var(--rojo); }
   .repbar { margin:0 14px 10px; }
-  .repbar button { width:100%; min-height:52px; border:2px dashed var(--rojo); background:var(--rojo-s); color:var(--rojo-o); font-weight:800; font-size:17px; border-radius:14px; cursor:pointer; }
+  .repbar button { width:100%; min-height:44px; border:2px dashed var(--rojo); background:var(--rojo-s); color:var(--rojo-o); font-weight:800; font-size:17px; border-radius:14px; cursor:pointer; }
   .rep-o { border:2px solid var(--linea); border-radius:14px; margin-bottom:12px; overflow:hidden; }
   .rep-o h3 { margin:0; padding:12px 14px; font-size:18px; background:var(--fondo); }
   .rep-o label { display:flex; gap:12px; align-items:center; padding:12px 14px; border-top:1px solid var(--linea); font-size:17px; min-height:54px; }
@@ -428,7 +430,7 @@ function row(p) {
     f.textContent = on ? "♥" : "♡"; f.setAttribute("aria-pressed", String(on)); f.setAttribute("aria-label", (on ? "Quitar de favoritos " : "Marcar como favorito ") + p.name);
     f.onclick = () => marcarFav(p.id, !on);
     if (bumpFav === p.id) f.classList.add("bump");
-    const top = document.createElement("div"); top.className = "ntop"; n.replaceWith(top); top.append(n, f);
+    av.appendChild(f); // el corazón va sobre la esquina de la foto: el nombre gana ancho
   }
   const ctl = control(p); if (bumpId === p.id) ctl.firstElementChild && ctl.classList.add("bump");
   el.append(av, info, ctl);
@@ -446,6 +448,17 @@ async function marcarFav(id, on) {
 }
 // Catálogo por categorías (las de la web): categorías → subcategorías → productos. Con el buscador se ve todo junto.
 let nav = { cat: null, sub: null }; // sub: null = elegir subcategoría; "*" = todo lo de la categoría
+// Cabecera plegable: se oculta al bajar y reaparece al subir o al llegar arriba
+(() => {
+  const app = document.querySelector(".app"), lista = $("list");
+  let ult = 0;
+  lista.addEventListener("scroll", () => {
+    const t = lista.scrollTop, d = t - ult;
+    if (t < 24 || d < -6) app.classList.remove("compacto");
+    else if (d > 6 && t > 80 && lista.scrollHeight - lista.clientHeight > 140) app.classList.add("compacto");
+    ult = t;
+  }, { passive: true });
+})();
 const irA = (cat, sub) => { animarLista = true; limite = 150; nav = { cat, sub }; $("list").scrollTop = 0; renderList(); };
 // Foto representativa de una sección: un producto suyo con foto (se prefiere el más típico de la sección); sin foto, una letra de color
 const PREFIERE = { cafe: /capsula|molido|grano|natural/i, pascual: /leche/i, vinos: /ribera|crianza|reserva|verdejo|rueda|cava/i, aguas: /\bagua\b|bezoya/i, despensa: /aceite|oliva/i, refrigerados: /queso|jamon|chorizo|salchich/i, "f-hosteleria-y-menaje": /\bvaso|copa/i };
