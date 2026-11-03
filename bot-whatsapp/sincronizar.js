@@ -75,7 +75,7 @@ export async function sincronizar({ source, state, catalogDb, customersDb, accou
       } else {
         const { products, stats } = parseProductosXlsx(buf);
         if (!products.length) throw new Error("El Excel no tiene productos con precio.");
-        const r = catalogDb.upsertProducts(products);
+        const r = catalogDb.upsertProducts(products, { partial: true }); // lo que el Excel no trae (descuento, categoría…) se conserva
         detalle = `${stats.importados} productos (${r.added} nuevos, ${r.updated} con cambios, ${r.unchanged} iguales)` + (stats.sinPrecio ? `; ${stats.sinPrecio} sin precio, ignorados` : "");
       }
       st.files[tipo] = { sig: f.sig, name: f.name, at: now() };

@@ -1,0 +1,370 @@
+{
+ "1.1": {
+  "category": "Pascual"
+ },
+ "1.2": {
+  "category": "Pascual"
+ },
+ "1.3": {
+  "category": "Pascual"
+ },
+ "1.6": {
+  "category": "Pascual"
+ },
+ "1.12": {
+  "category": "Pascual"
+ },
+ "1.61": {
+  "category": "Pascual"
+ },
+ "1.76": {
+  "category": "Pascual"
+ },
+ "10.1": {
+  "category": "Aguas"
+ },
+ "10.3": {
+  "category": "Aguas"
+ },
+ "10.4": {
+  "category": "Aguas"
+ },
+ "10.5": {
+  "category": "Aguas"
+ },
+ "10.6": {
+  "category": "Aguas"
+ },
+ "10.7": {
+  "category": "Aguas"
+ },
+ "10.8": {
+  "category": "Aguas"
+ },
+ "11.0": {
+  "category": "Despensa",
+  "subcategory": "Don Simón"
+ },
+ "11.2": {
+  "category": "Pascual"
+ },
+ "11.3": {
+  "category": "Despensa",
+  "subcategory": "Don Simón"
+ },
+ "11.8": {
+  "category": "Pascual"
+ },
+ "11.9": {
+  "category": "Pascual"
+ },
+ "12.3": {
+  "category": "Pascual"
+ },
+ "12.4": {
+  "category": "Pascual"
+ },
+ "12.8": {
+  "category": "Pascual"
+ },
+ "15.2": {
+  "category": "Pascual"
+ },
+ "15.3": {
+  "category": "Pascual"
+ },
+ "15.5": {
+  "category": "Pascual"
+ },
+ "15.9": {
+  "category": "Pascual"
+ },
+ "20.3": {
+  "category": "Refrigerados",
+  "subcategory": "Quesos Reny Picot"
+ },
+ "21.0": {
+  "category": "Despensa",
+  "subcategory": "Don Simón"
+ },
+ "21.1": {
+  "category": "Vinos"
+ },
+ "21.2": {
+  "category": "Vinos"
+ },
+ "21.3": {
+  "category": "Vinos"
+ },
+ "21.4": {
+  "category": "Vinos"
+ },
+ "21.5": {
+  "category": "Vinos"
+ },
+ "24.1": {
+  "category": "Despensa",
+  "subcategory": "Aceite"
+ },
+ "24.2": {
+  "category": "Despensa",
+  "subcategory": "Aceite"
+ },
+ "24.3": {
+  "category": "Despensa",
+  "subcategory": "Aceite"
+ },
+ "27.1": {
+  "category": "Despensa",
+  "subcategory": "Helios"
+ },
+ "27.3": {
+  "category": "Despensa",
+  "subcategory": "Helios"
+ },
+ "27.6": {
+  "category": "Despensa",
+  "subcategory": "Helios"
+ },
+ "29.0": {
+  "category": "Despensa",
+  "subcategory": "Don Simón"
+ },
+ "29.1": {
+  "category": "Despensa",
+  "subcategory": "Helios"
+ },
+ "29.3": {
+  "category": "Pascual"
+ },
+ "29.6": {
+  "category": "Despensa",
+  "subcategory": "Helios"
+ },
+ "30.0": {
+  "category": "Despensa",
+  "subcategory": "Salsas Prima"
+ },
+ "30.01": {
+  "category": "Pascual"
+ },
+ "30.02": {
+  "category": "Pascual"
+ },
+ "30.3": {
+  "category": "Despensa",
+  "subcategory": "Conservas 3 kg"
+ },
+ "30.9": {
+  "category": "Despensa",
+  "subcategory": "Conservas 3 kg"
+ },
+ "32.1": {
+  "category": "Despensa",
+  "subcategory": "Legumbres"
+ },
+ "32.2": {
+  "category": "Despensa",
+  "subcategory": "Legumbres"
+ },
+ "32.3": {
+  "category": "Despensa",
+  "subcategory": "Legumbres"
+ },
+ "33.0": {
+  "category": "Despensa",
+  "subcategory": "Salsas Prima"
+ },
+ "33.1": {
+  "category": "Despensa",
+  "subcategory": "Salsas Prima"
+ },
+ "33.2": {
+  "category": "Despensa",
+  "subcategory": "Salsas Prima"
+ },
+ "33.3": {
+  "category": "Despensa",
+  "subcategory": "Salsas Prima"
+ },
+ "33.4": {
+  "category": "Despensa",
+  "subcategory": "Salsas Prima"
+ },
+ "33.7": {
+  "category": "Despensa",
+  "subcategory": "Salsas Prima"
+ },
+ "36.0": {
+  "category": "Pascual"
+ },
+ "40.0": {
+  "category": "Café"
+ },
+ "40.1": {
+  "category": "Café"
+ },
+ "40.2": {
+  "category": "Café"
+ },
+ "40.3": {
+  "category": "Café"
+ },
+ "40.4": {
+  "category": "Café"
+ },
+ "40.11": {
+  "category": "Café"
+ },
+ "40.21": {
+  "category": "Café"
+ },
+ "48.0": {
+  "category": "Despensa",
+  "subcategory": "Salsas Prima"
+ },
+ "51.0": {
+  "category": "Despensa",
+  "subcategory": "Especias"
+ },
+ "54.0": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Menaje"
+ },
+ "55.0": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Vasos y copas"
+ },
+ "55.1": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Vasos y copas"
+ },
+ "55.2": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Vasos y copas"
+ },
+ "55.11": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Vasos y copas"
+ },
+ "55.21": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Vasos y copas"
+ },
+ "55.22": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Vasos y copas"
+ },
+ "55.23": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Vasos y copas"
+ },
+ "56.0": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Papel"
+ },
+ "56.2": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Menaje"
+ },
+ "57.1": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Cubertería y sartenes"
+ },
+ "57.2": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Cubertería y sartenes"
+ },
+ "57.3": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Menaje"
+ },
+ "58.0": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Cubertería y sartenes"
+ },
+ "59.0": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Cubertería y sartenes"
+ },
+ "60.0": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Droguería"
+ },
+ "60.1": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Droguería"
+ },
+ "61.0": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Platos"
+ },
+ "61.1": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Platos"
+ },
+ "61.2": {
+  "category": "Hostelería y menaje",
+  "subcategory": "Platos"
+ },
+ "73.0": {
+  "category": "Refrigerados",
+  "subcategory": "Quesos Reny Picot"
+ },
+ "76.2": {
+  "category": "Despensa",
+  "subcategory": "Especias"
+ },
+ "79.0": {
+  "category": "Despensa",
+  "subcategory": "El Pozo"
+ },
+ "79.1": {
+  "category": "Despensa",
+  "subcategory": "El Pozo"
+ },
+ "81.2": {
+  "category": "Refrigerados",
+  "subcategory": "Campofrío y Navidul"
+ },
+ "81.3": {
+  "category": "Refrigerados",
+  "subcategory": "Campofrío y Navidul"
+ },
+ "81.4": {
+  "category": "Refrigerados",
+  "subcategory": "Campofrío y Navidul"
+ },
+ "81.7": {
+  "category": "Refrigerados",
+  "subcategory": "Campofrío y Navidul"
+ },
+ "81.8": {
+  "category": "Refrigerados",
+  "subcategory": "Campofrío y Navidul"
+ },
+ "81.9": {
+  "category": "Refrigerados",
+  "subcategory": "Campofrío y Navidul"
+ },
+ "81.11": {
+  "category": "Refrigerados",
+  "subcategory": "Campofrío y Navidul"
+ },
+ "81.12": {
+  "category": "Refrigerados",
+  "subcategory": "Campofrío y Navidul"
+ },
+ "81.61": {
+  "category": "Refrigerados",
+  "subcategory": "Campofrío y Navidul"
+ },
+ "85.0": {
+  "category": "Refrigerados",
+  "subcategory": "Quesos Reny Picot"
+ },
+ "91.0": {
+  "category": "Refrigerados",
+  "subcategory": "Campofrío y Navidul"
+ }
+}

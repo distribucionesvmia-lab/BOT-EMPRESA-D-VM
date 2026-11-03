@@ -31,7 +31,7 @@ test("parseProductos: reconoce las columnas por la cabecera (aunque haya un tít
   assert.equal(products[1].discount, 5);
   assert.equal(products[2].active, false);
   assert.equal(products[2].unitsPerBox, undefined);
-  assert.deepEqual(stats, { filas: 6, importados: 3, sinPrecio: 1, duplicados: 1, inactivos: 1, descartadas: 1 });
+  assert.deepEqual(stats, { filas: 6, importados: 3, sinPrecio: 1, sinPrecioIds: ["1004"], duplicados: 1, inactivos: 1, descartadas: 1 });
 });
 
 test("parseProductos: sin cabecera reconocible da un error claro", () => {

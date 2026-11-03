@@ -27,6 +27,7 @@ const FIELDS = [
   ["discount", [/^(dto|descuento|% ?dto)/], []],
   ["category", [/^(categoria|familia)$/], []],
   ["subcategory", [/^(subcategoria|subfamilia)$/], []],
+  ["family", [/familia/], []], // código de familia de a3ERP («56.0»): sirve para asignar categoría a los artículos nuevos
   ["blocked", [/^bloqueado/], []],
   ["obsolete", [/^obsoleto|^baja$/], []],
 ];
@@ -58,6 +59,9 @@ export function parseProductos(rows) {
     if (c.code >= 0 && c.name >= 0 && c.price >= 0) (hi = i), (col = c);
   }
   if (hi < 0) throw new Error("No encuentro la cabecera: el Excel de productos debe tener las columnas «Código», «Descripción» y «Precio».");
+  // Exportaciones de a3ERP con una columna de marca («+») delante del código: el código va en la columna siguiente (sin cabecera)
+  const muestra = rows.slice(hi + 1, hi + 9).filter((r) => r.some((c) => String(c).trim()));
+  if (col.code >= 0 && muestra.length && muestra.every((r) => /^[+\-*]?$/.test(String(r[col.code] ?? "").trim())) && !heads(rows[hi])[col.code + 1]) col.code++;
   const get = (r, k) => (col[k] >= 0 ? r[col[k]] : undefined);
   const products = [], rowOf = [], seen = new Set(); // rowOf: nº de fila de Excel de cada producto (para emparejar imágenes)
   const stats = { filas: 0, importados: 0, sinPrecio: 0, duplicados: 0, inactivos: 0, descartadas: 0 };
@@ -68,12 +72,15 @@ export function parseProductos(rows) {
     if (!id || !name) { stats.descartadas++; continue; }
     if (seen.has(id)) { stats.duplicados++; continue; }
     const price = parseNumber(get(r, "price"));
-    if (price === null || price < 0) { stats.sinPrecio++; continue; }
+    if (price === null || price < 0) { stats.sinPrecio++; (stats.sinPrecioIds ??= []).push(id); continue; }
     seen.add(id);
     const p = { id, name, price, active: !(yes(get(r, "blocked")) || yes(get(r, "obsolete"))) };
+    const fam = String(get(r, "family") ?? "").trim();
+    if (fam) p.family = fam;
     const upb = parseNumber(get(r, "unitsPerBox")), vat = tipoIva(get(r, "vat")), dto = parseNumber(get(r, "discount"));
     if (upb !== null && Number.isInteger(upb) && upb >= 1) p.unitsPerBox = upb;
     if (vat !== null && vat >= 0 && vat <= 100) p.vat = vat;
+    else if (String(get(r, "vat") ?? "").trim()) p.vatCode = String(get(r, "vat")).trim(); // código de IVA sin porcentaje conocido («SRE»)
     if (dto !== null && dto >= 0 && dto <= 100) p.discount = dto;
     const cat = String(get(r, "category") ?? "").trim(), sub = String(get(r, "subcategory") ?? "").trim();
     if (cat) p.category = cat;

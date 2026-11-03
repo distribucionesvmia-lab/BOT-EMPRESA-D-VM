@@ -89,8 +89,14 @@ export function openCatalogDb(path = process.env.CATALOG_DB ?? "catalogo.sqlite"
      * Crea o actualiza productos (todo o nada). Solo se tocan y registran los campos que cambian.
      * deactivateMissing: los que no vengan en la lista se marcan como inactivos (para sincronizar un catálogo completo).
      */
-    upsertProducts(list, { deactivateMissing = false, now = new Date().toISOString() } = {}) {
-      const items = list.map(normalize);
+    upsertProducts(list, { deactivateMissing = false, partial = false, now = new Date().toISOString() } = {}) {
+      // partial: lo que el producto no trae (undefined) se conserva como está en la base (descuento, categoría, IVA…)
+      const items = list.map((raw) => {
+        const old = partial ? get.get(String(raw?.id)) : null;
+        if (!old) return normalize(raw);
+        const dado = Object.fromEntries(Object.entries(raw).filter(([, v]) => v !== undefined));
+        return normalize({ ...toCatalog(old), active: !!old.active, ...dado });
+      });
       return atomic(() => {
         const out = { added: 0, updated: 0, unchanged: 0, deactivated: 0 };
         for (const n of items) out[apply(n, now)]++;

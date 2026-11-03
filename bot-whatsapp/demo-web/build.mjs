@@ -28,7 +28,8 @@ const tarifa = process.env.TARIFA_JSON ? `window.__VM_TARIFA__=${fs.readFileSync
 let fotos = "";
 if (process.env.FOTOS_DIR) {
   const mt = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" }, m = {};
-  for (const f of fs.readdirSync(process.env.FOTOS_DIR)) { const [id, ext] = [f.replace(/\.[^.]+$/, ""), f.split(".").pop().toLowerCase()]; if (mt[ext]) m[id] = `data:${mt[ext]};base64,` + fs.readFileSync(path.join(process.env.FOTOS_DIR, f)).toString("base64"); }
+  const ids = process.env.TARIFA_JSON ? new Set(JSON.parse(fs.readFileSync(process.env.TARIFA_JSON, "utf8")).map((p) => String(p.id))) : null; // solo las fotos de los productos de la lista
+  for (const f of fs.readdirSync(process.env.FOTOS_DIR)) { if (ids && !ids.has(f.replace(/\.[^.]+$/, ""))) continue; const [id, ext] = [f.replace(/\.[^.]+$/, ""), f.split(".").pop().toLowerCase()]; if (mt[ext]) m[id] = `data:${mt[ext]};base64,` + fs.readFileSync(path.join(process.env.FOTOS_DIR, f)).toString("base64"); }
   fotos = `window.__VM_FOTOS__=${JSON.stringify(m)};`;
 }
 const safe = (s) => s.replace(/<\/script/gi, "<\\/script");
