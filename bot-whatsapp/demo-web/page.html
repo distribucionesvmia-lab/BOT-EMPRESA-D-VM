@@ -864,3 +864,94 @@ VM.onChange(() => { if (pending) return; pending = true; requestAnimationFrame((
 VM.onError((e) => toast("No se pudo guardar: " + (e?.message || e?.code || "error")));
 VM.ready().then(route);
 </script>
+<script>
+// Actualización de los datos reales de a3ERP. Solo se activa con la dirección terminada en #cargar-datos y no hace nada hasta que el
+// propietario pulsa el botón. Lee datos/productos.json y datos/clientes.json de este mismo artefacto y los compara con la huella guardada
+// en cargas/hashes-*: la primera vez carga todo; después escribe solo lo nuevo o modificado y retira lo que ya no está.
+(() => {
+  if (location.hash !== "#cargar-datos") return;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const box = document.createElement("div");
+  box.id = "vmcarga";
+  box.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font:15px system-ui,sans-serif";
+  const btn = "padding:10px 16px;border:0;border-radius:8px;font:inherit;cursor:pointer;";
+  box.innerHTML = '<div style="background:#fff;color:#222;max-width:540px;width:92%;border-radius:14px;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.4)"><h2 style="margin:0 0 8px;font-size:19px">Actualizar datos de a3ERP</h2><p id="vmc-txt" style="margin:0 0 12px;line-height:1.45">Comprobando…</p><div style="background:#eee;border-radius:8px;height:12px;overflow:hidden;margin-bottom:14px"><div id="vmc-bar" style="height:100%;width:0;background:#c0262d;transition:width .2s"></div></div><div style="display:flex;gap:8px"><button id="vmc-go" disabled style="' + btn + 'background:#c0262d;color:#fff">Cargar ahora</button><button id="vmc-x" style="' + btn + 'background:#e6e6e6;color:#222">Cerrar</button></div></div>';
+  document.body.appendChild(box);
+  $("vmc-x").onclick = () => box.remove();
+  const say = (t) => { $("vmc-txt").innerHTML = t; };
+  // Reintenta con espera si la base pide ir más despacio
+  async function retry(fn) {
+    for (let i = 0; ; i++) {
+      try { return await fn(); } catch (e) {
+        const c = e && e.code;
+        if (i < 6 && (c === "resource_exhausted" || c === "unavailable")) { await sleep(1500 * (i + 1) + Math.random() * 500); continue; }
+        throw e;
+      }
+    }
+  }
+  // Huella corta de un registro (SHA-1 de su JSON, 16 caracteres): si no cambia, no se vuelve a escribir
+  const hash = async (o) => {
+    const b = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(JSON.stringify(o)));
+    return Array.from(new Uint8Array(b).slice(0, 8), (x) => x.toString(16).padStart(2, "0")).join("");
+  };
+  (async () => {
+    let db, origen = "copia de a3ERP";
+    const plan = [];
+    try {
+      db = await claude.use("db");
+      if (!db) return say("No hay acceso a la base de datos en esta vista. Abra el artefacto con la cuenta del propietario.");
+      const [a, b, m] = await Promise.all([fetch("datos/productos.json"), fetch("datos/clientes.json"), fetch("datos/origen.json")]);
+      if (!a.ok || !b.ok) throw new Error("no encuentro los archivos de datos (" + a.status + "/" + b.status + ")");
+      if (m.ok) origen = (await m.json()).origen || origen;
+      const datos = [["products", "Productos", await a.json()], ["customers", "Clientes", await b.json()]];
+      for (const [coll, nombre, rows] of datos) {
+        const snap = await retry(() => db.doc("cargas/hashes-" + coll).get());
+        const prev = snap.exists ? (snap.data().h || {}) : null; // null = primera carga
+        const h = {};
+        for (const r of rows) h[String(r.id)] = await hash(r);
+        const cambiar = rows.filter((r) => !prev || prev[String(r.id)] !== h[String(r.id)]);
+        const quitar = prev ? Object.keys(prev).filter((id) => !(id in h)) : [];
+        const nuevos = prev ? cambiar.filter((r) => !(String(r.id) in prev)).length : cambiar.length;
+        plan.push({ coll, nombre, rows, h, prev, cambiar, quitar, nuevos });
+      }
+    } catch (e) { return say("Error al preparar la actualización: " + esc(e.message || e.code || e)); }
+    const lineas = plan.map((p) => p.prev
+      ? "<b>" + p.nombre + ":</b> " + p.nuevos + " nuevos, " + (p.cambiar.length - p.nuevos) + " modificados, " + p.quitar.length + " retirados, " + (p.rows.length - p.cambiar.length) + " sin cambios."
+      : "<b>" + p.nombre + ":</b> primera carga: se cargan los " + p.rows.length + " (y se retiran los de demostración).");
+    const trabajo = plan.reduce((n, p) => n + p.cambiar.length + p.quitar.length, 0);
+    if (!trabajo && plan.every((p) => p.prev)) return say("Origen: " + esc(origen) + ".<br>" + lineas.join("<br>") + "<br><b>No hay nada que actualizar.</b>");
+    say("Origen: " + esc(origen) + ".<br>" + lineas.join("<br>") + "<br>Solo se escriben las diferencias. No se tocan los pedidos, las cuentas ni las exportaciones.");
+    $("vmc-go").textContent = "Aplicar cambios";
+    $("vmc-go").disabled = false;
+    $("vmc-go").onclick = async () => {
+      $("vmc-go").disabled = true;
+      let hecho = 0, borrados = 0;
+      const total = Math.max(1, trabajo);
+      const tick = () => { $("vmc-bar").style.width = Math.min(100, 100 * hecho / total) + "%"; say("Aplicando… " + hecho + " de " + total); };
+      try {
+        for (const p of plan) {
+          const col = db.collection(p.coll);
+          for (const r of p.cambiar) { await retry(() => col.doc(String(r.id)).set(r)); hecho++; if (hecho % 20 === 0) tick(); }
+          let sobran = p.quitar;
+          if (!p.prev) {
+            // Primera carga: retira lo que había antes (productos de demostración, clientes de baja); 9001 y 9002 son las cuentas de prueba de la demo
+            const snap = await retry(() => col.limit(1000).get());
+            sobran = snap.docs.map((d) => d.id).filter((id) => !(id in p.h) && !(p.coll === "customers" && (id === "9001" || id === "9002")));
+          }
+          for (const id of sobran) { await retry(() => col.doc(id).delete()); borrados++; hecho++; if (hecho % 20 === 0) tick(); }
+          // La huella se guarda al terminar cada colección: si se interrumpe, la siguiente vez se repite lo pendiente sin duplicar nada
+          await retry(() => db.doc("cargas/hashes-" + p.coll).set({ h: p.h, at: new Date().toISOString() }));
+        }
+        await retry(() => db.doc("cargas/ultima").set({ at: new Date().toISOString(), productos: plan[0].rows.length, clientes: plan[1].rows.length, origen }));
+        $("vmc-bar").style.width = "100%";
+        say("<b>Hecho.</b> " + (hecho - borrados) + " registros escritos y " + borrados + " retirados. Cierre esta ventana y recargue la página.");
+      } catch (e) {
+        say("Se ha interrumpido en " + hecho + " de " + total + ": " + esc(e.message || e.code || e) + ". Puede volver a pulsar el botón: reanuda sin duplicar nada.");
+        $("vmc-go").disabled = false;
+      }
+    };
+  })();
+})();
+</script>

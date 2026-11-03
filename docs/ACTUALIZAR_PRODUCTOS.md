@@ -42,6 +42,17 @@ Antes de aplicar se hace una copia de seguridad de la base (`catalogo.sqlite.ant
 node actualizar-productos.js ARTICULOS.xlsx --actual lista.json --salida-json lista-nueva.json --aplicar
 ```
 
+## Para la demo en línea (artefacto de Claude): solo se escriben las diferencias
+
+```bash
+node actualizar-productos.js ARTICULOS.xlsx --actual lista-anterior.json --iva SRE=4 --artefacto carpeta --salida-json lista-nueva.json --fotos imagenes --aplicar
+```
+
+Deja `carpeta/datos/productos.json` en el formato que lee el cargador de la demo. Se publica como archivo del artefacto (`publish_files`, modo *patch*) y el propietario abre la dirección terminada en `#cargar-datos`: el cargador compara una huella de cada producto y escribe **solo** lo nuevo o modificado y retira lo que ya no está. El cargador vive en `bot-whatsapp/demo-web/page.html` (no hay que tocar nada más).
+
+- `--descuentos-de lista.json`: el descuento de a3ERP manda. Toma el descuento de otra lista (por ejemplo la que saca el extractor de a3ERP) para los productos que estén en ella. En la primera carga con ARTICULOS_29-10-26 se usó la lista de la copia de a3ERP del 20/10: la columna «Dto %» de la tarifa de proveedores (20-30 % en Pascual y vinos) no coincidía con el descuento de a3ERP (0), y no se quiere mostrar al cliente un precio más bajo que el de la factura.
+- `--iva SRE=4`: el tipo de IVA de `SRE` coincide con la copia de a3ERP (4 %): en los 1.651 productos que están en las dos listas el IVA es idéntico.
+
 ## Familias nuevas
 
 Si llegan productos de una familia que aún no tiene categoría, edita `familias-categorias.json` (`"14.0": { "category": "…", "subcategory": "…" }`) o vuelve a aprenderlas de los productos ya clasificados:

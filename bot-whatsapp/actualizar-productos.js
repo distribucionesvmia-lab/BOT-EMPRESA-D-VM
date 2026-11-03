@@ -5,6 +5,8 @@
 //   Aplicarlos a la base del servidor:   node actualizar-productos.js ARTICULOS.xlsx --aplicar [--catalogo catalogo.sqlite]
 //   Con una lista en JSON (la demo):     node actualizar-productos.js ARTICULOS.xlsx --actual lista.json --salida-json nueva.json --aplicar
 //   Otras opciones:  --informe informe.md  ·  --fotos carpeta (guarda las fotos nuevas o cambiadas)  ·  --familias familias.json
+//                    --artefacto carpeta  (deja carpeta/datos/productos.json para el cargador por diferencias de la demo: #cargar-datos)
+//                    --descuentos-de lista.json  (toma el descuento de otra lista, p. ej. la sacada de a3ERP, para los productos que estén en ella)
 //                    --iva SRE=4  (tipo de IVA de un código que el Excel trae sin porcentaje; si no se indica, NO se supone)
 //
 // Lo que el Excel no trae no se toca (descuentos, categorías…). Los productos que ya no están pasan a «inactivos» (no se borran, queda el historial).
@@ -82,7 +84,7 @@ export const saltosDePrecio = (cmp, umbral = 25) =>
 async function main() {
   const args = process.argv.slice(2);
   const opt = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
-  const fichero = args.find((a, i) => !a.startsWith("--") && !["--catalogo", "--actual", "--salida-json", "--informe", "--fotos", "--familias", "--iva"].includes(args[i - 1]));
+  const fichero = args.find((a, i) => !a.startsWith("--") && !["--catalogo", "--actual", "--salida-json", "--informe", "--fotos", "--familias", "--iva", "--artefacto", "--descuentos-de"].includes(args[i - 1]));
   if (!fichero) { console.error("Uso: node actualizar-productos.js ARTICULOS.xlsx [--aplicar] [--catalogo catalogo.sqlite | --actual lista.json --salida-json nueva.json] [--informe informe.md] [--fotos carpeta] [--iva SRE=4]"); process.exit(1); }
   const iva = Object.fromEntries(args.flatMap((a, i) => (args[i - 1] === "--iva" ? [a.split("=")] : [])).map(([k, v]) => [k, Number(v)]));
   const familiasRuta = opt("--familias") ?? new URL("./familias-categorias.json", import.meta.url).pathname;
@@ -122,6 +124,22 @@ async function main() {
     process.exit(2);
   }
   const resultado = aplicarProductos(actual, nuevos);
+  if (opt("--descuentos-de")) { // el descuento de a3ERP manda: los productos que están en esa lista toman su descuento
+    const ref = new Map(JSON.parse(fs.readFileSync(opt("--descuentos-de"), "utf8")).map((p) => [String(p.id), p]));
+    let cambiados = 0;
+    for (const p of resultado) { const r = ref.get(p.id); if (r && (r.discount ?? 0) !== (p.discount ?? 0)) { p.discount = r.discount ?? 0; cambiados++; } }
+    console.log(`Descuentos tomados de ${path.basename(opt("--descuentos-de"))}: ${cambiados} productos cambiados.`);
+  }
+  if (opt("--artefacto")) {
+    // Formato de datos/productos.json del artefacto (claves en orden fijo: el cargador compara una huella de cada registro)
+    const dir = path.join(opt("--artefacto"), "datos");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "productos.json"), JSON.stringify(resultado.map((p) => ({
+      id: String(p.id), name: p.name, price: p.price, unitsPerBox: p.unitsPerBox ?? null, vat: p.vat ?? 21, discount: p.discount ?? 0,
+      ...(p.category ? { category: p.category } : {}), ...(p.subcategory ? { subcategory: p.subcategory } : {}), updatedAt: null, changes: [],
+    }))));
+    console.log(`\nArchivo para el artefacto: ${path.join(dir, "productos.json")} (${resultado.length} productos). Publícalo como archivo del artefacto y abre #cargar-datos: solo se escriben las diferencias.`);
+  }
   if (opt("--salida-json")) {
     fs.writeFileSync(opt("--salida-json"), JSON.stringify(resultado));
     console.log(`\nLista nueva guardada en ${opt("--salida-json")}: ${resultado.length} productos.`);
