@@ -6,7 +6,7 @@
 //   Con una lista en JSON (la demo):     node actualizar-productos.js ARTICULOS.xlsx --actual lista.json --salida-json nueva.json --aplicar
 //   Otras opciones:  --informe informe.md  ·  --fotos carpeta (guarda las fotos nuevas o cambiadas)  ·  --familias familias.json
 //                    --artefacto carpeta  (deja carpeta/datos/productos.json para el cargador por diferencias de la demo: #cargar-datos)
-//                    --descuentos-de lista.json  (toma el descuento de otra lista, p. ej. la sacada de a3ERP, para los productos que estén en ella)
+//                    --descuentos-de lista.json  (completa el descuento con el de otra lista, p. ej. la sacada de a3ERP, solo en los productos que no tengan)
 //                    --iva SRE=4  (tipo de IVA de un código que el Excel trae sin porcentaje; si no se indica, NO se supone)
 //
 // Lo que el Excel no trae no se toca (descuentos, categorías…). Los productos que ya no están pasan a «inactivos» (no se borran, queda el historial).
@@ -124,10 +124,10 @@ async function main() {
     process.exit(2);
   }
   const resultado = aplicarProductos(actual, nuevos);
-  if (opt("--descuentos-de")) { // el descuento de a3ERP manda: los productos que están en esa lista toman su descuento
+  if (opt("--descuentos-de")) { // completa: los productos SIN descuento toman el de esa lista (el que ya tienen no se toca)
     const ref = new Map(JSON.parse(fs.readFileSync(opt("--descuentos-de"), "utf8")).map((p) => [String(p.id), p]));
     let cambiados = 0;
-    for (const p of resultado) { const r = ref.get(p.id); if (r && (r.discount ?? 0) !== (p.discount ?? 0)) { p.discount = r.discount ?? 0; cambiados++; } }
+    for (const p of resultado) { const r = ref.get(p.id); if (r && r.discount && !p.discount) { p.discount = r.discount; cambiados++; } }
     console.log(`Descuentos tomados de ${path.basename(opt("--descuentos-de"))}: ${cambiados} productos cambiados.`);
   }
   if (opt("--artefacto")) {

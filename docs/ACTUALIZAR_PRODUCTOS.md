@@ -50,7 +50,7 @@ node actualizar-productos.js ARTICULOS.xlsx --actual lista-anterior.json --iva S
 
 Deja `carpeta/datos/productos.json` en el formato que lee el cargador de la demo. Se publica como archivo del artefacto (`publish_files`, modo *patch*) y el propietario abre la dirección terminada en `#cargar-datos`: el cargador compara una huella de cada producto y escribe **solo** lo nuevo o modificado y retira lo que ya no está. El cargador vive en `bot-whatsapp/demo-web/page.html` (no hay que tocar nada más).
 
-- `--descuentos-de lista.json`: el descuento de a3ERP manda. Toma el descuento de otra lista (por ejemplo la que saca el extractor de a3ERP) para los productos que estén en ella. En la primera carga con ARTICULOS_29-10-26 se usó la lista de la copia de a3ERP del 20/10: la columna «Dto %» de la tarifa de proveedores (20-30 % en Pascual y vinos) no coincidía con el descuento de a3ERP (0), y no se quiere mostrar al cliente un precio más bajo que el de la factura.
+- `--descuentos-de lista.json`: completa el descuento con el de otra lista (por ejemplo la que saca el extractor de a3ERP) solo en los productos que no tienen. El cliente confirmó que el «Dto %» de la tarifa (20-30 % en Pascual y vinos) es descuento para el cliente: ese manda; en 8 productos hay descuento en las dos listas y distinto (gana el de la tarifa).
 - `--iva SRE=4`: el tipo de IVA de `SRE` coincide con la copia de a3ERP (4 %): en los 1.651 productos que están en las dos listas el IVA es idéntico.
 
 ## Familias nuevas
