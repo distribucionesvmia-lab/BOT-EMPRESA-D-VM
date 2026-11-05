@@ -418,6 +418,7 @@
           <div class="actions">
             <button class="btn main" id="exportar-sel" type="button" disabled>Exportar seleccionados (0)</button>
             <button class="btn" id="exportar" type="button">Exportar todos los pendientes</button>
+            <button class="btn" id="borrar-pedidos" type="button">Borrar pedidos de prueba</button>
             <button class="btn" id="reiniciar" type="button">Restaurar datos de ejemplo</button>
             <span class="msg" id="expmsg"></span>
           </div>
@@ -769,6 +770,16 @@ async function exportarPedidos(ids) {
 }
 $("exportar").onclick = () => exportarPedidos(null);
 $("exportar-sel").onclick = () => selOrd.size && exportarPedidos([...selOrd]);
+let confirmBorrar = null;
+$("borrar-pedidos").onclick = async () => {
+  const b = $("borrar-pedidos");
+  if (!confirmBorrar) { b.textContent = "¿Seguro? Se borran TODOS los pedidos y exportaciones"; confirmBorrar = setTimeout(() => { confirmBorrar = null; b.textContent = "Borrar pedidos de prueba"; }, 4000); return; }
+  clearTimeout(confirmBorrar); confirmBorrar = null; b.textContent = "Borrar pedidos de prueba";
+  try {
+    const r = await VM.clearOrders(); lastExport = null; seenOrders = null; $("xlpanel").hidden = true;
+    $("expmsg").textContent = `Borrados ${r.pedidos} pedido${r.pedidos === 1 ? "" : "s"} y ${r.exportaciones} exportaci${r.exportaciones === 1 ? "ón" : "ones"}. Clientes, productos y cuentas no se han tocado.`;
+  } catch (e) { $("expmsg").textContent = e.message; }
+};
 let confirmReset = null;
 $("reiniciar").onclick = async () => {
   const b = $("reiniciar");

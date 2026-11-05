@@ -390,6 +390,14 @@ window.VM = {
     const ids = new Set(e.orderIds);
     return buildExport(withRefs().filter((o) => ids.has(o.id)), e.fileName, { id });
   },
+  /** Borra SOLO los pedidos y las exportaciones (los de prueba): no toca clientes, productos, cuentas ni solicitudes. La numeración de pedidos vuelve a empezar. */
+  async clearOrders() {
+    if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para borrar los pedidos.");
+    const pedidos = [...cache.orders], exportaciones = [...cache.exports];
+    for (const r of pedidos) await backend.remove("orders", r.id);
+    for (const r of exportaciones) await backend.remove("exports", r.id);
+    return { pedidos: pedidos.length, exportaciones: exportaciones.length };
+  },
   /** Borra pedidos y exportaciones y restaura los datos de ejemplo. */
   async resetData() {
     if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para restaurar los datos.");
