@@ -6,7 +6,7 @@ import fs from "node:fs";
 import { readXlsx } from "./xlsx-read.js";
 import { demoNifKeys } from "./demo-web/nif-demo.js";
 
-export function huellasNif(rows) {
+export function huellasNif(rows, { solo = null } = {}) { // solo: lista de códigos de cliente (p. ej. ["0429"]); si no se indica, todos
   const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
   const hi = rows.findIndex((r) => r.some((c) => /^cod\.? ?cliente/.test(norm(c))) && r.some((c) => norm(c) === "nif"));
   if (hi < 0) throw new Error("El listado debe tener las columnas «Cód. cliente» y «NIF».");
@@ -14,16 +14,16 @@ export function huellasNif(rows) {
   const out = {};
   for (const r of rows.slice(hi + 1)) {
     const id = String(r[ci] ?? "").trim(), nif = String(r[ni] ?? "").trim();
-    if (!id || !nif) continue;
+    if (!id || !nif || (solo && !solo.map((x) => x.replace(/^0+(?=\d)/, "")).includes(id.replace(/^0+(?=\d)/, "")))) continue;
     for (const v of new Set([id, id.replace(/^0+(?=\d)/, "")])) out[v] = demoNifKeys(v, nif);
   }
   return out;
 }
 
 if (process.argv[1]?.endsWith("nif-demo-a-json.js")) {
-  const [, , entrada, salida] = process.argv;
+  const [, , entrada, salida, ...solo] = process.argv; // clientes opcionales al final: node nif-demo-a-json.js clientes.xlsx nif.json 0429
   if (!entrada || !salida) { console.error("Uso: node nif-demo-a-json.js clientes.xlsx nif.json"); process.exit(1); }
-  const m = huellasNif(readXlsx(fs.readFileSync(entrada)));
+  const m = huellasNif(readXlsx(fs.readFileSync(entrada)), { solo: solo.length ? solo : null });
   fs.writeFileSync(salida, JSON.stringify(m));
   console.log(`${Object.keys(m).length} códigos de cliente con huellas de NIF → ${salida}`);
 }
