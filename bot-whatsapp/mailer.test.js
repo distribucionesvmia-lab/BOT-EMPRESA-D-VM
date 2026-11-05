@@ -126,7 +126,7 @@ test("notificador: envía el aviso de un pedido nuevo una sola vez y reintenta s
   let caido = true, t = Date.now();
   const n = crearNotificador({ db, config: { smtp: {}, from: "avisos@vm.es", to: ["oficina@vm.es"] }, log: silencio, now: () => new Date(t).toISOString(),
     send: async (_c, m) => { if (caido) throw new Error("servidor caído"); enviados.push(m); } });
-  const { order } = db.createOrder(pedido());
+  const { order } = db.createOrder(pedido({ at: new Date(t).toISOString() })); // pedido de «ahora»: el notificador solo reintenta los de los últimos 7 días
   assert.equal(await n.enviar(order), false); // falla: el pedido sigue guardado
   assert.equal(db.listOrders().length, 1);
   assert.match(n.status().ultimoError.message, /servidor caído/);
