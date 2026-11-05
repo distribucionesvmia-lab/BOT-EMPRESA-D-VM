@@ -14,7 +14,7 @@ import { seedDocs, DEMO_ACCOUNTS } from "./seeds.js";
 import { sha256hex } from "./sha256.js";
 import { makeDbBackend, makeLocalBackend } from "./backend.js";
 import data from "../ejemplo/historial-ficticio.json";
-import { demoNifMatches, demoCodeKey } from "./nif-demo.js";
+import { demoNifMatches, demoCodeKey, unirClavesNif } from "./nif-demo.js";
 import { nifClean } from "../nif-codes.js";
 import { nifCodes } from "../nif-codes.js";
 
@@ -39,7 +39,7 @@ function onData(coll, rows) {
   if (coll === "customers") {
     // El documento «_nifindex» guarda las huellas de los 6 últimos caracteres del NIF de cada cliente (no es un cliente)
     const idx = rows.find((d) => d.id === "_nifindex")?.keys ?? {};
-    rows = rows.filter((d) => d.id !== "_nifindex").map((c) => (c.nifKeys ? c : { ...c, nifKeys: idx[c.id] ?? [] }));
+    rows = rows.filter((d) => d.id !== "_nifindex").map((c) => ({ ...c, nifKeys: unirClavesNif(c, idx, globalThis.__VM_NIF__) })); // huellas propias + índice de la base + las preparadas al compilar
   }
   // Vista previa con la tarifa real: si la página trae una (build con TARIFA_JSON), sustituye a los productos de ejemplo (solo lectura)
   if (coll === "products" && globalThis.__VM_TARIFA__ && rows.length < 200) rows = // solo mientras la base tenga los productos de ejemplo: cuando se cargan los reales (#cargar-datos) mandan los de la base

@@ -5,4 +5,6 @@ import { sha256hex } from "./sha256.js";
 
 export const demoNifKeys = (customerId, nif) => nifCodes(nif).map((c) => sha256hex(`vm:${customerId}:${c}`));
 export const demoNifMatches = (customerId, typed, keys) => nifCodes(typed).some((c) => (keys ?? []).includes(sha256hex(`vm:${customerId}:${c}`)));
+/** Junta las huellas de NIF de un cliente: las suyas, las del índice de la base y las preparadas al compilar (sin repetir). */
+export const unirClavesNif = (cliente, ...fuentes) => [...new Set([...(cliente.nifKeys ?? []), ...fuentes.flatMap((f) => f?.[cliente.id] ?? [])])];
 export const demoCodeKey = (code) => sha256hex(`vm:codigo:${nifClean(code)}`);
