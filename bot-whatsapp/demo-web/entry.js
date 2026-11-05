@@ -3,7 +3,7 @@
 // clientes, pedidos y exportaciones, que se guardan y se actualizan (base compartida de Claude, o el navegador).
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog, habitualProducts } from "../bot.js";
 import { priceOrder, totals } from "../pricing.js";
-import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders } from "../weborder.js";
+import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, conHistorial } from "../weborder.js";
 import { deliveryOptions, deliveryInfo, deliveryCalendarFrom, madridDay, puedeHoy } from "../delivery.js";
 import { findCustomers } from "../identify.js";
 import { FORMAT, madrid, madridTime } from "../export-format.js";
@@ -44,6 +44,7 @@ function onData(coll, rows) {
   // Vista previa con la tarifa real: si la página trae una (build con TARIFA_JSON), sustituye a los productos de ejemplo (solo lectura)
   if (coll === "products" && globalThis.__VM_TARIFA__ && rows.length < 200) rows = // solo mientras la base tenga los productos de ejemplo: cuando se cargan los reales (#cargar-datos) mandan los de la base
     globalThis.__VM_TARIFA__.map((p) => ({ ...p, unitsPerBox: p.unitsPerBox ?? null, discount: p.discount ?? 0, updatedAt: null, changes: [] }));
+  if (coll === "customers" && globalThis.__VM_HISTORIAL__) rows = conHistorial(rows, globalThis.__VM_HISTORIAL__); // histórico puesto a mano a clientes concretos (p. ej. un cliente de prueba)
   cache[coll] = rows;
   if (coll === "products" && rows.length) setCatalog(activeCatalog()); // el bot usa el precio nuevo al instante
   emit();

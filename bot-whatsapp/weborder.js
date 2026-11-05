@@ -25,6 +25,13 @@ export function webProducts(customer, catalog, habitualProducts, imgOf = () => n
 /** Árbol de categorías del catálogo que ve el cliente (con cuántos productos tiene cada una). */
 export const webTree = (catalog) => arbolCategorias(catalog);
 
+/** Pone el histórico indicado ({ código de cliente: [pedidos] }) a los clientes de la lista que lo tengan (sustituye al que traían). */
+export function conHistorial(clientes, historial = {}) {
+  const k = (id) => String(id).trim().replace(/^0+(?=\d)/, ""); // «0429» y «429» son el mismo cliente
+  const por = new Map(Object.entries(historial).map(([id, o]) => [k(id), o]));
+  return clientes.map((c) => (por.has(k(c.id)) ? { ...c, orders: por.get(k(c.id)) } : c));
+}
+
 /**
  * Suma al historial de a3ERP los pedidos que el cliente ha hecho por la aplicación o el chat (y que a3ERP aún no ha facturado):
  * solo los de fecha igual o posterior al último pedido de a3ERP, para no contarlos dos veces cuando después aparezcan en su historial.

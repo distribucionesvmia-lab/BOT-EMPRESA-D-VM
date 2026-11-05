@@ -32,10 +32,12 @@ if (process.env.FOTOS_DIR) {
   for (const f of fs.readdirSync(process.env.FOTOS_DIR)) { if (ids && !ids.has(f.replace(/\.[^.]+$/, ""))) continue; const [id, ext] = [f.replace(/\.[^.]+$/, ""), f.split(".").pop().toLowerCase()]; if (mt[ext]) m[id] = `data:${mt[ext]};base64,` + fs.readFileSync(path.join(process.env.FOTOS_DIR, f)).toString("base64"); }
   fotos = `window.__VM_FOTOS__=${JSON.stringify(m)};`;
 }
+// HISTORIAL_JSON=ruta.json (de historial-a-json.js): pone ese histórico a los clientes indicados. Lleva datos de clientes: NO se sube al repositorio.
+const historial = process.env.HISTORIAL_JSON ? `window.__VM_HISTORIAL__=${fs.readFileSync(process.env.HISTORIAL_JSON, "utf8")};` : "";
 const safe = (s) => s.replace(/<\/script/gi, "<\\/script");
 const page = fs
   .readFileSync(path.join(here, "page.html"), "utf8")
-  .replace("/*__BUNDLE__*/", () => safe(tarifa + fotos + fs.readFileSync(bundle, "utf8")))
+  .replace("/*__BUNDLE__*/", () => safe(tarifa + fotos + historial + fs.readFileSync(bundle, "utf8")))
   .replace("/*__MINI__*/", () => safe(JSON.stringify(mini)));
 
 fs.writeFileSync(path.join(dist, "artifact.html"), page);

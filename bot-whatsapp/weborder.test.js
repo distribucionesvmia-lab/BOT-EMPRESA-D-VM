@@ -78,3 +78,11 @@ test("withOwnOrders: suma los pedidos hechos por la app solo si son posteriores 
   assert.equal(withOwnOrders(c, []), c); // sin pedidos propios: el mismo cliente
   assert.deepEqual(withOwnOrders({ id: "2", orders: [] }, propios).orders.map((o) => o.doc), ["W2", "W3"].reverse().filter(() => true).length ? ["W3", "W2"] : []);
 });
+
+test("conHistorial: pone el histórico indicado solo a los clientes que lo tienen", async () => {
+  const { conHistorial } = await import("./weborder.js");
+  const pedidos = [{ doc: "1", date: "2026-11-04", lines: [{ productId: "5", qty: 3 }] }];
+  const r = conHistorial([{ id: "0429", name: "BAR GELI", orders: [{ doc: "viejo", date: "2026-01-01", lines: [] }] }, { id: "9", name: "OTRO", orders: [] }], { "429": pedidos }); // el código puede venir con o sin ceros delante
+  assert.deepEqual(r[0].orders, pedidos); // sustituye al que traía
+  assert.deepEqual(r[1].orders, []); // los demás no cambian
+});
