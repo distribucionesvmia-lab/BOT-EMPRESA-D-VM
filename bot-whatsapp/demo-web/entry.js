@@ -37,7 +37,7 @@ const activeCatalog = () =>
 
 function onData(coll, rows) {
   if (coll === "customers") {
-    // El documento «_nifindex» guarda las huellas de los 6 últimos caracteres del NIF de cada cliente (no es un cliente)
+    // El documento «_nifindex» guarda las huellas de los 6 primeros dígitos del DNI de cada cliente (no es un cliente)
     const idx = rows.find((d) => d.id === "_nifindex")?.keys ?? {};
     rows = rows.filter((d) => d.id !== "_nifindex").map((c) => ({ ...c, nifKeys: unirClavesNif(c, idx, globalThis.__VM_NIF__) })); // huellas propias + índice de la base + las preparadas al compilar
   }
@@ -207,9 +207,9 @@ window.VM = {
     store.set("vm:acc", acc.id);
     return { ok: true, nombre: customer.name };
   },
-  /** Cliente habitual: solo los 6 últimos caracteres del NIF/CIF. El nombre, si se envía, estrecha la búsqueda. */
+  /** Cliente habitual: solo los 6 primeros dígitos del DNI/CIF. El nombre, si se envía, estrecha la búsqueda. */
   loginNif(nif, business) {
-    if (!nifCodes(nif).length) return { ok: false, error: "Escribe los 6 últimos caracteres de tu NIF." };
+    if (!nifCodes(nif).length && !/^[A-Z0-9]{6,10}$/.test(nifClean(nif))) return { ok: false, error: "Escribe los 6 primeros dígitos de tu DNI o CIF." }; // o el PIN personal
     const now = Date.now();
     if (nifFails.until > now) return { ok: false, error: "Demasiados intentos. Prueba más tarde o llama a la empresa." };
     // ¿Es el código personal que el cliente eligió en lugar del NIF?
@@ -231,7 +231,7 @@ window.VM = {
   /** El cliente cambia los 6 del NIF por un PIN personal (6 a 10 letras o números), único entre todos los clientes. */
   async changeCode(nuevo) {
     const a = currentAccount();
-    if (!a || !a.id.startsWith("n")) return { ok: false, error: "Entra primero con los 6 últimos del NIF." };
+    if (!a || !a.id.startsWith("n")) return { ok: false, error: "Entra primero con los 6 primeros dígitos de tu DNI." };
     if (!/^[A-Z0-9]{6,10}$/.test(nifClean(nuevo))) return { ok: false, error: "El código debe tener entre 6 y 10 letras o números." };
     if (cache.customers.some((c) => demoNifMatches(c.id, nuevo, c.nifKeys)) || cache.accounts.some((x) => x.codeKey === demoCodeKey(nuevo) && x.id !== a.id)) return { ok: false, error: "Ese código no está disponible. Elige otro." };
     if (!perms.canWrite) return { ok: false, error: "En modo solo lectura no se puede cambiar el PIN." };

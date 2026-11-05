@@ -1,5 +1,5 @@
 // Importación de la lista de clientes que exporta a3ERP (Excel): código, nombre comercial, razón social, población,
-// dirección, teléfono(s), correo(s), bloqueado y obsoleto. El NIF se usa solo para calcular la huella de sus 6 últimos caracteres (acceso del cliente): no se guarda.
+// dirección, teléfono(s), correo(s), bloqueado y obsoleto. El NIF se usa solo para calcular la huella de sus 6 primeros dígitos (acceso del cliente): no se guarda.
 import { readXlsx } from "./xlsx-read.js";
 import { nifKeys } from "./nif-key.js";
 

@@ -196,8 +196,8 @@
       <form class="vm-card" id="f-acceso" autocomplete="off">
         <span class="tag">Cliente habitual</span>
         <h2>Inicia sesión</h2>
-        <p>Entra con los <b>6 últimos caracteres de tu NIF o CIF</b>. Una vez dentro podrás <b>cambiar este código por un PIN personal</b> cuando quieras.</p>
-        <label id="l-nif">Últimos 6 caracteres del NIF o CIF<input id="a-nif" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 45678Z" required></label>
+        <p>Entra con los <b>6 primeros dígitos de tu DNI o CIF</b> (en un CIF, los 6 primeros números, sin la letra). Una vez dentro podrás <b>cambiar este código por un PIN personal</b> cuando quieras.</p>
+        <label id="l-nif">Primeros 6 dígitos del DNI o CIF<input id="a-nif" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 123456" required></label>
         <label id="l-emp" hidden>Nombre de tu empresa<input id="a-emp" maxlength="80" autocomplete="organization"></label>
         <label id="l-tel" hidden>Teléfono<input id="a-tel" type="tel" inputmode="tel" autocomplete="tel"></label>
         <label id="l-pin" hidden>PIN de 6 cifras<input id="a-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password"></label>
@@ -216,7 +216,7 @@
       <section class="vm-card how" aria-labelledby="como">
         <h2 id="como">¿Cómo hago un pedido?</h2>
         <ol>
-          <li><span><b>Inicia sesión</b> con los 6 últimos caracteres de tu NIF o CIF.</span></li>
+          <li><span><b>Inicia sesión</b> con los 6 primeros dígitos de tu DNI o CIF.</span></li>
           <li><span>Verás el <b>catálogo interactivo ordenado por preferencia</b>: tu histórico de compras primero, con un <b>campo de búsqueda</b> para encontrar cualquier artículo.</span></li>
           <li><span>Marca las cantidades y usa el filtro <b>«Solo con cantidad»</b> para ver solo lo que llevas. Revisa el carrito, añade tus <b>observaciones</b> si las necesitas y confirma el pedido.</span></li>
         </ol>
@@ -301,7 +301,7 @@ function modoAcceso(pin) {
   conPin = pin;
   $("l-nif").hidden = pin; $("l-emp").hidden = !pin; if (!pin) $("a-emp").value = ""; $("l-tel").hidden = !pin; $("l-pin").hidden = !pin;
   $("a-nif").required = !pin; $("a-emp").required = pin; $("a-tel").required = pin; $("a-pin").required = pin;
-  $("ir-pin").textContent = pin ? "Entrar con los 6 últimos del NIF" : "Entrar con teléfono y PIN";
+  $("ir-pin").textContent = pin ? "Entrar con los 6 primeros dígitos del DNI" : "Entrar con teléfono y PIN";
   $("a-err").textContent = "";
 }
 $("ir-pin").onclick = () => modoAcceso(!conPin);

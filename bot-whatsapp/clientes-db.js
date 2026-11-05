@@ -107,7 +107,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
                phone = COALESCE(excluded.phone, phone), address = COALESCE(excluded.address, address),
                recargo = excluded.recargo, active = excluded.active, updated_at = excluded.updated_at`,
           ).run(id, String(c.name).trim(), c.legalName ?? null, c.city ?? null, String(c.municipio ?? "").trim() || null, c.phone ?? phones9(c)[0] ?? null, c.address ?? null, c.recargoEquivalencia ? 1 : 0, c.active === false ? 0 : 1, now);
-          // El NIF no se guarda: solo la huella de sus 6 últimos caracteres (nif-key.js). Si el cliente ya trae las huellas, se usan tal cual.
+          // El NIF no se guarda: solo la huella de sus 6 primeros dígitos (nif-key.js). Si el cliente ya trae las huellas, se usan tal cual.
           const keys = Array.isArray(c.nifKeys) ? c.nifKeys : c.nif ? nifKeys(id, c.nif) : [];
           if (keys.length) db.prepare("UPDATE customers SET nif_keys = ? WHERE id = ?").run(JSON.stringify(keys), id);
           if (c.phones || c.phone) {
@@ -141,7 +141,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
 
     /** Clientes activos que podrían ser el que escribe (modo flexible: «alegría» encaja con «Bar Alegría»). Solo id y nombre. */
     candidates: (query) => findCustomers(db.prepare("SELECT id, name, legal_name AS legalName, active FROM customers").all().map((r) => ({ ...r, active: !!r.active })), query, { lenient: true }).map((c) => ({ id: c.id, name: c.name })),
-    /** ¿Los 6 últimos caracteres del NIF escritos corresponden a este cliente? Un cliente sin NIF guardado nunca coincide. */
+    /** ¿Los 6 primeros dígitos del DNI escritos corresponden a este cliente? Un cliente sin NIF guardado nunca coincide. */
     checkNif(id, typed) {
       const r = db.prepare("SELECT nif_keys FROM customers WHERE id = ? AND active = 1").get(String(id));
       return !!r?.nif_keys && nifMatches(String(id), typed, JSON.parse(r.nif_keys));

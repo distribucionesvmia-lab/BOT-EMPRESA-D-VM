@@ -124,9 +124,9 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       const empresa = String(b.empresa ?? "").slice(0, 80);
-      // Cliente habitual: solo los 6 últimos caracteres del NIF/CIF (el nombre es opcional: si se envía, estrecha la búsqueda)
+      // Cliente habitual: solo los 6 primeros dígitos del DNI/CIF (el nombre es opcional: si se envía, estrecha la búsqueda)
       if (b.nif !== undefined) {
-        if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe los 6 últimos caracteres de tu NIF." }), true;
+        if (nifCodes(b.nif).length === 0 && !validCode(b.nif)) return send(res, 400, { error: "Escribe los 6 primeros dígitos de tu DNI o CIF." }), true; // o el PIN personal
         if (!nifLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
         // ¿Es el código personal que el cliente puso en lugar del NIF? (si es así, no hace falta nada más)
         if (validCode(b.nif)) {

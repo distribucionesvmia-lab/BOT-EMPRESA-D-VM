@@ -68,7 +68,7 @@ export const customerDirectory = {
   /** Clientes que podrían ser el que pide acceso, con el motivo (nombre, teléfono, correo). */
   suggest: (business, phone, email) => dbs().customersDb.matchRegistration({ business, phone, email }).suggestions,
   search: (opts) => dbs().customersDb.search(opts),
-  /** Acceso con NIF: clientes que encajan con el nombre escrito (flexible) y comprobación de los 6 últimos caracteres. */
+  /** Acceso con NIF: clientes que encajan con el nombre escrito (flexible) y comprobación de los 6 primeros dígitos. */
   candidates: (query) => dbs().customersDb.candidates(query),
   findByNif: (typed) => dbs().customersDb.findByNif(typed),
   checkNif: (id, typed) => dbs().customersDb.checkNif(id, typed),

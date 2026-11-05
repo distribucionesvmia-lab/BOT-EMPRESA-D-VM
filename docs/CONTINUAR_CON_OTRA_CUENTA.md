@@ -18,7 +18,7 @@ git clone https://github.com/distribucionesvmia-lab/BOT-EMPRESA-D-VM.git && cd B
 git checkout claude/eager-hamilton-gknalq
 cd bot-whatsapp          # necesita Node 22 (usa node:sqlite); no hay dependencias que instalar
 npm test                 # 233 pruebas
-npm run demo             # servidor de demostración con datos ficticios (cliente de prueba: 00001R)
+npm run demo             # servidor de demostración con datos ficticios (cliente de prueba: 123456)
 ```
 
 Para saber qué está hecho y qué falta: `docs/CATALOGO_TRABAJO_PROGRESO.md`. Guías: `docs/ACTUALIZAR_PRODUCTOS.md`, `docs/GOOGLE_DRIVE.md`, `docs/DESPLIEGUE.md`, `docs/CATALOGO_REVISION_FINAL.md`.
@@ -44,7 +44,7 @@ TARIFA_JSON=lista-nueva.json FOTOS_DIR=imagenes node demo-web/build.mjs      # d
 
 ## 5. Decisiones del cliente ya tomadas (no preguntar de nuevo)
 
-Entrada con los 6 últimos del NIF · "Hoy" solo antes de las 10:00 y solo municipio 47085 · el «Dto %» de la tarifa es descuento para el cliente · IVA `SRE` = 4 % · los productos de familias nuevas sin categoría van a «Otros productos» · lo que no esté en el Excel de artículos se quita · el chat solo responde a pedir, último pedido, histórico y repetir (todo lo demás: «No estoy diseñado para responderte a eso»).
+Entrada con los 6 primeros dígitos del DNI/CIF (decisión del 05/11) · "Hoy" solo antes de las 10:00 y solo municipio 47085 · el «Dto %» de la tarifa es descuento para el cliente · IVA `SRE` = 4 % · los productos de familias nuevas sin categoría van a «Otros productos» · lo que no esté en el Excel de artículos se quita · el chat solo responde a pedir, último pedido, histórico y repetir (todo lo demás: «No estoy diseñado para responderte a eso»).
 
 ## 6. Pendiente
 

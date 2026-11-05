@@ -382,13 +382,13 @@ test("RETENCIÓN: los pedidos de una cuenta automática sin confirmar quedan ret
 
 const entrarNif = (nif, empresa) => call("POST", "/api/acceso", { body: { nif, ...(empresa ? { empresa } : {}) } });
 
-test("ACCESO CON NIF: las cuentas ya están creadas y el cliente entra solo con los 6 últimos caracteres del NIF", async () => {
+test("ACCESO CON NIF: las cuentas ya están creadas y el cliente entra solo con los 6 primeros dígitos del DNI/CIF", async () => {
   // Todos los clientes activos importados tienen ya su cuenta, y el NIF no aparece en ninguna respuesta
   const cuentas = (await call("GET", "/api/admin/cuentas", { admin: true })).json;
   assert.ok(cuentas.find((c) => c.customerId === "7003"));
   assert.equal(cuentas.find((c) => c.customerId === "7002"), undefined); // de baja: sin cuenta
   assert.equal(JSON.stringify(cuentas).includes("B11111111"), false);
-  // NIF B11111111 → últimos 6: 111111 (sin decir el nombre)
+  // NIF B11111111 → 6 primeros dígitos: 111111 (sin decir el nombre)
   const r = await entrarNif("111111");
   assert.equal(r.status, 200);
   assert.equal(r.json.cliente.nombre, "CAFETERIA IMPORTADA");
@@ -404,9 +404,10 @@ test("ACCESO CON NIF: las cuentas ya están creadas y el cliente entra solo con 
     ["7101", "BAR UNO", "TITULAR REPETIDO", "", "", "", "", "12222222A", "No", "No", "1"],
     ["7102", "BAR DOS", "TITULAR REPETIDO", "", "", "", "", "12222222A", "No", "No", "1"],
   ] }])));
-  const amb = await entrarNif("22222A");
+  const amb = await entrarNif("122222");
   assert.deepEqual([amb.status, amb.json.necesitaNombre], [409, true]);
-  assert.equal((await entrarNif("222222", "bar dos")).json.cliente.nombre, "BAR DOS");
+  assert.equal((await entrarNif("122222", "bar dos")).json.cliente.nombre, "BAR DOS");
+  assert.equal((await entrarNif("22222A")).status, 401); // los 6 últimos caracteres (como antes) ya no valen
   // la empresa puede bloquear la cuenta: ni con el NIF correcto entra, y al reactivarla vuelve a entrar
   const c = await cuentaDe("7001");
   await call("POST", `/api/admin/cuentas/${c.id}/bloquear`, { admin: true, body: { bloquear: true } });
@@ -431,7 +432,7 @@ test("CAMBIAR EL CÓDIGO: el cliente sustituye los 6 del NIF por uno personal; e
   assert.equal((await entrarNif("miclave7")).status, 200);
   assert.equal((await entrarNif("111111")).status, 401); // el NIF ya no vale para esa cuenta
   // otro cliente no puede quedarse con el mismo código
-  const otro = await entrarNif("22222A", "bar uno");
+  const otro = await entrarNif("122222", "bar uno");
   assert.equal((await call("POST", "/api/codigo", { cookie: cookieOf(otro), body: { nuevo: "MiClave7" } })).status, 400);
   // la empresa lo restablece: vuelve a valer el NIF
   const c = await cuentaDe("7001");
@@ -455,12 +456,12 @@ test("SINCRONIZACIÓN: la empresa ve el estado y puede lanzarla; importa los Exc
   let e = (await call("GET", "/api/admin/sincronizacion", { admin: true })).json;
   assert.equal(e.configurado, true);
   assert.equal(e.ultima, null);
-  fs.writeFileSync(path.join(syncDir, "clientes.xlsx"), buildWorkbook([{ name: "C", rows: [cabecera, ["8001", "CLIENTE SINCRONIZADO", "", "MEDINA", "", "", "", "A12345678", "No", "No", "1"]] }]));
+  fs.writeFileSync(path.join(syncDir, "clientes.xlsx"), buildWorkbook([{ name: "C", rows: [cabecera, ["8001", "CLIENTE SINCRONIZADO", "", "MEDINA", "", "", "", "A87654321", "No", "No", "1"]] }]));
   fs.writeFileSync(path.join(syncDir, "productos.xlsx"), buildWorkbook([{ name: "P", rows: [["Código", "Descripción", "Precio"], ["9001", "PRODUCTO NUEVO", "3,5"]] }]));
   let r = (await call("POST", "/api/admin/sincronizacion/ahora", { admin: true, body: {} })).json;
   assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "importado", "sin fichero"]);
   assert.equal((await call("GET", "/api/admin/clientes/lista?q=sincronizado", { admin: true })).json.total, 1);
-  const ent = await entrarNif("345678"); // los 6 últimos números de A12345678: el cliente recién sincronizado ya tiene cuenta y entra
+  const ent = await entrarNif("876543"); // los 6 primeros dígitos de A87654321: el cliente recién sincronizado ya tiene cuenta y entra
   assert.equal(ent.status, 200);
   assert.equal(ent.json.cliente.nombre, "CLIENTE SINCRONIZADO");
   r = (await call("POST", "/api/admin/sincronizacion/ahora", { admin: true, body: {} })).json;

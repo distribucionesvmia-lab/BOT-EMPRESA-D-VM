@@ -13,7 +13,7 @@ import { pickFiles, fileState, sincronizar } from "./sincronizar.js";
 import { localSource, driveSource, parseCredentials } from "./drive.js";
 
 const cabC = ["Cód. cliente", "Organización", "Razón social", "Población", "Dirección fiscal", "Teléfono", "E-Mail", "NIF", "Bloqueado", "Obsoleto"];
-const clientes = (n, extra = []) => buildWorkbook([{ name: "C", rows: [cabC, ...Array.from({ length: n }, (_, i) => [String(i + 1), `CLIENTE ${i + 1}`, "", "MEDINA", "", "", "", `0000${String(i + 1).padStart(4, "0")}Z`, "No", "No"]), ...extra] }]);
+const clientes = (n, extra = []) => buildWorkbook([{ name: "C", rows: [cabC, ...Array.from({ length: n }, (_, i) => [String(i + 1), `CLIENTE ${i + 1}`, "", "MEDINA", "", "", "", `${String(i + 1).repeat(8)}Z`, "No", "No"]), ...extra] }]);
 const productos = (rows) => buildWorkbook([{ name: "P", rows: [["Código", "Descripción", "Precio"], ...rows] }]);
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "vm-sync-"));
 const deps = (source) => ({ source, state: fileState(path.join(tmp(), "estado.json")), catalogDb: openCatalogDb(":memory:"), customersDb: openCustomersDb(":memory:"), accountsDb: openAccountsDb(":memory:") });
@@ -38,7 +38,7 @@ test("carpeta local: importa clientes y productos, crea las cuentas, no repite s
   assert.deepEqual(r.resultados.map((x) => x.estado), ["importado", "importado", "sin fichero"]);
   assert.equal(d.customersDb.count(), 3);
   assert.equal(d.accountsDb.listAccounts().length, 3); // cuentas ya creadas
-  assert.equal(d.customersDb.checkNif("1", "00001Z"), true); // el NIF se guarda solo como huella
+  assert.equal(d.customersDb.checkNif("1", "111111"), true); // el NIF se guarda solo como huella
   assert.equal(d.catalogDb.count(), 2);
   // sin cambios: no se vuelve a importar
   r = await sincronizar(d);

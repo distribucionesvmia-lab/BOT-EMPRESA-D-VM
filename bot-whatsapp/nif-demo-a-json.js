@@ -1,4 +1,4 @@
-// Prepara el acceso con NIF de la DEMO para los clientes de un listado de a3ERP: guarda solo las HUELLAS de los 6 últimos caracteres
+// Prepara el acceso con NIF de la DEMO para los clientes de un listado de a3ERP: guarda solo las HUELLAS de los 6 primeros dígitos
 // (nunca el NIF) de cada cliente, con su código tal como puede estar en la base de la demo («0429» y «429»).
 //   node nif-demo-a-json.js clientes.xlsx nif.json        y al compilar:  NIF_JSON=nif.json node demo-web/build.mjs
 // Así se puede entrar con el NIF aunque la base de la demo no tenga (o haya perdido) su índice de huellas.

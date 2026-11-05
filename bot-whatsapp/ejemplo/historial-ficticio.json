@@ -217,7 +217,7 @@
     "1004": 8
    },
    "recargoEquivalencia": false,
-   "nif": "00000001R",
+   "nif": "12345678Z",
    "municipio": "47085"
   },
   {
@@ -317,7 +317,7 @@
    ],
    "frequent": [],
    "recargoEquivalencia": true,
-   "nif": "B00000002",
+   "nif": "B22222222",
    "municipio": "47186"
   },
   {
@@ -366,7 +366,7 @@
    "recargoEquivalencia": false,
    "specialPrices": {},
    "discounts": {},
-   "nif": "00000003T",
+   "nif": "33333333R",
    "municipio": "47085"
   }
  ],

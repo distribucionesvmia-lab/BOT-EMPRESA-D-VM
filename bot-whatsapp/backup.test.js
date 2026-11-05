@@ -38,6 +38,6 @@ test("copia de todas las bases: pedidos, cuentas, clientes y catálogo (con sus 
   assert.match(errors.rota, /disco lleno/);
   assert.equal(openCatalogDb(files.catalogo).get("1").name, "AGUA");
   assert.equal(openCustomersDb(files.clientes).getById("C1").name, "BAR UNO");
-  assert.equal(openCustomersDb(files.clientes).checkNif("C1", "45678Z"), true); // la huella del NIF también va en la copia
+  assert.equal(openCustomersDb(files.clientes).checkNif("C1", "123456"), true); // la huella del NIF también va en la copia
   assert.equal(openAccountsDb(files.cuentas).listAccounts().length, 1);
 });

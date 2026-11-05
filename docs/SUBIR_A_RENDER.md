@@ -44,7 +44,7 @@ Guarda `ADMIN_TOKEN` y `NIF_PEPPER` en un gestor de contraseñas o en un papel e
 
 ## 5. Comprobar que funciona
 1. `https://TU-DIRECCIÓN/health` debe responder «ok».
-2. `https://TU-DIRECCIÓN/cliente` es lo que ven los clientes. Entra con los 6 últimos del NIF de un cliente de prueba (por ejemplo el Geli).
+2. `https://TU-DIRECCIÓN/cliente` es lo que ven los clientes. Entra con los 6 primeros dígitos del DNI/CIF de un cliente de prueba (por ejemplo el Geli).
 3. `https://TU-DIRECCIÓN/empresa` es la aplicación de la empresa: entras con `ADMIN_TOKEN`. Pulsa **Sincronizar ahora** y mira que aparecen clientes y productos.
 4. Haz un pedido de prueba y comprueba que llega el correo y que se exporta el Excel.
 

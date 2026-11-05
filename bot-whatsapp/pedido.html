@@ -817,7 +817,7 @@ const obs = new MutationObserver(capasCambian);
 
 (async () => {
   const r = await fetch(location.pathname + "/datos").catch(() => null);
-  if (!r || !r.ok) { $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 últimos caracteres de tu NIF</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
+  if (!r || !r.ok) { $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 primeros dígitos de tu DNI</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
   data = await r.json();
   document.title = "Pedido a " + data.business;
   $("ttl").textContent = "Hola, " + data.customer.name;

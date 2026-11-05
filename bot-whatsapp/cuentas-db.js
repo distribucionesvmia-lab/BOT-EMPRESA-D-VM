@@ -139,7 +139,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       }
     },
     /**
-     * Acceso de un cliente habitual: nombre de empresa (candidatos) + últimos 6 caracteres del NIF.
+     * Acceso de un cliente habitual: nombre de empresa (candidatos) + 6 primeros dígitos del DNI.
      * check(customerId) dice si el NIF escrito es el de ese cliente. Los fallos cuentan contra las cuentas candidatas.
      * { ok:true, token, account } o { ok:false, reason: "invalid" | "locked" }.
      */

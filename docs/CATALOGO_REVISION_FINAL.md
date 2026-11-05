@@ -42,7 +42,7 @@ Estado: Nada está publicado ni desplegado. Esto NO es una declaración de "list
 ```bash
 git fetch origin claude/eager-hamilton-gknalq && git checkout claude/eager-hamilton-gknalq
 cd bot-whatsapp && npm test        # 195 tests
-npm run demo                       # http://localhost:3000/cliente · entrar con 00000001R
+npm run demo                       # http://localhost:3000/cliente · entrar con 123456
 ```
 Revisar en un ancho de 390 px: añadir producto, cambiar a cajas, recargar (el carrito vuelve), repetir un pedido, marcar favorito, finalizar → elegir día → confirmar.
 
