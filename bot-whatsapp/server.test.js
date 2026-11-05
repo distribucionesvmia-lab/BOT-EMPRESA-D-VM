@@ -303,6 +303,18 @@ test("APP_MODE=empresa: la aplicación de la empresa no sirve nada del cliente",
   }
 });
 
+test("EMPRESA: la misma clave errónea repetida (las 7 cargas del panel) cuenta como un solo intento", async () => {
+  const { p, url } = await arrancar("empresa");
+  try {
+    // un error al teclear: el panel lanza 7 peticiones con la misma clave
+    for (let i = 0; i < 25; i++) assert.equal(await status(url + "/api/admin/resumen", { headers: { Authorization: "Bearer mal" } }), 403);
+    for (let i = 0; i < 25; i++) assert.equal(await status(url + "/api/admin/resumen"), 403); // sin clave: no cuenta
+    assert.equal(await status(url + "/api/admin/resumen", { headers: { Authorization: `Bearer ${ADMIN}` } }), 200); // y la buena entra
+  } finally {
+    p.kill();
+  }
+});
+
 test("EMPRESA: adivinar la clave tiene límite de intentos", async () => {
   const { p, url } = await arrancar("empresa");
   try {

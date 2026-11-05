@@ -44,8 +44,10 @@ function orderView(o) {
 export function createAdmin({ sync = null, mail = null, accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones" }) {
   const isAdmin = makeAdminCheck(adminToken);
   // Máximo 10 claves erróneas cada 10 minutos por IP; superado el límite se bloquea esa IP aunque acierte la clave
+  // Cada CLAVE distinta que falla cuenta una vez: el panel lanza varias peticiones a la vez con la misma clave y un solo
+  // error al teclear no debe bloquear al administrador. Las peticiones sin clave no cuentan (no adivinan nada).
   const failures = new Map();
-  const recentFailures = (key, now = Date.now()) => (failures.get(key) ?? []).filter((t) => now - t < 10 * 60_000);
+  const recentFailures = (key, now = Date.now()) => (failures.get(key) ?? []).filter((f) => now - f.t < 10 * 60_000);
   const ip = (req) => (process.env.TRUST_PROXY === "1" ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() : "") || req.socket.remoteAddress || "?";
 
   return async function route(req, res, url) {
@@ -54,7 +56,9 @@ export function createAdmin({ sync = null, mail = null, accounts, customers, ord
     const who = ip(req);
     if (recentFailures(who).length >= 10) return send(res, 429, { error: "Demasiados intentos. Espera unos minutos." }), true;
     if (!isAdmin(req)) {
-      failures.set(who, [...recentFailures(who), Date.now()]);
+      const presented = req.headers.authorization;
+      const prev = recentFailures(who);
+      if (presented && !prev.some((f) => f.h === presented)) failures.set(who, [...prev, { t: Date.now(), h: presented }]);
       return send(res, 403, { error: "Acceso no autorizado." }), true;
     }
     const get = req.method === "GET", post = req.method === "POST";

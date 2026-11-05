@@ -1,8 +1,10 @@
 import { BUSINESS, PRODUCTS } from "./config.js";
 import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRows, isYes, isNo, isDone, parseRemove, parseChangeQty, lev } from "./nlu.js";
+import { isTooGeneric } from "./identify.js";
 import { deliveryAllowed, longDate, puedeHoy } from "./delivery.js";
 
-const money = (n) => `${n.toFixed(2)}${BUSINESS.currency}`;
+const money = (n) => `${n.toFixed(2).replace(".", ",")} ${BUSINESS.currency}`; // «3,30 €», como en la web
+const udsT = (n) => `${n} ${n === 1 ? "ud" : "uds"}`; // «1 ud», «6 uds»
 const norm = (s) =>
   s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 const tokenize = (s) => norm(s).split(/[^a-z0-9]+/).filter(Boolean);
@@ -11,7 +13,10 @@ const trunc = (s, n) => (s.length <= n ? s : s.slice(0, n - 1).trimEnd() + "…"
 // Una línea de pedido: { id, name, price, qty, unit: "ud" | "caja", upb (unidades por caja, si se conoce), note? }
 // El cliente puede pedir en unidades o en cajas; las unidades de una caja salen de la ficha del artículo (unitsPerBox).
 const upbOf = (p) => (Number.isInteger(p?.unitsPerBox) && p.unitsPerBox > 1 ? p.unitsPerBox : null);
-const mkItem = (p, qty, unit = "ud", extra = {}) => ({ id: p.id, name: p.name, price: p.price, qty, unit, upb: upbOf(p), ...extra });
+// Precios especiales del cliente de la conversación en curso (se fijan en handleMessage, que es síncrona)
+let PRICES = null;
+const priceOf = (p) => PRICES?.[String(p.id)] ?? p.price;
+const mkItem = (p, qty, unit = "ud", extra = {}) => ({ id: p.id, name: p.name, price: priceOf(p), qty, unit, upb: upbOf(p), ...extra });
 const unitsOf = (i) => (i.unit === "caja" ? i.qty * (i.upb ?? 1) : i.qty);
 const qtyLabel = (i) =>
   i.unit === "caja" ? `${i.qty} ${i.qty === 1 ? "caja" : "cajas"}${i.upb ? ` (${i.qty * i.upb} uds)` : ""}` : `${i.qty}`;
@@ -56,7 +61,7 @@ const esUltimo = (t) => !/\d/.test(t) && t.length <= 48 && !PIDE_REPETIR.test(t)
 const esHistorico = (t) => !/\d/.test(t) && t.length <= 52 && !PIDE_REPETIR.test(t) && ["historico", "historial", "mis pedidos", "pedidos anteriores", "pedidos pasados", "que he pedido", "lo que he pedido", "lo que pedi", "que pedi", "mis compras", "compras anteriores", "ultimos pedidos", "pedidos que he hecho", "anteriores pedidos"].some((p) => t.includes(p));
 const esAbrir = (t) => OPEN_RE.test(t);
 const esRepetirUltimo = (t) => !/\d/.test(t) && t.length <= 48 && PIDE_REPETIR.test(t) && /pedido|ultim|anterior|vez/.test(t);
-const cantidadH = (i) => (i.unit === "caja" ? `${i.qty} ${i.qty === 1 ? "caja" : "cajas"}` : i.qty === 1 ? "1 ud" : `${i.qty} uds`);
+const cantidadH = (i) => (i.unit === "caja" ? `${i.qty} ${i.qty === 1 ? "caja" : "cajas"}` : udsT(i.qty));
 
 // ¿la palabra del cliente (q) corresponde a la del producto (t)? Acepta plurales y prefijos
 const wordMatch = (q, t) => q === t || (q.length >= 3 && t.startsWith(q)) || (t.length >= 4 && q.startsWith(t)) || (q.length >= 5 && t.length >= 5 && lev(q, t) <= 1); // perdona una errata: «cerbeza»
@@ -163,7 +168,7 @@ function listUi(s, page = 0) {
   const rows = all.slice(start, start + PAGE).map((p) => ({
     id: `p:${p.id}`,
     title: trunc(p.name, 24),
-    description: trunc(`${p.name} · última vez: ${p.lastQty} uds`, 72),
+    description: trunc(`${p.name} · última vez: ${udsT(p.lastQty)}`, 72),
   }));
   if (!rows.length) return undefined;
   if (start + PAGE < all.length) rows.push({ id: `more:${page + 1}`, title: "Ver más artículos", description: `Quedan ${all.length - start - PAGE} por ver` });
@@ -189,11 +194,14 @@ const WHO_PROMPT =
 const habitualBlock = (s) => {
   const top = habitualProducts(s.customer).slice(0, 6);
   return top.length
-    ? `⭐ *Tu histórico de productos* (según tus últimos pedidos):\n` + top.map((p) => `• ${p.name} — última vez: ${p.lastQty} uds`).join("\n") + `\n\n`
+    ? `⭐ *Tu histórico de productos* (según tus últimos pedidos):\n` + top.map((p) => `• ${p.name} — última vez: ${udsT(p.lastQty)}`).join("\n") + `\n\n`
     : `Todavía no tengo pedidos tuyos anteriores.\n\n`;
 };
 // Tras identificar al cliente por su nombre: confirmación + sus productos habituales
-const identifiedIntro = (s) => `✅ ¡Identificado! Eres *${s.customer.name}* (cód. ${s.customer.id}).\n\n${habitualBlock(s)}`;
+const identifiedIntro = (s) =>
+  s.unverified
+    ? `✅ ¡Hola, *${s.customer.name}*! Como escribes desde un teléfono que no tenemos registrado, una persona del equipo revisará tu pedido antes de prepararlo.\n\n`
+    : `✅ ¡Identificado! Eres *${s.customer.name}* (cód. ${s.customer.id}).\n\n${habitualBlock(s)}`;
 
 const greeting = (s, justIdentified = false) => {
   if (!s.customer) return { reply: s.opts?.identify && s.state === "who" ? WHO_PROMPT : GENERIC_MENU };
@@ -272,7 +280,7 @@ const confirmReply = (s) => {
     (BUSINESS.priceNote ? `_${BUSINESS.priceNote}_\n\n` : "") +
     (s.note ? `📝 Observaciones: ${s.note}\n` : "") +
     (s.delivery ? `📅 Entrega: *${longDate(s.delivery)}*\n` : "") +
-    `👤 ${s.name}\n📍 Entrega en: ${s.address}\n\n`;
+    `👤 ${s.name}\n📍 Entrega en: ${s.address || "la dirección que tenemos de tu negocio (la confirmaremos contigo)"}\n\n`;
   return s.customer
     ? { reply: body + `Pulsa un botón, o escribe los cambios (por ejemplo _"6 verdejo y 2 coca cola zero"_) y lo rehago.\n\n_¿Alguna observación? Escribe *nota: servir el jueves*, o *nota jamón: pieza grande* para un artículo._`, ui: buttons(["c:ok", "Confirmar"], ["c:edit", "Cambiar"], ["c:cancel", "Cancelar"]) }
     : { reply: body + `1️⃣ Confirmar\n2️⃣ Cancelar` };
@@ -301,7 +309,7 @@ function setCart(s, items) {
 /** Todo lo que no sea pedir, último pedido, histórico o repetir: se dice claro y se ofrece hacer un pedido rápido. */
 function noEntiendo(s) {
   return {
-    reply: "No estoy diseñado para responderte a eso. Te puedo ayudar a hacer un pedido rápido.",
+    reply: "No estoy diseñado para responderte a eso. Te puedo ayudar a hacer un pedido rápido." + (s.cart.length ? `\n\nPor ahora tu pedido lleva:\n${itemsText(s.cart)}` : ""),
     session: s,
     ui: s.link ? { type: "link", title: "Hacer pedido", url: s.link } : buttons(["h:open", "Hacer pedido"]),
   };
@@ -384,7 +392,7 @@ function askUnitReply(s, lead = "") {
   return {
     reply: `${lead}*${f.name}*\nEscribiste ${f.qty}. Este artículo se vende en cajas de ${f.upb} unidades: ¿lo quieres en *cajas* o en *unidades*?`,
     session: s,
-    ui: buttons(["ui:caja", cajas], ["ui:ud", `${f.qty} uds`], ["ui:no", "No lo quiero"]),
+    ui: buttons(["ui:caja", cajas], ["ui:ud", udsT(f.qty)], ["ui:no", "No lo quiero"]),
   };
 }
 
@@ -399,8 +407,8 @@ function askQty(s) {
   }
   const last = p.lastQty ?? 1;
   return {
-    reply: `*${p.name}*\n${money(p.price)} por unidad${p.lastQty ? ` · última vez: ${last} uds` : ""}.\n\n¿Cuántas unidades quieres? Pulsa un botón o escribe el número.`,
-    ui: buttons([`q:${last}`, `${last} uds (igual)`], [`q:${last * 2}`, `${last * 2} uds (doble)`], ["q:0", "No lo quiero"]),
+    reply: `*${p.name}*\n${money(priceOf(p))} por unidad${p.lastQty ? ` · última vez: ${udsT(last)}` : ""}.\n\n¿Cuántas unidades quieres? Pulsa un botón o escribe el número.`,
+    ui: buttons([`q:${last}`, `${udsT(last)} (igual)`], [`q:${last * 2}`, `${udsT(last * 2)} (doble)`], ["q:0", "No lo quiero"]),
   };
 }
 
@@ -438,6 +446,9 @@ const findLines = (lines, query) => {
   return lines.filter((i) => q.length && q.every((w) => tokensOf(i).some((t) => wordMatch(w, t))));
 };
 
+const NEW_CUSTOMER_NOTE =
+  "👋 ¡Bienvenido! Como eres cliente nuevo, avisamos a una persona del equipo para darte de alta. Mientras tanto puedes ver productos y dejar tu pedido: lo revisaremos antes de prepararlo.";
+
 const HUMAN_REPLY =
   "👤 Avisamos a una persona del equipo, te responderá en cuanto pueda. Mientras tanto, escribe *menu* si necesitas algo más.";
 
@@ -446,10 +457,19 @@ const HUMAN_REPLY =
  * Devuelve { reply, ui?, session, order?, handoff? } sin tocar la red ni el disco.
  */
 export function handleMessage(session, rawText, ctx = {}) {
+  PRICES = session?.customer?.specialPrices ?? null;
+  try {
+    return handleMessageInner(session, rawText, ctx);
+  } finally {
+    PRICES = null;
+  }
+}
+
+function handleMessageInner(session, rawText, ctx = {}) {
   const now = ctx.now ?? new Date().toISOString(); // el reloj se puede fijar en las pruebas
   const text = norm(rawText || "");
   const s = { ...session, cart: [...(session.cart ?? [])] };
-  const fresh = () => ({ ...newSession(s.customer, s.link, s.opts), byName: s.byName });
+  const fresh = () => ({ ...newSession(s.customer, s.link, s.opts), byName: s.byName, unverified: s.unverified });
   // Cierra el pedido: lo devuelve como `order` (con el día de entrega) y reinicia la conversación
   const placeOrder = () => {
     const items = getItems(s);
@@ -529,18 +549,33 @@ export function handleMessage(session, rawText, ctx = {}) {
     return askDelivery(s, now, notice || "No he entendido el día 🤔.\n\n");
   }
 
+  // Ya se avisó a una persona del equipo: no se vuelve a pedir el nombre, se espera o se reinicia con «menu»
+  if (s.state === "derivado" && text) {
+    return { reply: "👤 Ya hemos avisado a una persona del equipo, te responderá en cuanto pueda. Si quieres volver a intentarlo, escribe *menu*.", session: s };
+  }
+
   // Identificación: el cliente dice quién es y se busca en la base de datos de clientes
   if ((s.state === "who" || s.state === "who2") && text) {
     if (text === "nuevo") {
       s.opts = { ...s.opts, identify: false };
       s.state = "menu";
-      return { ...greeting(s), session: s };
+      // Avisamos a la empresa para que lo dé de alta; mientras, puede ver productos y pedir (su pedido queda por revisar)
+      return {
+        ...greeting(s),
+        reply: `${NEW_CUSTOMER_NOTE}\n\n${greeting(s).reply}`,
+        session: s,
+        handoff: true,
+      };
+    }
+    if (s.state === "who" && isTooGeneric(rawText)) {
+      // «bar», «cafetería»…: no es un nombre. Se pide completo y no cuenta como intento fallido
+      return { reply: `«${String(rawText).trim().slice(0, 40)}» es demasiado general 🙂. Escribe el *nombre completo* de tu negocio tal y como nos compras (por ejemplo: _Bar El Ejemplo_) o tu *código de cliente*.`, session: s };
     }
     const fail = (msg) => {
       s.attempts = (s.attempts ?? 0) + 1;
       if (s.attempts >= MAX_ATTEMPTS) {
         s.attempts = 0;
-        s.state = "who";
+        s.state = "derivado"; // ya está avisada una persona: no seguimos pidiendo el nombre
         s.candidates = null;
         return { reply: `No consigo identificarte 😕. Aviso a una persona del equipo para que te atienda.\n\n${HUMAN_REPLY}`, session: s, handoff: true };
       }
@@ -557,9 +592,13 @@ export function handleMessage(session, rawText, ctx = {}) {
       s.state = "who2";
       return { reply: "Hay varios clientes con un nombre parecido. Para distinguirte, escribe tu *código de cliente*.", session: s };
     } else if (!found.length) {
-      return fail("No encuentro ese nombre 🤔. Escríbelo otra vez como figura en tus facturas, o escribe tu código de cliente. Si eres cliente nuevo, escribe *nuevo*.");
+      return fail("No encuentro ese nombre 🤔. Escríbelo otra vez como figura en tus facturas, con todas sus palabras (por ejemplo _Bar El Ejemplo_ mejor que solo _Ejemplo_), o escribe tu código de cliente. Si eres cliente nuevo, escribe *nuevo*.");
     } else hit = found[0];
-    Object.assign(s, { customer: hit, name: hit.name, address: hit.address ?? "", byName: true, attempts: 0, candidates: null, state: "menu" });
+    // Quien se identifica solo por el nombre desde un teléfono que no es el del cliente NO ve su histórico, precios ni dirección:
+    // sus pedidos quedan retenidos y los revisa una persona
+    const unverified = !!s.opts?.holdUnverified && last9(s.opts?.phone) !== last9(hit.phone);
+    const shown = unverified ? { ...hit, orders: [], usual: [], frequent: [], specialPrices: {}, discounts: {}, address: "" } : hit;
+    Object.assign(s, { customer: shown, name: hit.name, address: shown.address ?? "", byName: true, unverified, attempts: 0, candidates: null, state: "menu" });
     s.link = LINK_MAKER(hit, s) ?? null;
     return { ...greeting(s, true), session: s };
   }
@@ -627,12 +666,12 @@ export function handleMessage(session, rawText, ctx = {}) {
       if (p) {
         const last = p.lastQty ?? 1;
         const upb = upbOf(p);
-        s.pick = { id: p.id, name: p.name, price: p.price, unitsPerBox: p.unitsPerBox, lastQty: last, unit: upb ? null : "ud" };
+        s.pick = { id: p.id, name: p.name, price: priceOf(p), unitsPerBox: p.unitsPerBox, lastQty: last, unit: upb ? null : "ud" };
         s.state = "qty";
         if (upb) {
           // El artículo se vende en cajas: se pregunta cómo lo quiere
           return {
-            reply: `*${p.name}*\n${money(p.price)} por unidad · caja de ${upb} uds (${money(p.price * upb)}).\n\n¿Lo quieres en *cajas* o en *unidades*?`,
+            reply: `*${p.name}*\n${money(priceOf(p))} por unidad · caja de ${upb} uds (${money(priceOf(p) * upb)}).\n\n¿Lo quieres en *cajas* o en *unidades*?`,
             session: s,
             ui: buttons(["u:caja", "Cajas"], ["u:ud", "Unidades"], ["q:0", "No lo quiero"]),
           };
@@ -645,7 +684,7 @@ export function handleMessage(session, rawText, ctx = {}) {
 
     if (s.state === "unitq" && s.askUnit?.length) {
       const m = /^ui:(caja|ud|no)$/.exec(text) ?? (text.startsWith("caja") ? [null, "caja"] : /^(ud|uds|unidad|unidades|suelt[oa]s?|latas?|botellas?|piezas?)\b/.test(text) ? [null, "ud"] : /^no( lo quiero| gracias)?$/.test(text) ? [null, "no"] : null);
-      if (!m) return askUnitReply(s, "Pulsa un botón o escribe *cajas* o *unidades*.\n\n");
+      if (!m) return askUnitReply(s, "Pulsa un botón o escribe *cajas* o *unidades* (o *menu* para empezar de nuevo).\n\n");
       const [f, ...rest] = s.askUnit;
       s.askUnit = rest;
       if (m[1] !== "no") addToCart(s, { ...f, unit: m[1] });
@@ -659,7 +698,10 @@ export function handleMessage(session, rawText, ctx = {}) {
         return { ...askQty(s), session: s };
       }
       // "q:3", "3", "3 cajas" o "12 uds"
-      const q = /^q:(\d+)$/.exec(text) ?? /^(\d{1,3})\s*(cajas?|uds?|unidades?)?$/.exec(text);
+      const q = /^q:(\d+)$/.exec(text) ?? /^(\d{1,3})\s*(cajas?|uds?|unidades?)?$/.exec(text) ?? (text in WORDS ? [null, String(WORDS[text])] : null);
+      if (!q && /^\d{4,}\s*(cajas?|uds?|unidades?)?$/.test(text)) {
+        return { reply: "La cantidad máxima por artículo es *999*. Si necesitas más, escribe *persona* y te atiende alguien del equipo.", session: s };
+      }
       if (q) {
         const word = q[2];
         if (word) s.pick = { ...s.pick, unit: word.startsWith("caja") ? "caja" : "ud" };
@@ -668,7 +710,8 @@ export function handleMessage(session, rawText, ctx = {}) {
         }
         return chooseQty(s, Number(q[1]));
       }
-      return { reply: "Escribe solo el número (por ejemplo 6), o «3 cajas» / «12 uds», o pulsa un botón.", session: s };
+      if (/^-\s*\d/.test(text)) return { reply: "La cantidad no puede ser negativa. Escribe un número (por ejemplo 6), o pulsa «No lo quiero» para quitarlo.", session: s };
+      return { reply: "No he entendido esa cantidad. Escribe un número entero de 1 a 999 (por ejemplo 6), o «3 cajas» / «12 uds», o pulsa un botón.", session: s };
     }
     if (["menu", "cart"].includes(s.state)) {
       if (text === "act:add") return showList(s);
@@ -702,6 +745,10 @@ export function handleMessage(session, rawText, ctx = {}) {
       if (!text) return { ...greeting(s), session: s };
       if (s.customer) {
         // Cliente conocido que escribe lo que quiere: se suma al pedido (y, si dice cuándo lo quiere, se apunta el día)
+        if (/(?:^|[\s,;+])-\s*\d/.test(rawText)) return { reply: "Las cantidades no pueden ser negativas. Escribe, por ejemplo, _\"3 aguas\"_; para quitar algo usa *Vaciar pedido* o *Cambiar*.", session: s };
+        // Un número suelto («1.5», «5»): no es un artículo (antes «1.5» se tomaba por «AGUA MINERAL 1,5 L»)
+        if (/^\s*\d+(?:[.,]\d+)?\s*$/.test(rawText) && !/^q:/.test(text)) return { reply: "Me falta el artículo 🙂. Escribe la cantidad y lo que quieres, por ejemplo _\"6 aguas\"_ o _\"2 cajas de cerveza\"_. Las cantidades son números enteros.", session: s };
+        if (/(?:^|[\s,;+y])0+\s+[a-zñ]/i.test(norm(rawText))) return { reply: "La cantidad tiene que ser mayor que 0. Escribe, por ejemplo, _\"3 aguas\"_.", session: s };
         const dd = takeDate(s, rawText, now);
         const found = parseItems(dd.rest, s.customer);
         const lead = (dd.notice ? dd.notice + "\n\n" : "") + (dd.set ? `📅 Entrega apuntada: *${longDate(s.delivery)}*\n\n` : "");
@@ -779,13 +826,19 @@ export function handleMessage(session, rawText, ctx = {}) {
         // Cliente conocido que cambia cantidades o el día: se rehace el pedido con lo que escribe
         const dd = takeDate(s, rawText, now);
         const found = parseItems(dd.rest, s.customer);
+        let unknown = "";
         if (found.length) setCart(s, found);
         else if (!dd.set && !dd.notice) {
-          s.orderText = rawText.trim().slice(0, 500);
-          s.items = null;
+          if (getItems(s).length) {
+            // No lo he entendido: el pedido se queda como estaba (antes se borraban las líneas y se enviaba un pedido vacío)
+            unknown = "No he entendido eso 🤔. Tu pedido sigue igual. Escribe los cambios (por ejemplo _\"6 verdejo\"_), pulsa *Confirmar* o *Cancelar*, o escribe *menu* para volver al inicio.\n\n";
+          } else {
+            s.orderText = rawText.trim().slice(0, 500);
+            s.items = null;
+          }
         }
         const c = confirmReply(s);
-        return { ...c, reply: (dd.notice ? dd.notice + "\n\n" : "") + c.reply, session: s };
+        return { ...c, reply: unknown + (dd.notice ? dd.notice + "\n\n" : "") + c.reply, session: s };
       }
       return { reply: "Escribe *1* para confirmar o *2* para cancelar.", session: s };
     }

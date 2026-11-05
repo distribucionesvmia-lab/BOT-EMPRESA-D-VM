@@ -20,7 +20,7 @@ test("cliente nuevo: flujo completo con texto libre", () => {
   assert.match(r.reply, /Escribe directamente/);
   assert.equal(r.ui, undefined);
   r = say(r.session, "2 aguas y una cerveza");
-  assert.match(r.reply, /Total: 2\.80/);
+  assert.match(r.reply, /Total: 2,80/);
   r = say(r.session, "1");
   r = say(r.session, "Ana");
   r = say(r.session, "Calle Sol 5");
@@ -45,7 +45,7 @@ test("cliente nuevo: texto sin producto reconocido se guarda tal cual", () => {
 test("cliente nuevo: se puede añadir más texto antes de continuar", () => {
   let r = say(newSession(), "2 aguas");
   r = say(r.session, "y 3 cervezas");
-  assert.match(r.reply, /Total: 4\.40/);
+  assert.match(r.reply, /Total: 4,40/);
 });
 
 // ---- Cliente conocido: cuestionario con lista y botones ----
@@ -197,7 +197,7 @@ test("«último pedido» e «histórico» llevan además una tabla (cantidad, pr
   assert.equal(t.titulo, "Pedido del 01/10/2026");
   assert.deepEqual(t.filas.map((f) => [f.cant, f.nombre, f.importe]), [["24 uds", "Agua", 24], ["12 uds", "Cerveza Estrella Galicia", 9.6]]);
   assert.equal(t.total, 33.6);
-  assert.match(r.reply, /Agua = 24\.00/); // el texto sigue siendo el respaldo para WhatsApp
+  assert.match(r.reply, /Agua = 24,00/); // el texto sigue siendo el respaldo para WhatsApp
   assert.equal(r.short, "🧾 *Tu último pedido*");
   const h = say(newSession(bar, "/catalogo"), "histórico");
   assert.equal(h.cards.length, 2); // un pedido por tabla

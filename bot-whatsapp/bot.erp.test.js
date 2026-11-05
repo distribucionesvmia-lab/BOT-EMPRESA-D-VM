@@ -107,7 +107,7 @@ test("chat: artículo en cajas pregunta cajas o unidades y calcula las unidades"
   r = handleMessage(r.session, "u:caja");
   assert.match(r.reply, /Cuántas \*cajas\*/);
   r = handleMessage(r.session, "q:2");
-  assert.match(r.reply, /2 cajas \(12 uds\) × AGUA GAS LIMON VIDRIO 250 = 41\.52/);
+  assert.match(r.reply, /2 cajas \(12 uds\) × AGUA GAS LIMON VIDRIO 250 = 41,52/);
   r = handleMessage(r.session, "act:done");
   r = handleMessage(r.session, "c:ok");
   assert.deepEqual(r.order.items.map((i) => [i.id, i.qty, i.unit]), [["A1", 2, "caja"]]);
@@ -214,6 +214,24 @@ test("identificación: nombre desconocido, reintentos y derivación a una person
   r = handleMessage(r.session, "Tampoco");
   assert.equal(r.handoff, true);
   assert.match(r.reply, /No consigo identificarte/);
+  // Tras avisar a una persona, no se sigue pidiendo el nombre
+  r = handleMessage(r.session, "xx");
+  assert.match(r.reply, /Ya hemos avisado a una persona/);
+  assert.doesNotMatch(r.reply, /No encuentro ese nombre/);
+  assert.notEqual(r.handoff, true); // no se avisa dos veces
+  // «menu» permite volver a intentarlo
+  r = handleMessage(r.session, "menu");
+  assert.match(r.reply, /nombre de tu negocio/);
+});
+
+test("identificación: un nombre demasiado general («bar») se explica y no cuenta como intento", () => {
+  let r = handleMessage(conIdentificacion(), "bar");
+  assert.match(r.reply, /demasiado general/);
+  for (const t of ["Bar", "cafetería", "el bar", "S.L."]) r = handleMessage(r.session, t);
+  assert.equal(r.session.attempts, 0);
+  assert.notEqual(r.handoff, true);
+  r = handleMessage(r.session, "Bar El Ejemplo"); // el nombre completo sigue funcionando
+  assert.match(r.reply, /Identificado/);
 });
 
 test("identificación: si varios encajan, pide el código y solo vale el de uno de ellos", () => {
@@ -229,6 +247,8 @@ test("identificación: si varios encajan, pide el código y solo vale el de uno 
 test("identificación: «nuevo» sigue el flujo de cliente nuevo y no vuelve a preguntar", () => {
   let r = handleMessage(conIdentificacion(), "nuevo");
   assert.match(r.reply, /Bienvenido/);
+  assert.match(r.reply, /cliente nuevo, avisamos a una persona/);
+  assert.equal(r.handoff, true); // la empresa se entera para darle de alta
   r = handleMessage(r.session, "hola");
   assert.match(r.reply, /Bienvenido/);
 });
@@ -245,4 +265,98 @@ test("identificación: un pedido de quien se identificó por nombre con otro tel
   assert.equal(flujo({ identify: true, phone: "34611111111", holdUnverified: true }).order.review, true);
   assert.equal(flujo({ identify: true, phone: "34600000001", holdUnverified: true }).order.review, false); // su teléfono: verificado
   assert.equal(flujo({ identify: true, phone: "34611111111", holdUnverified: false }).order.review, false); // regla desactivada (demo)
+});
+
+// ---- Privacidad: identificarse solo por el nombre desde otro teléfono ----
+test("identificación: desde un teléfono que no es el del cliente NO se enseña su histórico, ni se puede ver por el chat", () => {
+  const ajeno = { identify: true, phone: "34611111111", holdUnverified: true };
+  let r = handleMessage(conIdentificacion(ajeno), "Bar El Ejemplo");
+  assert.match(r.reply, /revisará tu pedido/);
+  assert.doesNotMatch(r.reply, /histórico de productos|AGUA GAS|9001|última vez/);
+  assert.equal(r.session.unverified, true);
+  for (const t of ["lista", "último pedido", "histórico", "repetir"]) {
+    const x = handleMessage(r.session, t);
+    assert.doesNotMatch(x.reply + JSON.stringify(x.ui ?? {}), /AGUA GAS|JAMON|última vez|Calle 1/, t);
+  }
+  // su teléfono: verificado, sí ve su histórico
+  r = handleMessage(conIdentificacion({ identify: true, phone: "34600000001", holdUnverified: true }), "Bar El Ejemplo");
+  assert.match(r.reply, /Identificado/);
+  assert.ok(r.ui.last, "con su teléfono sí ve su último pedido en la tarjeta de inicio"); // y los artículos de su histórico solo por «último pedido» e «histórico»
+  assert.equal(r.session.unverified, false);
+});
+
+test("chat: se enseñan los precios especiales del cliente, no los de tarifa", () => {
+  const c = { ...conCajas(), specialPrices: { A1: 0.1 } };
+  const tarifa = conCajas();
+  const a = handleMessage(newSession(c), "6 agua gas uds");
+  const b = handleMessage(newSession(tarifa), "6 agua gas uds");
+  assert.notEqual(a.reply, b.reply);
+  assert.match(a.reply, /0,60 €/); // 6 × 0,10
+});
+
+test("chat: cantidades negativas, cero, enormes y escritas con letra", () => {
+  const c = conCajas();
+  assert.match(handleMessage(newSession(c), "-3 agua gas").reply, /no pueden ser negativas/);
+  assert.match(handleMessage(newSession(c), "0 agua gas").reply, /mayor que 0/);
+  let r = handleMessage(newSession(c), "p:a1");
+  r = handleMessage(r.session, "u:ud");
+  assert.match(handleMessage(r.session, "99999").reply, /máxima por artículo es \*999\*/);
+  assert.match(handleMessage(r.session, "-5").reply, /no puede ser negativa/);
+  assert.match(handleMessage(r.session, "abc").reply, /entero de 1 a 999/);
+  assert.match(handleMessage(r.session, "doce").reply, /12 ×|× AGUA/);
+});
+
+test("chat: en «Revisa tu pedido», un texto que no se entiende NO borra las líneas del pedido", () => {
+  const c = conCajas();
+  let r = handleMessage(newSession(c), "5 uds de agua gas");
+  r = handleMessage(r.session, "act:done");
+  assert.equal(r.session.state, "confirm");
+  const antes = JSON.stringify(r.session.items ?? r.session.cart);
+  for (const t of ["ultimo", "que pedí la última vez", "mi historial"]) {
+    const x = handleMessage(r.session, t);
+    assert.match(x.reply, /No he entendido eso/, t);
+    assert.match(x.reply, /5 × AGUA GAS/, t); // las líneas siguen ahí
+    assert.equal(JSON.stringify(x.session.items ?? x.session.cart), antes, t);
+  }
+  // y sigue pudiendo cambiar cantidades escribiendo
+  const y = handleMessage(r.session, "7 uds de agua gas");
+  assert.match(y.reply, /7 × AGUA GAS/);
+});
+
+test("chat: singular («1 ud», «1 artículo») y dinero con coma como en la web", () => {
+  const c = conCajas();
+  const r = handleMessage(newSession(c), "1 jamon serrano");
+  assert.match(r.reply, /,\d\d €/);
+  assert.doesNotMatch(r.reply, /\d\.\d\d ?€/);
+  assert.doesNotMatch(r.reply, /\b1 uds\b/);
+});
+
+test("chat: lo que no se entiende recuerda lo que lleva el pedido", () => {
+  const c = conCajas();
+  let r = handleMessage(newSession(c), "5 uds de agua gas");
+  const x = handleMessage(r.session, "blablabla");
+  assert.match(x.reply, /No estoy diseñado para responderte a eso/);
+  assert.match(x.reply, /tu pedido lleva/);
+  assert.match(x.reply, /5 × AGUA GAS/);
+  // sin nada en el carrito, el mensaje sigue siendo el de siempre
+  const y = handleMessage(newSession(c), "blablabla");
+  assert.doesNotMatch(y.reply, /tu pedido lleva/);
+});
+
+test("chat: un número suelto no se toma por un artículo («1.5» ≠ AGUA 1,5 L) y «0 aguas» explica el motivo", () => {
+  const c = conCajas();
+  for (const t of ["1.5", "1,5", "5"]) {
+    const r = handleMessage(newSession(c), t);
+    assert.match(r.reply, /Me falta el artículo/, t);
+    assert.deepEqual(r.session.cart, [], t);
+  }
+  assert.match(handleMessage(newSession(c), "0 agua gas").reply, /mayor que 0/);
+});
+
+test("identificación: si escribe solo una palabra del nombre, se le sugiere el nombre completo", () => {
+  let r = handleMessage(conIdentificacion(), "ejemplo");
+  assert.match(r.reply, /No encuentro ese nombre/);
+  assert.match(r.reply, /con todas sus palabras/);
+  r = handleMessage(r.session, "Bar El Ejemplo");
+  assert.match(r.reply, /Identificado/);
 });

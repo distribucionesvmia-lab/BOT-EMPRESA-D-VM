@@ -52,3 +52,14 @@ export function findCustomers(customers, query, { lenient = false } = {}) {
   const best = Math.max(0, ...strong.map((s) => s.score));
   return strong.filter((s) => s.score >= best - 0.05).map((s) => s.c);
 }
+
+/**
+ * ¿Lo escrito es demasiado general para identificar a nadie? («bar», «cafetería», «el», «S.L.»…).
+ * Sirve para pedir el nombre completo en vez de decir que no existe.
+ */
+export function isTooGeneric(query) {
+  const q = norm(query);
+  if (!q) return false;
+  const words = significant(q);
+  return words.every((w) => GENERIC.has(w));
+}

@@ -55,7 +55,9 @@ const hasCredentials = () => WHATSAPP_TOKEN && PHONE_NUMBER_ID;
 // Enlace personal (caduca en 24 h) para abrir el catálogo de pedido del cliente
 const linkFor = (customer, phone, flags = {}) => `${PUBLIC_URL}/pedido/${makeToken(phone, customer.id, Date.now(), flags)}`;
 const digits9 = (p) => String(p ?? "").replace(/\D/g, "").slice(-9);
-setCustomerFinder((query) => findCustomers(query));
+// El cliente del chat de WhatsApp lleva su historial de a3ERP MÁS lo que ha pedido por el bot o la app (para «último pedido», «histórico» y «repetir»)
+const conSusPedidos = (c) => (c ? withOwnOrders(c, getDb().ordersOf(c.id)) : c);
+setCustomerFinder((query) => (findCustomers(query) ?? []).map(conSusPedidos));
 // Quien se identifica por nombre desde un teléfono que no es el del cliente: su pedido de la mini-app queda retenido
 setLinkMaker((customer, session) =>
   linkFor(customer, session.opts?.phone ?? "", session.opts?.holdUnverified && digits9(session.opts?.phone) !== digits9(customer.phone) ? { u: 1 } : {}),
@@ -94,6 +96,13 @@ async function sendOut(to, out) {
   await post({ to, type: "interactive", interactive });
 }
 
+// Referencia del pedido (VM-2026-000123) para que el cliente pueda reclamar o consultarlo
+const conReferencia = (reply, ref) => {
+  if (!ref) return reply;
+  const linea = `🧾 Tu referencia: *${ref}*`;
+  return /\n\nEscribe \*menu\*/.test(reply) ? reply.replace(/\n\nEscribe \*menu\*/, `\n\n${linea}\n\nEscribe *menu*`) : `${reply}\n\n${linea}`;
+};
+
 // Pasa un mensaje por el bot: reconoce al cliente por su teléfono, guarda el pedido si lo hay y devuelve el resultado
 async function handleIncoming(from, text, msgId = null) {
   await refreshCatalog();
@@ -102,7 +111,7 @@ async function handleIncoming(from, text, msgId = null) {
   if (!current) {
     let customer = null;
     try {
-      customer = await getCustomerByPhone(from);
+      customer = conSusPedidos(await getCustomerByPhone(from));
     } catch (err) {
       console.error("No se pudo consultar la base de clientes; se pregunta quién es:", err.message);
     }
@@ -123,7 +132,8 @@ async function handleIncoming(from, text, msgId = null) {
     out.order = { at: new Date().toISOString(), phone: from, key: msgId ? `wa:${msgId}` : `demo:${crypto.randomUUID()}`, ...out.order };
     // Precio de tarifa/especial, descuento, cajas/unidades e IVA según las fichas (ver pricing.js)
     out.order = priceOrder(out.order, current.customer ?? null, catalogNow());
-    await createOrder(out.order);
+    const { order: guardado } = await createOrder(out.order);
+    out.reply = conReferencia(out.reply, guardado?.ref);
   }
   return out;
 }
@@ -251,14 +261,16 @@ function webOrderRoutes(req, res, url) {
     if (!customer) return json(res, { error: "Enlace no válido o caducado" }, 410);
 
     if (req.method === "GET") {
-      const products = webProducts(customer, catalogNow(), habitualProducts, imgUrl);
+      // Identificado solo por nombre (link.u): no se enseña histórico, precios especiales ni dirección de ese cliente
+      const view = link.u ? { ...customer, orders: [], usual: [], frequent: [], specialPrices: {}, discounts: {}, address: "" } : customer;
+      const products = webProducts(view, catalogNow(), habitualProducts, imgUrl);
       return json(res, {
         business: BUSINESS.name,
         priceNote: BUSINESS.priceNote,
-        customer: { name: customer.name, address: customer.address },
+        customer: { name: view.name, address: view.address },
         used: getDb().hasOrderKey(linkKey(link)),
         products,
-        history: webHistory(customer, catalogNow()),
+        history: webHistory(view, catalogNow()),
         tree: webTree(catalogNow()),
         delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }),
         today: madridDay(),
@@ -275,9 +287,9 @@ function webOrderRoutes(req, res, url) {
       if (link.u) order.review = true; // identificado solo por nombre: lo revisa una persona antes de exportarlo
       const { items } = order;
       const priced = priceOrder(order, customer, catalogNow());
-      const { duplicate } = await createOrder(priced);
+      const { duplicate, order: guardado } = await createOrder(priced);
       if (duplicate) return json(res, { error: "Este pedido ya se envió" }, 409); // doble clic o dos pestañas
-      const message = `🎉 ¡Pedido recibido, ${customer.name}! ${items.length} artículos, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.\n\n${BUSINESS.payment}`;
+      const message = `🎉 ¡Pedido recibido, ${customer.name}! ${items.length} ${items.length === 1 ? "artículo" : "artículos"}, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.${guardado?.ref ? `\n🧾 Tu referencia: *${guardado.ref}*` : ""}\n\n${BUSINESS.payment}`;
       if (process.env.DEMO !== "1") {
         await send(link.p, message);
         if (OWNER_PHONE) await send(OWNER_PHONE, `🛒 Nuevo pedido de ${customer.name} (+${link.p})\n${order.text}\nTotal: ${priced.total.toFixed(2)}\n📍 ${customer.address}`);
@@ -364,7 +376,8 @@ async function accountChat(account, text, msgId) {
   chatSessions.set(account.id, { session: out.session, last: Date.now() });
   if (out.order) {
     const key = `chat:${account.id}:${msgId ?? crypto.randomUUID()}`; // el mismo mensaje reenviado no duplica el pedido
-    await createOrder(priceOrder({ at: new Date().toISOString(), phone: account.phone, key, ...holdIfUnconfirmed(account, out.order) }, customer, catalogNow()));
+    const { order: guardado } = await createOrder(priceOrder({ at: new Date().toISOString(), phone: account.phone, key, ...holdIfUnconfirmed(account, out.order) }, customer, catalogNow()));
+    out.reply = conReferencia(out.reply, guardado?.ref);
   }
   return out;
 }
@@ -452,9 +465,9 @@ async function appRoutes(req, res, url) {
     const built = webOrderFromBody(body, customer, { key: `web:${account.id}:${key}`, phone: account.phone }, catalogNow());
     if (built.error) return void sendJson(res, 400, { error: built.error });
     const priced = priceOrder(holdIfUnconfirmed(account, built.order), customer, catalogNow());
-    const { duplicate } = await createOrder(priced);
+    const { duplicate, order: guardado } = await createOrder(priced);
     if (duplicate) return void sendJson(res, 409, { error: "Este pedido ya se envió" }); // doble clic o dos pestañas
-    return void sendJson(res, 200, { ok: true, message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} artículos, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.\n\n${BUSINESS.payment}` });
+    return void sendJson(res, 200, { ok: true, message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} ${priced.items.length === 1 ? "artículo" : "artículos"}, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.${guardado?.ref ? `\n🧾 Tu referencia: *${guardado.ref}*` : ""}\n\n${BUSINESS.payment}` });
   }
   res.writeHead(404).end();
 }

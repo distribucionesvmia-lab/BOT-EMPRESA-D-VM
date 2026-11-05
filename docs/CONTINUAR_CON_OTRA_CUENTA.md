@@ -4,15 +4,12 @@ Este documento sirve para retomar el trabajo si Claude falla o hay que cambiar d
 
 ## 1. Dónde está el código
 
-Repositorio `distribucionesvmia-lab/BOT-EMPRESA-D-VM`. Hay **tres ramas** con trabajo, de agentes distintos, y de momento **no están fusionadas**:
+Repositorio `distribucionesvmia-lab/BOT-EMPRESA-D-VM`, rama **`claude/eager-hamilton-gknalq`**: es la rama principal y **ya incluye el trabajo de las otras dos** (fusionadas el 05/11/2026):
 
-| Rama | Qué tiene |
-|---|---|
-| `claude/eager-hamilton-gknalq` (principal) | Bot, catálogo, chat, Excel de pedidos, sincronización con Drive, correos, copias de seguridad, despliegue, **actualización de productos por diferencias**, cargador `#cargar-datos` de la demo |
-| `claude/dreamy-newton-ul75g0` | Arreglos de control de calidad: pedido recibido con su referencia, descuento visible en la fila, buscador que perdona erratas, textos y móvil. Choca en `bot.js` con la rama principal |
-| `claude/modest-newton-pe28a2` | Extractor de la copia de a3ERP (`extraer-a3erp.js`) y `preparar-artefacto.js`. No choca con la rama principal |
+- Rama de control de calidad (`claude/dreamy-newton-ul75g0`): pedido recibido con su referencia, descuento visible en la fila, buscador que perdona erratas, textos y móvil, informes en `bot-whatsapp/qa/`.
+- Rama del extractor de a3ERP (`claude/modest-newton-pe28a2`): `extraer-a3erp.js` y `preparar-artefacto.js`.
 
-Antes de dar nada por cerrado, fusionar las otras dos ramas en la principal (la de calidad requiere resolver el choque de `bot.js`).
+Las dos ramas antiguas se pueden dejar como están; no hace falta trabajar en ellas.
 
 ## 2. Cómo empezar
 
@@ -20,7 +17,7 @@ Antes de dar nada por cerrado, fusionar las otras dos ramas en la principal (la 
 git clone https://github.com/distribucionesvmia-lab/BOT-EMPRESA-D-VM.git && cd BOT-EMPRESA-D-VM
 git checkout claude/eager-hamilton-gknalq
 cd bot-whatsapp          # necesita Node 22 (usa node:sqlite); no hay dependencias que instalar
-npm test                 # 217 pruebas
+npm test                 # 233 pruebas
 npm run demo             # servidor de demostración con datos ficticios (cliente de prueba: 00001R)
 ```
 

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Empresa · Pedidos y altas de clientes</title>
 <style>
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-delay:0s !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }
   :root { --bg:#eef1ee; --panel:#fff; --fg:#17211c; --muted:#5d6b63; --line:#dbe2dd; --accent:#0f7a4d; --accent-fg:#fff; --soft:#e0f1e8; --warn:#fbefcf; --warn-fg:#8a5a00; --ok:#d7f0e0; --ok-fg:#14532d; --hold:#f8dcdc; --hold-fg:#8a2c2c; --err:#a12d2d; }
   @media (prefers-color-scheme: dark) { :root { --bg:#0f1512; --panel:#18211d; --fg:#e6ede8; --muted:#93a39a; --line:#2a3630; --accent:#37c382; --accent-fg:#07251a; --soft:#173b2c; --warn:#3a2f10; --warn-fg:#f0c66a; --ok:#153a29; --ok-fg:#8fe0b4; --hold:#40201f; --hold-fg:#f1a1a1; --err:#f1a1a1; color-scheme: dark; } }
   * { box-sizing: border-box; } [hidden] { display: none !important; }
@@ -105,6 +106,7 @@ const hora = (iso) => new Date(iso).toLocaleString("es-ES", { day: "2-digit", mo
 
 async function call(path, body, raw) {
   const r = await fetch(path, { method: body ? "POST" : "GET", headers: { Authorization: "Bearer " + clave, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 429) { clearInterval(timer); $("app").hidden = true; $("login").hidden = false; throw new Error("Demasiados intentos con una clave errónea. Espera unos minutos y vuelve a probar."); }
   if (r.status === 403) { try { sessionStorage.removeItem("vm_admin"); } catch {} clearInterval(timer); $("app").hidden = true; $("login").hidden = false; throw new Error("Clave incorrecta"); }
   if (raw) return r;
   const j = await r.json().catch(() => ({}));
@@ -271,7 +273,7 @@ async function avisos() {
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), clientes(), avisos(), sincronizacion(), correo()]); } catch (e) { if (e.message !== "Clave incorrecta") $("act").textContent = "Sin conexión con el servidor"; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), clientes(), avisos(), sincronizacion(), correo()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
