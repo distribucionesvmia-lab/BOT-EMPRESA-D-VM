@@ -186,7 +186,7 @@ window.VM = {
     const id = open?.id ?? `r${Date.now().toString(36)}${uid()}`;
     const doc = { id, phone: p, email: mail, business: biz, status: "pending", pinHash: pinHash(p, pin), matched: MOTIVOS[m.reason], createdAt: now };
     await (open ? backend.update("registrations", id, doc) : backend.set("registrations", id, doc));
-    return { ok: true, estado: "pendiente", mensaje: "Hemos recibido tu solicitud. La empresa la revisará y te avisará." };
+    return { ok: true, estado: "pendiente", mensaje: "Hemos recibido tu solicitud. En un plazo de 24 a 48 horas nos pondremos en contacto contigo y se aceptará tu cuenta para que puedas hacer pedidos." };
   },
   /** Teléfono + nombre de la empresa + PIN. La respuesta es la misma si algo falla (no se revela qué). */
   login(phone, business, pin) {

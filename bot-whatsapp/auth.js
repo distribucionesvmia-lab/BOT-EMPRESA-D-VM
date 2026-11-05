@@ -116,7 +116,7 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
       if (r.error) return send(res, 400, { error: r.error }), true;
       const motivo = { ambiguo: "Hay varios clientes que encajan", contacto: "El nombre coincide pero no el teléfono ni el correo", nombre: "No hay ningún cliente con ese nombre" }[m.reason];
       accounts.setMatched(r.id, motivo);
-      return send(res, 200, { ok: true, estado: "pendiente", mensaje: "Hemos recibido tu solicitud. La empresa la revisará y te avisará." }), true;
+      return send(res, 200, { ok: true, estado: "pendiente", mensaje: "Hemos recibido tu solicitud. En un plazo de 24 a 48 horas nos pondremos en contacto contigo y se aceptará tu cuenta para que puedas hacer pedidos." }), true;
     }
 
     if (p === "/api/acceso" && req.method === "POST") {
