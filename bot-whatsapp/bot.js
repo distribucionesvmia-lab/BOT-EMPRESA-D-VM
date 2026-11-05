@@ -1,6 +1,7 @@
 import { BUSINESS, PRODUCTS } from "./config.js";
 import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRows, isYes, isNo, isDone, parseRemove, parseChangeQty, lev } from "./nlu.js";
 import { isTooGeneric } from "./identify.js";
+import { categorizar } from "./categorias.js";
 import { deliveryAllowed, longDate, puedeHoy } from "./delivery.js";
 
 const money = (n) => `${n.toFixed(2).replace(".", ",")} ${BUSINESS.currency}`; // «3,30 €», como en la web
@@ -70,7 +71,10 @@ const wordMatch = (q, t) => q === t || (q.length >= 3 && t.startsWith(q)) || (t.
  * Interpreta texto libre ("2 cajas de coca cola zero y 6 verdejo") contra el catálogo.
  * `customer` (opcional) da prioridad a lo que ya ha comprado. Marca `unsure` si hay varias opciones igual de buenas.
  */
-export function parseItems(rawText, customer = null) {
+// Palabra igual a la del producto (o en plural/singular): «agua» ↔ «aguas», «cervezas» ↔ «cerveza». Sin prefijos: «tal» no es «tallarines».
+const wordExact = (q, t) => q === t || q === t + "s" || q === t + "es" || t === q + "s" || t === q + "es";
+
+export function parseItems(rawText, customer = null, opts = {}) {
   const bought = new Set(
     (customer?.orders ?? []).flatMap((o) => o.lines.map((l) => l.productId)).concat((customer?.usual ?? []).map((u) => u.productId))
   );
@@ -89,6 +93,14 @@ export function parseItems(rawText, customer = null) {
     const unit = byBox && !byUnit ? "caja" : "ud";
     const query = words.filter((w) => !STOP.has(w));
     if (!query.length || qty < 1 || qty > 999) continue;
+    // Si pide algo genérico («agua», «cervezas», «vino») y hay varios artículos que encajan, no se elige uno: se le pregunta (opts.ambiguos)
+    if (opts.ambiguos) {
+      const porNombre = CATALOG.filter((p) => query.every((q) => tokensOf(p).some((t) => wordExact(q, t))));
+      // Una sola palabra que es el nombre de una categoría (Aguas, Vinos…): se enseña TODA la categoría, no solo los que llevan la palabra en el nombre
+      const porCategoria = query.length === 1 ? CATALOG.filter((p) => tokenize(categorizar(p).catNombre).some((t) => wordExact(query[0], t))) : [];
+      const todos = porCategoria.length > 1 ? porCategoria : porNombre;
+      if (todos.length > 1) { opts.ambiguos.push({ query: query.join(" "), qty: qi >= 0 ? qty : null, unit, unitStated: byBox || byUnit, productos: todos }); continue; }
+    }
 
     const scored = [];
     for (const p of CATALOG) {
@@ -304,6 +316,27 @@ function setCart(s, items) {
   s.cart = items.map((i) => ({ ...i }));
   s.items = s.cart;
   s.orderText = s.cart.map((i) => `${i.qty} ${i.unit === "caja" ? "cajas de " : ""}${i.name}`).join(", ");
+}
+
+/**
+ * El cliente escribió algo genérico («agua», «2 cervezas», «vino») y hay varios artículos que encajan: no se elige ninguno,
+ * se le pregunta qué tipo quiere y se le enseñan TODOS. Si existe una categoría con ese nombre (Aguas, Vinos…) se enseña esa.
+ */
+function preguntarTipo(s, a, lead = "") {
+  const compra = new Set((s.customer?.orders ?? []).flatMap((o) => o.lines.map((l) => String(l.productId))));
+  const lista = a.productos.slice()
+    .sort((x, y) => (compra.has(String(y.id)) ? 1 : 0) - (compra.has(String(x.id)) ? 1 : 0) || x.name.localeCompare(y.name, "es"));
+  const cuantos = lista.length, mostrados = lista.slice(0, 80);
+  s.opciones = { query: a.query, qty: a.qty, unit: a.unit, unitStated: a.unitStated, ids: mostrados.map((p) => String(p.id)) };
+  s.state = "menu";
+  return {
+    reply: `${lead}¿Qué tipo de *${a.query}* quieres? Tenemos ${cuantos}${cuantos > mostrados.length ? ` (te enseño los primeros ${mostrados.length}; escribe el nombre para afinar)` : ""}. Elige uno de la lista:${a.qty ? `\n_Pediste ${a.qty}._` : ""}`,
+    session: s,
+    ui: {
+      type: "list", button: trunc(`Ver ${a.query}`, 20), section: trunc(a.query, 24),
+      rows: mostrados.map((p) => ({ id: `p:${p.id}`, title: trunc(p.name, 24), description: trunc(`${p.name} · ${money(priceOf(p))}${upbOf(p) ? ` · caja de ${upbOf(p)}` : ""}${compra.has(String(p.id)) ? " · ya lo has pedido" : ""}`, 72) })),
+    },
+  };
 }
 
 /** Todo lo que no sea pedir, último pedido, histórico o repetir: se dice claro y se ofrece hacer un pedido rápido. */
@@ -663,7 +696,16 @@ function handleMessageInner(session, rawText, ctx = {}) {
       // el texto llega en minúsculas: los códigos de artículo con letras se comparan sin distinguir mayúsculas
       const sameId = (x) => String(x.id).toLowerCase() === pick[1];
       const p = habitualProducts(s.customer).find(sameId) ?? CATALOG.find(sameId);
+      const op = s.opciones; // venía de «¿qué tipo de agua quieres?»: se recuerda la cantidad que ya había dicho
+      if (p && op && op.qty && op.ids.some((id) => id.toLowerCase() === pick[1])) {
+        s.opciones = null;
+        const upb = upbOf(p);
+        if (upb && !op.unitStated) { s.askUnit = [{ ...mkItem(p, op.qty, "ud"), upb }]; return askUnitReply(s); }
+        addToCart(s, mkItem(p, op.qty, op.unit));
+        return showCart(s, "Anotado ✅\n\n");
+      }
       if (p) {
+        s.opciones = null;
         const last = p.lastQty ?? 1;
         const upb = upbOf(p);
         s.pick = { id: p.id, name: p.name, price: priceOf(p), unitsPerBox: p.unitsPerBox, lastQty: last, unit: upb ? null : "ud" };
@@ -750,10 +792,16 @@ function handleMessageInner(session, rawText, ctx = {}) {
         if (/^\s*\d+(?:[.,]\d+)?\s*$/.test(rawText) && !/^q:/.test(text)) return { reply: "Me falta el artículo 🙂. Escribe la cantidad y lo que quieres, por ejemplo _\"6 aguas\"_ o _\"2 cajas de cerveza\"_. Las cantidades son números enteros.", session: s };
         if (/(?:^|[\s,;+y])0+\s+[a-zñ]/i.test(norm(rawText))) return { reply: "La cantidad tiene que ser mayor que 0. Escribe, por ejemplo, _\"3 aguas\"_.", session: s };
         const dd = takeDate(s, rawText, now);
-        const found = parseItems(dd.rest, s.customer);
+        const amb = [];
+        const found = parseItems(dd.rest, s.customer, { ambiguos: amb });
         const lead = (dd.notice ? dd.notice + "\n\n" : "") + (dd.set ? `📅 Entrega apuntada: *${longDate(s.delivery)}*\n\n` : "");
         // Solo se toma como pedido si dice cuántas quiere («6 aguas», «una cerveza»): «qué tal» o «agua» sueltos no se anotan
         const conCantidad = /\d/.test(numberWords(dd.rest));
+        // Algo genérico («agua», «2 cervezas», «vino»): no se elige por él, se le pregunta el tipo y se le enseñan todos
+        if (amb.length) {
+          if (conCantidad) for (const { unitStated, ...f } of found) if (!(f.upb && !unitStated)) addToCart(s, f); // lo claro y con cantidad se anota
+          return preguntarTipo(s, amb[0], lead);
+        }
         if (found.length && conCantidad) {
           const ask = [];
           for (const { unitStated, ...f } of found) {

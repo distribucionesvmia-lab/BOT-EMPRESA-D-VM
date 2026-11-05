@@ -360,3 +360,44 @@ test("identificación: si escribe solo una palabra del nombre, se le sugiere el 
   r = handleMessage(r.session, "Bar El Ejemplo");
   assert.match(r.reply, /Identificado/);
 });
+
+test("algo genérico («agua», «2 cervezas», «vino»): no se elige por el cliente, se le pregunta el tipo y se le enseñan todos", () => {
+  const surtido = [
+    { id: "A1", name: "BEZOYA AGUA 50 CL", price: 0.3, vat: 10, discount: 0, category: "Aguas" },
+    { id: "A2", name: "SOLAN DE CABRAS AGUA 1,5 L", price: 0.6, unitsPerBox: 6, vat: 10, discount: 0, category: "Aguas" },
+    { id: "A3", name: "AGUA CON GAS 33 CL", price: 0.5, vat: 10, discount: 0, category: "Aguas" },
+    { id: "A4", name: "VASO AGUA ARCO", price: 1, vat: 21, discount: 0, category: "Hostelería y menaje" },
+    { id: "V1", name: "VINO TINTO CRIANZA", price: 6, vat: 21, discount: 0, category: "Vinos" },
+    { id: "V2", name: "PINNA FIDELIS ROBLE 2023", price: 9, vat: 21, discount: 0, category: "Vinos" }, // sin la palabra «vino»: también es un vino
+    { id: "C1", name: "CERVEZA MAHOU 33 CL", price: 0.7, vat: 21, discount: 0 },
+    { id: "C2", name: "CERVEZA ALHAMBRA 33 CL", price: 0.8, vat: 21, discount: 0 },
+    { id: "T1", name: "TALLARINES 500 G", price: 1, vat: 10, discount: 0 },
+    { id: "T2", name: "TALCO", price: 1, vat: 21, discount: 0 },
+  ];
+  setCatalog(surtido);
+  try {
+    const c = { id: "C-1", name: "Bar", address: "x", orders: [] };
+    const say = (t, s = newSession(c, "/catalogo")) => handleMessage(s, t);
+    // «agua»: pregunta y enseña todas las de la categoría Aguas (no el vaso de agua)
+    let r = say("agua");
+    assert.match(r.reply, /¿Qué tipo de \*agua\* quieres\? Tenemos 3/);
+    assert.deepEqual(r.ui.rows.map((x) => x.id), ["p:A3", "p:A1", "p:A2"]); // ordenadas por nombre
+    assert.equal(r.session.cart.length, 0); // no se ha anotado nada
+    // «vino»: enseña toda la categoría Vinos, también el que no lleva la palabra en el nombre
+    assert.deepEqual(say("vino").ui.rows.map((x) => x.id).sort(), ["p:V1", "p:V2"]);
+    // sin categoría con ese nombre: todos los que llevan la palabra (plural incluido)
+    assert.deepEqual(say("cervezas").ui.rows.map((x) => x.id).sort(), ["p:C1", "p:C2"]);
+    // con cantidad: la recuerda; elige uno y sigue (el A2 se vende en cajas: pregunta cajas o unidades)
+    r = say("2 aguas");
+    r = handleMessage(r.session, "p:A1");
+    assert.deepEqual(r.session.cart.map((i) => [i.id, i.qty, i.unit]), [["A1", 2, "ud"]]);
+    r = handleMessage(say("2 aguas").session, "p:A2");
+    assert.match(r.reply, /cajas de 6 unidades/);
+    // palabras que solo se parecen («tal» ≠ «tallarines») no se toman por un artículo
+    assert.match(say("qué tal").reply, /No estoy diseñado/);
+    // un artículo concreto, sin duda, se anota sin preguntar
+    assert.match(say("3 tallarines").reply, /Anotado/);
+  } finally {
+    setCatalog(catalogo);
+  }
+});
