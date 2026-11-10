@@ -122,7 +122,7 @@
   .p { display:grid; grid-template-columns:auto 1fr auto; gap:12px; padding:10px 14px; border-bottom:1px solid var(--linea); align-items:center; border-left:6px solid transparent; }
   .p.sel { background:#fff8f8; border-left-color:var(--rojo); }
   .av img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#fff; border-radius:18px; }
-  .av { position:relative; overflow:hidden; width:76px; height:76px; border-radius:18px; display:grid; place-items:center; color:#fff; font-weight:800; font-size:30px; }
+  .av { position:relative; overflow:hidden; width:120px; height:120px; border-radius:18px; cursor:zoom-in; display:grid; place-items:center; color:#fff; font-weight:800; font-size:30px; }
   .info { min-width:0; align-self:start; }
   .info .n { font-weight:700; font-size:16.5px; line-height:1.2; overflow-wrap:anywhere; }
   .info .c { color:var(--gris); font-size:14px; margin-top:3px; }
@@ -139,7 +139,7 @@
   .step button:active { background:#ffd9d9; }
   .step input { flex:1; width:100%; min-width:0; height:46px; border:0; padding:0; text-align:center; font-size:19px; font-weight:800; outline:none; -moz-appearance:textfield; }
   .step input::-webkit-outer-spin-button, .step input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-  @media (max-width:480px) { .p { gap:10px; padding:12px 10px; } .av { width:60px; height:60px; font-size:20px; border-radius:14px; } .ctl { width:128px; } .info .n { font-size:16px; } }
+  @media (max-width:480px) { .p { gap:10px; padding:12px 10px; } .av { width:92px; height:92px; font-size:26px; border-radius:14px; } .ctl { width:128px; } .info .n { font-size:16px; } }
   .cap { text-align:center; font-size:13px; font-weight:700; color:var(--rojo-o); line-height:1.15; padding:0 2px 2px; }
   .p.sel .step { border-width:1px; }
   .ud { display:flex; border:2px solid var(--linea); border-radius:12px; overflow:hidden; }
@@ -431,13 +431,30 @@ function control(p) {
   return box;
 }
 
+// Foto en grande: toca la foto de un producto; se cierra tocando fuera, con la X o con Esc
+function verFoto(p) {
+  let z = document.getElementById("zoomFoto");
+  if (!z) {
+    z = document.createElement("div"); z.id = "zoomFoto"; z.hidden = true; z.setAttribute("role", "dialog"); z.setAttribute("aria-modal", "true");
+    z.style.cssText = "position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px";
+    z.innerHTML = '<button type="button" aria-label="Cerrar" style="position:absolute;top:12px;right:14px;width:44px;height:44px;border:0;border-radius:22px;background:#fff;font-size:22px;cursor:pointer">✕</button><img alt="" style="width:min(92vw,560px);height:min(92vw,560px);max-height:70vh;object-fit:contain;background:#fff;border-radius:14px"><div style="color:#fff;text-align:center;font-weight:600;padding:12px 8px 4px"></div><div class="zia" style="color:#ccc;text-align:center;font-size:12px;font-style:italic;padding-bottom:8px"></div>';
+    z.onclick = () => (z.hidden = true);
+    document.body.appendChild(z);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !z.hidden) { z.hidden = true; e.stopImmediatePropagation(); } }, true);
+  }
+  z.querySelector("img").src = p.img; z.children[2].textContent = p.name; z.querySelector(".zia").textContent = p.ia ? "Foto orientativa creada con IA" : "";
+  z.hidden = false;
+}
+
 function row(p) {
   const el = document.createElement("div"); el.className = "p" + (qty.get(p.id) > 0 ? " sel" : "");
   const av = document.createElement("div"); av.className = "av"; av.style.background = hue(p.name); av.textContent = initials(p.name);
   if (p.img) { // foto del producto encima de las iniciales; si no carga, se queda el marcador
-    const im = document.createElement("img"); im.src = p.img; im.alt = ""; im.decoding = "async";
+    const im = document.createElement("img"); im.src = p.img; im.alt = ""; im.decoding = "async"; im.loading = "lazy";
     im.onerror = () => im.remove();
     av.appendChild(im);
+    av.title = "Toca para ver la foto más grande";
+    av.addEventListener("click", (ev) => { if (!ev.target.closest("button")) verFoto(p); });
   }
   const info = document.createElement("div"); info.className = "info";
   const n = document.createElement("div"); n.className = "n"; n.textContent = p.name;
