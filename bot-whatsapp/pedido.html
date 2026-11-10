@@ -294,6 +294,10 @@
     .repbar { padding-bottom:6px; } .repbar button { min-height:40px; font-size:15px; border-width:1.5px; }
     header { padding-bottom:12px; }
   }
+  /* Móviles Samsung/Android: los botones − y + no hacen zoom al tocar rápido, no se animan ni se seleccionan */
+  .step, .step button, .step input, .hstep, .hstep button, .hstep input, .ud, .ud button, .add { touch-action:manipulation; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; }
+  .step input, .hstep input { user-select:text; -webkit-user-select:text; }
+  .ctl .bump, .hstep.bump, .step.bump { animation:none !important; }
 </style>
 </head>
 <body>
@@ -388,7 +392,7 @@ const orderKey = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : Stri
 const qty = new Map(); // id -> cantidad (en cajas o en unidades, según unitOf)
 const unitOf = new Map(); // id -> "ud" | "caja"
 const notes = new Map(); // id -> observación de la línea
-const unit = id => unitOf.get(id) || "ud";
+const unit = id => unitOf.get(id) || (productoPorId.get(id)?.unitsPerBox ? "caja" : "ud"); // por defecto: en cajas si el artículo se vende por cajas
 const uds = l => l.qty * (unit(l.id) === "caja" ? (l.unitsPerBox || 1) : 1);
 
 const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -473,7 +477,7 @@ function control(p) {
   // Artículos que se venden en cajas: el cliente elige Uds o Cajas desde el principio, antes de añadirlos
   if (p.unitsPerBox) {
     const sel = document.createElement("div"); sel.className = "ud"; sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Pedir en");
-    for (const [u, t] of [["ud", "Uds"], ["caja", "Cajas"]]) {
+    for (const [u, t] of [["caja", "Cajas"], ["ud", "Uds"]]) {
       const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.className = unit(p.id) === u ? "on" : ""; b.setAttribute("aria-pressed", String(unit(p.id) === u));
       b.onclick = () => cambiarUnidad(p, u);
       sel.appendChild(b);
@@ -550,7 +554,7 @@ function row(p) {
     if (bumpFav === p.id) f.classList.add("bump");
     av.appendChild(f); // el corazón va sobre la esquina de la foto: el nombre gana ancho
   }
-  const ctl = control(p); if (bumpId === p.id) ctl.firstElementChild && ctl.classList.add("bump");
+  const ctl = control(p);
   el.append(av, info, ctl);
   return el;
 }
@@ -713,7 +717,7 @@ function renderCart() {
     const mid = document.createElement("div"); mid.className = "cmid";
     if (l.unitsPerBox) {
       const sel = document.createElement("div"); sel.className = "ud"; sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Pedir en");
-      for (const [u, t] of [["ud", "Uds"], ["caja", "Cajas"]]) {
+      for (const [u, t] of [["caja", "Cajas"], ["ud", "Uds"]]) {
         const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.className = unit(l.id) === u ? "on" : ""; b.setAttribute("aria-pressed", String(unit(l.id) === u));
         b.onclick = () => cambiarUnidad(l, u); sel.appendChild(b);
       }
@@ -723,7 +727,6 @@ function renderCart() {
     const minus = document.createElement("button"); minus.type = "button"; minus.textContent = "−"; minus.setAttribute("aria-label", "Quitar uno de " + l.name); minus.onclick = () => setQty(l.id, l.qty - 1);
     const inp = document.createElement("input"); inp.type = "number"; inp.inputMode = "numeric"; inp.min = 0; inp.value = l.qty; inp.setAttribute("aria-label", "Cantidad de " + l.name); inp.onchange = () => setQty(l.id, inp.value);
     const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.setAttribute("aria-label", "Añadir uno de " + l.name); plus.onclick = () => setQty(l.id, l.qty + 1);
-    if (bumpId === l.id) st.classList.add("bump");
     st.append(minus, inp, plus); mid.appendChild(st);
     const imp = document.createElement("div"); imp.className = "cimp";
     const ib = document.createElement("b"); ib.textContent = eur(importe(l));
