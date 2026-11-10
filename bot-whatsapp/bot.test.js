@@ -98,12 +98,30 @@ test("cliente conocido: 0 unidades quita el artículo", () => {
   assert.match(r.reply, /quitado/);
 });
 
-test("cliente conocido: 'repetir' repite el último pedido", () => {
+test("cliente conocido: «repetir» deja ELEGIR cualquiera de sus últimos pedidos (no solo el último)", () => {
   let r = say(newSession(bar), "repetir");
-  assert.equal(r.session.state, "confirm");
-  assert.match(r.reply, /24 × Agua/);
-  r = say(r.session, "c:ok");
-  assert.deepEqual(r.order.items.map((i) => i.qty), [24, 12]);
+  assert.equal(r.ui.type, "list");
+  assert.ok(r.ui.rows.length >= 2, "ofrece todos sus pedidos");
+  assert.ok(r.ui.rows.every((x) => /^r:/.test(x.id) && x.title.length <= 24 && x.description.length <= 72));
+  const [primero, segundo] = r.ui.rows;
+  // el primero de la lista es el último pedido
+  const ult = say(r.session, primero.id);
+  assert.equal(ult.session.state, "confirm");
+  assert.match(ult.reply, /24 × Agua/);
+  assert.deepEqual(say(ult.session, "c:ok").order.items.map((i) => i.qty), [24, 12]);
+  // y se puede repetir uno anterior
+  const otro = say(r.session, segundo.id);
+  assert.equal(otro.session.state, "confirm");
+  assert.doesNotMatch(otro.reply, /24 × Agua/);
+});
+
+test("«Histórico» enseña los pedidos y deja repetir cualquiera; «repite el último pedido» repite el último", () => {
+  const h = say(newSession(bar, "/catalogo"), "histórico");
+  assert.equal(h.ui.type, "list");
+  assert.equal(h.ui.rows.length, h.cards.length); // un pedido por tabla y uno por opción de la lista
+  assert.equal(say(h.session, h.ui.rows[h.ui.rows.length - 1].id).session.state, "confirm");
+  assert.match(say(newSession(bar), "repite el último pedido").reply, /24 × Agua/);
+  assert.equal(say(newSession(bar), "h:repeat").ui.type, "list"); // el botón «Repetir» de la pantalla de inicio
 });
 
 test("cliente conocido: puede escribir lo que quiere y se suma al pedido", () => {
@@ -115,7 +133,7 @@ test("cliente conocido: puede escribir lo que quiere y se suma al pedido", () =>
 });
 
 test("cliente conocido: 'Cambiar' vuelve al pedido y vaciar lo deja a cero", () => {
-  let r = say(newSession(bar), "repetir");
+  let r = say(newSession(bar), "repite el último pedido");
   r = say(r.session, "c:edit");
   assert.equal(r.session.state, "cart");
   assert.match(r.reply, /24 × Agua/);
