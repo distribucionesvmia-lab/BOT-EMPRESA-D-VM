@@ -59,6 +59,23 @@ schtasks /Run /TN "VM Cliente" & schtasks /Run /TN "VM Empresa"
 ```
 Las bases de datos están en `C:\vm\datos`, fuera del programa: actualizar no las toca.
 
+## 7. Poder actualizarlo SIN ir a la oficina
+Hay dos tipos de actualización y ninguna obliga a ir al ordenador:
+
+**A) Datos (clientes, productos, historial):**
+- Deja el Excel en la carpeta `datos` de Google Drive desde donde estés: el programa lo recoge solo cada 15 minutos y aplica solo las diferencias; o
+- Entra a la app de la empresa desde fuera con **Tailscale** (paso 7.1) y usa «Actualizar datos desde Excel».
+
+**B) Programa (mejoras nuevas):** actualización automática cada noche.
+1. Ejecuta una vez, como administrador:
+```
+schtasks /Create /TN "VM Actualizar" /TR "C:\vm\bot\bot-whatsapp\deploy\windows\actualizar-auto.bat" /SC DAILY /ST 04:00 /RU SYSTEM /F
+```
+2. Cada noche a las 04:00 mira GitHub. Si hay cambios nuevos, los descarga, **pasa las pruebas** y reinicia el programa. Si las pruebas fallan, vuelve a la versión anterior y lo deja anotado en `C:\vm\logs\actualizar.log`.
+3. Las bases de datos y la configuración (`C:\vm\datos`, `C:\vm\config`) no se tocan.
+
+**7.1 Entrar a la app de la empresa desde fuera, sin publicarla:** instala **Tailscale** en el ordenador de la oficina y en tu móvil/portátil (misma cuenta). Desde cualquier sitio abres `http://NOMBRE-DEL-PC:3001/empresa` y entras con tu clave. Solo entran tus dispositivos. Para eso, en `empresa.env` pon `HOST=0.0.0.0` (y no publiques nunca el puerto 3001 en internet).
+
 ## Que no se pierdan los datos
 - Todo está en `C:\vm\datos`. **Haz copia de esa carpeta** (o activa `BACKUP_DIR` en una carpeta de Drive).
 - El programa hace solo una **copia diaria de las cuatro bases** (pedidos, cuentas con sus PIN, clientes y catálogo) a las 03:00, y guarda las 14 últimas.
