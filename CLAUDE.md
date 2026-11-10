@@ -38,7 +38,7 @@ Si algo sale mal tras reiniciar: `git log -3`, vuelve al commit anterior (`git r
 ## Reglas de negocio importantes
 - Acceso del cliente: **primeros 6 dígitos** del DNI/CIF (letras se saltan); además un código personal si lo elige. Huellas con `NIF_PEPPER`; el NIF no se guarda.
 - Un cliente solo ve y pide lo suyo. Altas nuevas: «te contactaremos en 24-48 h»; sus pedidos quedan retenidos hasta que la empresa los revise.
-- Totales como en a3ERP (IVA y recargo de equivalencia). Exportación a Excel selectiva para a3ERP.
+- Totales como en a3ERP. **Impuestos confirmados por la gestoría**: tres tipos de IVA (4 %, 10 % y 21 %); el código «SRE» de a3ERP es el superreducido = **4 %**. Recargo de equivalencia (clientes con R.E.): 0,5 % sobre el 4 %, 1,4 % sobre el 10 % y 5,2 % sobre el 21 %. **El IVA y el R.E. se calculan sobre la misma base y no se acumulan** (10 € de base al 21 % = 10 + 2,10 de IVA + 0,52 de R.E. = 12,62 €). Exportación a Excel selectiva para a3ERP.
 - Actualizar datos: siempre **vista previa y solo diferencias** (pestaña «Actualizar datos desde Excel» o Excel en la carpeta `datos` de Drive). Un Excel con menos de la mitad de lo que hay se rechaza.
 - Si el cliente escribe algo que no es pedido/histórico/repetir, el bot responde que no está diseñado para eso y ofrece «Hacer pedido».
 

@@ -65,12 +65,12 @@ test("leerExcel: exportación de a3ERP con columna «+» delante del código, c�
   ];
   const { productos, sinPrecioIds } = leerExcel(buildWorkbook([{ name: "ARTICULOS", widths: [], rows }]));
   assert.deepEqual(productos.map((p) => [p.id, p.name, p.price, p.vat, p.vatCode, p.unitsPerBox, p.active, p.family]), [
-    ["11098", "LECHE", 0.05, undefined, "SRE", 150, true, "1.1"],
+    ["11098", "LECHE", 0.05, 4, undefined, 150, true, "1.1"], // SRE (superreducido) = 4 %, confirmado por la gestoría
     ["110012", "AGUA", 0.5, 10, undefined, 6, true, "10.1"],
     ["9", "VIEJO", 1, 21, undefined, 1, false, "9.9"],
   ]);
   assert.deepEqual(sinPrecioIds, ["7"]);
-  assert.deepEqual(leerExcel(buildWorkbook([{ name: "A", widths: [], rows }]), { iva: { SRE: 4 } }).productos[0].vat, 4);
+  assert.equal(leerExcel(buildWorkbook([{ name: "A", widths: [], rows }])).productos[0].vat, 4);
 });
 
 test("familias: se aprende la categoría de cada familia y se usa para clasificar", () => {

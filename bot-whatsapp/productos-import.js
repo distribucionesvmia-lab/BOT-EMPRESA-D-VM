@@ -32,8 +32,9 @@ const FIELDS = [
   ["obsolete", [/^obsoleto|^baja$/], []],
 ];
 
-/** Tipo de IVA: un porcentaje («21», «10 %») o un código de a3ERP que lo lleva escrito («ORD21», «RED10» → 21, 10). Otros códigos («SRE») → null: su tipo hay que confirmarlo, no se supone. */
+/** Tipo de IVA: un porcentaje («21», «10 %») o un código de a3ERP: «ORD21», «RED10» → 21, 10 y «SRE» (superreducido) → 4 (confirmado por la gestoría). Otros códigos → null: su tipo hay que confirmarlo, no se supone. */
 export function tipoIva(v) {
+  if (/^sre$/i.test(String(v ?? "").trim())) return 4;
   const n = parseNumber(v);
   if (n !== null) return n;
   const m = /^[A-Za-z]+(\d{1,2})$/.exec(String(v ?? "").trim());

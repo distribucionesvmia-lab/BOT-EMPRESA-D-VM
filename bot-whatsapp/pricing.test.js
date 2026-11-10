@@ -53,3 +53,15 @@ test("recargo de equivalencia según el tipo de IVA", () => {
   assert.deepEqual([t.base, t.iva, t.re, t.total], [150, 26, 5.9, 181.9]); // 21 + 5 de IVA… 26; R.E. 5,20 + 0,70
   assert.equal(totals(items, false).re, 0);
 });
+
+test("impuestos como los calcula la gestoría: el IVA y el recargo de equivalencia se calculan sobre la MISMA base (no se acumulan)", () => {
+  // 10 € de base al 21 %: IVA 2,10 + R.E. 5,2 % de 10 = 0,52 → 12,62 (no 5,2 % sobre 12,10)
+  const t = totals([{ amount: 10, vat: 21 }], true);
+  assert.deepEqual([t.base, t.iva, t.re, t.total], [10, 2.1, 0.52, 12.62]);
+  // los tres tipos con sus recargos: 4 % → 0,5 · 10 % → 1,4 · 21 % → 5,2
+  assert.equal(totals([{ amount: 100, vat: 4 }], true).total, 104.5);
+  assert.equal(totals([{ amount: 100, vat: 10 }], true).total, 111.4);
+  assert.equal(totals([{ amount: 100, vat: 21 }], true).total, 126.2);
+  // sin recargo: solo el IVA
+  assert.equal(totals([{ amount: 100, vat: 10 }], false).total, 110);
+});

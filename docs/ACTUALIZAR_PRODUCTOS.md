@@ -72,3 +72,6 @@ En la misma pestaña, elige **«Fotos de productos (ZIP)»** y sube un ZIP con l
 
 ### Categorías por tipo de producto
 Las categorías y subcategorías del catálogo se ordenan por **tipo de producto** (lo que el cliente busca), no por marca: Café, Pascual, Aguas, Bebidas, Vinos, Despensa, Refrigerados, Congelados, Hostelería y menaje, Otros. Cada producto se clasifica con (1) reglas por el nombre para casos concretos (el azúcar es despensa aunque venga de la familia del café), (2) el código de familia de a3ERP con `familias-categorias.json` (afinado por el nombre cuando la familia es muy amplia) y (3) palabras del nombre si no hay familia. Está en `categorias.js`. Al subir el Excel de productos en «Actualizar datos», «Ver cambios» enseña los productos cuya categoría cambia («Categoría: A → B») y «Aplicar» los mueve.
+
+### IVA y recargo de equivalencia (confirmado por la gestoría)
+Tipos: 4 %, 10 % y 21 %. El código «SRE» de a3ERP es el superreducido (4 %); «RED10» es el 10 % y «ORD21» el 21 %. Con recargo de equivalencia se suma 0,5 % (sobre el 4 %), 1,4 % (sobre el 10 %) o 5,2 % (sobre el 21 %), siempre **sobre la base** y sin acumularse con el IVA.
