@@ -329,6 +329,53 @@
   .ctl { max-width:100%; } .step input { min-width:0; }
   .ud button { flex:1 1 auto; white-space:nowrap; padding:0 10px; }
   .p .ctl .ud { flex:none; min-width:max-content; }
+  /* ── Compra estable y zonas de toque grandes (44–48 px) ── */
+  .ctl { display:grid; grid-template-columns:auto minmax(0, 1fr); grid-template-areas:"ud slot" "cap cap"; align-items:center; gap:6px 8px; }
+  .ctl > .ud { grid-area:ud; } .ctl > .slot { grid-area:slot; min-width:0; } .ctl > .cap { grid-area:cap; min-height:1.25em; }
+  .ud { min-width:112px; height:48px; align-items:stretch; } .ud button { min-height:44px; min-width:56px; }
+  .udfijo { display:flex; align-items:center; justify-content:center; font-size:calc(15px / var(--k,1)); font-weight:700; color:var(--gris); background:#fff; border-color:var(--linea); }
+  .slot .add, .slot .step { width:100%; height:48px; min-height:48px; }
+  .step button { width:44px; height:100%; } .step input { height:100%; }
+  .favb { width:44px; height:44px; left:0; top:0; font-size:calc(22px / var(--k,1)); background:transparent; box-shadow:none; }
+  .favb::before { content:""; position:absolute; inset:7px; border-radius:50%; background:rgba(255,255,255,.92); box-shadow:0 1px 3px rgba(0,0,0,.2); z-index:-1; }
+  .tabs button.tab { min-height:48px; } .chip { min-height:44px; } .migas button { min-height:44px; } .filbar .fil { min-height:44px; }
+  @media (min-width:561px) { .p .ctl { width:150px; grid-template-columns:minmax(0, 1fr); grid-template-areas:"ud" "slot" "cap"; } .ud { min-width:0; } }
+  @media (max-width:560px) { .p .ctl { grid-template-columns:120px minmax(0, 1fr); grid-template-areas:"ud slot" "cap cap"; } .p .ctl .cap { flex:none; } .p .ctl .ud { width:120px; min-width:0; } .p .ctl .add, .p .ctl .step { flex:none; } .tabs button.tab { min-height:48px; } }
+
+  /* ── Móvil apaisado (p. ej. 568×320): cabecera, pestañas y buscador ocupan poco; carrito compacto ── */
+  @media (orientation:landscape) and (max-height:520px) {
+    .app { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto auto auto minmax(0, 1fr); }
+    header { grid-column:1 / -1; padding:4px 14px; border-radius:0 0 14px 14px; max-height:56px; flex-wrap:nowrap; }
+    header img { height:28px; } .ttl b { font-size:calc(15px / var(--k,1)); -webkit-line-clamp:1; } .cartbtn { min-height:44px; padding:0 14px; margin-left:auto; }
+    .paso, .guia { display:none; }
+    .tabs { grid-column:1; grid-row:2; margin:4px 6px 4px 14px; } .buscar { grid-column:2; grid-row:2; padding:4px 14px 4px 6px; } .buscar input { min-height:44px; } .buscar::before { top:14px; left:calc(6px + 14px); }
+    .filbar { grid-column:1 / -1; grid-row:3; padding:0 14px 4px; } main { grid-column:1 / -1; grid-row:4; min-height:0; padding-bottom:78px; }
+    .app.compacto header, .app.compacto .tabs { max-height:0; }
+    footer { padding:6px 14px calc(6px + env(safe-area-inset-bottom)); } footer .big, #verCarrito { min-height:48px; }
+    .p { margin:6px 12px; padding:8px; grid-template-columns:72px minmax(0, 1fr) 300px; gap:10px; contain-intrinsic-size:auto 112px; }
+    .p .av { width:72px; height:72px; font-size:calc(22px / var(--k,1)); }
+    .p .ctl { width:300px; grid-template-columns:116px minmax(0, 1fr); grid-template-areas:"ud slot" "cap cap"; padding:6px; gap:2px 8px; } .p .ctl .ud { width:116px; min-width:0; }
+    .p .ctl .cap { min-height:1.1em; line-height:1.1; } .info .n { font-size:calc(15.5px / var(--k,1)); } .pr b { font-size:calc(18px / var(--k,1)); }
+    footer { left:auto; right:12px; bottom:6px; padding:0; background:none; backdrop-filter:none; -webkit-backdrop-filter:none; } footer .big, #verCarrito { width:auto; padding:0 20px; min-height:46px; border-radius:23px; font-size:calc(16px / var(--k,1)); }
+    .migas { position:static; padding:2px 14px; } main { padding-bottom:60px; }
+    .screen .head { padding:4px 14px; } .screen .head button { width:44px; height:44px; } .screen .head h2 { font-size:calc(19px / var(--k,1)); margin:0; }
+    .cartfoot { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; padding:6px 14px calc(6px + env(safe-area-inset-bottom)); }
+    .cartfoot .tot { flex:1 1 180px; padding:0; } .cartfoot .big { flex:1 1 240px; min-height:46px; } .cartfoot .keepbtn { flex:1 1 100%; min-height:40px; margin:0; }
+    .screen > .box.pie { padding-top:6px !important; flex-direction:row; flex-wrap:wrap; }
+  }
+
+  /* ── Ordenador y tablet grande: 2–3 columnas de productos y 4 de categorías (antes, una sola columna con mucho vacío) ── */
+  @media (min-width:900px) {
+    header, .paso, .guia, .filbar, footer { padding-left:max(16px, calc((100% - 1240px) / 2)); padding-right:max(16px, calc((100% - 1240px) / 2)); }
+    .tabs { margin-left:max(16px, calc((100% - 1240px) / 2)); margin-right:max(16px, calc((100% - 1240px) / 2)); max-width:560px; }
+    .buscar { padding-left:max(16px, calc((100% - 1240px) / 2)); padding-right:max(16px, calc((100% - 1240px) / 2)); } .buscar::before { left:calc(max(16px, (100% - 1240px) / 2) + 14px); }
+    main { padding-left:max(0px, calc((100% - 1240px) / 2)); padding-right:max(0px, calc((100% - 1240px) / 2)); }
+    #list { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); align-items:start; }
+    #list > :not(.p) { grid-column:1 / -1; }
+    .cats { grid-template-columns:repeat(4, minmax(0, 1fr)); } .subs { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    footer { display:flex; justify-content:center; } footer .big { width:min(100%, 640px); }
+  }
+  @media (min-width:1500px) { #list { grid-template-columns:repeat(3, minmax(0, 1fr)); } .cats { grid-template-columns:repeat(5, minmax(0, 1fr)); } }
 </style>
 </head>
 <body>
@@ -498,7 +545,7 @@ function recuperar() {
 function control(p) {
   const q = qty.get(p.id) || 0, box = document.createElement("div");
   box.className = "ctl";
-  // Artículos que se venden en cajas: el cliente elige Uds o Cajas desde el principio, antes de añadirlos
+  // Siempre la misma estructura (selector · hueco de compra · leyenda): «+ Añadir» y el contador miden igual y la tarjeta no cambia de alto
   if (p.unitsPerBox) {
     const sel = document.createElement("div"); sel.className = "ud"; sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Pedir en");
     for (const [u, t] of [["caja", "Cajas"], ["ud", "Uds"]]) {
@@ -507,12 +554,18 @@ function control(p) {
       sel.appendChild(b);
     }
     box.appendChild(sel);
+  } else {
+    const fijo = document.createElement("div"); fijo.className = "ud udfijo"; fijo.textContent = "Uds"; fijo.setAttribute("aria-hidden", "true"); // artículo que solo se vende suelto: mismo hueco, sin botón
+    box.appendChild(fijo);
   }
+  const hueco = document.createElement("div"); hueco.className = "slot"; box.appendChild(hueco);
+  const cap = document.createElement("div"); cap.className = "cap";
   if (!q) {
     const b = document.createElement("button");
     b.className = "add"; b.type = "button"; b.textContent = "+ Añadir"; b.setAttribute("aria-label", "Añadir " + p.name);
     b.onclick = () => setQty(p.id, 1);
-    box.appendChild(b);
+    hueco.appendChild(b);
+    cap.textContent = "\u00a0"; box.appendChild(cap);
     return box;
   }
   const st = document.createElement("div"); st.className = "step";
@@ -520,9 +573,8 @@ function control(p) {
   const inp = document.createElement("input"); inp.type = "number"; inp.inputMode = "numeric"; inp.min = 0; inp.value = q; inp.setAttribute("aria-label", "Cantidad de " + p.name);
   inp.onchange = () => setQty(p.id, inp.value);
   const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.setAttribute("aria-label", "Añadir uno de " + p.name); plus.onclick = () => setQty(p.id, q + 1);
-  st.append(minus, inp, plus); box.appendChild(st);
+  st.append(minus, inp, plus); hueco.appendChild(st);
   // Lo que lleva pedido, siempre a la vista: «3 uds» o «2 cajas · 12 uds»
-  const cap = document.createElement("div"); cap.className = "cap";
   const enCajas = p.unitsPerBox && unit(p.id) === "caja";
   cap.textContent = enCajas ? `${q} ${q === 1 ? "caja" : "cajas"} · ${q * p.unitsPerBox} uds` : `${q} ${q === 1 ? "unidad" : "unidades"}`;
   box.appendChild(cap);
@@ -566,7 +618,7 @@ function row(p) {
     chip.onclick = () => { unitOf.set(p.id, "ud"); setQty(p.id, p.lastQty); }; // las de la última vez son unidades
     pr.appendChild(chip);
   }
-  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " uds" + (unit(p.id) === "caja" && qty.get(p.id) ? " → " + qty.get(p.id) * p.unitsPerBox + " uds" : "");
+  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " uds"; // (las unidades que lleva pedidas ya salen bajo el contador: así la tarjeta no cambia de alto)
   info.append(n, c);
   if (p.ia) { const ia = document.createElement("div"); ia.className = "ia"; ia.textContent = "Foto orientativa creada con IA"; ia.style.cssText = "font-size:calc(11px / var(--k,1));color:#8a8a8a;font-style:italic;margin:1px 0 2px"; info.appendChild(ia); }
   info.append(pr);

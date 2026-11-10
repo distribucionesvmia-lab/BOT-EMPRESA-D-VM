@@ -550,3 +550,12 @@ test("APP EN EL MÓVIL: manifiesto, iconos y service worker públicos, y la pág
   assert.match(await sw.text(), /addEventListener\("fetch"/);
   assert.match(await (await fetch(`${BASE}/cliente`)).text(), /rel="manifest"/);
 });
+
+test("RENDIMIENTO: las páginas y los datos van comprimidos (gzip) cuando el navegador lo admite, y sin comprimir si no", async () => {
+  const gz = await fetch(`${BASE}/cliente`, { headers: { "Accept-Encoding": "gzip" } });
+  assert.equal(gz.headers.get("content-encoding"), "gzip");
+  assert.match(await gz.text(), /Primeros 6 dígitos/); // (fetch ya lo descomprime: si el gzip estuviera mal, esto fallaría)
+  const plano = await fetch(`${BASE}/cliente`, { headers: { "Accept-Encoding": "identity" } });
+  assert.equal(plano.headers.get("content-encoding"), null);
+  assert.match(await plano.text(), /Primeros 6 dígitos/);
+});

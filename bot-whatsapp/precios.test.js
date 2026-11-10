@@ -139,3 +139,15 @@ test("MÓVIL: el tamaño de letra del sistema (Samsung) se compensa: ningún fon
     assert.ok((html.match(/var\(--k,1\)/g) ?? []).length > 20, f);
   }
 });
+
+test("CATÁLOGO WEB: «+ Añadir» y el contador miden igual en todas las filas, zonas de toque de 44 px o más, móvil apaisado y ordenador en columnas", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.match(ped, /className = "ud udfijo"/); // los artículos sueltos ocupan el mismo hueco que los de cajas
+  assert.match(ped, /\.slot \.add, \.slot \.step \{ width:100%; height:48px/);
+  assert.match(ped, /\.favb \{ width:44px; height:44px/);
+  assert.match(ped, /\.tabs button\.tab \{ min-height:48px; \}/);
+  assert.match(ped, /@media \(orientation:landscape\) and \(max-height:520px\)/);
+  assert.match(ped, /@media \(min-width:900px\)[\s\S]*#list \{ display:grid; grid-template-columns:repeat\(2/);
+  assert.doesNotMatch(ped, /" → " \+ qty\.get\(p\.id\) \* p\.unitsPerBox/); // el texto de la tarjeta no cambia al añadir (no se mueve lo de debajo)
+});

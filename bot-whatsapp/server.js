@@ -1,5 +1,6 @@
 import http from "node:http";
 import crypto from "node:crypto";
+import zlib from "node:zlib";
 import fs from "node:fs";
 import path from "node:path";
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog as catalogNow, habitualProducts } from "./bot.js";
@@ -167,8 +168,15 @@ async function onMessage(msg) {
 // Modo demo (npm run demo): chat simulado en el navegador, sin WhatsApp ni Meta
 const readOrders = () => getDb().listOrders().reverse().map((o) => ({ ...o, at: o.created_at, customerId: o.customer_id })); // el demo las pinta de más antiguo a más reciente
 
-const json = (res, data, code = 200) =>
-  res.writeHead(code, { "Content-Type": "application/json" }).end(JSON.stringify(data));
+// Compresión (gzip) de páginas y datos: la página del cliente baja de ~106 KB a ~43 KB y el catálogo en JSON a una cuarta parte (importa con mala cobertura)
+const conGzip = (res, headers, body) => {
+  const buf = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+  if (buf.length < 1024 || !/\bgzip\b/.test(String(res.req?.headers?.["accept-encoding"] ?? ""))) return [headers, buf];
+  return [{ ...headers, "Content-Encoding": "gzip", Vary: "Accept-Encoding" }, zlib.gzipSync(buf, { level: 6 })];
+};
+const enviar = (res, code, headers, body) => { const [h, b] = conGzip(res, headers, body); return res.writeHead(code, h).end(b); };
+
+const json = (res, data, code = 200) => enviar(res, code, { "Content-Type": "application/json" }, JSON.stringify(data));
 
 function readBody(req) {
   return new Promise((resolve) => {
@@ -254,8 +262,7 @@ function webOrderRoutes(req, res, url) {
   const token = m[1];
 
   if (req.method === "GET" && !m[2]) {
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" });
-    return res.end(fs.readFileSync(new URL("./pedido.html", import.meta.url)));
+    return enviar(res, 200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }, fs.readFileSync(new URL("./pedido.html", import.meta.url)));
   }
 
   (async () => {
@@ -386,7 +393,7 @@ function imgs() {
 const imgUrl = (id) => (imgs().has(id) ? `/img/${encodeURIComponent(id)}` : null);
 const imgEsIa = (id) => (imgs(), imgIa.has(String(id)));
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow" };
-const sendJson = (res, code, data) => res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify(data));
+const sendJson = (res, code, data) => enviar(res, code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify(data));
 
 // Conversación de un cliente con sesión: el cliente sale SIEMPRE de la cuenta (nunca de lo que envíe el navegador)
 async function accountChat(account, text, msgId) {
@@ -423,7 +430,7 @@ async function appRoutes(req, res, url) {
   // Aplicación de la empresa (el empresario)
   if (p === "/empresa" || p === "/distribuidor") {
     if (!adminEnabled) return void res.writeHead(404).end();
-    return void res.writeHead(200, HTML).end(page("empresa.html"));
+    return void enviar(res, 200, HTML, page("empresa.html"));
   }
   if (p.startsWith("/api/admin/")) {
     if (!adminEnabled) return void res.writeHead(404).end(); // la aplicación del cliente no tiene administración, ni con clave
@@ -431,7 +438,7 @@ async function appRoutes(req, res, url) {
   }
   // Aplicación del cliente
   if (!clientEnabled) return void res.writeHead(404).end();
-  if (p === "/cliente" && req.method === "GET") return void res.writeHead(200, HTML).end(page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml({ titular: process.env.PRIVACY_TITULAR || undefined, cif: process.env.PRIVACY_CIF || "", direccion: process.env.PRIVACY_DIRECCION || undefined, email: process.env.PRIVACY_EMAIL || "" })));
+  if (p === "/cliente" && req.method === "GET") return void enviar(res, 200, HTML, (page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml({ titular: process.env.PRIVACY_TITULAR || undefined, cif: process.env.PRIVACY_CIF || "", direccion: process.env.PRIVACY_DIRECCION || undefined, email: process.env.PRIVACY_EMAIL || "" }))));
   if (await auth.route(req, res, url)) return;
 
   const account = auth.sessionOf(req);
@@ -449,7 +456,7 @@ async function appRoutes(req, res, url) {
   // Catálogo de pedido (la mini-aplicación) del cliente con sesión
   if (p === "/catalogo" && req.method === "GET") {
     if (!account) return void res.writeHead(302, { Location: "/cliente" }).end();
-    return void res.writeHead(200, HTML).end(page("pedido.html"));
+    return void enviar(res, 200, HTML, page("pedido.html"));
   }
   if (p === "/catalogo/datos" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
