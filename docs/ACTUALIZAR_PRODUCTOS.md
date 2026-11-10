@@ -57,3 +57,12 @@ Deja `carpeta/datos/productos.json` en el formato que lee el cargador de la demo
 
 Si llegan productos de una familia que aún no tiene categoría, edita `familias-categorias.json` (`"14.0": { "category": "…", "subcategory": "…" }`) o vuelve a aprenderlas de los productos ya clasificados:
 `node familias-aprender.js ARTICULOS.xlsx lista-actual.json familias-categorias.json`.
+
+## Actualizar desde la aplicación de la empresa (sin comandos)
+
+En la aplicación de la empresa, pestaña **Clientes › Actualizar datos desde Excel**: se elige el tipo (productos, clientes o histórico), se sube el Excel y **«Ver cambios»** enseña qué se añade, qué cambia (antes → después) y qué se quita, sin escribir nada. **«Aplicar cambios»** escribe solo las diferencias.
+
+- **Productos**: añade, modifica y pasa a inactivos los que ya no están; guarda las fotos nuevas o cambiadas del Excel en `IMG_DIR`; hace copia de la base antes. Rechaza un Excel con menos de la mitad de los productos activos (casi seguro incompleto) y los nuevos con IVA sin porcentaje conocido.
+- **Clientes**: crea los nuevos y actualiza solo los que cambian (nombre, razón social, dirección, teléfonos, correos, baja). Un dato vacío en el Excel no borra el que hay. Los que no vienen en el Excel **no se dan de baja solos** (se avisa). Cada cliente activo nuevo recibe su cuenta.
+- **Histórico**: solo se reescribe el histórico de los clientes cuyo historial cambia; los códigos que no existen se ignoran (sube antes los clientes).
+- Cada aplicación queda anotada en `actualizaciones.log` (junto a la base de clientes). La aplicación del cliente (`APP_MODE=cliente`) no tiene estas rutas: responden 404 aunque se envíe la clave.

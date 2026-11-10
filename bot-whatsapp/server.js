@@ -9,6 +9,7 @@ import { getDb } from "./db.js";
 import { priceOrder } from "./pricing.js";
 import { createAuth } from "./auth.js";
 import { createAdmin } from "./admin.js";
+import { crearActualizador } from "./actualizar-datos.js";
 import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy } from "./delivery.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
@@ -345,7 +346,14 @@ if (adminEnabled) {
     console.error("Sincronización desactivada:", e.message); // credenciales o carpeta mal configuradas: la aplicación sigue funcionando
   }
 }
-const admin = createAdmin({ sync, mail: notificador, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
+const dbsAdmin = adminEnabled ? getDatabases() : null;
+const actualizador = adminEnabled ? crearActualizador({
+  catalogDb: dbsAdmin.catalogDb, customersDb: dbsAdmin.customersDb, accountsDb: getAccountsDb(), imgDir: process.env.IMG_DIR ?? new URL("./imagenes/", import.meta.url).pathname,
+  familias: (() => { try { return JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8")); } catch { return {}; } })(),
+  registro: (e) => { try { fs.appendFileSync(nodePath.join(nodePath.dirname(process.env.CUSTOMERS_DB ?? "clientes.sqlite"), "actualizaciones.log"), JSON.stringify(e) + "\n"); } catch { /* el registro nunca bloquea */ } },
+  onChange: () => { imgAt = 0; refreshCatalog().catch(console.error); },
+}) : null;
+const admin = createAdmin({ sync, mail: notificador, actualizador, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
 const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));

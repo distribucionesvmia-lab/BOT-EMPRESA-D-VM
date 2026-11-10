@@ -281,7 +281,7 @@ test("APP_MODE=cliente: la aplicación del cliente no tiene NADA de administraci
   const { p, url } = await arrancar("cliente");
   try {
     assert.equal(await status(url + "/cliente"), 200);
-    for (const ruta of ["/empresa", "/distribuidor", "/api/admin/pedidos", "/api/admin/solicitudes", "/api/admin/cuentas", "/api/admin/exportar", "/api/admin/resumen"]) {
+    for (const ruta of ["/empresa", "/distribuidor", "/api/admin/pedidos", "/api/admin/solicitudes", "/api/admin/cuentas", "/api/admin/exportar", "/api/admin/resumen", "/api/admin/vista-previa/productos", "/api/admin/aplicar/clientes", "/api/admin/clientes/lista"]) {
       assert.equal(await status(url + ruta, { headers: { Authorization: `Bearer ${ADMIN}` } }), 404, ruta);
     }
   } finally {
@@ -486,4 +486,22 @@ test("EXPORTAR ELEGIDOS: solo salen los pedidos marcados y se validan las refere
   const tras = await lista();
   assert.equal(tras.find((o) => o.ref === a).estado, "exportado");
   assert.equal(tras.find((o) => o.ref === b).estado, "pendiente"); // el no marcado sigue pendiente
+});
+
+test("ACTUALIZAR DATOS: vista previa y aplicar por Excel solo con la clave de la empresa; la app del cliente no lo conoce", async () => {
+  const subirA = (ruta, buf, admin = true) => fetch(`${BASE}/api/admin/${ruta}`, { method: "POST", headers: { "Content-Type": "application/octet-stream", ...(admin ? { Authorization: `Bearer ${ADMIN}` } : {}) }, body: buf }).then(async (r) => ({ status: r.status, json: await r.json() }));
+  const x = Buffer.from(buildWorkbook([{ name: "C", rows: [cabecera, ["    7901", "BAR ACTUALIZADO", "BAR ACTUALIZADO", "MEDINA", "CL. UNO 1", "611000111", "", "B22222222", "No", "No", "1"]] }]));
+  assert.equal((await subirA("vista-previa/clientes", x, false)).status, 403);
+  assert.equal((await subirA("aplicar/clientes", x, false)).status, 403);
+  const v = await subirA("vista-previa/clientes", x);
+  assert.equal(v.status, 200);
+  assert.equal(v.json.resumen.nuevos, 1, JSON.stringify(v.json));
+  assert.equal((await call("GET", "/api/admin/clientes/lista?q=actualizado", { admin: true })).json.total, 0); // la vista previa no escribe
+  assert.equal((await subirA("aplicar/clientes", x)).json.nuevos, 1);
+  assert.equal((await call("GET", "/api/admin/clientes/lista?q=actualizado", { admin: true })).json.total, 1);
+  assert.equal((await subirA("aplicar/clientes", x)).status, 400); // repetir: no hay diferencias
+  assert.equal((await subirA("vista-previa/clientes", Buffer.from("basura"))).status, 400);
+  // la página del cliente no contiene nada de la administración
+  const html = await (await fetch(`${BASE}/cliente`)).text();
+  assert.equal(/api\/admin|\/empresa|Actualizar datos|importar/i.test(html), false);
 });

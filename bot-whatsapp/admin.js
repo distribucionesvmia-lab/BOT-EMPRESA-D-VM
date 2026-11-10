@@ -41,7 +41,7 @@ function orderView(o) {
  * accounts: base de cuentas · customers: { list, getById, suggest } · orders: base de pedidos (db.js)
  * Devuelve route(req, res, url) → true si atendió la petición.
  */
-export function createAdmin({ sync = null, mail = null, accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones" }) {
+export function createAdmin({ sync = null, mail = null, actualizador = null, accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones" }) {
   const isAdmin = makeAdminCheck(adminToken);
   // Máximo 10 claves erróneas cada 10 minutos por IP; superado el límite se bloquea esa IP aunque acierte la clave
   // Cada CLAVE distinta que falla cuenta una vez: el panel lanza varias peticiones a la vez con la misma clave y un solo
@@ -137,6 +137,19 @@ export function createAdmin({ sync = null, mail = null, accounts, customers, ord
         const r = customers.importMany(list);
         const cuentasNuevas = accounts.ensureMany(list.filter((c) => c.active !== false).map((c) => c.id)); // cada cliente activo ya tiene su cuenta
         return send(res, 200, { ok: true, ...stats, nuevos: r.added, actualizados: r.updated, cuentasNuevas }), true;
+      } catch (e) {
+        return send(res, 400, { error: e.message || "No se pudo leer el Excel." }), true;
+      }
+    }
+    // ---- Actualizar datos desde un Excel: vista previa de los cambios y aplicar solo las diferencias ----
+    m = /^\/api\/admin\/(vista-previa|aplicar)\/(productos|clientes|historial)$/.exec(p);
+    if (m && post) {
+      if (!actualizador) return send(res, 400, { error: "La actualización de datos no está disponible." }), true;
+      const buf = await readBuffer(req, 25_000_000); // los Excel con fotos de producto pesan más que los de texto
+      if (!buf || !buf.length) return send(res, 400, { error: "No se recibió el archivo (máximo 25 MB)." }), true;
+      try {
+        if (m[1] === "vista-previa") return send(res, 200, { ok: true, tipo: m[2], ...actualizador.vistaPrevia(m[2], buf) }), true;
+        return send(res, 200, { ok: true, tipo: m[2], ...actualizador.aplicar(m[2], buf, { fichero: String(url.searchParams.get("fichero") ?? "").slice(0, 120) }) }), true;
       } catch (e) {
         return send(res, 400, { error: e.message || "No se pudo leer el Excel." }), true;
       }

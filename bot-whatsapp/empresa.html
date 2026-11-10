@@ -76,6 +76,13 @@
         <div class="row"><button class="main" id="sync-ahora" type="button" hidden>Sincronizar ahora</button><span class="muted" id="sync-msg" role="status"></span></div>
         <ul id="sync-reg" class="muted" style="margin:8px 0 0;padding-left:18px"></ul>
       </div>
+      <div class="panel" id="act-panel">
+        <h2>Actualizar datos desde Excel</h2>
+        <p class="muted">Sube el Excel de <b>productos</b>, <b>clientes</b> o <b>histórico</b>. Primero se enseñan los cambios respecto a lo que ya hay y, solo si confirmas, se aplican <b>únicamente las diferencias</b>. El histórico necesita que los clientes ya estén cargados.</p>
+        <div class="row"><select id="ad-tipo" aria-label="Tipo de datos"><option value="productos">Productos</option><option value="clientes">Clientes</option><option value="historial">Histórico de compras</option></select><input type="file" id="ad-file" accept=".xlsx" aria-label="Archivo Excel"><button class="main" id="ad-ver" type="button">Ver cambios</button><button id="ad-aplicar" type="button" hidden>Aplicar cambios</button></div>
+        <p class="muted" id="ad-msg" role="status"></p>
+        <div id="ad-res"></div>
+      </div>
       <div class="panel">
         <h2>Importar clientes desde Excel</h2>
         <p class="muted">Sube la lista de clientes que exporta a3ERP (columnas «Cód. cliente», «Organización», «Razón social», «Población», «Dirección fiscal», «Teléfono», «E-Mail», «Bloqueado», «Obsoleto»). Los nuevos se añaden y los que ya existen se actualizan; no se toca su historial ni sus precios y el NIF <b>no se guarda</b>: solo una huella de sus 6 últimos caracteres.</p>
@@ -255,6 +262,46 @@ async function clientes() {
 $("q-cli").oninput = () => { clearTimeout(tClientes); tClientes = setTimeout(() => { pagCli = 0; clientes(); }, 300); };
 $("cli-ant").onclick = () => { pagCli = Math.max(0, pagCli - 1); clientes(); };
 $("cli-sig").onclick = () => { pagCli++; clientes(); };
+let adFichero = null;
+const adEt = { anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", desconocidos: "Clientes desconocidos (ignorados)", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
+function adPinta(r) {
+  const cont = $("ad-res"); cont.textContent = "";
+  const t = document.createElement("table"), tb = document.createElement("tbody"); t.appendChild(tb);
+  for (const [k, v] of Object.entries(r.resumen)) { const tr = document.createElement("tr"), a = document.createElement("td"), b = document.createElement("td"); a.textContent = adEt[k] ?? k; b.textContent = v; tr.append(a, b); tb.appendChild(tr); }
+  cont.appendChild(t);
+  for (const a of r.aviso ?? []) { const p = document.createElement("p"); p.className = "muted"; p.textContent = "Aviso: " + a; cont.appendChild(p); }
+  const fmt = (v) => (v === null || v === undefined || v === "" ? "—" : typeof v === "boolean" ? (v ? "sí" : "no") : String(v));
+  for (const [grupo, filas] of Object.entries(r.detalle ?? {})) {
+    if (!filas.length) continue;
+    const d = document.createElement("details"), s = document.createElement("summary"); s.textContent = `${adEt[grupo] ?? grupo} (primeros ${filas.length})`; d.appendChild(s);
+    const ul = document.createElement("ul");
+    for (const f of filas) {
+      const li = document.createElement("li");
+      li.textContent = `${f.id ?? ""} ${f.nombre ?? f.name ?? ""}` + (f.precio != null ? ` · ${f.precio} €` : "") + (f.motivo ? ` · ${f.motivo}` : "") + (f.pct != null ? `: ${f.antes} → ${f.despues} (${f.pct.toFixed(0)} %)` : "") + (f.pedidosNuevos != null ? ` · ${f.pedidosNuevos} pedidos nuevos` : "") + (f.cambios ? ": " + f.cambios.map((c) => `${c.campo} ${fmt(c.antes)} → ${fmt(c.despues)}`).join("; ") : "");
+      ul.appendChild(li);
+    }
+    d.appendChild(ul); cont.appendChild(d);
+  }
+}
+async function adLlamar(ruta) {
+  const r = await fetch(`/api/admin/${ruta}/${$("ad-tipo").value}?fichero=${encodeURIComponent(adFichero.name)}`, { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": "application/octet-stream" }, body: adFichero });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "No se pudo procesar el Excel");
+  return j;
+}
+$("ad-ver").onclick = async () => {
+  adFichero = $("ad-file").files[0]; $("ad-aplicar").hidden = true; $("ad-res").textContent = "";
+  if (!adFichero) { $("ad-msg").textContent = "Elige primero el archivo Excel."; return; }
+  $("ad-ver").disabled = true; $("ad-msg").textContent = "Comparando con lo que hay…";
+  try { const j = await adLlamar("vista-previa"); adPinta(j); $("ad-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : "No hay cambios que aplicar (o hay un aviso que lo impide)."; $("ad-aplicar").hidden = !j.aplicable; }
+  catch (e) { $("ad-msg").textContent = e.message; } finally { $("ad-ver").disabled = false; }
+};
+$("ad-aplicar").onclick = async () => {
+  if (!confirm("¿Aplicar estos cambios? Solo se escribirán las diferencias.")) return;
+  $("ad-aplicar").disabled = true; $("ad-msg").textContent = "Aplicando…";
+  try { const j = await adLlamar("aplicar"); const { resumen, ...r } = j; delete r.ok; delete r.tipo; $("ad-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${k} ${v}`).join(" · "); $("ad-aplicar").hidden = true; $("ad-res").textContent = ""; $("ad-file").value = ""; refrescar(); }
+  catch (e) { $("ad-msg").textContent = e.message; } finally { $("ad-aplicar").disabled = false; }
+};
 $("importar").onclick = async () => {
   const f = $("f-excel").files[0]; if (!f) { $("imp-msg").textContent = "Elige primero el archivo Excel."; return; }
   $("importar").disabled = true; $("imp-msg").textContent = "Importando…";
