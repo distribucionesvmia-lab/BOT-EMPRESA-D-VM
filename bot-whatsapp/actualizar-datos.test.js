@@ -154,3 +154,11 @@ test("productos: un precio que cambia mucho o datos raros obligan a confirmar an
   assert.equal(lista.find((q) => q.id === "1").price, 5);
   assert.equal(lista.some((q) => q.id === "3" || q.id === "4"), false);
 });
+
+test("productos: un Excel sin código de familia no cambia la categoría de los productos que ya existen", () => {
+  const { a, catalogDb } = montar();
+  catalogDb.upsertProducts([{ id: "1", name: "AGUA BEZOYA 1 L", price: 1, vat: 10, category: "Aguas", subcategory: "Bezoya" }]);
+  const p = a.vistaPrevia("productos", prod(["1", "AGUA BEZOYA 1 L", "1,20", "RED10", "6", "No", "No"], ["2", "CERVEZA MAHOU LATA", "0,60", "ORD21", "24", "No", "No"]));
+  assert.equal(p.resumen.modificados, 1); // solo cambia el precio
+  assert.deepEqual(p.detalle.modificados[0].cambios.map((c) => c.campo).includes("Categoría"), false);
+});

@@ -44,7 +44,9 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const activos = actual.filter((p) => p.active !== false).length;
     // Categoría y subcategoría por tipo de producto (familia de a3ERP + nombre), también en los que ya existen: así una mejora de las categorías llega a todo el catálogo.
     // Si el Excel trae su propia columna «Categoría», manda esa.
-    const nuevos = lista.map((p) => ({ ...p, ...(p.category ? {} : clasificar(p, familias)) }));
+    // Si el Excel no trae el código de familia, los productos que ya existen conservan su categoría (reclasificar solo por el nombre sería peor que lo que ya hay); los nuevos se clasifican siempre.
+    const existentes = new Set(actual.map((p) => String(p.id)));
+    const nuevos = lista.map((p) => ({ ...p, ...(p.category || (existentes.has(p.id) && !p.family) ? {} : clasificar(p, familias)) }));
     const cmp = compararProductos(actual, nuevos, { sinPrecioIds });
     const saltos = saltosDePrecio(cmp);
     const aviso = [];
