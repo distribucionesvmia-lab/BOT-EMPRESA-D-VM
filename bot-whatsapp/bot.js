@@ -6,6 +6,7 @@ import { deliveryAllowed, longDate, puedeHoy } from "./delivery.js";
 import { priceLine, totals } from "./pricing.js";
 
 const money = (n) => `${n.toFixed(2).replace(".", ",")} ${BUSINESS.currency}`; // «3,30 €», como en la web
+const moneyP = (n) => `${Number(n).toFixed(3).replace(".", ",")} ${BUSINESS.currency}`; // precio de un artículo: SIEMPRE con 3 decimales («1,665 €»)
 const udsT = (n) => `${n} ${n === 1 ? "ud" : "uds"}`; // «1 ud», «6 uds»
 const norm = (s) =>
   s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
@@ -178,7 +179,7 @@ function listUi(s, page = 0) {
   const rows = all.slice(start, start + PAGE).map((p) => ({
     id: `p:${p.id}`,
     title: trunc(p.name, 24),
-    description: trunc(p.lastQty != null ? `${p.name} · última vez: ${udsT(p.lastQty)}` : `${p.name} · ${money(priceOf(p))}`, 72),
+    description: trunc(p.lastQty != null ? `${p.name} · última vez: ${udsT(p.lastQty)}` : `${p.name} · ${moneyP(priceOf(p))}`, 72),
   }));
   if (!rows.length) return undefined;
   if (start + PAGE < all.length) rows.push({ id: `more:${page + 1}`, title: "Ver más artículos", description: `Quedan ${all.length - start - PAGE} por ver` });
@@ -247,7 +248,7 @@ const catalog = () => {
   const shown = CATALOG.slice(0, 25);
   return (
     `🛍️ *Productos*\n\n` +
-    shown.map((p) => `• ${p.name} — ${money(p.price)}`).join("\n") +
+    shown.map((p) => `• ${p.name} — ${moneyP(p.price)}`).join("\n") +
     (CATALOG.length > shown.length ? `\n… y ${CATALOG.length - shown.length} más. Escribe el nombre de lo que buscas.` : "") +
     `\n\n✍️ Escribe lo que quieres, por ejemplo: _"2 aguas y una cerveza"_`
   );
@@ -330,7 +331,7 @@ function preguntarTipo(s, a, lead = "") {
     session: s,
     ui: {
       type: "list", button: trunc(`Ver ${a.query}`, 20), section: trunc(a.query, 24),
-      rows: mostrados.map((p) => ({ id: `p:${p.id}`, title: trunc(p.name, 24), description: trunc(`${p.name} · ${money(priceOf(p))}${upbOf(p) ? ` · caja de ${upbOf(p)}` : ""}${compra.has(String(p.id)) ? " · ya lo has pedido" : ""}`, 72) })),
+      rows: mostrados.map((p) => ({ id: `p:${p.id}`, title: trunc(p.name, 24), description: trunc(`${p.name} · ${moneyP(priceOf(p))}${upbOf(p) ? ` · caja de ${upbOf(p)}` : ""}${compra.has(String(p.id)) ? " · ya lo has pedido" : ""}`, 72) })),
     },
   };
 }
@@ -437,7 +438,7 @@ function askQty(s) {
   }
   const last = p.lastQty ?? 1;
   return {
-    reply: `*${p.name}*\n${money(priceOf(p))} por unidad${p.lastQty ? ` · última vez: ${udsT(last)}` : ""}.\n\n¿Cuántas unidades quieres? Pulsa un botón o escribe el número.`,
+    reply: `*${p.name}*\n${moneyP(priceOf(p))} por unidad${p.lastQty ? ` · última vez: ${udsT(last)}` : ""}.\n\n¿Cuántas unidades quieres? Pulsa un botón o escribe el número.`,
     ui: buttons([`q:${last}`, `${udsT(last)} (igual)`], [`q:${last * 2}`, `${udsT(last * 2)} (doble)`], ["q:0", "No lo quiero"]),
   };
 }
@@ -694,7 +695,7 @@ function handleMessageInner(session, rawText, ctx = {}) {
         if (upb) {
           // El artículo se vende en cajas: se pregunta cómo lo quiere
           return {
-            reply: `*${p.name}*\n${money(priceOf(p))} por unidad · caja de ${upb} uds (${money(priceOf(p) * upb)}).\n\n¿Lo quieres en *cajas* o en *unidades*?`,
+            reply: `*${p.name}*\n${moneyP(priceOf(p))} por unidad · caja de ${upb} uds (${moneyP(priceOf(p) * upb)}).\n\n¿Lo quieres en *cajas* o en *unidades*?`,
             session: s,
             ui: buttons(["u:caja", "Cajas"], ["u:ud", "Unidades"], ["q:0", "No lo quiero"]),
           };

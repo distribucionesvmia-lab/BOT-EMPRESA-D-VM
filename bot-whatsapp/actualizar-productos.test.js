@@ -84,7 +84,7 @@ test("familias: se aprende la categoría de cada familia y se usa para clasifica
 test("informe: resumen con los números y los cambios de cada producto", () => {
   const t = informe(compararProductos(actual, nuevo, { sinPrecioIds: ["9"] }), { fichero: "A.xlsx" });
   assert.match(t, /\| 1 \| 2 \| 1 \| 1 \| 2 \| 2 \|/); // añadidos, quitados, modificados, reactivados, sin precio, iguales
-  assert.match(t, /\*\*2\*\* COLA: Nombre COLA → COLA ZERO; Precio 1,00 € → 1,20 €; Unidades por caja — → 24/);
+  assert.match(t, /\*\*2\*\* COLA: Nombre COLA → COLA ZERO; Precio 1,000 € → 1,200 €; Unidades por caja — → 24/);
   assert.match(t, /- 4 ANTIGUO · ya no está en el Excel/);
 });
 

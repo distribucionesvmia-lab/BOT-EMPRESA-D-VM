@@ -114,3 +114,28 @@ test("MÓVIL con letra grande (Samsung): ninguna caja de altura fija corta los t
   assert.match(ped, /grid-template-columns:repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(ped, /\.ud button \{ flex:1 1 auto; white-space:nowrap/);
 });
+
+test("PRECIOS DE ARTÍCULO: se enseñan siempre con 3 decimales (catálogo web, chat y Excel); los importes y totales, con 2", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.match(ped, /const eurp = n => Number\(n\)\.toFixed\(3\)/);
+  assert.match(ped, /price\.textContent = eurp\(p\.price\)/);
+  assert.match(ped, /pr\.textContent = eurp\(l\.price\) \+ " \/ ud"/);
+  assert.match(ped, /const eur = n => n\.toFixed\(2\)/); // los totales siguen con 2
+  const { handleMessage, newSession } = await import("./bot.js");
+  const bar = { id: "C1", name: "Bar", address: "x", orders: [] };
+  const r = handleMessage(newSession(bar), "productos");
+  assert.match(r.reply, /— \d+,\d{3} €/);
+  const xlsx = fs.readFileSync(new URL("./xlsx-files.js", import.meta.url), "utf8");
+  assert.match(xlsx, /formatCode="#,##0\.000"/);
+});
+
+test("MÓVIL: el tamaño de letra del sistema (Samsung) se compensa: ningún font-size en px sin dividir entre --k", async () => {
+  const fs = await import("node:fs");
+  for (const f of ["pedido.html", "cliente.html", "demo-web/page.html"]) {
+    const html = fs.readFileSync(new URL("./" + f, import.meta.url), "utf8");
+    assert.match(html, /function medir\(\)/, f + ": falta la medición de --k");
+    assert.equal((html.match(/font-size: *\d+(\.\d+)?px/g) ?? []).filter((x) => !x.endsWith("100px")).length, 0, f + ": hay tamaños de letra sin compensar"); // (100px es la sonda que mide --k)
+    assert.ok((html.match(/var\(--k,1\)/g) ?? []).length > 20, f);
+  }
+});
