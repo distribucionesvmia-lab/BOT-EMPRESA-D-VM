@@ -33,11 +33,12 @@ const REGLAS_NOMBRE = [
   R(/articulo generico|base al \d+ ?% iva|operaciones sujetas|^iva \d/, "Otros productos", "Artículos internos (no vender)"),
   R(/\b(azucar|azucarillo|azucarito|edulcorante|sacarina|stevia)s?\b/, "Despensa", "Azúcar y edulcorantes"), // «azúcar para el café» es despensa; «sin azúcar» se excluye abajo
   R(/\bleche condensada|\bcondensada\b/, "Despensa", "Cacao y desayuno"),
-  R(/\bcopa\b/, "Hostelería y menaje", null),
+  R(/^(?!.*(cerveza|\bvino\b|licor|whisky|ginebra)).*\bcopa\b/, "Hostelería y menaje", null),
+  R(/crackers/, "Despensa", "Galletas y dulces"),
+  R(/\bsal\b.*(bolsi|sobre|gr\b)|^prima sal\b/, "Despensa", "Sal y especias"),
   R(/maizena/, "Despensa", "Pasta, arroz y harinas"),
   R(/meica|bockwurst|frankfurter|corned beef/, "Despensa", "Conservas de carne"),
   R(/pasta sandw/, "Despensa", "Tomate y salsas"),
-  R(/^(?!.*(merme|mini|mermelada)).*(melocoton|coctel de frutas|coctel frutas|cocktail|cerezas|mandarina|piña en|macedonia de frutas)/, "Despensa", "Frutas en conserva"),
   R(/\bporra navidad|lote navidad|\blote\b.*navidul|navidad/, "Otros productos", "Lotes de Navidad"),
   R(/cajetin|\bpalet\b|envase retornable|envases|botella (vacia|vacio)|bidon vacio/, "Otros productos", "Envases y palés"),
   // menaje y desechables que vienen en familias de café (vasos de cartón, tazas, paletinas…): se afinan como hostelería
@@ -63,6 +64,8 @@ const AFINAR = {
     [/gazpacho|salmorejo|callos|orejas|morros|rabo|tortilla|ensaladilla|empanadilla|croqueta|pato|pisto|lasana|masa/, "Platos cocinados y gazpachos"],
   ],
   despensa: [
+    [/^(?!.*(merme|mini|picos|mermelada|agua|zumo|salchi)).*(melocoton|coctel de frutas|coctel frutas|cocktail frutas|cerezas|mandarina|pina en|macedonia de frutas)/, "Frutas en conserva"],
+    [/tomate (para )?untar|untar tomate/, "Tomate y salsas"],
     [/mermelada|merme\b|confitura|membrillo|crema de cacao|untar|picos|\bmiel\b/, "Mermeladas y miel"],
     [/sirope|topping|jarabe/, "Siropes y toppings"],
     [/maizena|harina|pan rallado|arroz|pasta|fideo|macarron|spag|tallarin|lasana|helices|plumas|cuscus|sopa/, "Pasta, arroz y harinas"],
@@ -74,15 +77,15 @@ const AFINAR = {
     [/tarta|pastel|brownie|cheesecake|bizcocho|muffin/, "Pastelería"],
   ],
   hosteleria: [
-    [/estuche|bolsa papel|asa plana|caja regalo/, "Embalaje y bolsas"],
+    [/estuche(?!.*(servillet|cubierto))|bolsa papel|asa plana|caja regalo/, "Embalaje y bolsas"],
     [/delantal|gorro|chaqueta cocina|pantalon|cubrecabeza|manguito|trapo|bata\b/, "Uniformes y textil"],
-    [/fregona|mopa|escoba|recogedor|\bcubo\b|contenedor.*(\d+ ?l\b|pedal)|bayeta|estropajo|lejia|cloro|amoniaco|sosa|detergente|desinfect|jabon|higienic|basura|guante|mascarilla|abrillantador|pulverizador|friegasuelos|fregasuelos|ambientador|insectic|esponja|gamuza|limpia|limpieza|cepillo|rasqueta|lavavajillas|alcohol|toallero|toallita|escobilla|gel (bano|manos)|desatascador|eliminador/, "Limpieza y droguería"],
-    [/mantel|servilleta(?!ro)|rollo|papel|blonda|rodal|desech|reut|vaso.*(carton|kraft|plast|irromp|transp)|vaso chiquito|tapa (vaso|para|env)|paletina|palillo|pajita|cana papel|portavasos|film|aluminio|alumi\b|bolsa (de |envasar|basura|hielo)|termosellable|take ?away|envase|(set|pack).*(plastico|cubiertos)|bandeja carton|cana azuc|tarrina|bagazo|dispensador (bobina|servilleta)/, "Papel y desechables"],
-    [/escurridor|prensa|hermetico|gastronorm|\bgn ?1|contenedor|cuchillo (jamonero|kebab|cocinero|chef|deshuesador|puntilla|pelador|pan|filetear|carnicero|arcos|sabatier|queso)|cuchara (madera|helado|servir|arroz)|espumadera|cucharon|chaira|afilador/, "Cocina y utensilios"],
+    [/fregona|mopa|escoba|recogedor|\bcubo\b|contenedor.*(\d+ ?l\b|pedal)|bayeta|estropajo|lejia|cloro|amoniaco|sosa|detergente|desinfect|jabon|higienic|basura|guante(?! horno)|mascarilla|abrillantador|pulverizador|friegasuelos|fregasuelos|ambientador|insectic|esponja|gamuza|limpia|limpieza|cepillo|lavavajillas|alcohol|toallero|secamanos|toallita|escobilla|gel (bano|manos)|desatascador|eliminador/, "Limpieza y droguería"],
+    [/mantel|servilleta(?!ro)|rollo|papel|blonda|rodal|desech|reut|vaso.*(carton|kraft|plast|irromp|transp)|vaso chiquito|tapa (vaso|para|env)|paletina|palillo|pajita|cana papel|portavasos|film|rollo aluminio|papel aluminio|alumi\b|bolsa (de |envasar|basura|hielo)|termosellable|take ?away|envase|(set|pack).*(plastico|cubiertos)|bandeja carton|cana azuc|tarrina|bagazo|carton|kraft|hoja de palma|brocheta|lazo bambu|tapa pet|dispensador (bobina|servilleta)/, "Papel y desechables"],
+    [/sifon|rasqueta|guante horno|\bcazo\b|sarten|\bolla\b|tabla polietileno|abrelatas|pinza (recta|reposteria|emplatado)|rallador|librador|salsero|barreno|bandeja horno|freidora|biberon|escurridor|prensa|hermetico|gastronorm|\bgn ?1|contenedor|cuchillo (jamonero|kebab|cocinero|chef|deshuesador|puntilla|pelador|pan|filetear|carnicero|arcos|sabatier|queso)|cuchara (madera|helado|servir|arroz)|espumadera|cucharon|chaira|afilador/, "Cocina y utensilios"],
     [/tenedor|cuchara\b|cucharas|cucharilla|cubierto|\bcuchillo\b|pala pescado/, "Cubertería"],
     [/(?<!a la )\btazas?\b|plato (solo|con leche|cortado|te|cafe|moka)|plato moka|cafetera|tetera|azucarero|jarra (leche|cafe)|lechera|\bmoka\b|expresso|espresso|vaso (cafe|te)\b/, "Tazas y cafetería"],
     [/\bvasos?\b|\bcopas?\b|chupito|cubata|jarrita|jarra (cerveza|cristal|agua)|catavino|decantador/, "Vasos y copas"],
-    [/salero|aceitera|vinagrera|servilletero|palillero|cubitera|champanera|panera|cesta|jarra|botella|decanter|coctelera|sacacorchos|abrebotellas|pinza (hielo|azucarillo)|bandeja servicio|frasca/, "Mesa y bar"],
+    [/salero|aceitera|vinagrera|servilletero|palillero|cubitera|champanera|panera|cesta|jarra|botella|decanter|coctelera|sacacorchos|abrebotellas|pinza (hielo|azucarillo)|bandeja servicio|frasca|cenicero|recogemigas|campana cristal|quesera|bandeja camarero|tapon dosificador/, "Mesa y bar"],
     [/\bplato|\bbowl|ensaladera|fuente|cazuela|bandeja|cuenco|barreno|\bsopera|\bflan\b(?!ero)/, "Platos, bowls y fuentes"],
   ],
 };
@@ -141,7 +144,7 @@ export function clasificar(p, familias = {}) {
     const c = byName(f.category);
     for (const [re, sub] of AFINAR[c?.id] ?? []) {
       if (!re.test(n)) continue;
-      if (c.id === "despensa" && f.subcategory && !/^(Tomate y salsas|Siropes y toppings|Mermeladas y miel)$/.test(f.subcategory) && !/^(27\.3)$/.test(p.family)) continue; // en despensa solo afinan las familias mezcladas
+      if (c.id === "despensa" && f.subcategory && !/^(Tomate y salsas|Siropes y toppings|Mermeladas y miel|Conservas vegetales y encurtidos)$/.test(f.subcategory) && !/^(27\.3)$/.test(p.family)) continue; // en despensa solo afinan las familias mezcladas
       return { category: f.category, subcategory: sub };
     }
     return { category: f.category, subcategory: f.subcategory ?? (c ? c.subs[c.subs.length - 1][1] : "General") };
