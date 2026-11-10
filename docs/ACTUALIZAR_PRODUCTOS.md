@@ -66,3 +66,6 @@ En la aplicación de la empresa, pestaña **Clientes › Actualizar datos desde 
 - **Clientes**: crea los nuevos y actualiza solo los que cambian (nombre, razón social, dirección, teléfonos, correos, baja). Un dato vacío en el Excel no borra el que hay. Los que no vienen en el Excel **no se dan de baja solos** (se avisa). Cada cliente activo nuevo recibe su cuenta.
 - **Histórico**: solo se reescribe el histórico de los clientes cuyo historial cambia; los códigos que no existen se ignoran (sube antes los clientes).
 - Cada aplicación queda anotada en `actualizaciones.log` (junto a la base de clientes). La aplicación del cliente (`APP_MODE=cliente`) no tiene estas rutas: responden 404 aunque se envíe la clave.
+
+### Fotos de productos (ZIP)
+En la misma pestaña, elige **«Fotos de productos (ZIP)»** y sube un ZIP con las fotos: cada archivo se llama como el código del producto (`11098.jpg`, `.png` o `.webp`) y puede estar dentro de carpetas. «Ver cambios» cuenta las nuevas, las que sustituyen a una foto existente y las que se ignoran (código que no está en el catálogo u otros archivos). Al aplicar, se guardan en la carpeta de fotos (`IMG_DIR`, por defecto `imagenes/`); un producto solo tiene una foto. Máximo 80 MB por ZIP. Las fotos no se suben a GitHub.

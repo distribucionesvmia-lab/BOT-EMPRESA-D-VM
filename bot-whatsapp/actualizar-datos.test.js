@@ -84,3 +84,26 @@ test("tipo desconocido o Excel que no es del tipo: error claro", () => {
   assert.throws(() => a.vistaPrevia("pedidos", prod()), /desconocido/);
   assert.throws(() => a.vistaPrevia("clientes", prod(["1", "X", "1", "RED10", "1", "No", "No"])), /cabecera/);
 });
+
+import { zip } from "./zip.js";
+test("fotos: un ZIP con «<código>.jpg» en carpetas; solo las de productos del catálogo, nuevas o cambiadas", () => {
+  const { a, catalogDb } = montarConFotos();
+  catalogDb.upsertProducts([{ id: "11", name: "AGUA", price: 1, vat: 10 }, { id: "12", name: "LECHE", price: 1, vat: 10 }]);
+  const foto = (n) => Buffer.alloc(300, n);
+  const z1 = Buffer.from(zip({ "fotos/11 - AGUA/11.jpg": foto(1), "12.png": foto(2), "99.jpg": foto(3), "control.xlsx": foto(4), "__MACOSX/11.jpg": foto(5) }));
+  const p = a.vistaPrevia("fotos", z1);
+  assert.deepEqual([p.resumen.fotosNuevas, p.resumen.fotosCambiadas, p.resumen.ignoradas], [2, 0, 1]); // 99 no está en el catálogo
+  assert.equal(a.aplicar("fotos", z1).fotosGuardadas, 2);
+  assert.equal(fs.existsSync(path.join(a.imgDir, "11.jpg")) && fs.existsSync(path.join(a.imgDir, "12.png")), true);
+  assert.throws(() => a.aplicar("fotos", z1), /nada que aplicar/); // repetirlo no hace nada
+  const z2 = Buffer.from(zip({ "11.webp": foto(9) }));
+  assert.equal(a.vistaPrevia("fotos", z2).resumen.fotosCambiadas, 1);
+  a.aplicar("fotos", z2);
+  assert.equal(fs.existsSync(path.join(a.imgDir, "11.jpg")), false); // una sola foto por producto
+  assert.equal(fs.existsSync(path.join(a.imgDir, "11.webp")), true);
+});
+function montarConFotos() {
+  const imgDir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-img-"));
+  const catalogDb = openCatalogDb(":memory:");
+  return { catalogDb, a: { ...crearActualizador({ catalogDb, customersDb: openCustomersDb(":memory:"), accountsDb: openAccountsDb(":memory:"), imgDir }), imgDir } };
+}

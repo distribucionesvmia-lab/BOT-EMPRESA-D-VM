@@ -5,12 +5,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { parseHistorialXlsx } from "./historial-import.js";
+import { unzip } from "./xlsx-read.js";
 import { leerExcel, categoriaPorFamilia, saltosDePrecio } from "./actualizar-productos.js";
 import { compararProductos, aplicarProductos, CAMPOS, vendible } from "./productos-diff.js";
 
 const MUESTRA = 40; // filas de detalle que se enseñan por apartado
 const MIN_RATIO = 0.5; // un Excel con menos de la mitad de lo que hay se rechaza: casi seguro está incompleto
-export const TIPOS = ["productos", "clientes", "historial"];
+export const TIPOS = ["productos", "clientes", "historial", "fotos"];
 
 const mismo = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const claveHistorial = (o) => `${o.date}|${o.doc}|${[...o.lines].map((l) => `${l.productId}x${l.qty}`).sort().join(",")}`;
@@ -137,7 +138,50 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     };
   }
 
-  const por = { productos, clientes, historial };
+
+  // ---------- fotos (un ZIP con «<código>.jpg|png|webp», en cualquier carpeta) ----------
+  function fotos(buf) {
+    if (!imgDir) throw new Error("La carpeta de fotos no está configurada.");
+    const entradas = unzip(buf, (n) => /\.(jpe?g|png|webp)$/i.test(n) && !/(^|\/)(__MACOSX|\.)/.test(n) && !/\/$/.test(n));
+    const nombres = new Map(catalogDb.list({ activeOnly: false }).map((p) => [String(p.id), p.name]));
+    const catalogo = new Set(nombres.keys());
+    const nuevas = [], cambiadas = [], ignoradas = [];
+    let iguales = 0;
+    const porId = new Map();
+    for (const [ruta, data] of Object.entries(entradas)) {
+      const m = /^([\w-]{1,40})\.(jpe?g|png|webp)$/i.exec(path.basename(ruta));
+      if (!m) { ignoradas.push({ id: path.basename(ruta), nombre: "el nombre del archivo no es un código de producto" }); continue; }
+      if (data.length < 200 || data.length > 8_000_000) { ignoradas.push({ id: m[1], nombre: "tamaño de imagen no válido" }); continue; }
+      if (!catalogo.has(m[1])) { ignoradas.push({ id: m[1], nombre: "ese código no está en el catálogo" }); continue; }
+      porId.set(m[1], { ext: m[2].toLowerCase() === "jpeg" ? "jpg" : m[2].toLowerCase(), data });
+    }
+    const ruta = (id, ext) => path.join(imgDir, `${id}.${ext}`);
+    for (const [id, f] of porId) {
+      const r = ruta(id, f.ext);
+      if (!fs.existsSync(r)) { const otra = ["jpg", "png", "webp"].some((e) => fs.existsSync(ruta(id, e))); (otra ? cambiadas : nuevas).push({ id, nombre: nombres.get(id) }); }
+      else if (!fs.readFileSync(r).equals(f.data)) cambiadas.push({ id });
+      else iguales++;
+    }
+    const resumen = { fotosNuevas: nuevas.length, fotosCambiadas: cambiadas.length, iguales, ignoradas: ignoradas.length };
+    const aviso = ignoradas.length ? [`${ignoradas.length} archivos se ignoran (código que no está en el catálogo u otros archivos).`] : [];
+    return {
+      resumen, aviso, aplicable: nuevas.length + cambiadas.length > 0,
+      detalle: { anadidos: nuevas.slice(0, MUESTRA), modificados: cambiadas.slice(0, MUESTRA), ignoradas: ignoradas.slice(0, MUESTRA) },
+      aplicar() {
+        fs.mkdirSync(imgDir, { recursive: true });
+        let guardadas = 0;
+        for (const [id, f] of porId) {
+          const r = ruta(id, f.ext);
+          if (fs.existsSync(r) && fs.readFileSync(r).equals(f.data)) continue;
+          for (const e of ["jpg", "png", "webp"]) if (e !== f.ext) fs.rmSync(ruta(id, e), { force: true }); // una sola foto por producto
+          fs.writeFileSync(r, f.data); guardadas++;
+        }
+        return { fotosGuardadas: guardadas };
+      },
+    };
+  }
+
+  const por = { productos, clientes, historial, fotos };
   const preparar = (tipo, buf) => {
     if (!por[tipo]) throw new Error("Tipo de datos desconocido.");
     return por[tipo](buf);

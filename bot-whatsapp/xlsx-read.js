@@ -3,11 +3,11 @@
 import zlib from "node:zlib";
 
 /** Descomprime un ZIP en memoria: { "ruta": Buffer }. Solo lee los ficheros que se piden. */
-function unzip(buf, want) {
+export function unzip(buf, want) {
   const out = {};
   let eocd = buf.length - 22;
   while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
-  if (eocd < 0) throw new Error("El archivo no es un .xlsx válido");
+  if (eocd < 0) throw new Error("El archivo no es un .xlsx o .zip válido");
   const n = buf.readUInt16LE(eocd + 10);
   let p = buf.readUInt32LE(eocd + 16);
   for (let i = 0; i < n; i++) {

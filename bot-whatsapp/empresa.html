@@ -79,8 +79,8 @@
       </div>
       <div class="panel" id="act-panel">
         <h2>Actualizar datos desde Excel</h2>
-        <p class="muted">Sube el Excel de <b>productos</b> o de <b>clientes</b>. Primero se enseñan los cambios respecto a lo que ya hay y, solo si confirmas, se aplican <b>únicamente las diferencias</b>. El historial de compras se sube en la pestaña «Historial de clientes».</p>
-        <div class="row"><select id="ad-tipo" aria-label="Tipo de datos"><option value="productos">Productos</option><option value="clientes">Clientes</option></select><input type="file" id="ad-file" accept=".xlsx" aria-label="Archivo Excel"><button class="main" id="ad-ver" type="button">Ver cambios</button><button id="ad-aplicar" type="button" hidden>Aplicar cambios</button></div>
+        <p class="muted">Sube el Excel de <b>productos</b> o de <b>clientes</b>, o un <b>ZIP de fotos</b> (cada foto con el código del producto como nombre: <code>11098.jpg</code>, en cualquier carpeta). Primero se enseñan los cambios respecto a lo que ya hay y, solo si confirmas, se aplican <b>únicamente las diferencias</b>. El historial de compras se sube en la pestaña «Historial de clientes».</p>
+        <div class="row"><select id="ad-tipo" aria-label="Tipo de datos"><option value="productos">Productos</option><option value="clientes">Clientes</option><option value="fotos">Fotos de productos (ZIP)</option></select><input type="file" id="ad-file" accept=".xlsx,.zip" aria-label="Archivo Excel"><button class="main" id="ad-ver" type="button">Ver cambios</button><button id="ad-aplicar" type="button" hidden>Aplicar cambios</button></div>
         <p class="muted" id="ad-msg" role="status"></p>
         <div id="ad-res"></div>
       </div>
@@ -272,7 +272,7 @@ async function clientes() {
 $("q-cli").oninput = () => { clearTimeout(tClientes); tClientes = setTimeout(() => { pagCli = 0; clientes(); }, 300); };
 $("cli-ant").onclick = () => { pagCli = Math.max(0, pagCli - 1); clientes(); };
 $("cli-sig").onclick = () => { pagCli++; clientes(); };
-const adEt = { anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", desconocidos: "Códigos de cliente que no existen (ignorados)", clientes: "Clientes con historial distinto", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
+const adEt = { anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", ignoradas: "Archivos ignorados", desconocidos: "Códigos de cliente que no existen (ignorados)", clientes: "Clientes con historial distinto", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
 function adPinta(r, p) {
   const cont = $(p + "-res"); cont.textContent = "";
   const t = document.createElement("table"), tb = document.createElement("tbody"); t.appendChild(tb);
