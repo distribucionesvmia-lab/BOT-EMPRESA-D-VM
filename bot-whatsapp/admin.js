@@ -41,7 +41,7 @@ function orderView(o) {
  * accounts: base de cuentas · customers: { list, getById, suggest } · orders: base de pedidos (db.js)
  * Devuelve route(req, res, url) → true si atendió la petición.
  */
-export function createAdmin({ sync = null, mail = null, actualizador = null, accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones" }) {
+export function createAdmin({ sync = null, mail = null, actualizador = null, estado = null, accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones" }) {
   const isAdmin = makeAdminCheck(adminToken);
   // Máximo 10 claves erróneas cada 10 minutos por IP; superado el límite se bloquea esa IP aunque acierte la clave
   // Cada CLAVE distinta que falla cuenta una vez: el panel lanza varias peticiones a la vez con la misma clave y un solo
@@ -68,6 +68,9 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, acc
       const list = orders.listOrders({ exportStatus: "pending", limit: 500 }).map(orderView);
       return send(res, 200, { clientes: customers.search({ limit: 1 }).total, cuentasSinConfirmar: accounts.listAccounts().filter((a) => !a.verified).length, solicitudes: accounts.listRegistrations("pending").length, pedidosPendientes: list.filter((o) => o.estado === "pendiente").length, pedidosRetenidos: list.filter((o) => o.estado === "retenido").length }), true;
     }
+
+    // ---- Estado del sistema y problemas detectados (para vigilarlo desde fuera) ----
+    if (p === "/api/admin/estado" && get) return estado ? send(res, 200, estado()) : send(res, 404, { error: "No disponible." }), true;
 
     // ---- Pedidos ----
     if (p === "/api/admin/pedidos" && get) return send(res, 200, orders.listOrders({ limit: 150 }).map(orderView)), true;

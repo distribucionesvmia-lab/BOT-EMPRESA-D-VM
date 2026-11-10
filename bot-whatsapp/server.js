@@ -10,6 +10,8 @@ import { priceOrder } from "./pricing.js";
 import { createAuth } from "./auth.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
+import { estadoSistema, crearVigilante } from "./monitor.js";
+import { sendMail } from "./mailer.js";
 import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy } from "./delivery.js";
 import { scheduleDailyExport, runExport } from "./exporter.js";
@@ -353,7 +355,16 @@ const actualizador = adminEnabled ? crearActualizador({
   registro: (e) => { try { fs.appendFileSync(nodePath.join(nodePath.dirname(process.env.CUSTOMERS_DB ?? "clientes.sqlite"), "actualizaciones.log"), JSON.stringify(e) + "\n"); } catch { /* el registro nunca bloquea */ } },
   onChange: () => { imgAt = 0; refreshCatalog().catch(console.error); },
 }) : null;
-const admin = createAdmin({ sync, mail: notificador, actualizador, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
+const estadoDelSistema = adminEnabled ? () => {
+  const dataDir = nodePath.dirname(nodePath.resolve(process.env.CUSTOMERS_DB ?? "clientes.sqlite"));
+  const pend = getDb().listOrders({ exportStatus: "pending", limit: 500 }).map((o) => ({ fecha: o.created_at, estado: !o.review && o.customer_id ? "pendiente" : "retenido" }));
+  return estadoSistema({
+    pedidosPendientes: () => pend, solicitudesPendientes: () => getAccountsDb().listRegistrations("pending"), cuentasSinConfirmar: () => getAccountsDb().listAccounts().filter((a) => !a.verified).length,
+    sync, correo: notificador, copiasDir: process.env.BACKUP_DIR ?? "respaldos", dataDir,
+    catalogo: () => { const l = dbsAdmin.catalogDb.list({ activeOnly: true }); return { activos: l.length, sinPrecio: l.filter((p) => !(p.price > 0)).length }; },
+  });
+} : null;
+const admin = createAdmin({ sync, mail: notificador, actualizador, estado: estadoDelSistema, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
 const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));
@@ -541,6 +552,11 @@ http
     if (process.env.DEMO !== "1" && adminEnabled && process.env.EXPORT_AUTO !== "0") scheduleDailyExport(getDb());
     if (process.env.DEMO !== "1") sync?.start();
     notificador?.start(); // reintenta los avisos que no salieron
+    // Vigilancia: avisa por correo de problemas nuevos y manda un informe diario (VIGILANCIA=0 la desactiva)
+    if (process.env.DEMO !== "1" && adminEnabled && process.env.VIGILANCIA !== "0") {
+      const cfg = mailConfigFromEnv();
+      if (cfg) crearVigilante({ estado: estadoDelSistema, enviar: ({ subject, text }) => sendMail(cfg.smtp, { from: cfg.from, to: cfg.to, subject, text }) }).start();
+    }
     // Copia diaria de TODAS las bases (pedidos, cuentas, clientes y catálogo), aunque la exportación a Excel esté desactivada
     if (process.env.DEMO !== "1" && adminEnabled) scheduleBackups(() => ({ pedidos: getDb(), cuentas: getAccountsDb(), clientes: getDatabases().customersDb, catalogo: getDatabases().catalogDb }));
     // En Render (o similar) los datos deben estar en el disco persistente: si no, se pierden en cada despliegue

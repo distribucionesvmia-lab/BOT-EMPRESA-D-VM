@@ -281,7 +281,7 @@ test("APP_MODE=cliente: la aplicación del cliente no tiene NADA de administraci
   const { p, url } = await arrancar("cliente");
   try {
     assert.equal(await status(url + "/cliente"), 200);
-    for (const ruta of ["/empresa", "/distribuidor", "/api/admin/pedidos", "/api/admin/solicitudes", "/api/admin/cuentas", "/api/admin/exportar", "/api/admin/resumen", "/api/admin/vista-previa/productos", "/api/admin/aplicar/clientes", "/api/admin/clientes/lista"]) {
+    for (const ruta of ["/empresa", "/distribuidor", "/api/admin/pedidos", "/api/admin/solicitudes", "/api/admin/cuentas", "/api/admin/exportar", "/api/admin/resumen", "/api/admin/vista-previa/productos", "/api/admin/aplicar/clientes", "/api/admin/clientes/lista", "/api/admin/estado"]) {
       assert.equal(await status(url + ruta, { headers: { Authorization: `Bearer ${ADMIN}` } }), 404, ruta);
     }
   } finally {
@@ -504,4 +504,13 @@ test("ACTUALIZAR DATOS: vista previa y aplicar por Excel solo con la clave de la
   // la página del cliente no contiene nada de la administración
   const html = await (await fetch(`${BASE}/cliente`)).text();
   assert.equal(/api\/admin|\/empresa|Actualizar datos|importar/i.test(html), false);
+});
+
+test("ESTADO: /api/admin/estado solo con la clave de la empresa y lista los problemas", async () => {
+  assert.equal((await call("GET", "/api/admin/estado")).status, 403);
+  const r = await call("GET", "/api/admin/estado", { admin: true });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.funcionando, true);
+  assert.ok(Array.isArray(r.json.problemas) && typeof r.json.pedidos.pendientes === "number");
+  assert.ok(r.json.problemas.some((p) => p.clave === "correo-sin-configurar")); // en las pruebas no hay SMTP
 });
