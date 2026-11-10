@@ -19,7 +19,7 @@ Código en `bot-whatsapp/`. Documentación en `docs/` (empieza por `docs/PLAN_DO
 ## Cómo hacer un cambio (siempre así)
 1. `git pull` antes de empezar (puede haber cambios hechos desde otro sitio).
 2. Cambia lo mínimo necesario. Si añades comportamiento, añade su prueba.
-3. Pruebas: `cd bot-whatsapp && npm test` → **todas deben pasar** (hoy: 247). Si fallan, arréglalo; nunca borres ni desactives una prueba para que pase.
+3. Pruebas: `cd bot-whatsapp && npm test` → **todas deben pasar** (hoy: unas 260). Si fallan, arréglalo; nunca borres ni desactives una prueba para que pase.
 4. Reinicia las dos tareas y comprueba `/health`.
 5. Prueba el cambio de verdad (navegador, o el flujo afectado). Si no lo has podido probar, dilo.
 6. `git commit` con un mensaje claro en español y `git push` a la rama de trabajo.
