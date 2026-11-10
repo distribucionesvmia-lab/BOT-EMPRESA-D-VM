@@ -7,7 +7,7 @@ import { buildWorkbook } from "./xlsx.js";
 import { openCatalogDb } from "./catalogo-db.js";
 import { openCustomersDb } from "./clientes-db.js";
 import { openAccountsDb } from "./cuentas-db.js";
-import { crearActualizador } from "./actualizar-datos.js";
+import { crearActualizador, dimensiones } from "./actualizar-datos.js";
 
 const libro = (rows) => Buffer.from(buildWorkbook([{ name: "H", widths: [], rows }]));
 const montar = () => {
@@ -120,3 +120,15 @@ function montarConFotos() {
   const catalogDb = openCatalogDb(":memory:");
   return { catalogDb, a: { ...crearActualizador({ catalogDb, customersDb: openCustomersDb(":memory:"), accountsDb: openAccountsDb(":memory:"), imgDir }), imgDir } };
 }
+
+test("dimensiones: lee el tamaño de un PNG y de un JPEG, y avisa de las fotos pequeñas", () => {
+  const png = Buffer.alloc(40); png[0] = 0x89; png[1] = 0x50; png.writeUInt32BE(64, 16); png.writeUInt32BE(48, 20);
+  assert.deepEqual(dimensiones(png), { w: 64, h: 48 });
+  const jpg = Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x03, 0x20, 0x04, 0x00, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]); // 1024 × 800
+  assert.deepEqual(dimensiones(jpg), { w: 1024, h: 800 });
+  assert.equal(dimensiones(Buffer.from("no es una imagen")), null);
+  const { a, catalogDb } = montarConFotos();
+  catalogDb.upsertProducts([{ id: "31", name: "AGUA", price: 1, vat: 10 }]);
+  const z = Buffer.from(zip({ "31.png": Buffer.concat([png, Buffer.alloc(300)]) }));
+  assert.match(a.vistaPrevia("fotos", z).aviso.join(" "), /baja resolución/);
+});

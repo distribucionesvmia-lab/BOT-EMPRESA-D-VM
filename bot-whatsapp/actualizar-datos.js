@@ -14,6 +14,24 @@ const MUESTRA = 40; // filas de detalle que se enseñan por apartado
 const MIN_RATIO = 0.5; // un Excel con menos de la mitad de lo que hay se rechaza: casi seguro está incompleto
 export const TIPOS = ["productos", "clientes", "historial", "fotos"];
 
+/** Ancho y alto de un PNG o JPEG (null si no se reconoce). Sirve para avisar de fotos de baja resolución. */
+export function dimensiones(b) {
+  try {
+    if (b.length > 24 && b[0] === 0x89 && b[1] === 0x50) return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
+    if (b[0] === 0xff && b[1] === 0xd8) {
+      let p = 2;
+      while (p + 9 < b.length) {
+        if (b[p] !== 0xff) { p++; continue; }
+        const m = b[p + 1];
+        if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) return { h: b.readUInt16BE(p + 5), w: b.readUInt16BE(p + 7) };
+        p += 2 + b.readUInt16BE(p + 2);
+      }
+    }
+  } catch { /* imagen rara */ }
+  return null;
+}
+const POCA_RESOLUCION = 200; // píxeles: por debajo, la foto se ve borrosa al ampliarla (el Excel de a3ERP trae miniaturas de 64 px)
+
 const mismo = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const claveHistorial = (o) => `${o.date}|${o.doc}|${[...o.lines].map((l) => `${l.productId}x${l.qty}`).sort().join(",")}`;
 
@@ -32,35 +50,35 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     if (activos >= 20 && lista.length < activos * MIN_RATIO) aviso.push(`El Excel tiene ${lista.length} productos y hay ${activos} activos: parece incompleto. No se puede aplicar.`);
     const sinIva = cmp.anadidos.filter((p) => p.vat === undefined).length;
     if (sinIva) aviso.push(`${sinIva} productos nuevos tienen un código de IVA sin porcentaje conocido: no se pueden añadir hasta que se indique su tipo.`);
-    // fotos nuevas o cambiadas
-    let fotosNuevas = 0, fotosCambiadas = 0;
+    // Fotos del Excel: solo se guardan las de productos que aún no tienen foto. Nunca sustituyen a una foto ya guardada (las del Excel son miniaturas
+    // de baja calidad: no deben pisar fotos buenas subidas en un ZIP). Se avisa de las que son de poca resolución.
+    let fotosNuevas = 0, fotosBajaCalidad = 0;
     const fotoRuta = (f) => path.join(imgDir, `${f.id}.${f.ext === "jpeg" ? "jpg" : f.ext}`);
+    const tieneFoto = (id) => ["jpg", "png", "webp"].some((e) => fs.existsSync(path.join(imgDir, `${id}.${e}`)));
+    const fotosAGuardar = [];
     if (imgDir) for (const f of fotos) {
-      const r = fotoRuta(f);
-      if (!/^[\w-]{1,40}$/.test(f.id)) continue;
-      if (!fs.existsSync(r)) fotosNuevas++; else if (!fs.readFileSync(r).equals(f.data)) fotosCambiadas++;
+      if (!/^[\w-]{1,40}$/.test(f.id) || tieneFoto(f.id)) continue;
+      fotosAGuardar.push(f); fotosNuevas++;
+      const d = dimensiones(f.data); if (d && Math.max(d.w, d.h) < POCA_RESOLUCION) fotosBajaCalidad++;
     }
-    const resumen = { anadidos: cmp.anadidos.length, quitados: cmp.quitados.length, modificados: cmp.modificados.length, reactivados: cmp.reactivados.length, sinPrecio: cmp.sinPrecio.length, iguales: cmp.iguales, fotosNuevas, fotosCambiadas };
+    if (fotosBajaCalidad) aviso.push(`${fotosBajaCalidad} de las ${fotosNuevas} fotos nuevas del Excel son miniaturas de baja resolución (menos de ${POCA_RESOLUCION} px) y se verán borrosas: es mejor subir fotos grandes en un ZIP.`);
+    const resumen = { anadidos: cmp.anadidos.length, quitados: cmp.quitados.length, modificados: cmp.modificados.length, reactivados: cmp.reactivados.length, sinPrecio: cmp.sinPrecio.length, iguales: cmp.iguales, fotosNuevas, fotosBajaCalidad };
     const detalle = {
       modificados: cmp.modificados.slice(0, MUESTRA).map((m) => ({ id: m.id, nombre: m.name, cambios: m.cambios.map((c) => ({ campo: CAMPOS[c.campo] ?? c.campo, antes: c.antes, despues: c.despues })) })),
       anadidos: cmp.anadidos.slice(0, MUESTRA).map((p) => ({ id: p.id, nombre: p.name, precio: p.price })),
       quitados: cmp.quitados.slice(0, MUESTRA).map((p) => ({ id: p.id, nombre: p.name, motivo: p.motivo })),
       saltosPrecio: saltosDePrecio(cmp).slice(0, MUESTRA),
     };
-    const hayCambios = !!(cmp.anadidos.length || cmp.quitados.length || cmp.modificados.length || cmp.reactivados.length || fotosNuevas || fotosCambiadas);
+    const hayCambios = !!(cmp.anadidos.length || cmp.quitados.length || cmp.modificados.length || cmp.reactivados.length || fotosNuevas);
     return {
       resumen, detalle, aviso, aplicable: hayCambios && !aviso.length,
       aplicar() {
         const resultado = aplicarProductos(actual, nuevos);
         const r = catalogDb.upsertProducts(resultado.map((p) => ({ ...p, unitsPerBox: p.unitsPerBox ?? null })), { partial: true, deactivateMissing: true });
         let fotosGuardadas = 0;
-        if (imgDir) {
+        if (imgDir && fotosAGuardar.length) {
           fs.mkdirSync(imgDir, { recursive: true });
-          for (const f of fotos) {
-            if (!/^[\w-]{1,40}$/.test(f.id)) continue;
-            const ruta = fotoRuta(f);
-            if (!fs.existsSync(ruta) || !fs.readFileSync(ruta).equals(f.data)) { fs.writeFileSync(ruta, f.data); fotosGuardadas++; }
-          }
+          for (const f of fotosAGuardar) { fs.writeFileSync(fotoRuta(f), f.data); fotosGuardadas++; }
         }
         return { anadidos: r.added, modificados: r.updated, iguales: r.unchanged, desactivados: r.deactivated, fotosGuardadas };
       },
@@ -174,6 +192,8 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     }
     const resumen = { fotosNuevas: nuevas.length, fotosCambiadas: cambiadas.length, iguales, ignoradas: ignoradas.length, fotosIA: [...porId.keys()].filter((i) => ia.has(i)).length };
     const aviso = ignoradas.length ? [`${ignoradas.length} archivos se ignoran (código que no está en el catálogo u otros archivos).`] : [];
+    const chicas = [...porId.values()].filter((f) => { const d = dimensiones(f.data); return d && Math.max(d.w, d.h) < POCA_RESOLUCION; }).length;
+    if (chicas) aviso.push(`${chicas} fotos son de baja resolución (menos de ${POCA_RESOLUCION} px) y se verán borrosas.`);
     return {
       resumen, aviso, aplicable: nuevas.length + cambiadas.length > 0 || ia.size > 0,
       detalle: { anadidos: nuevas.slice(0, MUESTRA), modificados: cambiadas.slice(0, MUESTRA), ignoradas: ignoradas.slice(0, MUESTRA) },

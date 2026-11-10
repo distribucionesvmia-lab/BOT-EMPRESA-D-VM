@@ -75,3 +75,6 @@ Las categorías y subcategorías del catálogo se ordenan por **tipo de producto
 
 ### IVA y recargo de equivalencia (confirmado por la gestoría)
 Tipos: 4 %, 10 % y 21 %. El código «SRE» de a3ERP es el superreducido (4 %); «RED10» es el 10 % y «ORD21» el 21 %. Con recargo de equivalencia se suma 0,5 % (sobre el 4 %), 1,4 % (sobre el 10 %) o 5,2 % (sobre el 21 %), siempre **sobre la base** y sin acumularse con el IVA.
+
+### Calidad de las fotos
+El Excel de la tarifa de a3ERP trae las fotos como **miniaturas de 64 píxeles**: ampliadas se ven borrosas. Por eso las fotos del Excel solo se guardan si el producto aún no tiene foto (nunca sustituyen a una foto buena ya subida) y «Ver cambios» avisa de cuántas son de baja resolución (< 200 px). Para que se vea bien lo que se compra, hay que subir fotos grandes en un ZIP («Fotos de productos (ZIP)»): las de ~1000 px se ven nítidas. En la demo del artefacto las miniaturas se recortan, se amplían con filtro Lanczos y se enfocan (build: ver docs/CONTINUAR_CON_OTRA_CUENTA.md).
