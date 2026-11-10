@@ -408,8 +408,9 @@
         <button class="tab" role="tab" type="button" data-t="pedidos" aria-selected="true">Pedidos <span class="cnt" id="n-ped" hidden></span></button>
         <button class="tab" role="tab" type="button" data-t="solicitudes" aria-selected="false">Solicitudes de alta <span class="cnt" id="n-sol" hidden></span></button>
         <button class="tab" role="tab" type="button" data-t="clientes" aria-selected="false">Clientes</button>
+        <button class="tab" role="tab" type="button" data-t="historial" aria-selected="false">Historial de clientes</button>
         <button class="tab" role="tab" type="button" data-t="cuentas" aria-selected="false">Cuentas de clientes <span class="cnt" id="n-cue" hidden></span></button>
-        <button class="tab" role="tab" type="button" data-t="datos" aria-selected="false">Bases de datos</button>
+        <button class="tab" role="tab" type="button" data-t="datos" aria-selected="false">Productos</button>
       </div>
 
       <div id="p-pedidos" style="display:grid;gap:16px">
@@ -449,8 +450,8 @@
       <div id="p-clientes" hidden>
       <div class="panel" id="act-panel" style="margin-bottom:16px">
         <h2>Actualizar datos desde Excel</h2>
-        <p class="msg">Sube el Excel de <b>productos</b>, <b>clientes</b> o <b>histórico</b>. Primero se enseñan los cambios respecto a lo que ya hay y, solo si confirmas, se aplican <b>únicamente las diferencias</b>. En esta demo se aplican sobre los datos de ejemplo.</p>
-        <div class="row2"><select id="ad-tipo" aria-label="Tipo de datos"><option value="productos">Productos</option><option value="clientes">Clientes</option><option value="historial">Histórico de compras</option></select><input type="file" id="ad-file" accept=".xlsx" aria-label="Archivo Excel"><button class="btn main" id="ad-ver" type="button">Ver cambios</button><button class="btn" id="ad-aplicar" type="button" hidden>Aplicar cambios</button></div>
+        <p class="msg">Sube el Excel de <b>productos</b> o de <b>clientes</b>. Primero se enseñan los cambios respecto a lo que ya hay y, solo si confirmas, se aplican <b>únicamente las diferencias</b>. En esta demo se aplican sobre los datos de ejemplo.</p>
+        <div class="row2"><select id="ad-tipo" aria-label="Tipo de datos"><option value="productos">Productos</option><option value="clientes">Clientes</option></select><input type="file" id="ad-file" accept=".xlsx" aria-label="Archivo Excel"><button class="btn main" id="ad-ver" type="button">Ver cambios</button><button class="btn" id="ad-aplicar" type="button" hidden>Aplicar cambios</button></div>
         <p class="msg" id="ad-msg" role="status"></p>
         <div id="ad-res"></div>
       </div>
@@ -468,11 +469,27 @@
         <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
       </div>
 
+      <div id="p-historial" hidden style="display:grid;gap:16px">
+        <div class="panel" id="hi-panel">
+          <h2>Subir historial de clientes</h2>
+          <p class="msg">Sube el Excel con las compras de los clientes (columnas «Cód. cliente», «Fecha», «Documento», «Cód. artículo» y «Cantidad»). Cada línea se <b>relaciona con su cliente por el código</b>: ese historial es el que le sale al cliente en «Histórico» y «Último pedido». Antes de aplicar se enseña a qué clientes afecta y qué códigos no existen. Los clientes tienen que estar ya cargados.</p>
+          <div class="row2"><select id="hi-tipo" aria-label="Tipo de datos" hidden><option value="historial">Histórico de compras</option></select><input type="file" id="hi-file" accept=".xlsx" aria-label="Archivo Excel del historial"><button class="btn main" id="hi-ver" type="button">Ver cambios</button><button class="btn" id="hi-aplicar" type="button" hidden>Aplicar cambios</button></div>
+          <p class="msg" id="hi-msg" role="status"></p>
+          <div id="hi-res"></div>
+        </div>
+        <div class="panel">
+          <h2>Historial por cliente</h2>
+          <div class="row2" style="margin-bottom:10px"><input id="q-his" type="search" placeholder="Buscar cliente por nombre o código" aria-label="Buscar cliente" style="min-width:min(100%,380px)"><span class="msg" id="his-total"></span></div>
+          <div class="scroll"><table><thead><tr><th>Cód.</th><th>Cliente</th><th class="num">Pedidos</th><th>Último pedido</th><th></th></tr></thead><tbody id="his"></tbody></table></div>
+          <div class="row2" style="margin-top:10px"><button class="btn" id="his-ant" type="button">← Anterior</button><button class="btn" id="his-sig" type="button">Siguiente →</button><span class="msg" id="his-pag"></span></div>
+          <div id="his-det" style="margin-top:12px"></div>
+        </div>
+      </div>
+
       <div class="panel" id="p-datos" hidden>
-        <h2>Bases de datos que consulta el bot</h2>
+        <h2>Productos que consulta el bot</h2>
         <div class="tabs" role="tablist">
           <button class="tab dbtab" type="button" role="tab" data-db="productos" aria-selected="true">Productos</button>
-          <button class="tab dbtab" type="button" role="tab" data-db="clientes" aria-selected="false">Clientes</button>
         </div>
         <p class="msg" id="dbmsg"></p>
         <div class="scroll"><table id="dbtabla"></table></div>
@@ -701,7 +718,7 @@ $("f").addEventListener("submit", (e) => { e.preventDefault(); const v = t.value
 document.querySelectorAll(".dis-grid > .tabs .tab").forEach((b) => (b.onclick = () => { empTab = b.dataset.t; pintarTabs(); }));
 function pintarTabs() {
   document.querySelectorAll(".dis-grid > .tabs .tab").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.t === empTab)));
-  $("p-pedidos").hidden = empTab !== "pedidos"; $("p-solicitudes").hidden = empTab !== "solicitudes"; $("p-cuentas").hidden = empTab !== "cuentas"; $("p-clientes").hidden = empTab !== "clientes"; $("p-datos").hidden = empTab !== "datos";
+  $("p-pedidos").hidden = empTab !== "pedidos"; $("p-solicitudes").hidden = empTab !== "solicitudes"; $("p-cuentas").hidden = empTab !== "cuentas"; $("p-clientes").hidden = empTab !== "clientes"; $("p-datos").hidden = empTab !== "datos"; $("p-historial").hidden = empTab !== "historial";
 }
 function mostrarPin(texto, pin) { const p = $("pin"); p.hidden = false; p.textContent = texto + " "; p.appendChild(el("b", pin)); p.appendChild(el("span", " — anótalo ahora y díselo al cliente: no se volverá a mostrar.")); }
 
@@ -779,10 +796,31 @@ async function exportarPedidos(ids) {
 }
 $("exportar").onclick = () => exportarPedidos(null);
 $("exportar-sel").onclick = () => selOrd.size && exportarPedidos([...selOrd]);
-let adFichero = null;
-const adEt = { anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", desconocidos: "Clientes desconocidos (ignorados)", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
-function adPinta(r) {
-  const cont = $("ad-res"); cont.textContent = "";
+let qHis = "", pagHis = 0;
+function pintarHistorial() {
+  const r = VM.historialPage(qHis, pagHis), tb = $("his"); tb.innerHTML = "";
+  $("his-total").textContent = `${r.total} cliente${r.total === 1 ? "" : "s"}`;
+  for (const c of r.rows) {
+    const ver = el("button", "Ver", { type: "button", className: "btn" }); ver.disabled = !c.pedidos; ver.onclick = () => verHistorial(c.id);
+    const tr = document.createElement("tr"); tr.append(el("td", c.id, { className: "ref" }), el("td", c.name), el("td", String(c.pedidos), { className: "num" }), el("td", c.ultimo || "—"), (() => { const td = el("td"); td.appendChild(ver); return td; })()); tb.appendChild(tr);
+  }
+  const paginas = Math.max(1, Math.ceil(r.total / r.perPage)); $("his-pag").textContent = `Página ${pagHis + 1} de ${paginas}`; $("his-ant").disabled = pagHis === 0; $("his-sig").disabled = pagHis + 1 >= paginas;
+}
+function verHistorial(id) {
+  const d = VM.historialDe(id), cont = $("his-det"); cont.textContent = ""; if (!d) return;
+  cont.appendChild(el("h3", `${d.name} · ${d.pedidos.length} pedido${d.pedidos.length === 1 ? "" : "s"}`));
+  for (const o of d.pedidos.slice(0, 8)) {
+    const det = document.createElement("details"); det.appendChild(el("summary", `${o.date} · ${o.doc} · ${o.lineas.length} línea${o.lineas.length === 1 ? "" : "s"}`));
+    const ul = document.createElement("ul"); for (const l of o.lineas) ul.appendChild(el("li", `${l.qty} × ${l.nombre} (${l.id})`)); det.appendChild(ul); cont.appendChild(det);
+  }
+  cont.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+$("q-his").oninput = (e) => { qHis = e.target.value; pagHis = 0; pintarHistorial(); };
+$("his-ant").onclick = () => { pagHis = Math.max(0, pagHis - 1); pintarHistorial(); };
+$("his-sig").onclick = () => { pagHis++; pintarHistorial(); };
+const adEt = { anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", desconocidos: "Códigos de cliente que no existen (ignorados)", clientes: "Clientes con historial distinto", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
+function adPinta(r, p) {
+  const cont = $(p + "-res"); cont.textContent = "";
   const t = document.createElement("table"), tb = document.createElement("tbody"); t.appendChild(tb);
   for (const [k, v] of Object.entries(r.resumen)) { const tr = document.createElement("tr"), a = document.createElement("td"), b = document.createElement("td"); a.textContent = adEt[k] ?? k; b.textContent = v; tr.append(a, b); tb.appendChild(tr); }
   cont.appendChild(t);
@@ -800,19 +838,24 @@ function adPinta(r) {
     d.appendChild(ul); cont.appendChild(d);
   }
 }
-$("ad-ver").onclick = async () => {
-  adFichero = $("ad-file").files[0]; $("ad-aplicar").hidden = true; $("ad-res").textContent = "";
-  if (!adFichero) { $("ad-msg").textContent = "Elige primero el archivo Excel."; return; }
-  $("ad-ver").disabled = true; $("ad-msg").textContent = "Comparando con lo que hay…";
-  try { const j = { ok: true, ...VM.vistaPrevia($("ad-tipo").value, new Uint8Array(await adFichero.arrayBuffer())) }; adPinta(j); $("ad-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : "No hay cambios que aplicar (o hay un aviso que lo impide)."; $("ad-aplicar").hidden = !j.aplicable; }
-  catch (e) { $("ad-msg").textContent = e.message; } finally { $("ad-ver").disabled = false; }
+function montarExcel(p, despues) {
+  let fichero = null;
+$(p + "-ver").onclick = async () => {
+  fichero = $(p + "-file").files[0]; $(p + "-aplicar").hidden = true; $(p + "-res").textContent = "";
+  if (!fichero) { $(p + "-msg").textContent = "Elige primero el archivo Excel."; return; }
+  $(p + "-ver").disabled = true; $(p + "-msg").textContent = "Comparando con lo que hay…";
+  try { const j = { ok: true, ...VM.vistaPrevia($(p + "-tipo").value, new Uint8Array(await fichero.arrayBuffer())) }; adPinta(j, p); $(p + "-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : "No hay cambios que aplicar (o hay un aviso que lo impide)."; $(p + "-aplicar").hidden = !j.aplicable; }
+  catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-ver").disabled = false; }
 };
-$("ad-aplicar").onclick = async () => {
+$(p + "-aplicar").onclick = async () => {
   if (!confirm("¿Aplicar estos cambios? Solo se escribirán las diferencias.")) return;
-  $("ad-aplicar").disabled = true; $("ad-msg").textContent = "Aplicando…";
-  try { const j = await VM.aplicarDatos($("ad-tipo").value, new Uint8Array(await adFichero.arrayBuffer()), adFichero.name); const { resumen, ...r } = j; delete r.ok; delete r.tipo; $("ad-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${k} ${v}`).join(" · "); $("ad-aplicar").hidden = true; $("ad-res").textContent = ""; $("ad-file").value = ""; }
-  catch (e) { $("ad-msg").textContent = e.message; } finally { $("ad-aplicar").disabled = false; }
+  $(p + "-aplicar").disabled = true; $(p + "-msg").textContent = "Aplicando…";
+  try { const j = await VM.aplicarDatos($(p + "-tipo").value, new Uint8Array(await fichero.arrayBuffer()), fichero.name); const { resumen, ...r } = j; delete r.ok; delete r.tipo; const et = { anadidos: "añadidos", modificados: "modificados", iguales: "sin cambios", desactivados: "pasan a inactivos", fotosGuardadas: "fotos guardadas", nuevos: "nuevos", actualizados: "actualizados", cuentasNuevas: "cuentas nuevas", clientes: "clientes con historial actualizado", lineas: "líneas" }; $(p + "-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${v} ${et[k] ?? k}`).join(" · "); $(p + "-aplicar").hidden = true; $(p + "-res").textContent = ""; $(p + "-file").value = ""; despues(); }
+  catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-aplicar").disabled = false; }
 };
+}
+montarExcel("ad", () => pintarClientes());
+montarExcel("hi", () => pintarHistorial());
 let confirmBorrar = null;
 $("borrar-pedidos").onclick = async () => {
   const b = $("borrar-pedidos");
@@ -913,6 +956,7 @@ function pintarTodo() {
   if (!enUso("p-clientes")) pintarClientes();
   if (!enUso("p-solicitudes")) pintarSolicitudes();
   if (!enUso("p-datos")) pintarBd();
+  if (!enUso("p-historial")) pintarHistorial();
 }
 VM.onChange(() => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; avisos(); pintarTodo(); if (!$("v-cliente").hidden) pantallaCliente(); }); });
 VM.onError((e) => toast("No se pudo guardar: " + (e?.message || e?.code || "error")));

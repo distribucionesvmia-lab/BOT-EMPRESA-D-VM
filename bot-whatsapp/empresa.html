@@ -44,6 +44,7 @@
       <button class="tab" role="tab" data-t="pedidos" aria-selected="true">Pedidos <span class="n" id="n-ped" hidden></span></button>
       <button class="tab" role="tab" data-t="solicitudes" aria-selected="false">Solicitudes de alta <span class="n" id="n-sol" hidden></span></button>
       <button class="tab" role="tab" data-t="clientes" aria-selected="false">Clientes <span class="n" id="n-cli" hidden></span></button>
+      <button class="tab" role="tab" data-t="historial" aria-selected="false">Historial de clientes</button>
       <button class="tab" role="tab" data-t="cuentas" aria-selected="false">Cuentas de clientes <span class="n" id="n-cue" hidden></span></button>
     </div>
 
@@ -78,8 +79,8 @@
       </div>
       <div class="panel" id="act-panel">
         <h2>Actualizar datos desde Excel</h2>
-        <p class="muted">Sube el Excel de <b>productos</b>, <b>clientes</b> o <b>histórico</b>. Primero se enseñan los cambios respecto a lo que ya hay y, solo si confirmas, se aplican <b>únicamente las diferencias</b>. El histórico necesita que los clientes ya estén cargados.</p>
-        <div class="row"><select id="ad-tipo" aria-label="Tipo de datos"><option value="productos">Productos</option><option value="clientes">Clientes</option><option value="historial">Histórico de compras</option></select><input type="file" id="ad-file" accept=".xlsx" aria-label="Archivo Excel"><button class="main" id="ad-ver" type="button">Ver cambios</button><button id="ad-aplicar" type="button" hidden>Aplicar cambios</button></div>
+        <p class="muted">Sube el Excel de <b>productos</b> o de <b>clientes</b>. Primero se enseñan los cambios respecto a lo que ya hay y, solo si confirmas, se aplican <b>únicamente las diferencias</b>. El historial de compras se sube en la pestaña «Historial de clientes».</p>
+        <div class="row"><select id="ad-tipo" aria-label="Tipo de datos"><option value="productos">Productos</option><option value="clientes">Clientes</option></select><input type="file" id="ad-file" accept=".xlsx" aria-label="Archivo Excel"><button class="main" id="ad-ver" type="button">Ver cambios</button><button id="ad-aplicar" type="button" hidden>Aplicar cambios</button></div>
         <p class="muted" id="ad-msg" role="status"></p>
         <div id="ad-res"></div>
       </div>
@@ -97,6 +98,15 @@
     </div>
 
     <!-- Cuentas -->
+    <div id="p-historial" hidden style="display:grid;gap:14px">
+      <div class="panel">
+        <h2>Subir historial de clientes</h2>
+        <p class="muted">Sube el Excel con las compras de los clientes (columnas «Cód. cliente», «Fecha», «Documento», «Cód. artículo» y «Cantidad»). Cada línea se <b>relaciona con su cliente por el código</b>: es el historial que le sale al cliente en «Histórico» y «Último pedido». Antes de aplicar se enseña a qué clientes afecta y qué códigos no existen; solo se reescribe el de los clientes cuyo historial cambia. Los clientes tienen que estar ya cargados.</p>
+        <div class="row"><select id="hi-tipo" aria-label="Tipo de datos" hidden><option value="historial">Histórico de compras</option></select><input type="file" id="hi-file" accept=".xlsx" aria-label="Archivo Excel del historial"><button class="main" id="hi-ver" type="button">Ver cambios</button><button id="hi-aplicar" type="button" hidden>Aplicar cambios</button></div>
+        <p class="muted" id="hi-msg" role="status"></p>
+        <div id="hi-res"></div>
+      </div>
+    </div>
     <div class="panel" id="p-cuentas" hidden>
       <h2>Cuentas de clientes</h2>
       <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
@@ -262,10 +272,9 @@ async function clientes() {
 $("q-cli").oninput = () => { clearTimeout(tClientes); tClientes = setTimeout(() => { pagCli = 0; clientes(); }, 300); };
 $("cli-ant").onclick = () => { pagCli = Math.max(0, pagCli - 1); clientes(); };
 $("cli-sig").onclick = () => { pagCli++; clientes(); };
-let adFichero = null;
-const adEt = { anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", desconocidos: "Clientes desconocidos (ignorados)", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
-function adPinta(r) {
-  const cont = $("ad-res"); cont.textContent = "";
+const adEt = { anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", desconocidos: "Códigos de cliente que no existen (ignorados)", clientes: "Clientes con historial distinto", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
+function adPinta(r, p) {
+  const cont = $(p + "-res"); cont.textContent = "";
   const t = document.createElement("table"), tb = document.createElement("tbody"); t.appendChild(tb);
   for (const [k, v] of Object.entries(r.resumen)) { const tr = document.createElement("tr"), a = document.createElement("td"), b = document.createElement("td"); a.textContent = adEt[k] ?? k; b.textContent = v; tr.append(a, b); tb.appendChild(tr); }
   cont.appendChild(t);
@@ -283,25 +292,30 @@ function adPinta(r) {
     d.appendChild(ul); cont.appendChild(d);
   }
 }
-async function adLlamar(ruta) {
-  const r = await fetch(`/api/admin/${ruta}/${$("ad-tipo").value}?fichero=${encodeURIComponent(adFichero.name)}`, { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": "application/octet-stream" }, body: adFichero });
+async function adLlamar(ruta, p, fichero) {
+  const r = await fetch(`/api/admin/${ruta}/${$(p + "-tipo").value}?fichero=${encodeURIComponent(fichero.name)}`, { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": "application/octet-stream" }, body: fichero });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || "No se pudo procesar el Excel");
   return j;
 }
-$("ad-ver").onclick = async () => {
-  adFichero = $("ad-file").files[0]; $("ad-aplicar").hidden = true; $("ad-res").textContent = "";
-  if (!adFichero) { $("ad-msg").textContent = "Elige primero el archivo Excel."; return; }
-  $("ad-ver").disabled = true; $("ad-msg").textContent = "Comparando con lo que hay…";
-  try { const j = await adLlamar("vista-previa"); adPinta(j); $("ad-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : "No hay cambios que aplicar (o hay un aviso que lo impide)."; $("ad-aplicar").hidden = !j.aplicable; }
-  catch (e) { $("ad-msg").textContent = e.message; } finally { $("ad-ver").disabled = false; }
+function montarExcel(p, despues) {
+  let fichero = null;
+$(p + "-ver").onclick = async () => {
+  fichero = $(p + "-file").files[0]; $(p + "-aplicar").hidden = true; $(p + "-res").textContent = "";
+  if (!fichero) { $(p + "-msg").textContent = "Elige primero el archivo Excel."; return; }
+  $(p + "-ver").disabled = true; $(p + "-msg").textContent = "Comparando con lo que hay…";
+  try { const j = await adLlamar("vista-previa", p, fichero); adPinta(j, p); $(p + "-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : "No hay cambios que aplicar (o hay un aviso que lo impide)."; $(p + "-aplicar").hidden = !j.aplicable; }
+  catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-ver").disabled = false; }
 };
-$("ad-aplicar").onclick = async () => {
+$(p + "-aplicar").onclick = async () => {
   if (!confirm("¿Aplicar estos cambios? Solo se escribirán las diferencias.")) return;
-  $("ad-aplicar").disabled = true; $("ad-msg").textContent = "Aplicando…";
-  try { const j = await adLlamar("aplicar"); const { resumen, ...r } = j; delete r.ok; delete r.tipo; $("ad-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${k} ${v}`).join(" · "); $("ad-aplicar").hidden = true; $("ad-res").textContent = ""; $("ad-file").value = ""; refrescar(); }
-  catch (e) { $("ad-msg").textContent = e.message; } finally { $("ad-aplicar").disabled = false; }
+  $(p + "-aplicar").disabled = true; $(p + "-msg").textContent = "Aplicando…";
+  try { const j = await adLlamar("aplicar", p, fichero); const { resumen, ...r } = j; delete r.ok; delete r.tipo; $(p + "-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${k} ${v}`).join(" · "); $(p + "-aplicar").hidden = true; $(p + "-res").textContent = ""; $(p + "-file").value = ""; refrescar(); despues?.(); }
+  catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-aplicar").disabled = false; }
 };
+}
+montarExcel("ad");
+montarExcel("hi");
 $("importar").onclick = async () => {
   const f = $("f-excel").files[0]; if (!f) { $("imp-msg").textContent = "Elige primero el archivo Excel."; return; }
   $("importar").disabled = true; $("imp-msg").textContent = "Importando…";
@@ -324,7 +338,7 @@ async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), 
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-  $("p-pedidos").hidden = b.dataset.t !== "pedidos"; $("p-solicitudes").hidden = b.dataset.t !== "solicitudes"; $("p-clientes").hidden = b.dataset.t !== "clientes"; $("p-cuentas").hidden = b.dataset.t !== "cuentas";
+  $("p-pedidos").hidden = b.dataset.t !== "pedidos"; $("p-solicitudes").hidden = b.dataset.t !== "solicitudes"; $("p-clientes").hidden = b.dataset.t !== "clientes"; $("p-cuentas").hidden = b.dataset.t !== "cuentas"; $("p-historial").hidden = b.dataset.t !== "historial";
 }));
 async function entrar() { try { await refrescar(); if ($("app").hidden && clave) { await call("/api/admin/resumen"); $("login").hidden = true; $("app").hidden = false; clearInterval(timer); timer = setInterval(refrescar, 15000); } } catch (e) { $("l-err").textContent = e.message; } }
 $("f-login").onsubmit = (e) => { e.preventDefault(); clave = $("clave").value; try { sessionStorage.setItem("vm_admin", clave); } catch {} $("l-err").textContent = ""; entrar(); };

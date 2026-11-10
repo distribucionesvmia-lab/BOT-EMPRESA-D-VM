@@ -389,6 +389,20 @@ window.VM = {
     const all = cache.customers.filter((c) => !t || [c.name, c.legalName, c.id, c.city, ...(c.phones ?? []), ...(c.emails ?? [])].some((v) => String(v ?? "").toLowerCase().includes(t))).sort((a, b) => a.name.localeCompare(b.name));
     return { total: all.length, page, perPage: 50, rows: all.slice(page * 50, page * 50 + 50).map((c) => ({ id: c.id, name: c.name, legalName: c.legalName ?? "", city: c.city ?? "", phones: phonesOf(c), emails: c.emails ?? [], active: c.active !== false, cuenta: conCuenta.has(c.id) })) };
   },
+  /** Clientes con su historial (los que tienen compras primero): lista paginada para la pestaña «Historial de clientes». */
+  historialPage(q = "", page = 0) {
+    const t = String(q).trim().toLowerCase();
+    const all = cache.customers.filter((c) => !t || [c.name, c.legalName, c.id].some((v) => String(v ?? "").toLowerCase().includes(t)))
+      .map((c) => { const o = c.orders ?? []; return { id: c.id, name: c.name, pedidos: o.length, ultimo: o.map((x) => x.date).sort().pop() ?? "" }; })
+      .sort((a, b) => (b.pedidos > 0) - (a.pedidos > 0) || a.name.localeCompare(b.name));
+    return { total: all.length, page, perPage: 50, rows: all.slice(page * 50, page * 50 + 50) };
+  },
+  /** Pedidos de un cliente con el nombre de cada producto. */
+  historialDe(id) {
+    const c = cache.customers.find((x) => x.id === String(id)); if (!c) return null;
+    const nombre = new Map(cache.products.map((p) => [String(p.id), p.name]));
+    return { id: c.id, name: c.name, pedidos: [...(c.orders ?? [])].sort((a, b) => (a.date < b.date ? 1 : -1)).map((o) => ({ doc: o.doc, date: o.date, lineas: o.lines.map((l) => ({ id: l.productId, nombre: nombre.get(String(l.productId)) ?? "(producto que ya no está en el catálogo)", qty: l.qty })) })) };
+  },
   /** La empresa da por revisado un pedido retenido. */
   async approveOrder(orderId) {
     if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor.");

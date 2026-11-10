@@ -113,10 +113,11 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const { byCustomer, stats } = parseHistorialXlsx(buf);
     if (!byCustomer.size) throw new Error("El Excel del historial no tiene líneas válidas.");
     let desconocidos = 0, iguales = 0, pedidosNuevos = 0;
+    const noExisten = [];
     const cambiar = new Map(), muestra = [];
     for (const [cid, pedidos] of byCustomer) {
       const a = customersDb.getById(cid);
-      if (!a) { desconocidos++; continue; }
+      if (!a) { desconocidos++; noExisten.push({ id: cid, nombre: "no existe en la base de clientes" }); continue; }
       const antes = new Set(a.orders.map(claveHistorial));
       const nuevosPed = pedidos.filter((o) => !antes.has(claveHistorial(o)));
       const despues = new Set(pedidos.map(claveHistorial));
@@ -131,7 +132,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     if (cambiar.size === 0 && iguales === 0) aviso.push("Ningún cliente del historial existe en la base: sube antes el Excel de clientes. No se puede aplicar.");
     const resumen = { clientesConCambios: cambiar.size, pedidosNuevos, iguales, desconocidos, lineas: stats.lineas, sinFecha: stats.sinFecha };
     return {
-      resumen, detalle: { clientes: muestra.slice(0, MUESTRA) }, aviso, aplicable: cambiar.size > 0,
+      resumen, detalle: { clientes: muestra.slice(0, MUESTRA), desconocidos: noExisten.slice(0, MUESTRA) }, aviso, aplicable: cambiar.size > 0,
       aplicar() { const r = customersDb.setPurchases(cambiar); return { clientes: r.clientes, lineas: r.lineas }; },
     };
   }
