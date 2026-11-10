@@ -6,7 +6,8 @@ import path from "node:path";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { parseHistorialXlsx } from "./historial-import.js";
 import { unzip, readXlsx } from "./xlsx-read.js";
-import { leerExcel, categoriaPorFamilia, saltosDePrecio } from "./actualizar-productos.js";
+import { leerExcel, saltosDePrecio } from "./actualizar-productos.js";
+import { clasificar } from "./categorias.js";
 import { compararProductos, aplicarProductos, CAMPOS, vendible } from "./productos-diff.js";
 
 const MUESTRA = 40; // filas de detalle que se enseñan por apartado
@@ -23,9 +24,9 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     if (!lista.length) throw new Error("El Excel no tiene productos con precio.");
     const actual = catalogDb.list({ activeOnly: false });
     const activos = actual.filter((p) => p.active !== false).length;
-    const catNueva = categoriaPorFamilia(familias);
-    const hoy = new Set(actual.map((p) => String(p.id)));
-    const nuevos = lista.map((p) => ({ ...p, ...(p.category || hoy.has(p.id) ? {} : catNueva(p)) }));
+    // Categoría y subcategoría por tipo de producto (familia de a3ERP + nombre), también en los que ya existen: así una mejora de las categorías llega a todo el catálogo.
+    // Si el Excel trae su propia columna «Categoría», manda esa.
+    const nuevos = lista.map((p) => ({ ...p, ...(p.category ? {} : clasificar(p, familias)) }));
     const cmp = compararProductos(actual, nuevos, { sinPrecioIds });
     const aviso = [];
     if (activos >= 20 && lista.length < activos * MIN_RATIO) aviso.push(`El Excel tiene ${lista.length} productos y hay ${activos} activos: parece incompleto. No se puede aplicar.`);

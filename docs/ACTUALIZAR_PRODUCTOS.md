@@ -69,3 +69,6 @@ En la aplicación de la empresa, pestaña **Clientes › Actualizar datos desde 
 
 ### Fotos de productos (ZIP)
 En la misma pestaña, elige **«Fotos de productos (ZIP)»** y sube un ZIP con las fotos: cada archivo se llama como el código del producto (`11098.jpg`, `.png` o `.webp`) y puede estar dentro de carpetas. «Ver cambios» cuenta las nuevas, las que sustituyen a una foto existente y las que se ignoran (código que no está en el catálogo u otros archivos). Al aplicar, se guardan en la carpeta de fotos (`IMG_DIR`, por defecto `imagenes/`); un producto solo tiene una foto. Máximo 80 MB por ZIP. Las fotos no se suben a GitHub.
+
+### Categorías por tipo de producto
+Las categorías y subcategorías del catálogo se ordenan por **tipo de producto** (lo que el cliente busca), no por marca: Café, Pascual, Aguas, Bebidas, Vinos, Despensa, Refrigerados, Congelados, Hostelería y menaje, Otros. Cada producto se clasifica con (1) reglas por el nombre para casos concretos (el azúcar es despensa aunque venga de la familia del café), (2) el código de familia de a3ERP con `familias-categorias.json` (afinado por el nombre cuando la familia es muy amplia) y (3) palabras del nombre si no hay familia. Está en `categorias.js`. Al subir el Excel de productos en «Actualizar datos», «Ver cambios» enseña los productos cuya categoría cambia («Categoría: A → B») y «Aplicar» los mueve.

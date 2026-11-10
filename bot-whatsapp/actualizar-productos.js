@@ -15,6 +15,7 @@ import path from "node:path";
 import { readXlsxSheets, fotosPorFila } from "./xlsx-read.js";
 import { parseProductos } from "./productos-import.js";
 import { compararProductos, aplicarProductos, CAMPOS, vendible } from "./productos-diff.js";
+import { clasificar } from "./categorias.js";
 
 const eur = (n) => (n == null ? "—" : Number(n).toFixed(2).replace(".", ",") + " €");
 const fmt = (campo, v) => (v == null ? "—" : campo === "price" ? eur(v) : campo === "active" ? (v ? "sí" : "no") : String(v));
@@ -40,11 +41,8 @@ export function leerExcel(buf, { iva = {} } = {}) {
   return { productos, sinPrecioIds, fotos };
 }
 
-/** Categoría de un producto NUEVO según el código de familia de a3ERP (mapa familias-categorias.json). */
-export const categoriaPorFamilia = (mapa) => (n) => {
-  const m = n.family && mapa[n.family];
-  return m ? { category: m.category, ...(m.subcategory ? { subcategory: m.subcategory } : {}) } : {};
-};
+/** Categoría y subcategoría de un producto por su tipo: reglas del nombre + código de familia de a3ERP (mapa familias-categorias.json). */
+export const categoriaPorFamilia = (mapa) => (n) => clasificar(n, mapa);
 
 /** Informe en texto (Markdown) de los cambios. */
 export function informe(cmp, { fichero = "", sinFamilia = [], ivaDesconocido = [], saltosPrecio = [] } = {}) {
@@ -99,7 +97,7 @@ async function main() {
     actual = db.list({ activeOnly: false });
   }
   const catNueva = categoriaPorFamilia(familias);
-  const nuevos = productos.map((p) => ({ ...p, ...(p.category ? {} : (actual.some((a) => String(a.id) === p.id) ? {} : catNueva(p))) }));
+  const nuevos = productos.map((p) => ({ ...p, ...(p.category ? {} : catNueva(p)) })); // también los que ya existen: las categorías se rehacen por tipo de producto
   const cmp = compararProductos(actual, nuevos, { sinPrecioIds });
   const ivaDesconocido = nuevos.filter((p) => p.vat === undefined && p.vatCode && vendible(p));
   const sinFamilia = cmp.anadidos.filter((p) => !p.category);

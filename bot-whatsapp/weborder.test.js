@@ -46,8 +46,8 @@ test("el catálogo web lleva categoría y subcategoría de cada producto y el á
   const { webTree } = await import("./weborder.js");
   const cat = [{ id: "1", name: "AGUA MINERAL 1,5 L", price: 1 }, { id: "2", name: "Bezoya 50 cl", price: 1 }, { id: "3", name: "Vino tinto", price: 5 }, { id: "4", name: "Escoba", price: 3, category: "Droguería", subcategory: "Limpieza" }];
   const p = webProducts({ id: "C" }, cat, () => []);
-  assert.deepEqual(p.map((x) => [x.name, x.cat, x.sub]).sort(), [["AGUA MINERAL 1,5 L", "aguas", "otros"], ["Bezoya 50 cl", "aguas", "bezoya"], ["Escoba", "f-drogueria", "limpieza"], ["Vino tinto", "vinos", "otros"]]);
-  assert.deepEqual(webTree(cat).map((c) => [c.nombre, c.count]), [["Vinos", 1], ["Aguas", 2], ["Droguería", 1]]);
+  assert.deepEqual(p.map((x) => [x.name, x.cat, x.sub]).sort(), [["AGUA MINERAL 1,5 L", "aguas", "otras-aguas"], ["Bezoya 50 cl", "aguas", "bezoya"], ["Escoba", "f-drogueria", "limpieza"], ["Vino tinto", "vinos", "otros-vinos"]]);
+  assert.deepEqual(webTree(cat).map((c) => [c.nombre, c.count]), [["Aguas", 2], ["Vinos", 1], ["Droguería", 1]]);
 });
 
 test("el catálogo web lleva el precio y el descuento que aplicará el servidor (precio especial del cliente o ficha)", () => {

@@ -73,12 +73,12 @@ test("leerExcel: exportación de a3ERP con columna «+» delante del código, c�
   assert.deepEqual(leerExcel(buildWorkbook([{ name: "A", widths: [], rows }]), { iva: { SRE: 4 } }).productos[0].vat, 4);
 });
 
-test("familias: se aprende la categoría de cada familia y se usa solo para productos nuevos", () => {
+test("familias: se aprende la categoría de cada familia y se usa para clasificar", () => {
   const mapa = aprenderFamilias([{ id: "1", family: "1.1" }, { id: "2", family: "1.1" }, { id: "3", family: "56.0" }, { id: "4", family: "56.0" }, { id: "5", family: "56.0" }],
     [{ id: "1", category: "Pascual" }, { id: "2", category: "Pascual" }, { id: "3", category: "Hostelería", subcategory: "Vasos" }, { id: "4", category: "Hostelería", subcategory: "Vasos" }, { id: "5", category: "Despensa" }]);
   assert.deepEqual(mapa, { "1.1": { category: "Pascual" }, "56.0": { category: "Hostelería", subcategory: "Vasos" } });
-  assert.deepEqual(categoriaPorFamilia(mapa)({ family: "56.0" }), { category: "Hostelería", subcategory: "Vasos" });
-  assert.deepEqual(categoriaPorFamilia(mapa)({ family: "99.9" }), {});
+  assert.deepEqual(categoriaPorFamilia(mapa)({ family: "56.0", name: "X" }), { category: "Hostelería", subcategory: "Vasos" });
+  assert.deepEqual(categoriaPorFamilia(mapa)({ family: "99.9", name: "AGUA BEZOYA 1 L" }), { category: "Aguas", subcategory: "Bezoya" }); // familia desconocida: se deduce del nombre
 });
 
 test("informe: resumen con los números y los cambios de cada producto", () => {
