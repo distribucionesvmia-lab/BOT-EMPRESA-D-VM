@@ -1,3 +1,15 @@
+# Instalación rápida (lo más fácil)
+
+1. Instala Node.js 22 (https://nodejs.org) y deja el programa en `C:\vm\bot` (ver «2. Descargar el programa» más abajo).
+2. Abre la carpeta `C:\vm\bot\bot-whatsapp\deploy\windows`, haz **clic derecho en `instalar-todo.bat` → «Ejecutar como administrador»**.
+3. Hace todo solo: crea las carpetas, **inventa las claves**, deja el programa arrancando con el ordenador y te enseña **tu clave de la empresa** (apúntala).
+4. Abre en el navegador `http://localhost:3001/empresa`, entra con esa clave y carga los datos (clientes → productos → historial).
+5. Más tarde, cuando tengas los datos: correo de avisos y carpeta de Drive (se editan en `C:\vm\config\*.env`) y la dirección pública para los clientes (paso 5).
+
+Los pasos largos de abajo son lo mismo hecho a mano, por si algo falla.
+
+---
+
 # Instalar el bot en el servidor de la oficina (Windows)
 
 Sin Docker y sin pagar nada: Node.js + dos tareas programadas que arrancan solas con el servidor. Los datos quedan en `C:\vm\datos`.
