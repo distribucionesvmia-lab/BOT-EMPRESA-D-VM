@@ -164,13 +164,6 @@
   .sub.todo { background:var(--rojo-s); border-color:var(--rojo); color:var(--rojo-o); }
   .favb { position:absolute; left:3px; top:3px; z-index:2; width:30px; height:30px; padding:0; border:0; border-radius:50%; background:rgba(255,255,255,.92); box-shadow:0 1px 3px rgba(0,0,0,.2); font-size:19px; line-height:1; cursor:pointer; color:#9a9ea4; flex:none; }
   .favb[aria-pressed="true"] { color:var(--rojo); }
-  .repbar { margin:0 14px 10px; }
-  .repbar button { width:100%; min-height:44px; border:2px dashed var(--rojo); background:var(--rojo-s); color:var(--rojo-o); font-weight:800; font-size:17px; border-radius:14px; cursor:pointer; }
-  .rep-o { border:2px solid var(--linea); border-radius:14px; margin-bottom:12px; overflow:hidden; }
-  .rep-o h3 { margin:0; padding:12px 14px; font-size:18px; background:var(--fondo); }
-  .rep-o label { display:flex; gap:12px; align-items:center; padding:12px 14px; border-top:1px solid var(--linea); font-size:17px; min-height:54px; }
-  .rep-o input[type=checkbox] { width:26px; height:26px; flex:none; accent-color:var(--rojo); }
-  .rep-o .rq { margin-left:auto; font-weight:800; white-space:nowrap; }
   .vacio .lnk { margin-top:14px; border:2px solid var(--rojo); background:#fff; color:var(--rojo-o); font-weight:800; font-size:17px; min-height:48px; padding:0 18px; border-radius:14px; cursor:pointer; }
   .vacio { padding:48px 24px; text-align:center; color:var(--gris); font-size:18px; line-height:1.4; }
 
@@ -291,7 +284,7 @@
     .tabs button.tab { min-height:40px; font-size:15px; }
     .buscar { padding-bottom:8px; } .buscar input { min-height:44px; }
     .filbar { padding-bottom:8px; } .filbar .fil { min-height:36px; font-size:14px; padding:0 14px; }
-    .repbar { padding-bottom:6px; } .repbar button { min-height:40px; font-size:15px; border-width:1.5px; }
+   
     header { padding-bottom:12px; }
   }
   /* Móviles Samsung/Android: los botones − y + no hacen zoom al tocar rápido, no se animan ni se seleccionan */
@@ -321,17 +314,9 @@
   <div class="buscar"><input id="q" type="search" placeholder="Buscar un producto…" autocomplete="off" aria-label="Buscar un producto"></div>
   <!-- Filtro de ida y vuelta, solo en la pestaña «Histórico» (data-t="hab") -->
   <div class="filbar" id="filbar" hidden><button class="fil" id="fil" type="button" aria-pressed="false">☑ Ver solo lo que he marcado</button><span id="filinfo"></span></div>
-  <div class="repbar" id="repbar" hidden><button id="repAbrir" type="button">↻ Repetir un pedido anterior</button></div>
   <main id="list"></main>
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <footer><button class="big" id="verCarrito" type="button" disabled>Añade productos para empezar</button></footer>
-
-  <!-- Repetir un pedido anterior: se revisa línea a línea antes de añadir nada al carrito -->
-  <section class="screen" id="repetir" hidden style="z-index:6">
-    <div class="head"><button id="repVolver" type="button" aria-label="Volver a los productos">←</button><div><small>Repetir pedido</small><h2>Elige qué repetir</h2></div></div>
-    <div class="body" style="padding:14px"><p style="margin:0 0 12px;color:var(--gris);font-size:16px">Marca lo que quieras volver a pedir. Las cantidades son las del pedido original; podrás cambiarlas en el carrito. Los precios son los de hoy.</p><div id="repLista"></div></div>
-    <div class="box pie"><button class="big" id="repOk" type="button">Añadir al pedido</button></div>
-  </section>
 
   <section class="screen" id="cart" hidden>
     <div class="head"><button id="back" type="button" aria-label="Volver a los productos">←</button><div><small>Paso 2 de 3</small><h2>Revisa tu pedido</h2></div></div>
@@ -660,7 +645,6 @@ function entrada(list, sel) {
 function renderList() {
   const list = $("list"); list.innerHTML = "";
   $("filbar").hidden = tab !== "hab";
-  $("repbar").hidden = !(tab === "hab" && !query.trim() && (data.history || []).length); // el filtro solo existe en esta pestaña
   const q = norm(query.trim());
   const filtra = tab === "hab" && soloCantidad;
   // Catálogo sin buscar: primero se eligen categoría y subcategoría
@@ -790,34 +774,6 @@ function precargar() {
   }
   if (n) { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); aviso(`Tu pedido anterior ya está en el carrito (${n} artículo${n === 1 ? "" : "s"}). Añade lo que quieras del catálogo y finaliza.`); }
 }
-// Repetir un pedido anterior (las líneas vienen del servidor; se mantienen solo los artículos que siguen en el catálogo)
-let repSel = [];
-$("repAbrir").onclick = () => {
-  const box = $("repLista"); box.innerHTML = ""; repSel = [];
-  const byId = new Map(data.products.map(p => [p.id, p]));
-  for (const o of data.history) {
-    const lns = o.lines.filter(l => byId.has(l.id)); if (!lns.length) continue;
-    const w = document.createElement("div"); w.className = "rep-o";
-    const h = document.createElement("h3"); h.textContent = `Pedido del ${largo(o.date)}`; w.appendChild(h);
-    for (const l of lns) {
-      const lab = document.createElement("label"), cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = true;
-      const t = document.createElement("span"); t.textContent = byId.get(l.id).name;
-      const q = document.createElement("span"); q.className = "rq"; q.textContent = l.qty + (l.qty === 1 ? " ud" : " uds");
-      lab.append(cb, t, q); w.appendChild(lab); repSel.push({ cb, id: l.id, qty: l.qty });
-    }
-    box.appendChild(w);
-  }
-  if (!repSel.length) { box.innerHTML = '<div class="vacio">No hay pedidos anteriores disponibles.</div>'; }
-  $("repetir").hidden = false;
-};
-$("repVolver").onclick = () => ($("repetir").hidden = true);
-$("repOk").onclick = () => {
-  const ids = new Map(); // si un artículo sale en varios pedidos marcados, se queda con el pedido más reciente (el primero)
-  for (const x of repSel) if (x.cb.checked && !ids.has(x.id)) ids.set(x.id, x.qty);
-  for (const [id, n] of ids) { unitOf.set(id, "ud"); qty.set(id, Math.min(999, n)); }
-  $("repetir").hidden = true; refresh();
-  aviso(ids.size ? `Añadidos ${ids.size} artículo${ids.size === 1 ? "" : "s"}. Revisa el carrito antes de finalizar.` : "No has marcado ningún artículo.");
-};
 $("fil").onclick = () => { soloCantidad = !soloCantidad; renderList(); }; // ida y vuelta
 let tBusca = 0;
 $("q").oninput = e => { query = e.target.value; limite = 150; clearTimeout(tBusca); tBusca = setTimeout(renderList, 140); };
@@ -919,14 +875,13 @@ async function enviarPedido(delivery, errBox) {
   }
 }
 
-// Pantallas superpuestas (carrito, repetir, día de entrega, resumen, calendario): foco, tecla Esc y botón «Atrás» del móvil
-const CAPAS = ["cart", "repetir", "when", "resumen"], FONDO = ["header", ".paso", ".guia", ".tabs", ".buscar", ".filbar", ".repbar", "#list", "footer"];
+// Pantallas superpuestas (carrito, día de entrega, resumen, calendario): foco, tecla Esc y botón «Atrás» del móvil
+const CAPAS = ["cart", "when", "resumen"], FONDO = ["header", ".paso", ".guia", ".tabs", ".buscar", ".filbar", "#list", "footer"];
 const abiertas = () => [...CAPAS.filter(id => !$(id).hidden), ...($("calFondo").hidden ? [] : ["calFondo"])];
 function cerrarArriba() {
   if (!$("calFondo").hidden) $("calFondo").hidden = true;
   else if (!$("resumen").hidden) $("resumen").hidden = true;
   else if (!$("when").hidden) $("when").hidden = true;
-  else if (!$("repetir").hidden) $("repetir").hidden = true;
   else if (!$("cart").hidden) showCart(false);
 }
 let prof = 0, silencio = false, foco = null, nPrev = 0;

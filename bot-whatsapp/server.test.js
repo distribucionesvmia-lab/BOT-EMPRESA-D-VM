@@ -182,7 +182,8 @@ test("un pedido reenviado con la misma clave no se duplica; el cuerpo mal formad
 test("un pedido hecho por el chat se guarda a nombre del cliente de la sesión", async () => {
   const say = (who, text) => call("POST", "/api/chat", { cookie: who.cookie, body: { text, id: "msg-" + Math.random().toString(36).slice(2) } });
   await say(B, "hola");
-  const rep = await say(B, "repite el último pedido");
+  await say(B, "24 uds de agua");
+  const rep = await say(B, "act:done");
   assert.match(rep.json.reply, /Revisa tu pedido/);
   const conf = await say(B, "c:ok");
   assert.match(conf.json.reply, /Cuándo quieres recibirlo/); // antes de enviar pregunta el día de entrega

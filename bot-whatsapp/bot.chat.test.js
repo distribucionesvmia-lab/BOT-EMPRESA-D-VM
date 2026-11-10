@@ -113,11 +113,11 @@ test("erratas y frases con relleno", () => {
   assert.equal(lineas(ultimo("12x cerveza")), "12×C1");
 });
 
-test("«lo de siempre para el viernes» repite el último pedido con el día", () => {
+test("«lo de siempre para el viernes»: ya no hay «repetir pedido»; no se apunta nada al pedido", () => {
   const r = ultimo("lo de siempre para el viernes");
-  assert.match(r.reply, /Revisa tu pedido/);
-  assert.equal(r.session.delivery, "2026-10-30");
-  assert.match(r.reply, /Entrega: \*viernes 30 de octubre\*/);
+  assert.doesNotMatch(r.reply, /Revisa tu pedido/);
+  assert.equal((r.session.cart ?? []).length, 0);
+  assert.notEqual(r.session.state, "confirm");
 });
 
 test("cambiar el día desde la pantalla de confirmar, cancelar con «no», y que «no» con más texto no cancele", () => {

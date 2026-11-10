@@ -403,7 +403,6 @@
             <button type="button" data-q="hacer pedido" class="main">Hacer pedido</button>
             <button type="button" data-q="último pedido">Último pedido</button>
             <button type="button" data-q="histórico">Histórico</button>
-            <button type="button" data-q="h:repeat">Repetir</button>
           </nav>
           <form class="send" id="f"><input id="t" autocomplete="off" placeholder="Escribe un mensaje" aria-label="Mensaje"><button aria-label="Enviar">➤</button></form>
         </div>
@@ -689,7 +688,7 @@ function tarjetaTabla(card) {
   const ft = t.createTFoot().insertRow(); const a = ft.insertCell(); a.colSpan = 2; a.textContent = card.conIva ? "Total con IVA" : "Total"; const b = ft.insertCell(); b.className = "c-imp"; b.textContent = eur(card.total);
   c.append(h, t); chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
 }
-// Inicio: «Hacer pedido» y «Repetir el último», cada uno en su fila con su botón
+// Inicio: «Hacer pedido» en su fila con su botón
 function inicio(ui) {
   const c = document.createElement("div"); c.className = "vm-inicio";
   const fila = (peque, grande, boton, accion) => {
@@ -699,7 +698,6 @@ function inicio(ui) {
     f.append(t, bt); c.appendChild(f);
   };
   fila("Pedido nuevo", "Elige del catálogo", "Hacer pedido", abrirMini);
-  if (ui.last) fila("Tu último pedido · " + ui.last.date, ui.last.articulos + (ui.last.articulos === 1 ? " artículo" : " artículos") + " · " + eur(ui.last.total) + " con IVA", "Repetir", () => enviar("h:repeat", "Repetir un pedido"));
   chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
 }
 const sinEmoji = (t) => String(t ?? "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim();

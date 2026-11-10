@@ -98,30 +98,20 @@ test("cliente conocido: 0 unidades quita el artículo", () => {
   assert.match(r.reply, /quitado/);
 });
 
-test("cliente conocido: «repetir» deja ELEGIR cualquiera de sus últimos pedidos (no solo el último)", () => {
-  let r = say(newSession(bar), "repetir");
-  assert.equal(r.ui.type, "list");
-  assert.ok(r.ui.rows.length >= 2, "ofrece todos sus pedidos");
-  assert.ok(r.ui.rows.every((x) => /^r:/.test(x.id) && x.title.length <= 24 && x.description.length <= 72));
-  const [primero, segundo] = r.ui.rows;
-  // el primero de la lista es el último pedido
-  const ult = say(r.session, primero.id);
-  assert.equal(ult.session.state, "confirm");
-  assert.match(ult.reply, /24 × Agua/);
-  assert.deepEqual(say(ult.session, "c:ok").order.items.map((i) => i.qty), [24, 12]);
-  // y se puede repetir uno anterior
-  const otro = say(r.session, segundo.id);
-  assert.equal(otro.session.state, "confirm");
-  assert.doesNotMatch(otro.reply, /24 × Agua/);
+test("cliente conocido: «repetir» ya no existe; el bot ofrece hacer un pedido y no apunta nada", () => {
+  for (const t of ["repetir", "repite el último pedido", "lo de siempre", "h:repeat", "h:repeat1"]) {
+    const r = say(newSession(bar, "/catalogo"), t);
+    assert.match(r.reply, /No estoy diseñado/, t);
+    assert.equal(r.session.cart.length, 0, t);
+    assert.notEqual(r.session.state, "confirm", t);
+  }
 });
 
-test("«Histórico» enseña los pedidos y deja repetir cualquiera; «repite el último pedido» repite el último", () => {
+test("«Histórico» enseña los pedidos con sus tablas y solo ofrece hacer un pedido (sin «repetir»)", () => {
   const h = say(newSession(bar, "/catalogo"), "histórico");
-  assert.equal(h.ui.type, "list");
-  assert.equal(h.ui.rows.length, h.cards.length); // un pedido por tabla y uno por opción de la lista
-  assert.equal(say(h.session, h.ui.rows[h.ui.rows.length - 1].id).session.state, "confirm");
-  assert.match(say(newSession(bar), "repite el último pedido").reply, /24 × Agua/);
-  assert.equal(say(newSession(bar), "h:repeat").ui.type, "list"); // el botón «Repetir» de la pantalla de inicio
+  assert.ok(h.cards.length >= 2); // un pedido por tabla
+  assert.deepEqual(h.ui.buttons.map((b) => b.id), ["h:open"]);
+  assert.doesNotMatch(JSON.stringify(h.ui) + h.reply, /Repetir|h:repeat|r:/);
 });
 
 test("cliente conocido: puede escribir lo que quiere y se suma al pedido", () => {
@@ -133,7 +123,8 @@ test("cliente conocido: puede escribir lo que quiere y se suma al pedido", () =>
 });
 
 test("cliente conocido: 'Cambiar' vuelve al pedido y vaciar lo deja a cero", () => {
-  let r = say(newSession(bar), "repite el último pedido");
+  let r = say(newSession(bar), "24 aguas y 12 cervezas");
+  r = say(r.session, "act:done");
   r = say(r.session, "c:edit");
   assert.equal(r.session.state, "cart");
   assert.match(r.reply, /24 × Agua/);
@@ -172,7 +163,7 @@ test("«último pedido» enseña el último pedido con botones; no lo repite sol
     const r = say(newSession(bar, "/catalogo"), t);
     assert.match(r.reply, /Tu último pedido\* \(01\/10\/2026\)/, t);
     assert.match(r.reply, /24 uds/);
-    assert.deepEqual(r.ui.buttons.map((b) => b.id), ["h:repeat1", "h:hist", "h:open"]);
+    assert.deepEqual(r.ui.buttons.map((b) => b.id), ["h:hist", "h:open"]);
     assert.equal(r.session.state, "menu");
   }
 });
@@ -186,18 +177,10 @@ test("«histórico» enseña los pedidos anteriores con lo que pidió en cada un
   }
 });
 
-test("los botones del último pedido: repetirlo lleva a confirmar y «Hacer pedido» abre el catálogo", () => {
+test("los botones del último pedido: «Hacer pedido» abre el catálogo y «Ver histórico» el histórico", () => {
   let r = say(newSession(bar, "/catalogo"), "último pedido");
-  const rep = say(r.session, "h:repeat1");
-  assert.equal(rep.session.state, "confirm");
-  assert.match(rep.reply, /Revisa tu pedido/);
   assert.equal(say(r.session, "h:open").ui.open, true);
   assert.match(say(r.session, "h:hist").reply, /histórico/i);
-});
-
-test("«repite el último pedido» lo repite (con confirmación)", () => {
-  const r = say(newSession(bar, "/catalogo"), "repite el último pedido");
-  assert.equal(r.session.state, "confirm");
 });
 
 test("un cliente sin pedidos anteriores: último pedido e histórico lo dicen y ofrecen hacer uno", () => {
@@ -222,11 +205,11 @@ test("«último pedido» e «histórico» llevan además una tabla (cantidad, pr
   assert.equal(h.cards.length, 2); // un pedido por tabla
 });
 
-test("el saludo explica en puntos lo fácil que es pedir (y solo ofrece «Repetir» si hay un pedido anterior)", () => {
+test("el saludo explica en puntos lo fácil que es pedir (sin ofrecer «Repetir»)", () => {
   const r = say(newSession(bar, "/catalogo"), "hola");
   assert.match(r.reply, /Hacer tu pedido es muy fácil/);
   assert.match(r.reply, /• Pulsa \*Hacer pedido\*/);
-  assert.match(r.reply, /• ¿Lo de siempre\? Pulsa \*Repetir\*/);
+  assert.doesNotMatch(r.reply, /Repetir|¿Lo de siempre/);
   assert.match(r.reply, /• Elige el día de entrega/);
   const nuevo = say(newSession({ id: "C-9", name: "Bar Nuevo", address: "x", orders: [] }, "/catalogo"), "hola");
   assert.doesNotMatch(nuevo.reply, /Repetir/);
@@ -246,9 +229,10 @@ test("lo que no es pedir, último pedido, histórico o repetir recibe una respue
   assert.match(ok.reply, /Anotado/);
 });
 
-test("repetir el último pedido y añadir productos: se abre el catálogo con lo repetido ya dentro (y sin enlace, la lista incluye todo el catálogo)", () => {
+test("añadir productos desde la pantalla de confirmar: se abre el catálogo con lo pedido ya dentro (y sin enlace, la lista incluye todo el catálogo)", () => {
   const conLink = newSession(bar, "/catalogo");
-  let r = say(conLink, "repetir ultimo pedido");
+  let r = say(conLink, "24 aguas y 12 cervezas");
+  r = say(r.session, "act:done");
   assert.ok(r.ui.buttons.some((b) => b.id === "c:more" && /Añadir/.test(b.title)));
   const ids = (r.session.items ?? r.session.cart).map((i) => i.id);
   r = say(r.session, "c:more");
@@ -257,7 +241,7 @@ test("repetir el último pedido y añadir productos: se abre el catálogo con lo
   assert.match(r.ui.url, /^\/catalogo#c=/);
   for (const id of ids) assert.ok(r.ui.url.includes(`${id}.`), `falta ${id} en ${r.ui.url}`);
   // sin enlace (chat de WhatsApp): la lista de artículos no se limita al histórico
-  r = say(say(newSession(bar), "repetir ultimo pedido").session, "c:more");
+  r = say(say(say(newSession(bar), "24 aguas y 12 cervezas").session, "act:done").session, "c:more");
   assert.equal(r.ui.type, "list");
   assert.ok(r.ui.rows.some((x) => x.id === "p:3") && r.ui.rows.some((x) => x.id === "p:4"));
 });
