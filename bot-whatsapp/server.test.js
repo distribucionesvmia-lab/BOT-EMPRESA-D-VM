@@ -514,3 +514,9 @@ test("ESTADO: /api/admin/estado solo con la clave de la empresa y lista los prob
   assert.ok(Array.isArray(r.json.problemas) && typeof r.json.pedidos.pendientes === "number");
   assert.ok(r.json.problemas.some((p) => p.clave === "correo-sin-configurar")); // en las pruebas no hay SMTP
 });
+
+test("BUSCADORES: robots.txt lo prohíbe todo y las páginas llevan noindex", async () => {
+  const r = await fetch(`${BASE}/robots.txt`);
+  assert.match(await r.text(), /Disallow: \//);
+  assert.match((await fetch(`${BASE}/cliente`)).headers.get("x-robots-tag") ?? "", /noindex/);
+});

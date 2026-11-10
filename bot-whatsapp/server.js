@@ -380,7 +380,7 @@ function imgs() {
   return imgIndex;
 }
 const imgUrl = (id) => (imgs().has(id) ? `/img/${encodeURIComponent(id)}` : null);
-const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff" };
+const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow" };
 const sendJson = (res, code, data) => res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify(data));
 
 // Conversación de un cliente con sesión: el cliente sale SIEMPRE de la cuenta (nunca de lo que envíe el navegador)
@@ -407,6 +407,7 @@ const isJson = (req) => /^application\/json/i.test(req.headers["content-type"] ?
 
 async function appRoutes(req, res, url) {
   const p = url.pathname;
+  if (p === "/robots.txt") return void res.writeHead(200, { "Content-Type": "text/plain" }).end("User-agent: *\nDisallow: /\n"); // que Google no indexe nada
   if (p === "/") {
     if (!String(req.headers.accept ?? "").includes("text/html")) return void res.end("Bot activo");
     return void res.writeHead(302, { Location: clientEnabled ? "/cliente" : "/empresa" }).end();
