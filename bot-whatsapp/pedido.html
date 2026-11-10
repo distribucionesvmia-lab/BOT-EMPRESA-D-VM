@@ -175,11 +175,13 @@
   .vacio { padding:48px 24px; text-align:center; color:var(--gris); font-size:18px; line-height:1.4; }
 
   /* Barra inferior: siempre a la vista, botón enorme */
-  footer { z-index:6; position:absolute; left:0; right:0; bottom:0; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(rgba(255,255,255,0), #fff 28%); }
+  footer { z-index:4; position:absolute; left:0; right:0; bottom:0; padding:12px 14px calc(12px + env(safe-area-inset-bottom)); background:linear-gradient(rgba(255,255,255,0), #fff 28%); }
   #verCarrito { font-size:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .big { width:100%; border:0; border-radius:16px; background:var(--rojo); color:#fff; font-size:20px; font-weight:800; min-height:62px; padding:12px; cursor:pointer; box-shadow:0 4px 0 var(--rojo-o); }
   .big:active { transform:translateY(2px); box-shadow:none; }
   .big:disabled { background:#c9cbcf; box-shadow:none; cursor:default; }
+  .screen > .box.pie { padding:10px max(14px, calc((100% - 860px) / 2)) max(14px, env(safe-area-inset-bottom)) !important; display:flex; flex-direction:column; gap:10px; } /* botones del pie: con margen a los lados y separados */
+  .screen > .box.pie .big.sec { margin-top:0; }
   .big.sec { background:#fff; color:var(--rojo-o); border:2px solid var(--rojo); margin-top:10px; box-shadow:none; }
 
   /* Elegir día */
@@ -258,7 +260,7 @@
   <section class="screen" id="repetir" hidden style="z-index:6">
     <div class="head"><button id="repVolver" type="button" aria-label="Volver a los productos">←</button><div><small>Repetir pedido</small><h2>Elige qué repetir</h2></div></div>
     <div class="body" style="padding:14px"><p style="margin:0 0 12px;color:var(--gris);font-size:16px">Marca lo que quieras volver a pedir. Las cantidades son las del pedido original; podrás cambiarlas en el carrito. Los precios son los de hoy.</p><div id="repLista"></div></div>
-    <div class="box"><button class="big" id="repOk" type="button">Añadir al pedido</button></div>
+    <div class="box pie"><button class="big" id="repOk" type="button">Añadir al pedido</button></div>
   </section>
 
   <section class="screen" id="cart" hidden>
@@ -305,7 +307,7 @@
       <div class="err" id="errRes" role="alert"></div>
     </div>
     <div class="tot"><span>Total con IVA<small id="resSub" style="display:block;font-weight:400"></small></span><b id="resTotal">0,00 €</b></div>
-    <div class="box"><button class="big" id="resOk" type="button">✓ Confirmar y enviar pedido</button><button class="big sec" id="resCambiar" type="button">← Cambiar el día</button></div>
+    <div class="box pie"><button class="big" id="resOk" type="button">✓ Confirmar y enviar pedido</button><button class="big sec" id="resCambiar" type="button">← Cambiar el día</button></div>
   </section>
 
   <section class="screen" id="done" hidden>
@@ -800,7 +802,7 @@ let diaElegido = null;
 function resumen(day) {
   diaElegido = day;
   $("resDia").textContent = largo(day).replace(/^./, c => c.toUpperCase());
-  $("resAddr").textContent = "📍 " + (data.customer.address || "—");
+  $("resAddr").textContent = "📍 " + (data.customer.address || "La dirección que tenemos de tu negocio (la confirmaremos contigo)");
   const box = $("resLineas"); box.innerHTML = "";
   for (const l of lines()) {
     const k = l.unitsPerBox || 1, cj = unit(l.id) === "caja", d = document.createElement("div");
@@ -873,7 +875,7 @@ const obs = new MutationObserver(capasCambian);
   document.title = "Pedido a " + data.business;
   $("ttl").textContent = "Hola, " + data.customer.name;
   $("sub").textContent = "Haz tu pedido a " + data.business;
-  $("addr").textContent = "📍 Entrega en: " + (data.customer.address || "—");
+  $("addr").textContent = data.customer.address || "La dirección que tenemos de tu negocio (la confirmaremos contigo).";
   $("priceNote").textContent = data.priceNote || "";
   if (data.used) { $("doneT").textContent = "Este pedido ya se envió"; $("doneP").textContent = "Vuelve al chat para hacer otro pedido."; $("done").hidden = false; return; }
   if (!data.products.some(p => p.count > 0)) { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); }
