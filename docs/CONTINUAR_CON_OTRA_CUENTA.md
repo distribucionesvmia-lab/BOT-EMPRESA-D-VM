@@ -52,3 +52,6 @@ Elegir dónde alojar el programa (Render, servidor de la empresa, etc.), revisar
 
 ## Clientes falsos de prueba (Pablo y Enrique) en la demo
 `node prueba-a-json.js prueba.json "T0818:PABLO MARTIN CASTAÑEDA:81818181A:historial-pablo.xlsx" "T5900:ENRIQUE MARTIN GALLEGO:59005900B:historial-enrique.xlsx"` y al compilar `PRUEBA_JSON=prueba.json node demo-web/build.mjs`. Entran con 818181 (Pablo) y 590059 (Enrique). Los ids llevan «T» para no pisar a clientes reales con el mismo código. Ese JSON no se sube a GitHub.
+
+## Fotos creadas con IA
+Si el ZIP de fotos trae su Excel de control (columnas `codigo` y `tipo`, con `IA` en las generadas), al aplicarlo se guarda `fotos-ia.json` junto a las fotos y el catálogo muestra «Foto orientativa creada con IA» bajo el producto. Una foto real posterior para ese código quita el aviso. En la demo: `FOTOS_IA_JSON=lista.json node demo-web/build.mjs` (lista de códigos).

@@ -445,7 +445,9 @@ function row(p) {
     pr.appendChild(chip);
   }
   if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " uds" + (unit(p.id) === "caja" && qty.get(p.id) ? " → " + qty.get(p.id) * p.unitsPerBox + " uds" : "");
-  info.append(n, c, pr);
+  info.append(n, c);
+  if (p.ia) { const ia = document.createElement("div"); ia.className = "ia"; ia.textContent = "Foto orientativa creada con IA"; ia.style.cssText = "font-size:11px;color:#8a8a8a;font-style:italic;margin:1px 0 2px"; info.appendChild(ia); }
+  info.append(pr);
   // Columnas: foto · datos (nombre con el corazón de favorito) · Uds/Cajas y «Añadir» siempre a la derecha
   if (data.favs) {
     const f = document.createElement("button"); f.type = "button"; f.className = "favb"; const on = favs.has(p.id);

@@ -102,6 +102,19 @@ test("fotos: un ZIP con «<código>.jpg» en carpetas; solo las de productos del
   assert.equal(fs.existsSync(path.join(a.imgDir, "11.jpg")), false); // una sola foto por producto
   assert.equal(fs.existsSync(path.join(a.imgDir, "11.webp")), true);
 });
+test("fotos: el Excel de control del ZIP marca las fotos «IA» y el catálogo las avisa", () => {
+  const { a, catalogDb } = montarConFotos();
+  catalogDb.upsertProducts([{ id: "21", name: "ATUN", price: 1, vat: 10 }, { id: "22", name: "PAN", price: 1, vat: 10 }]);
+  const control = Buffer.from(buildWorkbook([{ name: "Hoja", widths: [], rows: [["codigo", "producto", "tipo"], ["21", "ATUN", "IA"], ["22", "PAN", "real"]] }]));
+  const z = Buffer.from(zip({ "21.jpg": Buffer.alloc(300, 1), "22.jpg": Buffer.alloc(300, 2), "control_fotos.xlsx": control }));
+  assert.equal(a.vistaPrevia("fotos", z).resumen.fotosIA, 1);
+  a.aplicar("fotos", z);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(a.imgDir, "fotos-ia.json"), "utf8")), ["21"]);
+  // una foto real posterior para el 21 la quita de la lista
+  const z2 = Buffer.from(zip({ "21.png": Buffer.alloc(300, 7), "control_fotos.xlsx": Buffer.from(buildWorkbook([{ name: "H", widths: [], rows: [["codigo", "tipo"], ["21", "real"]] }])) }));
+  a.aplicar("fotos", z2);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(a.imgDir, "fotos-ia.json"), "utf8")), []);
+});
 function montarConFotos() {
   const imgDir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-img-"));
   const catalogDb = openCatalogDb(":memory:");

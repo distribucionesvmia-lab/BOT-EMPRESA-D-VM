@@ -267,7 +267,7 @@ function webOrderRoutes(req, res, url) {
     if (req.method === "GET") {
       // Identificado solo por nombre (link.u): no se enseña histórico, precios especiales ni dirección de ese cliente
       const view = link.u ? { ...customer, orders: [], usual: [], frequent: [], specialPrices: {}, discounts: {}, address: "" } : customer;
-      const products = webProducts(view, catalogNow(), habitualProducts, imgUrl);
+      const products = webProducts(view, catalogNow(), habitualProducts, imgUrl, imgEsIa);
       return json(res, {
         business: BUSINESS.name,
         priceNote: BUSINESS.priceNote,
@@ -372,15 +372,17 @@ const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), g
 // Fotos de producto: ficheros «<código>.png|jpg|webp» en la carpeta IMG_DIR (por defecto «imagenes»). Se listan al arrancar y cada 5 minutos.
 const IMG_DIR = process.env.IMG_DIR ?? new URL("./imagenes/", import.meta.url).pathname;
 const IMG_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
-let imgIndex = new Map(), imgAt = 0;
+let imgIndex = new Map(), imgAt = 0, imgIa = new Set(); // imgIa: códigos cuya foto está generada con IA (fotos-ia.json en la carpeta de fotos)
 function imgs() {
   if (Date.now() - imgAt > 300_000) {
     imgAt = Date.now();
     try { imgIndex = new Map(fs.readdirSync(IMG_DIR).map((f) => /^([\w-]{1,40})\.(png|jpe?g|webp)$/i.exec(f)).filter(Boolean).map((m) => [m[1], m[0]])); } catch { imgIndex = new Map(); }
+    try { imgIa = new Set(JSON.parse(fs.readFileSync(IMG_DIR + "fotos-ia.json", "utf8")).map(String)); } catch { imgIa = new Set(); }
   }
   return imgIndex;
 }
 const imgUrl = (id) => (imgs().has(id) ? `/img/${encodeURIComponent(id)}` : null);
+const imgEsIa = (id) => (imgs(), imgIa.has(String(id)));
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow" };
 const sendJson = (res, code, data) => res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify(data));
 
@@ -453,7 +455,7 @@ async function appRoutes(req, res, url) {
       customer: { name: customer.name, address: customer.address, re: !!customer.recargoEquivalencia },
       used: false,
       favs: getAccountsDb().favorites(account.customerId),
-      products: webProducts(customer, catalogNow(), habitualProducts, imgUrl),
+      products: webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa),
       history: webHistory(customer, catalogNow()),
       tree: webTree(catalogNow()),
       delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }),

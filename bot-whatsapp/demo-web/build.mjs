@@ -37,11 +37,13 @@ const historial = process.env.HISTORIAL_JSON ? `window.__VM_HISTORIAL__=${fs.rea
 // NIF_JSON=ruta.json (de nif-demo-a-json.js): huellas de los 6 últimos caracteres del NIF (no el NIF) para poder entrar aunque la base no tenga el índice.
 const nifs = process.env.NIF_JSON ? `window.__VM_NIF__=${fs.readFileSync(process.env.NIF_JSON, "utf8")};` : "";
 // PRUEBA_JSON=ruta.json (de prueba-a-json.js): clientes FALSOS de prueba con su historial. NO se sube al repositorio.
+// FOTOS_IA_JSON=ruta.json: lista de códigos cuya foto está generada con IA (se avisa en pequeño en el catálogo)
+const fotosIa = process.env.FOTOS_IA_JSON ? `window.__VM_FOTOS_IA__=${fs.readFileSync(process.env.FOTOS_IA_JSON, "utf8")};` : "";
 const prueba = process.env.PRUEBA_JSON ? `window.__VM_PRUEBA__=${fs.readFileSync(process.env.PRUEBA_JSON, "utf8")};` : "";
 const safe = (s) => s.replace(/<\/script/gi, "<\\/script");
 const page = fs
   .readFileSync(path.join(here, "page.html"), "utf8")
-  .replace("/*__BUNDLE__*/", () => safe(tarifa + fotos + historial + nifs + prueba + fs.readFileSync(bundle, "utf8")))
+  .replace("/*__BUNDLE__*/", () => safe(tarifa + fotos + historial + nifs + prueba + fotosIa + fs.readFileSync(bundle, "utf8")))
   .replace("/*__MINI__*/", () => safe(JSON.stringify(mini)));
 
 fs.writeFileSync(path.join(dist, "artifact.html"), page);

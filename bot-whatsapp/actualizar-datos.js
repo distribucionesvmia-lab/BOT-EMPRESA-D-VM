@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { parseHistorialXlsx } from "./historial-import.js";
-import { unzip } from "./xlsx-read.js";
+import { unzip, readXlsx } from "./xlsx-read.js";
 import { leerExcel, categoriaPorFamilia, saltosDePrecio } from "./actualizar-productos.js";
 import { compararProductos, aplicarProductos, CAMPOS, vendible } from "./productos-diff.js";
 
@@ -143,6 +143,15 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
   function fotos(buf) {
     if (!imgDir) throw new Error("La carpeta de fotos no está configurada.");
     const entradas = unzip(buf, (n) => /\.(jpe?g|png|webp)$/i.test(n) && !/(^|\/)(__MACOSX|\.)/.test(n) && !/\/$/.test(n));
+    // Si el ZIP trae su Excel de control (columnas «codigo» y «tipo»), las fotos con tipo «IA» se marcan como generadas con IA
+    const ia = new Set(), noIa = new Set();
+    for (const data of Object.values(unzip(buf, (n) => /(^|\/)[^/]*\.xlsx$/i.test(n) && !/(^|\/)(__MACOSX|\.)/.test(n)))) {
+      try {
+        const rows = readXlsx(data), h = rows[0].map((c) => String(c).trim().toLowerCase()), iC = h.findIndex((c) => /^c[oó]digo/.test(c)), iT = h.findIndex((c) => c === "tipo");
+        if (iC < 0 || iT < 0) continue;
+        for (const r of rows.slice(1)) { const id = String(r[iC]).trim(), t = String(r[iT]).trim().toLowerCase(); if (!id) continue; (t === "ia" ? ia : noIa).add(id); }
+      } catch { /* un Excel que no es el de control se ignora */ }
+    }
     const nombres = new Map(catalogDb.list({ activeOnly: false }).map((p) => [String(p.id), p.name]));
     const catalogo = new Set(nombres.keys());
     const nuevas = [], cambiadas = [], ignoradas = [];
@@ -162,10 +171,10 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
       else if (!fs.readFileSync(r).equals(f.data)) cambiadas.push({ id });
       else iguales++;
     }
-    const resumen = { fotosNuevas: nuevas.length, fotosCambiadas: cambiadas.length, iguales, ignoradas: ignoradas.length };
+    const resumen = { fotosNuevas: nuevas.length, fotosCambiadas: cambiadas.length, iguales, ignoradas: ignoradas.length, fotosIA: [...porId.keys()].filter((i) => ia.has(i)).length };
     const aviso = ignoradas.length ? [`${ignoradas.length} archivos se ignoran (código que no está en el catálogo u otros archivos).`] : [];
     return {
-      resumen, aviso, aplicable: nuevas.length + cambiadas.length > 0,
+      resumen, aviso, aplicable: nuevas.length + cambiadas.length > 0 || ia.size > 0,
       detalle: { anadidos: nuevas.slice(0, MUESTRA), modificados: cambiadas.slice(0, MUESTRA), ignoradas: ignoradas.slice(0, MUESTRA) },
       aplicar() {
         fs.mkdirSync(imgDir, { recursive: true });
@@ -176,7 +185,14 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
           for (const e of ["jpg", "png", "webp"]) if (e !== f.ext) fs.rmSync(ruta(id, e), { force: true }); // una sola foto por producto
           fs.writeFileSync(r, f.data); guardadas++;
         }
-        return { fotosGuardadas: guardadas };
+        // fotos-ia.json: códigos con foto generada con IA (el catálogo lo avisa en pequeño). Las que ahora vienen como reales se quitan.
+        if (ia.size || noIa.size) {
+          const f = path.join(imgDir, "fotos-ia.json");
+          let actuales = []; try { actuales = JSON.parse(fs.readFileSync(f, "utf8")).map(String); } catch { /* aún no existe */ }
+          const nuevo = new Set(actuales.filter((i) => !noIa.has(i))); for (const i of ia) if (porId.has(i)) nuevo.add(i);
+          fs.writeFileSync(f, JSON.stringify([...nuevo].sort()));
+        }
+        return { fotosGuardadas: guardadas, fotosMarcadasIA: [...porId.keys()].filter((i) => ia.has(i)).length };
       },
     };
   }

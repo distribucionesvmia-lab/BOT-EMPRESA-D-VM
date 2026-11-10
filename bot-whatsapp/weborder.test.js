@@ -86,3 +86,10 @@ test("conHistorial: pone el histórico indicado solo a los clientes que lo tiene
   assert.deepEqual(r[0].orders, pedidos); // sustituye al que traía
   assert.deepEqual(r[1].orders, []); // los demás no cambian
 });
+
+test("webProducts: avisa de las fotos creadas con IA (solo si el producto tiene foto)", () => {
+  const cat = [{ id: 1, name: "Agua", price: 1 }, { id: 2, name: "Pan", price: 1 }, { id: 3, name: "Sal", price: 1 }];
+  const r = webProducts({}, cat, () => [], (id) => (id === "3" ? null : `/img/${id}`), (id) => id !== "2");
+  const por = Object.fromEntries(r.map((p) => [p.id, p.ia === true]));
+  assert.deepEqual(por, { 1: true, 2: false, 3: false }); // el 3 no tiene foto: sin aviso
+});
