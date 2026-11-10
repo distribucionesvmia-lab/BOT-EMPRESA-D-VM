@@ -495,7 +495,7 @@ async function appRoutes(req, res, url) {
 http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://x");
-    if (url.pathname === "/" || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/img/")) {
+    if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/img/")) {
       appRoutes(req, res, url).catch((err) => {
         console.error(err);
         if (!res.headersSent) res.writeHead(500).end();
