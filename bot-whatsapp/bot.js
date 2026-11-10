@@ -175,16 +175,18 @@ const PAGE = 9;
 const buttons = (...bs) => ({ type: "buttons", buttons: bs.map(([id, title]) => ({ id, title: trunc(title, 20) })) });
 
 function listUi(s, page = 0) {
-  const all = habitualProducts(s.customer);
+  const habituales = habitualProducts(s.customer), vistos = new Set(habituales.map((p) => String(p.id)));
+  // Primero lo que ya ha pedido y después TODO el catálogo: puede añadir cualquier producto, no solo los de su histórico
+  const all = !s.customer || s.unverified ? habituales : [...habituales, ...CATALOG.filter((p) => !vistos.has(String(p.id))).sort((a, c) => a.name.localeCompare(c.name, "es"))];
   const start = page * PAGE;
   const rows = all.slice(start, start + PAGE).map((p) => ({
     id: `p:${p.id}`,
     title: trunc(p.name, 24),
-    description: trunc(`${p.name} · última vez: ${udsT(p.lastQty)}`, 72),
+    description: trunc(p.lastQty != null ? `${p.name} · última vez: ${udsT(p.lastQty)}` : `${p.name} · ${money(priceOf(p))}`, 72),
   }));
   if (!rows.length) return undefined;
   if (start + PAGE < all.length) rows.push({ id: `more:${page + 1}`, title: "Ver más artículos", description: `Quedan ${all.length - start - PAGE} por ver` });
-  return { type: "list", button: "Ver artículos", section: "Tu histórico", rows };
+  return { type: "list", button: "Ver artículos", section: habituales.length ? "Tu histórico y catálogo" : "Catálogo", rows };
 }
 
 const GENERIC_MENU =
@@ -294,7 +296,7 @@ const confirmReply = (s) => {
     (s.delivery ? `📅 Entrega: *${longDate(s.delivery)}*\n` : "") +
     `👤 ${s.name}\n📍 Entrega en: ${s.address || "la dirección que tenemos de tu negocio (la confirmaremos contigo)"}\n\n`;
   return s.customer
-    ? { reply: body + `Pulsa un botón, o escribe los cambios (por ejemplo _"6 verdejo y 2 coca cola zero"_) y lo rehago.\n\n_¿Alguna observación? Escribe *nota: servir el jueves*, o *nota jamón: pieza grande* para un artículo._`, ui: buttons(["c:ok", "Confirmar"], ["c:edit", "Cambiar"], ["c:cancel", "Cancelar"]) }
+    ? { reply: body + `Pulsa un botón, o escribe los cambios (por ejemplo _"6 verdejo y 2 coca cola zero"_) y lo rehago.\n\n_¿Alguna observación? Escribe *nota: servir el jueves*, o *nota jamón: pieza grande* para un artículo._`, ui: buttons(["c:ok", "Confirmar"], ["c:more", "Añadir productos"], ["c:cancel", "Cancelar"]) }
     : { reply: body + `1️⃣ Confirmar\n2️⃣ Cancelar` };
 };
 
@@ -348,6 +350,16 @@ function noEntiendo(s) {
   };
 }
 /** «Hacer pedido»: se abre el catálogo (con enlace) o, sin él, la lista del chat. */
+/** Enlace al catálogo con el pedido en marcha ya cargado (#c=código.unidades,…): lo que había se queda y se le suma lo nuevo. */
+function catalogoConPedido(s) {
+  const items = (s.state === "confirm" ? getItems(s) : s.cart) ?? [];
+  const c = items.filter((i) => i.id != null && unitsOf(i) > 0).map((i) => `${encodeURIComponent(String(i.id))}.${unitsOf(i)}`).join(",");
+  return c ? `${String(s.link).split("#")[0]}#c=${c}` : s.link;
+}
+function anadirProductos(s) {
+  if (!s.link) return showList(s, 0, "🛒 Elige lo que quieres añadir (tu pedido se mantiene):");
+  return { reply: "🛒 *¡Abriendo el catálogo!* Tu pedido se queda como está: añade lo que quieras y finaliza desde allí. Si no se abre solo, pulsa el botón.", session: s, ui: { type: "link", title: "Añadir productos", url: catalogoConPedido(s), open: true } };
+}
 function openCatalog(s) {
   if (s.link) {
     return { reply: "🛒 *¡Abriendo tu catálogo!* Si no se abre solo, pulsa el botón.", session: s, ui: { type: "link", title: "Hacer pedido", url: s.link, open: true } };
@@ -756,7 +768,7 @@ function handleMessageInner(session, rawText, ctx = {}) {
       return { reply: "No he entendido esa cantidad. Escribe un número entero de 1 a 999 (por ejemplo 6), o «3 cajas» / «12 uds», o pulsa un botón.", session: s };
     }
     if (["menu", "cart"].includes(s.state)) {
-      if (text === "act:add") return showList(s);
+      if (text === "act:add") return s.customer ? anadirProductos(s) : showList(s);
       if (text === "act:clear") {
         s.cart = [];
         return showList(s, 0, "He vaciado tu pedido. Elige un artículo:");
@@ -768,6 +780,7 @@ function handleMessageInner(session, rawText, ctx = {}) {
         return { ...confirmReply(s), session: s };
       }
     }
+    if (s.state === "confirm" && text === "c:more") return anadirProductos(s);
     if (s.state === "confirm" && text === "c:edit") {
       s.items = null;
       return showCart(s, "De acuerdo, cambia lo que quieras.\n\n");

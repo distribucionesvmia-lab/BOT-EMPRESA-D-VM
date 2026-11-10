@@ -61,7 +61,7 @@ test("cliente conocido: saluda por nombre y ofrece la lista de sus artículos", 
   const r = say(newSession(bar), "hola");
   assert.match(r.reply, /Bar Alegría/);
   assert.equal(r.ui.type, "list");
-  assert.deepEqual(r.ui.rows.map((x) => x.id), ["p:1", "p:2"]); // el agua, comprada 2 veces, va primero
+  assert.deepEqual(r.ui.rows.map((x) => x.id), ["p:1", "p:2", "p:3", "p:4"]); // primero lo ya pedido (el agua, comprada 2 veces, va primero) y después el resto del catálogo
   assert.match(r.ui.rows[0].description, /última vez: 24 uds/);
   assert.ok(r.ui.rows.every((x) => x.title.length <= 24 && x.description.length <= 72));
 });
@@ -81,7 +81,7 @@ test("cliente conocido: elige artículos, marca unidades con botones o escribien
   assert.match(r.reply, /6 × Agua/);
   r = say(r.session, "act:done");
   assert.match(r.reply, /Plaza Mayor 3/);
-  assert.deepEqual(r.ui.buttons.map((b) => b.id), ["c:ok", "c:edit", "c:cancel"]);
+  assert.deepEqual(r.ui.buttons.map((b) => b.id), ["c:ok", "c:more", "c:cancel"]);
   r = say(r.session, "c:ok");
   assert.equal(r.order.customerId, "C-0001");
   assert.deepEqual(r.order.items.map((i) => [i.id, i.qty]), [[2, 12], [1, 6]]);
@@ -225,4 +225,20 @@ test("lo que no es pedir, último pedido, histórico o repetir recibe una respue
   // pedir con cantidad sigue funcionando
   const ok = say(newSession(bar, "/catalogo"), "2 aguas");
   assert.match(ok.reply, /Anotado/);
+});
+
+test("repetir el último pedido y añadir productos: se abre el catálogo con lo repetido ya dentro (y sin enlace, la lista incluye todo el catálogo)", () => {
+  const conLink = newSession(bar, "/catalogo");
+  let r = say(conLink, "repetir ultimo pedido");
+  assert.ok(r.ui.buttons.some((b) => b.id === "c:more" && /Añadir/.test(b.title)));
+  const ids = (r.session.items ?? r.session.cart).map((i) => i.id);
+  r = say(r.session, "c:more");
+  assert.equal(r.ui.type, "link");
+  assert.equal(r.ui.open, true);
+  assert.match(r.ui.url, /^\/catalogo#c=/);
+  for (const id of ids) assert.ok(r.ui.url.includes(`${id}.`), `falta ${id} en ${r.ui.url}`);
+  // sin enlace (chat de WhatsApp): la lista de artículos no se limita al histórico
+  r = say(say(newSession(bar), "repetir ultimo pedido").session, "c:more");
+  assert.equal(r.ui.type, "list");
+  assert.ok(r.ui.rows.some((x) => x.id === "p:3") && r.ui.rows.some((x) => x.id === "p:4"));
 });

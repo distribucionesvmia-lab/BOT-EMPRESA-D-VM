@@ -681,7 +681,7 @@ function pill(texto, onclick) { const e = document.createElement("button"); e.ty
 function interactivo(ui) {
   const box = document.createElement("div"); box.className = "ui";
   if (ui.type === "link" && ui.home) { inicio(ui); if (ui.open) setTimeout(abrirMini, 800); return; }
-  if (ui.type === "link") { const l = pill(ui.title, abrirMini); l.classList.add("primary"); box.appendChild(l); if (ui.open) setTimeout(abrirMini, 800); }
+  if (ui.type === "link") { const l = pill(ui.title, () => abrirMini(ui.url)); l.classList.add("primary"); box.appendChild(l); if (ui.open) setTimeout(() => abrirMini(ui.url), 800); }
   else if (ui.type === "buttons") ui.buttons.forEach((b) => box.appendChild(pill(b.title, () => enviar(b.id, b.title))));
   else box.appendChild(pill(ui.button, () => {
     sheet.innerHTML = "";
@@ -692,12 +692,13 @@ function interactivo(ui) {
   chat.appendChild(box); chat.scrollTop = chat.scrollHeight;
 }
 // La mini-aplicación de pedido es la misma página que usa el servidor, con su API conectada a esta demo
-function abrirMini() {
+function abrirMini(url) {
   const link = VM.miniOpen(); miniState = { link, ready: false };
+  const pre = /#c=[^#]*/.exec(String(url ?? ""))?.[0] ?? ""; // pedido en marcha que se lleva al catálogo
   web.innerHTML = "";
   const bar = el("div", "", { className: "web-h" }); const x = el("span", "✕ Cerrar"); x.onclick = () => (web.hidden = true);
   bar.append(x, document.createTextNode("Catálogo de pedido"));
-  const fr = el("iframe", "", { title: "Catálogo de pedido", srcdoc: MINI_HTML }); web.append(bar, fr); web.hidden = false;
+  const fr = el("iframe", "", { title: "Catálogo de pedido", srcdoc: pre ? MINI_HTML.replace("<head>", `<head><script>window.vmPrecarga=${JSON.stringify(pre)}<\/script>`) : MINI_HTML }); web.append(bar, fr); web.hidden = false;
   setTimeout(() => { if (miniState && !miniState.ready) { fr.remove(); web.appendChild(el("p", "Este visor no permite abrir el catálogo. Puedes pedir escribiendo en el chat, por ejemplo «2 aguas».", { style: "padding:16px;color:var(--muted)" })); } }, 2500);
 }
 window.addEventListener("message", (e) => {

@@ -658,6 +658,19 @@ document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   document.querySelectorAll(".tab").forEach(x => { x.classList.toggle("on", x === b); x.setAttribute("aria-pressed", String(x === b)); });
   renderList();
 });
+// Pedido en marcha que viene del chat (#c=código.unidades,…): lo que ya había pedido se queda en el carrito y se le suma lo nuevo
+function precargar() {
+  const m = /[#&]c=([^&]*)/.exec(String(window.vmPrecarga ?? location.hash));
+  if (!m) return;
+  const byId = new Set(data.products.map(p => p.id));
+  let n = 0;
+  for (const par of m[1].split(",")) {
+    const [rawId, rawN] = par.split("."), id = decodeURIComponent(rawId ?? ""), u = Math.min(999, Math.floor(Number(rawN)));
+    if (!byId.has(id) || !(u > 0)) continue;
+    unitOf.set(id, "ud"); qty.set(id, u); n++;
+  }
+  if (n) { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); aviso(`Tu pedido anterior ya está en el carrito (${n} artículo${n === 1 ? "" : "s"}). Añade lo que quieras del catálogo y finaliza.`); }
+}
 // Repetir un pedido anterior (las líneas vienen del servidor; se mantienen solo los artículos que siguen en el catálogo)
 let repSel = [];
 $("repAbrir").onclick = () => {
@@ -828,6 +841,7 @@ const obs = new MutationObserver(capasCambian);
   if (!data.products.some(p => p.count > 0)) { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); }
   (data.favs || []).forEach(id => favs.add(id));
   recuperar();
+  precargar();
   refresh();
 })();
 </script>
