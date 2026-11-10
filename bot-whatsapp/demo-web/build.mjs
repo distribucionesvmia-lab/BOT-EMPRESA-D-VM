@@ -36,10 +36,12 @@ if (process.env.FOTOS_DIR) {
 const historial = process.env.HISTORIAL_JSON ? `window.__VM_HISTORIAL__=${fs.readFileSync(process.env.HISTORIAL_JSON, "utf8")};` : "";
 // NIF_JSON=ruta.json (de nif-demo-a-json.js): huellas de los 6 últimos caracteres del NIF (no el NIF) para poder entrar aunque la base no tenga el índice.
 const nifs = process.env.NIF_JSON ? `window.__VM_NIF__=${fs.readFileSync(process.env.NIF_JSON, "utf8")};` : "";
+// PRUEBA_JSON=ruta.json (de prueba-a-json.js): clientes FALSOS de prueba con su historial. NO se sube al repositorio.
+const prueba = process.env.PRUEBA_JSON ? `window.__VM_PRUEBA__=${fs.readFileSync(process.env.PRUEBA_JSON, "utf8")};` : "";
 const safe = (s) => s.replace(/<\/script/gi, "<\\/script");
 const page = fs
   .readFileSync(path.join(here, "page.html"), "utf8")
-  .replace("/*__BUNDLE__*/", () => safe(tarifa + fotos + historial + nifs + fs.readFileSync(bundle, "utf8")))
+  .replace("/*__BUNDLE__*/", () => safe(tarifa + fotos + historial + nifs + prueba + fs.readFileSync(bundle, "utf8")))
   .replace("/*__MINI__*/", () => safe(JSON.stringify(mini)));
 
 fs.writeFileSync(path.join(dist, "artifact.html"), page);

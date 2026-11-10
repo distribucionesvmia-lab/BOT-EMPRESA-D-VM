@@ -48,6 +48,7 @@ function onData(coll, rows) {
   if (coll === "products" && globalThis.__VM_TARIFA__ && rows.length < 200) rows = // solo mientras la base tenga los productos de ejemplo: cuando se cargan los reales (#cargar-datos) mandan los de la base
     globalThis.__VM_TARIFA__.map((p) => ({ ...p, unitsPerBox: p.unitsPerBox ?? null, discount: p.discount ?? 0, updatedAt: null, changes: [] }));
   if (coll === "customers" && globalThis.__VM_HISTORIAL__) rows = conHistorial(rows, globalThis.__VM_HISTORIAL__); // histórico puesto a mano a clientes concretos (p. ej. un cliente de prueba)
+  if (coll === "customers" && globalThis.__VM_PRUEBA__) rows = [...rows, ...globalThis.__VM_PRUEBA__.filter((p) => !rows.some((c) => c.id === p.id))]; // clientes falsos de prueba (solo en la vista)
   cache[coll] = rows;
   if (coll === "products" && rows.length) setCatalog(activeCatalog()); // el bot usa el precio nuevo al instante
   emit();

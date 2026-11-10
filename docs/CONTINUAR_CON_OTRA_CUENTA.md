@@ -49,3 +49,6 @@ Entrada con los 6 primeros dígitos del DNI/CIF (decisión del 05/11) · "Hoy" s
 ## 6. Pendiente
 
 Elegir dónde alojar el programa (Render, servidor de la empresa, etc.), revisar los 21 precios que cambian más de un 25 %, prueba en un móvil real y revisión humana antes de abrirlo a clientes.
+
+## Clientes falsos de prueba (Pablo y Enrique) en la demo
+`node prueba-a-json.js prueba.json "T0818:PABLO MARTIN CASTAÑEDA:81818181A:historial-pablo.xlsx" "T5900:ENRIQUE MARTIN GALLEGO:59005900B:historial-enrique.xlsx"` y al compilar `PRUEBA_JSON=prueba.json node demo-web/build.mjs`. Entran con 818181 (Pablo) y 590059 (Enrique). Los ids llevan «T» para no pisar a clientes reales con el mismo código. Ese JSON no se sube a GitHub.
