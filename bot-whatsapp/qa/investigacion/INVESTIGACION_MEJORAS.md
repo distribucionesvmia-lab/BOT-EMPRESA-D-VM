@@ -108,6 +108,7 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 
 | Fecha | Qué se hizo |
 |---|---|
+| 10-nov-2026 | Informe en PDF (`Investigacion_mejoras_app_pedidos.pdf`) con la comparativa de empresas, la medición, las propuestas por fases y las 8 decisiones pendientes. |
 | 10-nov-2026 | Ronda 1: medición del artefacto actual en 9 tamaños, 4 grupos de búsqueda (pedido B2B, móvil, Sysco, pedido rápido, WhatsApp Flows, accesibilidad), primeras 9 observaciones y 14 ideas. |
 
 ### Qué investigaré en la próxima ronda
@@ -134,3 +135,27 @@ Los scripts están en esta carpeta (`auditoria-artefacto.cjs`). Necesitan el HTM
 ```bash
 node auditoria-artefacto.cjs <carpeta-con-index.html> <carpeta-de-salida>
 ```
+
+## 8. Cómo lo hacen otras empresas (ronda 1b) — resumen
+
+El informe completo, con tabla y fiabilidad de cada fuente, está en `Investigacion_mejoras_app_pedidos.pdf`.
+
+- **Sysco Shop:** empieza el pedido desde el historial, duplica un pedido en uno editable, permite modificar hasta la hora límite y avisa de habituales olvidados.
+- **Amazon Business / Grainger:** listas de reordenar con nombre que no se vacían, listas compartidas, escáner de código de barras.
+- **Instacart:** «Comprar otra vez» en la cabecera y en el inicio; con pocos pedidos enseña lo que otros compran con regularidad; «añadir todo» de un pedido pasado.
+- **Faire:** mínimo menor para repetir; el carrito dice cuánto falta para el mínimo o los portes gratis.
+- **Disbesa Store (hostelería, España):** compra rápida de habituales, repetir pedido completo o parcial, promociones.
+- **Apps instaladas (PWA):** casos de Google (Flipkart, George.com, Lancôme) con mejoras de conversión; son tiendas enormes, orientativo.
+- **No encontrado:** Mercadona, estudios de usabilidad con hosteleros, funciones de Makro PRO en España.
+
+## 9. Decisiones pendientes del usuario
+
+1. Letra: ¿respetar la del móvil del cliente (hasta +30 %) con control A−/A+, o fija?
+2. ¿Aprobar la Fase 1 (M-02, M-03, M-01, M-07, M-08)?
+3. ¿«Tu pedido de siempre» como botón principal de la portada?
+4. Reglas de reparto y compra (hora límite, mínimo, portes gratis, días y zonas) para F-05.
+5. Ofertas y novedades: ¿existen y de dónde salen? (F-11)
+6. WhatsApp: ¿API de Meta activa y presupuesto para mensajes? (F-09, F-10)
+7. Medir el uso sin datos personales (F-14).
+8. Vino: ¿21 € es por botella o por caja? (F6-1)
++. ¿Se pide más desde el móvil o desde el ordenador del bar?
