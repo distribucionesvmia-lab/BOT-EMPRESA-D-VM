@@ -105,3 +105,12 @@ test("MÓVIL: «Mostrar más» no se sale del ancho y el código/PIN de entrada 
   for (const id of ["a-nif", "a-pin", "r-pin", "r-pin2", "c-nuevo", "c-nuevo2"]) assert.match(cli, new RegExp(`id="${id}"[^>]*maxlength="6"`), id);
   assert.match(cli, /replace\(\/\\D\/g, ""\)\.slice\(0, 6\)/);
 });
+
+test("MÓVIL con letra grande (Samsung): ninguna caja de altura fija corta los textos y las categorías caben en 2 columnas", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.match(ped, /header \{ max-height:280px; flex-wrap:wrap/);
+  assert.match(ped, /\.paso \{ max-height:160px; \}/);
+  assert.match(ped, /grid-template-columns:repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(ped, /\.ud button \{ flex:1 1 auto; white-space:nowrap/);
+});

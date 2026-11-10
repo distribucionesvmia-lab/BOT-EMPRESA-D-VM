@@ -296,6 +296,22 @@
   main, .screen, .screen .body, #list { max-width:100%; overflow-x:hidden; }
   .cats > .cat, .subs > .sub, .p { min-width:0; max-width:100%; }
   .cat b, .cat small { overflow-wrap:anywhere; }
+  /* ── Textos grandes (Samsung/Android con «tamaño de letra» alto): nada se corta ni se sale del ancho ── */
+  header { max-height:280px; flex-wrap:wrap; row-gap:8px; } .paso { max-height:160px; } .tabs { max-height:180px; }
+  header .ttl { flex:1 1 110px; min-width:0; } header .ttl b { overflow-wrap:anywhere; }
+  main { padding-bottom:150px; }
+  .cartbtn { margin-left:auto; max-width:100%; }
+  .cats { grid-template-columns:repeat(2, minmax(0, 1fr)); padding:12px; gap:10px; }
+  .cats > .cat { padding:14px 8px; min-height:112px; width:100%; }
+  .cat b, .cat small { max-width:100%; overflow-wrap:anywhere; hyphens:auto; }
+  .sub b, .sub { overflow-wrap:anywhere; } .sub small { white-space:normal; text-align:right; }
+  .tabs button.tab { white-space:normal; }
+  footer .big, #verCarrito { white-space:normal; overflow:visible; text-overflow:clip; font-size:clamp(15px, 4.4vw, 20px); line-height:1.2; min-height:58px; }
+  .p .info, .p .n, .p .pr { min-width:0; } .p .n { overflow-wrap:anywhere; }
+  #total { white-space:nowrap; }
+  .ctl { max-width:100%; } .step input { min-width:0; }
+  .ud button { flex:1 1 auto; white-space:nowrap; padding:0 10px; }
+  .p .ctl .ud { flex:none; min-width:max-content; }
 </style>
 </head>
 <body>
