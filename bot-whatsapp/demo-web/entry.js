@@ -17,12 +17,14 @@ import data from "../ejemplo/historial-ficticio.json";
 import { demoNifMatches, demoCodeKey, unirClavesNif } from "./nif-demo.js";
 import { nifClean } from "../nif-codes.js";
 import { nifCodes } from "../nif-codes.js";
+import { crearActualizador } from "../actualizar-datos.js";
 
 const PHONE = "34600999999"; // el móvil de prueba no está en ninguna ficha: el bot pregunta quién es
 const COLLS = ["products", "customers", "orders", "exports", "registrations", "accounts"];
 const uid = () => Math.random().toString(36).slice(2, 8);
 
 let backend, mode = "local", perms = { canWrite: true, isAdmin: true };
+let rawProducts = [];
 const cache = { products: [], customers: [], orders: [], exports: [], registrations: [], accounts: [] };
 const listeners = new Set();
 const errorListeners = new Set();
@@ -33,7 +35,7 @@ const favsDemo = new Map(); // favoritos de la demo (solo en memoria)
 const links = new Map();
 
 const activeCatalog = () =>
-  [...cache.products].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({ id: p.id, name: p.name, price: p.price, ...(p.unitsPerBox ? { unitsPerBox: p.unitsPerBox } : {}), vat: p.vat, discount: p.discount, ...(p.category ? { category: p.category } : {}), ...(p.subcategory ? { subcategory: p.subcategory } : {}) }));
+  [...cache.products].filter((p) => p.active !== false).sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({ id: p.id, name: p.name, price: p.price, ...(p.unitsPerBox ? { unitsPerBox: p.unitsPerBox } : {}), vat: p.vat, discount: p.discount, ...(p.category ? { category: p.category } : {}), ...(p.subcategory ? { subcategory: p.subcategory } : {}) }));
 
 function onData(coll, rows) {
   if (coll === "customers") {
@@ -41,6 +43,7 @@ function onData(coll, rows) {
     const idx = rows.find((d) => d.id === "_nifindex")?.keys ?? {};
     rows = rows.filter((d) => d.id !== "_nifindex").map((c) => ({ ...c, nifKeys: unirClavesNif(c, idx, globalThis.__VM_NIF__) })); // huellas propias + índice de la base + las preparadas al compilar
   }
+  if (coll === "products") rawProducts = rows; // lo que hay de verdad en la base, antes de la vista previa con la tarifa
   // Vista previa con la tarifa real: si la página trae una (build con TARIFA_JSON), sustituye a los productos de ejemplo (solo lectura)
   if (coll === "products" && globalThis.__VM_TARIFA__ && rows.length < 200) rows = // solo mientras la base tenga los productos de ejemplo: cuando se cargan los reales (#cargar-datos) mandan los de la base
     globalThis.__VM_TARIFA__.map((p) => ({ ...p, unitsPerBox: p.unitsPerBox ?? null, discount: p.discount ?? 0, updatedAt: null, changes: [] }));
@@ -148,6 +151,55 @@ function buildExport(rows, fileName, extra = {}) {
 }
 const stampName = () => `pedidos-${madrid(new Date().toISOString()).replace(/[-: ]/g, "").replace(/^(\d{8})/, "$1-")}.xlsx`;
 
+
+// ---- Actualizar datos desde Excel (el mismo actualizador del programa real, sobre los datos de la demo) ----
+// Las lecturas salen de la memoria y las escrituras se encolan: tras aplicar se esperan todas.
+const pendientes = [];
+const escribe = (p) => { pendientes.push(p); return p; };
+const adaptCatalogo = {
+  list: () => cache.products.map((p) => ({ ...p, active: p.active !== false })),
+  upsertProducts(lista, { deactivateMissing = false } = {}) {
+    const hoy = new Map(cache.products.map((p) => [String(p.id), p])), vistos = new Set(), r = { added: 0, updated: 0, unchanged: 0, deactivated: 0 };
+    const salida = new Map(); // id → documento que debe quedar
+    for (const n of lista) {
+      const id = String(n.id), a = hoy.get(id); vistos.add(id);
+      const nuevo = { ...(a ?? { discount: 0, changes: [], updatedAt: null }), ...n, id, active: true };
+      if (!a) r.added++; else if (JSON.stringify({ ...a, active: a.active !== false }) !== JSON.stringify(nuevo)) r.updated++; else { r.unchanged++; continue; }
+      salida.set(id, { ...nuevo, updatedAt: new Date().toISOString() });
+    }
+    if (deactivateMissing) for (const a of cache.products) if (a.active !== false && !vistos.has(String(a.id))) { r.deactivated++; salida.set(String(a.id), { ...a, active: false }); }
+    // Mientras la página enseña la tarifa de ejemplo en vez de lo que hay en la base, la primera vez se guardan TODOS los productos (y se retiran los de ejemplo)
+    if (globalThis.__VM_TARIFA__ && rawProducts.length < 200) {
+      for (const a of cache.products) if (!salida.has(String(a.id))) salida.set(String(a.id), { ...a });
+      for (const d of rawProducts) if (!salida.has(String(d.id))) escribe(backend.remove("products", String(d.id)));
+    }
+    for (const [id, doc] of salida) escribe(backend.set("products", id, doc));
+    return r;
+  },
+};
+const adaptClientes = {
+  count: () => cache.customers.length,
+  getById: (id) => { const c = cache.customers.find((x) => x.id === String(id)); return c ? { ...c, address: c.address ?? "", legalName: c.legalName ?? "", phone: c.phone ?? "", phones: c.phones ?? [], emails: c.emails ?? [], active: c.active !== false, orders: c.orders ?? [] } : null; },
+  list: () => cache.customers.map((c) => ({ id: c.id, name: c.name, active: c.active !== false })),
+  upsertCustomers(lista) {
+    const r = { added: 0, updated: 0 };
+    for (const n of lista) {
+      const a = cache.customers.find((x) => x.id === n.id), { nifKeys: _k, ...resto } = n; // las huellas de NIF no se tocan en la demo
+      const clean = Object.fromEntries(Object.entries(resto).filter(([, v]) => v !== "" && v != null && !(Array.isArray(v) && !v.length)));
+      if (a) { r.updated++; escribe(backend.set("customers", a.id, { ...a, ...clean })); } else { r.added++; escribe(backend.set("customers", n.id, { specialPrices: {}, discounts: {}, orders: [], ...resto, nifKeys: [] })); }
+    }
+    return r;
+  },
+  setPurchases(porCliente) {
+    const r = { clientes: 0, lineas: 0, desconocidos: 0 };
+    for (const [cid, pedidos] of porCliente) {
+      if (!cache.customers.some((x) => x.id === String(cid))) { r.desconocidos++; continue; }
+      escribe(backend.set("customers", String(cid), { ...cache.customers.find((x) => x.id === String(cid)), orders: pedidos })); r.clientes++; r.lineas += pedidos.reduce((n, o) => n + o.lines.length, 0);
+    }
+    return r;
+  },
+};
+const actualizador = crearActualizador({ catalogDb: adaptCatalogo, customersDb: adaptClientes, accountsDb: { ensureMany: () => 0 } });
 window.VM = {
   business: BUSINESS.name,
   phone: PHONE,
@@ -389,6 +441,15 @@ window.VM = {
     if (!e) return null;
     const ids = new Set(e.orderIds);
     return buildExport(withRefs().filter((o) => ids.has(o.id)), e.fileName, { id });
+  },
+  /** Excel (productos, clientes o histórico) → { resumen, detalle, aviso, aplicable }. No escribe nada. */
+  vistaPrevia(tipo, bytes) { return actualizador.vistaPrevia(tipo, Buffer.from(bytes)); },
+  /** Aplica solo las diferencias del Excel. */
+  async aplicarDatos(tipo, bytes, fichero) {
+    if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para actualizar los datos.");
+    const r = actualizador.aplicar(tipo, Buffer.from(bytes), { fichero });
+    await Promise.all(pendientes.splice(0));
+    return r;
   },
   /** Borra SOLO los pedidos y las exportaciones (los de prueba): no toca clientes, productos, cuentas ni solicitudes. La numeración de pedidos vuelve a empezar. */
   async clearOrders() {

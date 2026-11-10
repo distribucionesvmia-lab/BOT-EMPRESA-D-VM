@@ -446,12 +446,21 @@
         <div class="vacio" id="sol-vacio" hidden>No hay solicitudes pendientes. Cuando un cliente solicite acceso y no coincida con la base de clientes, aparecerá aquí.</div>
       </div>
 
-      <div class="panel" id="p-clientes" hidden>
+      <div id="p-clientes" hidden>
+      <div class="panel" id="act-panel" style="margin-bottom:16px">
+        <h2>Actualizar datos desde Excel</h2>
+        <p class="msg">Sube el Excel de <b>productos</b>, <b>clientes</b> o <b>histórico</b>. Primero se enseñan los cambios respecto a lo que ya hay y, solo si confirmas, se aplican <b>únicamente las diferencias</b>. En esta demo se aplican sobre los datos de ejemplo.</p>
+        <div class="row2"><select id="ad-tipo" aria-label="Tipo de datos"><option value="productos">Productos</option><option value="clientes">Clientes</option><option value="historial">Histórico de compras</option></select><input type="file" id="ad-file" accept=".xlsx" aria-label="Archivo Excel"><button class="btn main" id="ad-ver" type="button">Ver cambios</button><button class="btn" id="ad-aplicar" type="button" hidden>Aplicar cambios</button></div>
+        <p class="msg" id="ad-msg" role="status"></p>
+        <div id="ad-res"></div>
+      </div>
+      <div class="panel">
         <h2>Clientes</h2>
         <p class="msg">La lista de clientes con la que el sistema comprueba las altas (nombre comercial o razón social, teléfono y correo).</p>
         <div class="row2" style="margin-bottom:10px"><input id="q-cli" type="search" placeholder="Buscar por nombre, código, población, teléfono o correo" aria-label="Buscar cliente" style="min-width:min(100%,380px)"><span class="msg" id="cli-total"></span></div>
         <div class="scroll"><table><thead><tr><th>Cód.</th><th>Cliente</th><th>Población</th><th>Teléfonos</th><th>Correo</th><th>App</th></tr></thead><tbody id="cli"></tbody></table></div>
         <div class="row2" style="margin-top:10px"><button class="btn" id="cli-ant" type="button">← Anterior</button><button class="btn" id="cli-sig" type="button">Siguiente →</button><span class="msg" id="cli-pag"></span></div>
+      </div>
       </div>
 
       <div class="panel" id="p-cuentas" hidden>
@@ -770,6 +779,40 @@ async function exportarPedidos(ids) {
 }
 $("exportar").onclick = () => exportarPedidos(null);
 $("exportar-sel").onclick = () => selOrd.size && exportarPedidos([...selOrd]);
+let adFichero = null;
+const adEt = { anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", desconocidos: "Clientes desconocidos (ignorados)", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
+function adPinta(r) {
+  const cont = $("ad-res"); cont.textContent = "";
+  const t = document.createElement("table"), tb = document.createElement("tbody"); t.appendChild(tb);
+  for (const [k, v] of Object.entries(r.resumen)) { const tr = document.createElement("tr"), a = document.createElement("td"), b = document.createElement("td"); a.textContent = adEt[k] ?? k; b.textContent = v; tr.append(a, b); tb.appendChild(tr); }
+  cont.appendChild(t);
+  for (const a of r.aviso ?? []) { const p = document.createElement("p"); p.className = "muted"; p.textContent = "Aviso: " + a; cont.appendChild(p); }
+  const fmt = (v) => (v === null || v === undefined || v === "" ? "—" : typeof v === "boolean" ? (v ? "sí" : "no") : String(v));
+  for (const [grupo, filas] of Object.entries(r.detalle ?? {})) {
+    if (!filas.length) continue;
+    const d = document.createElement("details"), s = document.createElement("summary"); s.textContent = `${adEt[grupo] ?? grupo} (primeros ${filas.length})`; d.appendChild(s);
+    const ul = document.createElement("ul");
+    for (const f of filas) {
+      const li = document.createElement("li");
+      li.textContent = `${f.id ?? ""} ${f.nombre ?? f.name ?? ""}` + (f.precio != null ? ` · ${f.precio} €` : "") + (f.motivo ? ` · ${f.motivo}` : "") + (f.pct != null ? `: ${f.antes} → ${f.despues} (${f.pct.toFixed(0)} %)` : "") + (f.pedidosNuevos != null ? ` · ${f.pedidosNuevos} pedidos nuevos` : "") + (f.cambios ? ": " + f.cambios.map((c) => `${c.campo} ${fmt(c.antes)} → ${fmt(c.despues)}`).join("; ") : "");
+      ul.appendChild(li);
+    }
+    d.appendChild(ul); cont.appendChild(d);
+  }
+}
+$("ad-ver").onclick = async () => {
+  adFichero = $("ad-file").files[0]; $("ad-aplicar").hidden = true; $("ad-res").textContent = "";
+  if (!adFichero) { $("ad-msg").textContent = "Elige primero el archivo Excel."; return; }
+  $("ad-ver").disabled = true; $("ad-msg").textContent = "Comparando con lo que hay…";
+  try { const j = { ok: true, ...VM.vistaPrevia($("ad-tipo").value, new Uint8Array(await adFichero.arrayBuffer())) }; adPinta(j); $("ad-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : "No hay cambios que aplicar (o hay un aviso que lo impide)."; $("ad-aplicar").hidden = !j.aplicable; }
+  catch (e) { $("ad-msg").textContent = e.message; } finally { $("ad-ver").disabled = false; }
+};
+$("ad-aplicar").onclick = async () => {
+  if (!confirm("¿Aplicar estos cambios? Solo se escribirán las diferencias.")) return;
+  $("ad-aplicar").disabled = true; $("ad-msg").textContent = "Aplicando…";
+  try { const j = await VM.aplicarDatos($("ad-tipo").value, new Uint8Array(await adFichero.arrayBuffer()), adFichero.name); const { resumen, ...r } = j; delete r.ok; delete r.tipo; $("ad-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${k} ${v}`).join(" · "); $("ad-aplicar").hidden = true; $("ad-res").textContent = ""; $("ad-file").value = ""; }
+  catch (e) { $("ad-msg").textContent = e.message; } finally { $("ad-aplicar").disabled = false; }
+};
 let confirmBorrar = null;
 $("borrar-pedidos").onclick = async () => {
   const b = $("borrar-pedidos");

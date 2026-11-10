@@ -13,7 +13,7 @@ const dist = path.join(here, "dist");
 fs.mkdirSync(dist, { recursive: true });
 
 const bundle = path.join(dist, "bundle.js");
-execFileSync("npx", ["--yes", "esbuild@0.28.2", path.join(here, "entry.js"), "--bundle", "--format=iife", "--minify", "--target=es2020", `--outfile=${bundle}`], { stdio: "inherit" });
+execFileSync("npx", ["--yes", "esbuild@0.28.2", path.join(here, "entry.js"), "--bundle", "--format=iife", "--minify", "--target=es2020", `--inject:${path.join(here, "node-shims.js")}`, `--alias:node:zlib=${path.join(here, "node-shims.js")}`, `--alias:node:crypto=${path.join(here, "node-shims.js")}`, `--alias:node:fs=${path.join(here, "fs-shim.js")}`, `--alias:node:path=${path.join(here, "fs-shim.js")}`, "--define:process.argv=[]", "--external:node:sqlite", "--log-level=error", "--define:process.env.CATALOG_DB=undefined", "--define:process.env.NIF_PEPPER=undefined", `--outfile=${bundle}`], { stdio: "inherit" });
 
 // La mini-aplicación de pedido es la misma pedido.html del servidor; su fetch se redirige a la demo por postMessage
 const shim = `<script>(()=>{const w=new Map();let n=0;

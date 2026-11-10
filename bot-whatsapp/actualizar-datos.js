@@ -15,7 +15,7 @@ export const TIPOS = ["productos", "clientes", "historial"];
 const mismo = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const claveHistorial = (o) => `${o.date}|${o.doc}|${[...o.lines].map((l) => `${l.productId}x${l.qty}`).sort().join(",")}`;
 
-export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir = null, familias = {}, registro = () => {}, onChange = () => {} }) {
+export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir = null, copiaCatalogo = null, familias = {}, registro = () => {}, onChange = () => {} }) {
   // ---------- productos ----------
   function productos(buf) {
     const { productos: lista, sinPrecioIds, fotos } = leerExcel(buf);
@@ -149,7 +149,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     aplicar(tipo, buf, { fichero = "" } = {}) {
       const p = preparar(tipo, buf);
       if (!p.aplicable) throw new Error(p.aviso.find((a) => /No se puede aplicar|no se pueden añadir/.test(a)) ?? "No hay nada que aplicar.");
-      if (tipo === "productos") try { catalogDb.backupTo?.(`${process.env.CATALOG_DB ?? "catalogo.sqlite"}.antes-${new Date().toISOString().replace(/[:.]/g, "-")}.bak`); } catch { /* sin copia no se bloquea */ }
+      if (tipo === "productos" && copiaCatalogo) try { catalogDb.backupTo(`${copiaCatalogo}.antes-${new Date().toISOString().replace(/[:.]/g, "-")}.bak`); } catch { /* sin copia no se bloquea */ }
       const r = p.aplicar();
       registro({ at: new Date().toISOString(), tipo, fichero, resumen: p.resumen, resultado: r });
       onChange(tipo);

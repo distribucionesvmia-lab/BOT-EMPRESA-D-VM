@@ -348,7 +348,7 @@ if (adminEnabled) {
 }
 const dbsAdmin = adminEnabled ? getDatabases() : null;
 const actualizador = adminEnabled ? crearActualizador({
-  catalogDb: dbsAdmin.catalogDb, customersDb: dbsAdmin.customersDb, accountsDb: getAccountsDb(), imgDir: process.env.IMG_DIR ?? new URL("./imagenes/", import.meta.url).pathname,
+  catalogDb: dbsAdmin.catalogDb, customersDb: dbsAdmin.customersDb, accountsDb: getAccountsDb(), imgDir: process.env.IMG_DIR ?? new URL("./imagenes/", import.meta.url).pathname, copiaCatalogo: process.env.CATALOG_DB ?? "catalogo.sqlite",
   familias: (() => { try { return JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8")); } catch { return {}; } })(),
   registro: (e) => { try { fs.appendFileSync(nodePath.join(nodePath.dirname(process.env.CUSTOMERS_DB ?? "clientes.sqlite"), "actualizaciones.log"), JSON.stringify(e) + "\n"); } catch { /* el registro nunca bloquea */ } },
   onChange: () => { imgAt = 0; refreshCatalog().catch(console.error); },
