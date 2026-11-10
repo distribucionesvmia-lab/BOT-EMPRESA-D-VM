@@ -301,6 +301,9 @@
   form.send button:active { transform: scale(.92); }
   .sheet { border-radius: 24px 24px 0 0; } .row { padding: 14px 16px; }
   @media (max-width: 560px) { .phone { border-radius: 0; box-shadow: none; } }
+  .datos-wrap { display:grid; gap:16px; }
+  .datos-wrap[hidden] { display:none; }
+  .pasoDx { background:#e8f4ee; color:#0b6e4f; border-radius:999px; padding:6px 12px; font-size:13px; font-weight:700; }
 </style>
 
 <button type="button" class="tecnico-btn" id="tecnico-btn">Técnico</button>
@@ -433,7 +436,8 @@
         <button class="tab" role="tab" type="button" data-t="clientes" aria-selected="false">Clientes</button>
         <button class="tab" role="tab" type="button" data-t="historial" aria-selected="false">Historial de clientes</button>
         <button class="tab" role="tab" type="button" data-t="cuentas" aria-selected="false">Cuentas de clientes <span class="cnt" id="n-cue" hidden></span></button>
-        <button class="tab" role="tab" type="button" data-t="datos" aria-selected="false">Productos</button>
+        <button class="tab" role="tab" type="button" data-t="bases" aria-selected="false">Productos</button>
+        <button class="tab" role="tab" type="button" data-t="datos" aria-selected="false">📥 Datos y Excel</button>
       </div>
 
       <div id="p-pedidos" style="display:grid;gap:16px">
@@ -471,13 +475,6 @@
       </div>
 
       <div id="p-clientes" hidden>
-      <div class="panel" id="act-panel" style="margin-bottom:16px">
-        <h2>Actualizar datos desde Excel</h2>
-        <p class="msg">Sube el Excel de <b>productos</b> o de <b>clientes</b>. Primero se enseñan los cambios respecto a lo que ya hay y, solo si confirmas, se aplican <b>únicamente las diferencias</b>. En esta demo se aplican sobre los datos de ejemplo.</p>
-        <div class="row2"><select id="ad-tipo" aria-label="Tipo de datos"><option value="productos">Productos</option><option value="clientes">Clientes</option></select><input type="file" id="ad-file" accept=".xlsx" aria-label="Archivo Excel"><button class="btn main" id="ad-ver" type="button">Ver cambios</button><button class="btn" id="ad-aplicar" type="button" hidden>Aplicar cambios</button></div>
-        <p class="msg" id="ad-msg" role="status"></p>
-        <div id="ad-res"></div>
-      </div>
       <div class="panel">
         <h2>Clientes</h2>
         <p class="msg">La lista de clientes con la que el sistema comprueba las altas (nombre comercial o razón social, teléfono y correo).</p>
@@ -487,19 +484,21 @@
       </div>
       </div>
 
+      <div id="p-datos" class="datos-wrap" hidden>
+        <div class="panel">
+          <h2>Datos y Excel</h2>
+          <p class="msg">Sube aquí los Excel de a3ERP (y las fotos). Siempre pasa lo mismo: <b>1</b> eliges el archivo, <b>2</b> «Ver cambios» te enseña qué se añade, qué cambia y qué se quita <b>sin tocar nada</b>, y <b>3</b> «Aplicar cambios» escribe solo las diferencias. Orden recomendado la primera vez: <b>clientes → productos → historial → fotos</b>. En esta demo se aplica sobre los datos de ejemplo.</p>
+          <div class="row2"><span class="pasoDx">1 · Elige el archivo</span><span class="pasoDx">2 · Revisa los cambios</span><span class="pasoDx">3 · Aplica</span></div>
+        </div>
+        <div id="dx-tarjetas" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px;align-items:start"></div>
+      </div>
+
       <div class="panel" id="p-cuentas" hidden>
         <h2>Cuentas de clientes</h2>
         <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
       </div>
 
       <div id="p-historial" hidden style="display:grid;gap:16px">
-        <div class="panel" id="hi-panel">
-          <h2>Subir historial de clientes</h2>
-          <p class="msg">Sube el Excel con las compras de los clientes (columnas «Cód. cliente», «Fecha», «Documento», «Cód. artículo» y «Cantidad»). Cada línea se <b>relaciona con su cliente por el código</b>: ese historial es el que le sale al cliente en «Histórico» y «Último pedido». Antes de aplicar se enseña a qué clientes afecta y qué códigos no existen. Los clientes tienen que estar ya cargados.</p>
-          <div class="row2"><select id="hi-tipo" aria-label="Tipo de datos" hidden><option value="historial">Histórico de compras</option></select><input type="file" id="hi-file" accept=".xlsx" aria-label="Archivo Excel del historial"><button class="btn main" id="hi-ver" type="button">Ver cambios</button><button class="btn" id="hi-aplicar" type="button" hidden>Aplicar cambios</button></div>
-          <p class="msg" id="hi-msg" role="status"></p>
-          <div id="hi-res"></div>
-        </div>
         <div class="panel">
           <h2>Historial por cliente</h2>
           <div class="row2" style="margin-bottom:10px"><input id="q-his" type="search" placeholder="Buscar cliente por nombre o código" aria-label="Buscar cliente" style="min-width:min(100%,380px)"><span class="msg" id="his-total"></span></div>
@@ -509,7 +508,7 @@
         </div>
       </div>
 
-      <div class="panel" id="p-datos" hidden>
+      <div class="panel" id="p-bases" hidden>
         <h2>Productos que consulta el bot</h2>
         <div class="tabs" role="tablist">
           <button class="tab dbtab" type="button" role="tab" data-db="productos" aria-selected="true">Productos</button>
@@ -742,7 +741,7 @@ $("f").addEventListener("submit", (e) => { e.preventDefault(); const v = t.value
 document.querySelectorAll(".dis-grid > .tabs .tab").forEach((b) => (b.onclick = () => { empTab = b.dataset.t; pintarTabs(); }));
 function pintarTabs() {
   document.querySelectorAll(".dis-grid > .tabs .tab").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.t === empTab)));
-  $("p-pedidos").hidden = empTab !== "pedidos"; $("p-solicitudes").hidden = empTab !== "solicitudes"; $("p-cuentas").hidden = empTab !== "cuentas"; $("p-clientes").hidden = empTab !== "clientes"; $("p-datos").hidden = empTab !== "datos"; $("p-historial").hidden = empTab !== "historial";
+  $("p-pedidos").hidden = empTab !== "pedidos"; $("p-solicitudes").hidden = empTab !== "solicitudes"; $("p-cuentas").hidden = empTab !== "cuentas"; $("p-clientes").hidden = empTab !== "clientes"; $("p-bases").hidden = empTab !== "bases"; $("p-datos").hidden = empTab !== "datos"; if (empTab === "datos") ultimasSubidas(); $("p-historial").hidden = empTab !== "historial";
 }
 function mostrarPin(texto, pin) { const p = $("pin"); p.hidden = false; p.textContent = texto + " "; p.appendChild(el("b", pin)); p.appendChild(el("span", " — anótalo ahora y díselo al cliente: no se volverá a mostrar.")); }
 
@@ -883,8 +882,22 @@ $(p + "-aplicar").onclick = async () => {
   catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-aplicar").disabled = false; }
 };
 }
-montarExcel("ad", () => pintarClientes());
-montarExcel("hi", () => pintarHistorial());
+const TIPOS_DX = [
+  { p: "px", tipo: "productos", icono: "🏷️", titulo: "Productos y precios", acepta: ".xlsx", desc: "Añade los productos nuevos, actualiza precios, IVA, unidades por caja y categorías, y retira los que ya no vienen (pasan a inactivos, no se borran).", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Cód. familia" },
+  { p: "cl", tipo: "clientes", icono: "👥", titulo: "Clientes", acepta: ".xlsx", desc: "Crea los clientes nuevos (con su cuenta) y actualiza nombre, dirección, teléfonos y correos. Los que no vienen en el Excel no se dan de baja solos.", cols: "Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto" },
+  { p: "hi", tipo: "historial", icono: "🧾", titulo: "Historial de compras", acepta: ".xlsx", desc: "Relaciona cada compra con su cliente por el código. Cada cliente conserva sus 10 últimos pedidos. Sube antes el Excel de clientes.", cols: "Cliente · Fecha · Nº Documento · Artículo · Unidades" },
+  { p: "fo", tipo: "fotos", icono: "🖼️", titulo: "Fotos de productos (ZIP)", acepta: ".zip", desc: "Un ZIP con una foto por producto, con el código como nombre (11098.jpg), en cualquier carpeta. Si trae un Excel de control con la columna «tipo» (IA), avisa en el catálogo de las fotos creadas con IA.", cols: "Archivos .jpg, .png o .webp (mejor de 800 px o más)" },
+];
+const ultSubida = {};
+function ultimasSubidas() { for (const t of TIPOS_DX) $(t.p + "-ult").textContent = ultSubida[t.tipo] ? "Última subida: " + ultSubida[t.tipo] : "Todavía no se ha subido ninguno (en esta demo)."; }
+for (const t of TIPOS_DX) {
+  const c = document.createElement("div"); c.className = "panel";
+  c.innerHTML = `<h2>${t.icono} ${t.titulo}</h2><p class="msg">${t.desc}</p><p class="msg" style="font-size:13px"><b>Columnas:</b> ${t.cols}</p><p class="msg" id="${t.p}-ult" style="font-size:13px"></p><input type="hidden" id="${t.p}-tipo" value="${t.tipo}"><div class="row2"><input type="file" id="${t.p}-file" accept="${t.acepta}" aria-label="Archivo de ${t.titulo}"><button class="btn main" id="${t.p}-ver" type="button">Ver cambios</button><button class="btn" id="${t.p}-aplicar" type="button" hidden>Aplicar cambios</button></div><p class="msg" id="${t.p}-msg" role="status"></p><div id="${t.p}-res"></div>`;
+  $("dx-tarjetas").appendChild(c);
+  montarExcel(t.p, () => { ultSubida[t.tipo] = new Date().toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }); ultimasSubidas(); pintarClientes(); pintarHistorial(); });
+  $(t.p + "-ver").addEventListener("click", () => { c.style.gridColumn = "1 / -1"; });
+}
+ultimasSubidas();
 let confirmBorrar = null;
 $("borrar-pedidos").onclick = async () => {
   const b = $("borrar-pedidos");
@@ -984,7 +997,7 @@ function pintarTodo() {
   pintarTabs(); contadores(); pintarPedidos(); pintarHistorial(); pintarCuentas();
   if (!enUso("p-clientes")) pintarClientes();
   if (!enUso("p-solicitudes")) pintarSolicitudes();
-  if (!enUso("p-datos")) pintarBd();
+  if (!enUso("p-bases")) pintarBd();
   if (!enUso("p-historial")) pintarHistorial();
 }
 VM.onChange(() => { if (pending) return; pending = true; requestAnimationFrame(() => { pending = false; avisos(); pintarTodo(); if (!$("v-cliente").hidden) pantallaCliente(); }); });
