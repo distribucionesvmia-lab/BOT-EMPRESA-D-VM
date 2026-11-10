@@ -410,6 +410,9 @@ const isJson = (req) => /^application\/json/i.test(req.headers["content-type"] ?
 
 async function appRoutes(req, res, url) {
   const p = url.pathname;
+  // Instalar la web como app (PWA): manifiesto, iconos y service worker (públicos: no llevan datos)
+  const PWA = { "/manifest.webmanifest": ["manifest.webmanifest", "application/manifest+json"], "/icono-192.png": ["icono-192.png", "image/png"], "/icono-512.png": ["icono-512.png", "image/png"], "/sw.js": ["sw.js", "text/javascript; charset=utf-8"] };
+  if (PWA[p] && req.method === "GET") return void res.writeHead(200, { "Content-Type": PWA[p][1], "Cache-Control": p === "/sw.js" ? "no-cache" : "public, max-age=86400", "X-Content-Type-Options": "nosniff", ...(p === "/sw.js" ? { "Service-Worker-Allowed": "/" } : {}) }).end(fs.readFileSync(new URL(`./pwa/${PWA[p][0]}`, import.meta.url)));
   if (p === "/robots.txt") return void res.writeHead(200, { "Content-Type": "text/plain" }).end("User-agent: *\nDisallow: /\n"); // que Google no indexe nada
   if (p === "/") {
     if (!String(req.headers.accept ?? "").includes("text/html")) return void res.end("Bot activo");
@@ -498,7 +501,7 @@ async function appRoutes(req, res, url) {
 http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://x");
-    if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/img/")) {
+    if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/img/")) {
       appRoutes(req, res, url).catch((err) => {
         console.error(err);
         if (!res.headersSent) res.writeHead(500).end();

@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#d90000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pedidos VM">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="/icono-192.png">
 <title>Pedidos · Distribuciones VM</title>
 <style>
   :root { --bg:#eef1ee; --panel:#fff; --fg:#17211c; --muted:#5d6b63; --line:#dbe2dd; --accent:#d90000; --accent-fg:#fff; --chat:#e9e3da; --in:#fff; --out:#d6f0cf; --bar:#a80000; --err:#a12d2d; }
@@ -222,6 +229,9 @@
           <li><span>Marca las cantidades y usa el filtro <b>«Solo con cantidad»</b> para ver solo lo que llevas. Revisa el carrito, añade tus <b>observaciones</b> si las necesitas y confirma el pedido.</span></li>
         </ol>
       </section>
+      <details class="vm-card" id="instalar" style="font-size:14px"><summary style="cursor:pointer;font-weight:600">📱 Instalar en el móvil como app</summary>
+        <p style="margin:8px 0 0"><b>iPhone:</b> abre esta página en Safari, pulsa el botón Compartir y elige «Añadir a pantalla de inicio».<br><b>Android:</b> en Chrome, menú ⋮ → «Instalar aplicación» (o «Añadir a pantalla de inicio»).</p>
+        <button class="vm-btn ghost" type="button" id="instalar-btn" hidden style="margin-top:8px">Instalar ahora</button></details>
       <p class="foot">Distribuciones Valentín · Medina del Campo</p>
     </div>
   </section>
@@ -419,6 +429,13 @@ function entrar(nombre) { $("cli").textContent = nombre; chat.innerHTML = ""; ve
   const r = await fetch("/api/yo");
   if (r.ok) entrar((await r.json()).cliente.nombre); else ver("acceso");
 })();
+</script>
+<script>
+// Instalar como app: registra el service worker y, en Android/Chrome, ofrece el botón «Instalar ahora»
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+let instalacion = null;
+addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); instalacion = e; const b = document.getElementById("instalar-btn"); if (b) b.hidden = false; });
+document.getElementById("instalar-btn")?.addEventListener("click", async () => { if (!instalacion) return; instalacion.prompt(); await instalacion.userChoice.catch(() => {}); instalacion = null; document.getElementById("instalar-btn").hidden = true; });
 </script>
 </body>
 </html>

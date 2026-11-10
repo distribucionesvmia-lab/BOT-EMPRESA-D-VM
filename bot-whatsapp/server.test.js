@@ -527,3 +527,16 @@ test("PRIVACIDAD: la pantalla de acceso y la de alta llevan la información de p
   assert.match(html, /Tu DNI\/CIF no se guarda/);
   assert.doesNotMatch(html, /data-privacidad/);
 });
+
+test("APP EN EL MÓVIL: manifiesto, iconos y service worker públicos, y la página los enlaza", async () => {
+  const m = await fetch(`${BASE}/manifest.webmanifest`);
+  assert.equal(m.status, 200);
+  const man = await m.json();
+  assert.equal(man.display, "standalone");
+  assert.equal(man.start_url, "/cliente");
+  for (const ic of man.icons) { const r = await fetch(BASE + ic.src); assert.equal(r.status, 200); assert.equal(r.headers.get("content-type"), "image/png"); }
+  const sw = await fetch(`${BASE}/sw.js`);
+  assert.equal(sw.status, 200);
+  assert.match(await sw.text(), /addEventListener\("fetch"/);
+  assert.match(await (await fetch(`${BASE}/cliente`)).text(), /rel="manifest"/);
+});
