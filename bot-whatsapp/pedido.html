@@ -233,6 +233,67 @@
   .screen .body, .screen > .box { padding-left:max(0px, calc((100% - 860px) / 2)); padding-right:max(0px, calc((100% - 860px) / 2)); }
   .screen > .box { padding-top:14px; padding-bottom:14px; }
   .screen .body[style*="padding:14px"] { padding-left:max(14px, calc((100% - 860px) / 2)) !important; padding-right:max(14px, calc((100% - 860px) / 2)) !important; }
+
+  /* ── Diseño moderno: tarjetas con sombra suave, controles redondeados, pie translúcido y toques más ágiles ── */
+  :root { --fondo:#f2f3f5; --sombra:0 1px 2px rgba(16,24,40,.06), 0 6px 18px rgba(16,24,40,.07); }
+  body { font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+  button, .p, .cat, .sub, .av { touch-action:manipulation; } /* sin el retardo de 300 ms al tocar en el móvil */
+  main, .screen .body { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+  header { background:linear-gradient(135deg,#e5101f 0%,#b30010 100%); border-radius:0 0 22px 22px; box-shadow:0 6px 18px rgba(179,0,16,.28); position:relative; z-index:3; padding-bottom:14px; }
+  .cartbtn { box-shadow:0 4px 12px rgba(0,0,0,.16); border-radius:999px; }
+  .paso { padding-top:14px; }
+  .tabs { background:#e8eaee; border-radius:16px; padding:4px; margin:6px max(14px, calc((100% - 860px) / 2)) 10px; gap:4px; }
+  .tabs button.tab { border:0; background:transparent; border-radius:12px; min-height:42px; transition:background .2s, color .2s, box-shadow .2s; }
+  .tabs button.tab.on { background:#fff; color:var(--rojo-o); box-shadow:0 1px 4px rgba(16,24,40,.18); }
+  .buscar input { border:1px solid #dcdfe5; border-radius:16px; background:#fff; box-shadow:0 1px 2px rgba(16,24,40,.05); font-size:17px; transition:border-color .2s, box-shadow .2s; }
+  .buscar input:focus { border-color:var(--rojo); box-shadow:0 0 0 4px rgba(217,0,0,.12); }
+  .filbar .fil { border-width:1px; border-radius:999px; }
+  main { background:var(--fondo); border-top:0; padding-top:4px; }
+  .p { margin:10px 12px; padding:12px; border:1px solid #e9ebef; border-left-width:1px; border-radius:22px; background:#fff; box-shadow:var(--sombra); content-visibility:auto; contain-intrinsic-size:auto 150px; transition:box-shadow .2s, border-color .2s, background-color .2s; }
+  .p.sel { background:#fffafa; border-color:rgba(217,0,0,.5); box-shadow:0 0 0 3px rgba(217,0,0,.1), var(--sombra); }
+  .av { border-radius:18px; background-color:#f6f7f9; }
+  .av img { border-radius:18px; padding:3px; }
+  .info .n { font-weight:650; letter-spacing:-.01em; }
+  .pr b { font-size:20px; letter-spacing:-.02em; }
+  .chip { border-radius:999px; min-height:36px; padding:4px 12px; }
+  .ctl { border:0; background:#f4f5f7; border-radius:18px; padding:8px; }
+  .p.sel .ctl { background:#fff1f1; }
+  .add { border-radius:14px; background:linear-gradient(#ef1f1f,#cf0000); box-shadow:0 6px 14px rgba(217,0,0,.28); transition:transform .12s, box-shadow .12s; }
+  .add:active { transform:scale(.96); box-shadow:0 2px 6px rgba(217,0,0,.25); }
+  .step { border-width:1.5px; border-radius:14px; }
+  .ud { border-width:1px; border-radius:12px; background:#fff; }
+  footer { background:linear-gradient(rgba(242,243,245,0), rgba(242,243,245,.94) 34%); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px); }
+  .big { border-radius:18px; background:linear-gradient(#ef1f1f,#cf0000); box-shadow:0 10px 22px rgba(217,0,0,.32); min-height:58px; transition:transform .12s, box-shadow .12s, opacity .2s; }
+  .big:active { transform:scale(.985); box-shadow:0 4px 10px rgba(217,0,0,.28); }
+  .big:disabled { background:#c9cbcf; box-shadow:none; }
+  .big.sec { background:#fff; box-shadow:none; border-width:1.5px; }
+  .cat, .sub { border-radius:22px; box-shadow:var(--sombra); border:1px solid #e9ebef; }
+  .screen .head { background:linear-gradient(135deg,#e5101f 0%,#b30010 100%); border-radius:0 0 22px 22px; box-shadow:0 6px 18px rgba(179,0,16,.25); position:relative; z-index:2; }
+  .screen .head button { border-radius:16px; }
+  .cartfoot { box-shadow:0 -8px 24px rgba(16,24,40,.08); border-top:0; border-radius:22px 22px 0 0; }
+  .card, .box { border-radius:20px; }
+
+  /* Móvil: foto + datos arriba y el recuadro de compra debajo, a todo el ancho (el nombre del producto deja de partirse en 6 líneas) */
+  @media (max-width:560px) {
+    .p { grid-template-columns:92px 1fr; grid-template-areas:"av info" "ctl ctl"; gap:10px 12px; margin:8px 10px; padding:12px; contain-intrinsic-size:auto 210px; }
+    .p .av { grid-area:av; width:92px; height:92px; align-self:start; }
+    .p .info { grid-area:info; }
+    .p .ctl { grid-area:ctl; width:auto; flex-direction:row; flex-wrap:wrap; align-items:center; gap:8px; padding:8px; }
+    .p .ctl .ud { flex:none; min-width:112px; }
+    .p .ctl .add, .p .ctl .step { flex:1 1 130px; min-width:0; }
+    .p .ctl .cap { flex:1 0 100%; padding:0; }
+    .info .n { font-size:16.5px; }
+  }
+
+  @media (max-width:560px) { /* más sitio para los productos: la zona de arriba ocupa menos */
+    .paso { padding:10px 16px 0; font-size:12px; }
+    .tabs { margin-top:4px; margin-bottom:8px; }
+    .tabs button.tab { min-height:40px; font-size:15px; }
+    .buscar { padding-bottom:8px; } .buscar input { min-height:44px; }
+    .filbar { padding-bottom:8px; } .filbar .fil { min-height:36px; font-size:14px; padding:0 14px; }
+    .repbar { padding-bottom:6px; } .repbar button { min-height:40px; font-size:15px; border-width:1.5px; }
+    header { padding-bottom:12px; }
+  }
 </style>
 </head>
 <body>
@@ -373,7 +434,7 @@ function setQty(id, n) {
 // Cambiar entre unidades y cajas conservando lo que se está pidiendo (nunca 24 uds → 24 cajas sin avisar)
 function cambiarUnidad(p, nueva) {
   const q = qty.get(p.id) || 0, ant = unit(p.id);
-  if (!q || ant === nueva) { unitOf.set(p.id, nueva); return refresh(); }
+  if (!q || ant === nueva) { unitOf.set(p.id, nueva); bumpId = p.id; return refresh(); }
   const k = p.unitsPerBox || 1;
   if (nueva === "ud") { unitOf.set(p.id, "ud"); return setQty(p.id, q * k); }
   const cajas = Math.ceil(q / k);
@@ -383,7 +444,12 @@ function cambiarUnidad(p, nueva) {
 // Carrito guardado en este navegador (24 h) para no perderlo al recargar
 const HORAS = 24;
 const clave = () => "vm_carrito_" + (location.pathname.startsWith("/pedido/") ? token : "c_" + data.customer.name);
-function guardar() {
+let tGuardar = 0;
+function guardar() { clearTimeout(tGuardar); tGuardar = setTimeout(guardarYa, 300); } // no se escribe en el móvil con cada pulsación
+addEventListener("pagehide", () => guardarYa());
+document.addEventListener("visibilitychange", () => { if (document.hidden) guardarYa(); });
+function guardarYa() {
+  clearTimeout(tGuardar);
   try {
     if (!qty.size) return localStorage.removeItem(clave());
     localStorage.setItem(clave(), JSON.stringify({ t: Date.now(), q: [...qty], u: [...unitOf], n: [...notes] }));
@@ -451,7 +517,7 @@ function verFoto(p) {
 }
 
 function row(p) {
-  const el = document.createElement("div"); el.className = "p" + (qty.get(p.id) > 0 ? " sel" : "");
+  const el = document.createElement("div"); el.className = "p" + (qty.get(p.id) > 0 ? " sel" : ""); el.dataset.id = p.id;
   const av = document.createElement("div"); av.className = "av"; av.style.background = hue(p.name); av.textContent = initials(p.name);
   if (p.img) { // foto del producto encima de las iniciales; si no carga, se queda el marcador
     const im = document.createElement("img"); im.src = p.img; im.alt = ""; im.decoding = "async"; im.loading = "lazy";
@@ -678,6 +744,7 @@ function renderCart() {
   if (!count()) showCart(false);
 }
 
+const productoPorId = new Map();
 function refresh() {
   guardar();
   const n = count();
@@ -687,8 +754,10 @@ function refresh() {
   $("verCarrito").textContent = n ? `🛒 Ver carrito · ${n} artículo${n === 1 ? "" : "s"} · ${eur(total())}` : "Añade productos para empezar";
   $("guia").innerHTML = n ? `✔ Llevas <b>${n} artículo${n === 1 ? "" : "s"}</b>. Cuando termines, pulsa el botón rojo de abajo.` : "Toca <b>«+ Añadir»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.";
   $("verCarrito").disabled = !n;
-  const scroll = $("list").scrollTop;
-  renderList(); $("list").scrollTop = scroll;
+  const fila = bumpId && !bumpFav && !(tab === "hab" && soloCantidad) ? $("list").querySelector(`.p[data-id="${CSS.escape(bumpId)}"]`) : null;
+  const prod = fila && productoPorId.get(bumpId);
+  if (fila && prod) fila.replaceWith(row(prod)); // cambio de cantidad: solo se repinta ese producto (antes se repintaba toda la lista, fotos incluidas)
+  else { const scroll = $("list").scrollTop; renderList(); $("list").scrollTop = scroll; }
   if (!$("cart").hidden) renderCart();
   bumpId = null; bumpFav = null;
 }
@@ -742,7 +811,8 @@ $("repOk").onclick = () => {
   aviso(ids.size ? `Añadidos ${ids.size} artículo${ids.size === 1 ? "" : "s"}. Revisa el carrito antes de finalizar.` : "No has marcado ningún artículo.");
 };
 $("fil").onclick = () => { soloCantidad = !soloCantidad; renderList(); }; // ida y vuelta
-$("q").oninput = e => { query = e.target.value; limite = 150; renderList(); };
+let tBusca = 0;
+$("q").oninput = e => { query = e.target.value; limite = 150; clearTimeout(tBusca); tBusca = setTimeout(renderList, 140); };
 $("verCarrito").onclick = $("cartIcon").onclick = () => count() && showCart(true);
 $("back").onclick = $("keep").onclick = () => showCart(false);
 
@@ -874,6 +944,7 @@ const obs = new MutationObserver(capasCambian);
   const r = await fetch(location.pathname + "/datos").catch(() => null);
   if (!r || !r.ok) { $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 primeros dígitos de tu DNI</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
   data = await r.json();
+  data.products.forEach(p => productoPorId.set(p.id, p));
   document.title = "Pedido a " + data.business;
   $("ttl").textContent = "Hola, " + data.customer.name;
   $("sub").textContent = "Haz tu pedido a " + data.business;

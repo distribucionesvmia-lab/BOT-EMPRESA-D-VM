@@ -24,3 +24,8 @@ Hay un ensayo automático (`restaurar.test.js`): se llenan las 4 bases, se hace 
 - Los números se leen igual en formato español y en inglés (`1.234,56` y `1,234.56`); los precios con ruido (`4,9950000000000001`) se guardan como 4,995.
 - **Hay que confirmar antes de aplicar** si algún precio cambia más de un 25 %, si se quitan muchos productos (≥ 5 y más del 10 %) o si hay datos raros. Sin confirmar no se escribe nada.
 - Un Excel con menos de la mitad de los productos actuales se rechaza. Solo se escriben las diferencias y cada cambio queda registrado.
+
+## Fluidez y diseño en el móvil (enlace del cliente)
+- Al cambiar una cantidad solo se repinta ese producto (antes se repintaba la lista entera, fotos incluidas): unos 20 ms por toque con 150 productos en pantalla. La búsqueda espera 140 ms al teclear y el borrador del pedido se guarda en el móvil con 300 ms de retardo (y al salir de la página).
+- Las filas fuera de pantalla no se calculan (`content-visibility`), los botones no tienen el retardo de 300 ms del toque y las listas no «rebotan» al llegar al final.
+- Diseño: tarjetas con sombra suave y esquinas redondeadas, pestañas tipo selector, cabecera con degradado, pie translúcido, botones con efecto al pulsar; en móvil cada producto muestra la foto y los datos arriba y los controles debajo a todo el ancho; los campos de texto son de 16 px (el iPhone no hace zoom al escribir). El chat tiene las mismas formas.
