@@ -48,6 +48,10 @@ function onData(coll, rows) {
   // Vista previa con la tarifa real: si la página trae una (build con TARIFA_JSON), sustituye a los productos de ejemplo (solo lectura)
   if (coll === "products" && globalThis.__VM_TARIFA__ && rows.length < 200) rows = // solo mientras la base tenga los productos de ejemplo: cuando se cargan los reales (#cargar-datos) mandan los de la base
     globalThis.__VM_TARIFA__.map((p) => ({ ...p, unitsPerBox: p.unitsPerBox ?? null, discount: p.discount ?? 0, updatedAt: null, changes: [] }));
+  if (coll === "products" && globalThis.__VM_TARIFA__ && rows.length >= 200) { // base ya con los productos reales: las categorías por tipo de producto de esta vista mandan sobre las guardadas
+    const cats = new Map(globalThis.__VM_TARIFA__.map((p) => [String(p.id), p]));
+    rows = rows.map((r) => { const c = cats.get(String(r.id)); return c?.category ? { ...r, category: c.category, subcategory: c.subcategory } : r; });
+  }
   if (coll === "customers" && globalThis.__VM_HISTORIAL__) rows = conHistorial(rows, globalThis.__VM_HISTORIAL__); // histórico puesto a mano a clientes concretos (p. ej. un cliente de prueba)
   if (coll === "customers" && globalThis.__VM_PRUEBA__) rows = [...rows, ...globalThis.__VM_PRUEBA__.filter((p) => !rows.some((c) => c.id === p.id))]; // clientes falsos de prueba (solo en la vista)
   cache[coll] = rows;

@@ -90,17 +90,18 @@ const AFINAR = {
 
 // 3) Sin familia: palabras del nombre (en este orden)
 const REGLAS_GENERALES = [
+  R(/^(?!.*\b(yogur|yogures|natilla|natillas|flan|leche|batido|postre|cuajada|gazpacho|zumo|helado|cerveza|vino|refresco|cafe)\b).*\b(vasos?|copas?|platos?|bowls?|cuchillos?|tenedor(es)?|cucharas?|cucharillas?|tazas?|mantel(es)?|servilletas?|bobinas?|portabobinas|brochetas?|ceniceros?|flaneros?|rollos? (mantel|papel|higienico|aluminio)|fregonas?|sartenes|sarten|ollas?|cazuelas?|bandejas?|ensaladeras?|cazos?|escobas?|bayetas?|estropajos?|guantes?|estuches?|jarras?|fuentes?|cubiertos?|delantal(es)?)\b/, "Hostelería y menaje", null), // menaje claro por el nombre
   R(/croissant|napolitana/, "Congelados", "Croissants y napolitanas"), // antes que «mantequilla» (un croissant de mantequilla no es mantequilla)
   R(/cerveza|\bcerv\b|radler|lager|\bcana\b.*alhambra/, "Bebidas", "Cervezas"),
-  R(/ron |ginebra|whisky|vodka|licor|brandy|anis\b|pacharan|coñac|conac|tequila|vermut|aguardiente|orujo|crema de orujo/, "Bebidas", "Licores y destilados"),
-  R(/refresco|\bcola\b|fanta|limonada|tonica|isotonic|energetic|gaseosa|nestea|aquarius|schweppes|red bull|kas\b|fuze/, "Bebidas", "Refrescos y tés fríos"),
+  R(/\bron\b|ginebra|whisky|vodka|licor|brandy|\banis\b|pacharan|coñac|conac|tequila|vermut|aguardiente|orujo|crema de orujo/, "Bebidas", "Licores y destilados"),
+  R(/refresco|\bcola\b|fanta|limonada|tonica|isotonic|energetic|gaseosa|nestea|aquarius|schweppes|red bull|\bkas\b|fuze/, "Bebidas", "Refrescos y tés fríos"),
   R(/zumo|nectar|bifrutas/, "Bebidas", "Zumos y néctares"),
   R(/\bvino\b|bornos|verdejo|tinto|blanco|rosado|crianza|reserva|\bcava\b|pazos|rioja|ribera|albarino|tempranillo|sauvignon/, "Vinos", "Otros vinos"),
   R(/bezoya/, "Aguas", "Bezoya"), R(/aquarel/, "Aguas", "Nestlé Aquarel"), R(/pedras/, "Aguas", "Pedras"), R(/pellegrino/, "Aguas", "S.Pellegrino"), R(/perrier/, "Aguas", "Perrier"),
   R(/garrafa agua|dispensador|bidon/, "Aguas", "Garrafas y dispensadores"),
   R(/\bagua\b|\baguas\b|mineral|con gas|sin gas/, "Aguas", "Otras aguas"),
   R(/vivesoy|bebida de (avena|almendra|soja|centeno|arroz)|bebida vegetal/, "Pascual", "Bebidas vegetales"),
-  R(/descafe|sin pausa/, "Café", "Café descafeinado"), R(/capsula/, "Café", "Cápsulas"), R(/infusi|\bte\b|manzanilla|poleo|tila|twinings/, "Café", "Infusiones y té"),
+  R(/descafe|sin pausa/, "Café", "Café descafeinado"), R(/capsula/, "Café", "Cápsulas"), R(/infusi|\bte\b|manzanilla|\bpoleo\b|\btila\b|twinings/, "Café", "Infusiones y té"),
   R(/mocay|\bcafe\b|maestro|barista/, "Café", "Café en grano y molido"),
   R(/sin lactosa/, "Pascual", "Leche sin lactosa"), R(/batido|cola-?cao shake/, "Pascual", "Batidos y cafés fríos"),
   R(/yogur|yogikids/, "Pascual", "Yogures"), R(/natilla|flan\b|postre|cuajada/, "Pascual", "Natillas y postres"),
@@ -145,7 +146,14 @@ export function clasificar(p, familias = {}) {
     }
     return { category: f.category, subcategory: f.subcategory ?? (c ? c.subs[c.subs.length - 1][1] : "General") };
   }
-  for (const r of REGLAS_GENERALES) if (r.re.test(n)) return { category: r.category, subcategory: r.subcategory };
+  for (const r of REGLAS_GENERALES) {
+    if (!r.re.test(n)) continue;
+    if (r.subcategory) return { category: r.category, subcategory: r.subcategory };
+    for (const [re, sub] of AFINAR[byName(r.category).id] ?? []) if (re.test(n)) return { category: r.category, subcategory: sub };
+    return { category: r.category, subcategory: "Cocina y utensilios" };
+  }
+  // Último recurso: las palabras de menaje, despensa, refrigerados y congelados de las reglas de afinado (solo si nada de lo anterior encaja)
+  for (const id of ["hosteleria", "despensa", "refrigerados", "congelados"]) for (const [re, sub] of AFINAR[id]) if (re.test(n)) return { category: byId.get(id).nombre, subcategory: sub };
   return { category: "Otros productos", subcategory: "Otros" };
 }
 

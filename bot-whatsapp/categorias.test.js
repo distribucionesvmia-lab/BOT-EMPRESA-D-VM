@@ -29,6 +29,13 @@ test("por tipo de producto, no por marca (sin código de familia: palabras del n
   assert.equal(k("ARTÍCULO RARO"), "otros/otros");
 });
 
+test("el pan de barra es pan (antes «croustilante» caía en infusiones por contener «tila»)", () => {
+  assert.equal(k("P. BARRA LARGA CROUSTILANTE TRA 260gr"), "congelados/panes-y-barras");
+  assert.equal(k("PAN DE BARRA 250 GR"), "congelados/panes-y-barras");
+  assert.equal(f("P. BARRA LARGA CROUSTILANTE TRA 260gr", "92.2"), "Congelados › Panes y barras");
+  assert.equal(k("TILA SOBRES 20 UD"), "cafe/infusiones-y-te"); // la tila de verdad sí es infusión
+});
+
 test("casos que antes quedaban mal: el azúcar es despensa aunque venga de la familia del café", () => {
   assert.equal(f("MOCAY AZUCAR 5 GR SOBRE (1X1000)", "40.3"), "Despensa › Azúcar y edulcorantes");
   assert.equal(f("AZUCARITOS MORENO ESTUCHE 300 GR", "40.3"), "Despensa › Azúcar y edulcorantes");
