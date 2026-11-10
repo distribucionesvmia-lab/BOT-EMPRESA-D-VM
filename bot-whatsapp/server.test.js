@@ -520,3 +520,10 @@ test("BUSCADORES: robots.txt lo prohíbe todo y las páginas llevan noindex", as
   assert.match(await r.text(), /Disallow: \//);
   assert.match((await fetch(`${BASE}/cliente`)).headers.get("x-robots-tag") ?? "", /noindex/);
 });
+
+test("PRIVACIDAD: la pantalla de acceso y la de alta llevan la información de protección de datos", async () => {
+  const html = await (await fetch(`${BASE}/cliente`)).text();
+  assert.equal((html.match(/Información sobre privacidad/g) ?? []).length, 2); // acceso y solicitud de alta
+  assert.match(html, /Tu DNI\/CIF no se guarda/);
+  assert.doesNotMatch(html, /data-privacidad/);
+});

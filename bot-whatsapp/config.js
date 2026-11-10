@@ -5,7 +5,7 @@ export const BUSINESS = {
   name: "DistribucionesVM",
   currency: "€",
   info: "📍 Calle Ejemplo 123\n🕘 Lunes a viernes, 9:00–18:00\n🚚 Envíos a toda la ciudad en 24–48 h",
-  priceNote: "Importes orientativos, sin IVA ni descuentos; los confirmamos al preparar el pedido.",
+  priceNote: "Los importes de cada línea van sin IVA; el total incluye IVA. Los confirmamos al preparar el pedido.",
   payment:"Te enviaremos el enlace o los datos de pago cuando confirmemos tu pedido.",
 };
 

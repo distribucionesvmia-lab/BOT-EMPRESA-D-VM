@@ -3,6 +3,7 @@ import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRo
 import { isTooGeneric } from "./identify.js";
 import { categorizar } from "./categorias.js";
 import { deliveryAllowed, longDate, puedeHoy } from "./delivery.js";
+import { priceLine, totals } from "./pricing.js";
 
 const money = (n) => `${n.toFixed(2).replace(".", ",")} ${BUSINESS.currency}`; // «3,30 €», como en la web
 const udsT = (n) => `${n} ${n === 1 ? "ud" : "uds"}`; // «1 ud», «6 uds»
@@ -16,6 +17,7 @@ const trunc = (s, n) => (s.length <= n ? s : s.slice(0, n - 1).trimEnd() + "…"
 const upbOf = (p) => (Number.isInteger(p?.unitsPerBox) && p.unitsPerBox > 1 ? p.unitsPerBox : null);
 // Precios especiales del cliente de la conversación en curso (se fijan en handleMessage, que es síncrona)
 let PRICES = null;
+let CLIENTE = null; // cliente de la conversación en curso (handleMessage es síncrono): sus precios, descuentos y recargo
 const priceOf = (p) => PRICES?.[String(p.id)] ?? p.price;
 const mkItem = (p, qty, unit = "ud", extra = {}) => ({ id: p.id, name: p.name, price: priceOf(p), qty, unit, upb: upbOf(p), ...extra });
 const unitsOf = (i) => (i.unit === "caja" ? i.qty * (i.upb ?? 1) : i.qty);
@@ -127,11 +129,19 @@ const itemsFromLines = (lines) =>
     })
     .filter(Boolean);
 
-const total = (items) => items.reduce((t, i) => t + unitsOf(i) * i.price, 0);
-const itemsText = (items) =>
-  items.map((i) => `• ${qtyLabel(i)} × ${i.name} = ${money(unitsOf(i) * i.price)}${i.unsure ? " ⚠️" : ""}${i.note ? `\n   📝 ${i.note}` : ""}`).join("\n") +
-  `\n*Total: ${money(total(items))}*` +
-  (items.some((i) => i.unsure) ? `\n⚠️ _No estoy seguro de este artículo: escribe la marca o el formato exacto._` : "");
+/** Importes como los verá el cliente: precio y descuento suyos, base por línea y TOTAL CON IVA (y recargo de equivalencia si lo tiene). */
+function importes(items, customer = CLIENTE) {
+  const lines = items.map((i) => { const p = priceLine(i, CATALOG.find((x) => String(x.id) === String(i.id)), customer); return { amount: p.amount, vat: p.vat }; });
+  return { lines, ...totals(lines, !!customer?.recargoEquivalencia) };
+}
+const total = (items, customer) => importes(items, customer).total; // con IVA
+const detalleIva = (t) => (t.iva || t.re ? `_(base ${money(t.base)} + IVA ${money(t.iva)}${t.re ? ` + R.E. ${money(t.re)}` : ""})_` : "");
+const itemsText = (items) => {
+  const t = importes(items);
+  return items.map((i, k) => `• ${qtyLabel(i)} × ${i.name} = ${money(t.lines[k].amount)}${i.unsure ? " ⚠️" : ""}${i.note ? `\n   📝 ${i.note}` : ""}`).join("\n") +
+    `\n*Total con IVA: ${money(t.total)}*${detalleIva(t) ? `\n${detalleIva(t)}` : ""}` +
+    (items.some((i) => i.unsure) ? `\n⚠️ _No estoy seguro de este artículo: escribe la marca o el formato exacto._` : "");
+};
 
 const fmtDate = (iso) => iso.slice(8, 10) + "/" + iso.slice(5, 7);
 const fmtDateFull = (iso) => fmtDate(iso) + "/" + iso.slice(0, 4);
@@ -144,7 +154,7 @@ export function repeatOptions(customer) {
   if (habitual.length) options.push({ label: `Lo que sueles pedir (${habitual.length} artículos)`, items: habitual });
   for (const o of (customer?.orders ?? []).slice(0, 3)) {
     const items = itemsFromLines(o.lines);
-    if (items.length) options.push({ label: `Pedido del ${fmtDate(o.date)} (${items.length} artículos · ${money(total(items))})`, items });
+    if (items.length) options.push({ label: `Pedido del ${fmtDate(o.date)} (${items.length} artículos · ${money(total(items, customer))})`, items });
   }
   return options.slice(0, 5);
 }
@@ -235,7 +245,7 @@ const greeting = (s, justIdentified = false) => {
         `• Elige el día de entrega, confirma y listo.`,
       ui: {
         type: "link", title: "Hacer pedido", url: s.link, home: true,
-        ...(ult ? { last: { date: fmtDateFull(ult.o.date), articulos: ult.items.length, total: Math.round(total(ult.items) * 100) / 100 } } : {}),
+        ...(ult ? { last: { date: fmtDateFull(ult.o.date), articulos: ult.items.length, total: Math.round(total(ult.items) * 100) / 100, conIva: true } } : {}),
       },
     };
   }
@@ -369,8 +379,8 @@ function openCatalog(s) {
 // Tabla de un pedido para la web (cantidad · producto · importe); el texto del mensaje sigue siendo el respaldo para WhatsApp
 const tablaPedido = (titulo, items, subtitulo = "") => ({
   titulo, subtitulo,
-  filas: items.map((i) => ({ cant: cantidadH(i), nombre: i.name, importe: Math.round(unitsOf(i) * i.price * 100) / 100 })),
-  total: Math.round(total(items) * 100) / 100,
+  filas: items.map((i, k) => ({ cant: cantidadH(i), nombre: i.name, importe: importes(items).lines[k].amount })),
+  total: Math.round(total(items) * 100) / 100, conIva: true,
 });
 /** «Último pedido»: se enseña (no se repite solo) con botones para repetirlo, ver el histórico o hacer otro pedido. */
 function showLast(s) {
@@ -378,7 +388,7 @@ function showLast(s) {
   if (!o) return { reply: "Todavía no tengo pedidos tuyos anteriores. ¿Quieres hacer uno?", session: s, ui: s.link ? { type: "link", title: "Hacer pedido", url: s.link } : buttons(["h:open", "Hacer pedido"]) };
   const items = itemsFromLines(o.lines);
   return {
-    reply: `🧾 *Tu último pedido* (${fmtDateFull(o.date)})\n\n` + items.map((i) => `• ${cantidadH(i)} · ${i.name} = ${money(unitsOf(i) * i.price)}`).join("\n") + `\n*Total: ${money(total(items))}*\n\n_Precios de hoy._`,
+    reply: `🧾 *Tu último pedido* (${fmtDateFull(o.date)})\n\n` + items.map((i, k) => `• ${cantidadH(i)} · ${i.name} = ${money(importes(items).lines[k].amount)}`).join("\n") + `\n*Total con IVA: ${money(total(items))}*\n\n_Precios de hoy._`,
     short: "🧾 *Tu último pedido*",
     cards: [tablaPedido(`Pedido del ${fmtDateFull(o.date)}`, items, "Precios de hoy")],
     session: s,
@@ -503,10 +513,12 @@ const HUMAN_REPLY =
  */
 export function handleMessage(session, rawText, ctx = {}) {
   PRICES = session?.customer?.specialPrices ?? null;
+  CLIENTE = session?.customer ?? null;
   try {
     return handleMessageInner(session, rawText, ctx);
   } finally {
     PRICES = null;
+    CLIENTE = null;
   }
 }
 
@@ -526,7 +538,7 @@ function handleMessageInner(session, rawText, ctx = {}) {
       note: s.note || "",
       delivery: s.delivery ?? null,
       items: items.map(({ unsure, upb, unitStated, ...i }) => i),
-      total: items.length ? total(items) : null,
+      total: items.length ? importes(items).base : null, // base del pedido (la empresa calcula luego el IVA); al cliente se le enseña con IVA
       // Quien se identificó solo por su nombre (el teléfono no es el del cliente) queda retenido hasta que lo revise una persona
       review: items.some((i) => i.unsure) || !items.length || !!(s.opts?.holdUnverified && s.byName && last9(s.opts?.phone) !== last9(s.customer?.phone)),
     };

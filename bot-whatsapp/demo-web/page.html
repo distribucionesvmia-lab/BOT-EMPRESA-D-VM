@@ -322,6 +322,7 @@
         <div class="err" id="a-err" role="alert"></div>
         <button class="vm-btn primary">Entrar</button>
         <button class="vm-link" type="button" id="ir-pin">Entrar con teléfono y PIN</button>
+        <div data-privacidad></div>
       </form>
 
       <div class="vm-card">
@@ -359,6 +360,8 @@
         <label>Repite el PIN<input id="r-pin2" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required></label>
         <div class="err" id="r-err" role="alert"></div><div class="okmsg" id="r-ok" role="status"></div>
         <button class="vm-btn primary">Enviar solicitud</button>
+        <p style="font-size:13px;color:#555">Al enviar la solicitud usaremos estos datos para gestionar tu alta y tus pedidos.</p>
+        <div data-privacidad></div>
         <button class="vm-link" type="button" id="ir-acceso">← Ya soy cliente: entrar</button>
       </form>
     </div>
@@ -659,7 +662,7 @@ function tarjetaTabla(card) {
   [["Cant.", "c-cant"], ["Producto", ""], ["Importe", "c-imp"]].forEach(([x, k]) => { const e = document.createElement("th"); e.scope = "col"; e.textContent = x; if (k) e.className = k; th.appendChild(e); });
   const tb = t.createTBody();
   card.filas.forEach((f) => { const r = tb.insertRow(); [[f.cant, "c-cant"], [f.nombre, ""], [eur(f.importe), "c-imp"]].forEach(([x, k]) => { const td = r.insertCell(); td.textContent = x; if (k) td.className = k; }); });
-  const ft = t.createTFoot().insertRow(); const a = ft.insertCell(); a.colSpan = 2; a.textContent = "Total"; const b = ft.insertCell(); b.className = "c-imp"; b.textContent = eur(card.total);
+  const ft = t.createTFoot().insertRow(); const a = ft.insertCell(); a.colSpan = 2; a.textContent = card.conIva ? "Total con IVA" : "Total"; const b = ft.insertCell(); b.className = "c-imp"; b.textContent = eur(card.total);
   c.append(h, t); chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
 }
 // Inicio: «Hacer pedido» y «Repetir el último», cada uno en su fila con su botón
@@ -672,7 +675,7 @@ function inicio(ui) {
     f.append(t, bt); c.appendChild(f);
   };
   fila("Pedido nuevo", "Elige del catálogo", "Hacer pedido", abrirMini);
-  if (ui.last) fila("Tu último pedido · " + ui.last.date, ui.last.articulos + (ui.last.articulos === 1 ? " artículo" : " artículos") + " · " + eur(ui.last.total), "Repetir", () => enviar("h:repeat1", "Repetir mi último pedido"));
+  if (ui.last) fila("Tu último pedido · " + ui.last.date, ui.last.articulos + (ui.last.articulos === 1 ? " artículo" : " artículos") + " · " + eur(ui.last.total) + " con IVA", "Repetir", () => enviar("h:repeat1", "Repetir mi último pedido"));
   chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
 }
 const sinEmoji = (t) => String(t ?? "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim();

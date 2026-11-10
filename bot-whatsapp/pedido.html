@@ -265,7 +265,7 @@
       <div class="err" id="err" role="alert"></div>
     </div>
     <div class="cartfoot">
-      <div class="tot"><span>Total aproximado<small id="totSub"></small></span><b id="total">0,00 €</b></div>
+      <div class="tot"><span>Total con IVA<small id="totSub"></small></span><b id="total">0,00 €</b></div>
       <button class="big" id="confirm" type="button">Elegir el día de entrega →</button>
       <button class="keepbtn" id="keep" type="button">+ Seguir añadiendo productos</button>
     </div>
@@ -297,7 +297,7 @@
       <div id="resNota" style="margin-top:10px;font-size:16px"></div>
       <div class="err" id="errRes" role="alert"></div>
     </div>
-    <div class="tot"><span>Total aproximado</span><b id="resTotal">0,00 €</b></div>
+    <div class="tot"><span>Total con IVA<small id="resSub" style="display:block;font-weight:400"></small></span><b id="resTotal">0,00 €</b></div>
     <div class="box"><button class="big" id="resOk" type="button">✓ Confirmar y enviar pedido</button><button class="big sec" id="resCambiar" type="button">← Cambiar el día</button></div>
   </section>
 
@@ -328,7 +328,19 @@ const lines = () => data.products.filter(p => qty.get(p.id) > 0).map(p => ({ ...
 const count = () => lines().length;
 // Importe de una línea: mismo cálculo que el servidor (unidades × precio × (1 − descuento %), redondeado a céntimos)
 const importe = l => Math.round((uds(l) * l.price * (1 - (l.discount || 0) / 100) + Number.EPSILON) * 100) / 100;
-const total = () => Math.round(lines().reduce((t, l) => t + importe(l), 0) * 100) / 100;
+const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+const RE_TIPO = { 21: 5.2, 10: 1.4, 4: 0.5 };
+// Total CON IVA, como en a3ERP: bases por tipo de IVA, IVA de cada base y recargo de equivalencia si el cliente lo tiene
+function calc() {
+  const g = new Map();
+  for (const l of lines()) g.set(l.vat ?? 21, (g.get(l.vat ?? 21) ?? 0) + importe(l));
+  let base = 0, iva = 0, re = 0;
+  for (const [v, s] of g) { const b = r2(s); base += b; iva += r2(b * v / 100); if (data.customer.re) re += r2(b * (RE_TIPO[v] ?? 0) / 100); }
+  base = r2(base); iva = r2(iva); re = r2(re);
+  return { base, iva, re, total: r2(base + iva + re) };
+}
+const total = () => calc().total;
+const desgloseIva = () => { const c = calc(); return c.base ? `base ${eur(c.base)} + IVA ${eur(c.iva)}${c.re ? " + R.E. " + eur(c.re) : ""}` : ""; };
 
 let toastT = 0, animarLista = true, bumpId = null, bumpFav = null, nPrev0 = 0; // animarLista: solo al cambiar de pestaña, categoría o al cargar; no con cada cambio de cantidad
 function aviso(texto, deshacer) {
@@ -632,7 +644,7 @@ function renderCart() {
     card.append(av, info, x, mid, ob);
     box.appendChild(card);
   });
-  tween($("total"), total());
+  tween($("total"), total()); $("totSub").textContent = desgloseIva();
   if (!count()) showCart(false);
 }
 
@@ -774,7 +786,7 @@ function resumen(day) {
   }
   const n = $("note").value.trim();
   $("resNota").textContent = n ? "Observaciones: " + n : "";
-  $("resTotal").textContent = eur(total()); $("errRes").textContent = "";
+  $("resTotal").textContent = eur(total()); $("resSub").textContent = desgloseIva(); $("errRes").textContent = "";
   $("resOk").disabled = false; $("resumen").hidden = false;
 }
 $("resOk").onclick = () => enviarPedido(diaElegido, $("errRes"));

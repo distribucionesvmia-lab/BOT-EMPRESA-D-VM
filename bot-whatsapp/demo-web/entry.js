@@ -18,6 +18,7 @@ import { demoNifMatches, demoCodeKey, unirClavesNif } from "./nif-demo.js";
 import { nifClean } from "../nif-codes.js";
 import { nifCodes } from "../nif-codes.js";
 import { crearActualizador } from "../actualizar-datos.js";
+import { privacidadHtml } from "../privacidad.js";
 
 const PHONE = "34600999999"; // el móvil de prueba no está en ninguna ficha: el bot pregunta quién es
 const COLLS = ["products", "customers", "orders", "exports", "registrations", "accounts"];
@@ -201,6 +202,7 @@ const adaptClientes = {
   },
 };
 const actualizador = crearActualizador({ catalogDb: adaptCatalogo, customersDb: adaptClientes, accountsDb: { ensureMany: () => 0 } });
+document.querySelectorAll("[data-privacidad]").forEach((n) => { n.outerHTML = privacidadHtml({ email: "" }); }); // información de privacidad en el acceso y en la solicitud de alta
 window.VM = {
   business: BUSINESS.name,
   phone: PHONE,
@@ -324,7 +326,7 @@ window.VM = {
   miniData(link) {
     const customer = links.get(link)?.customer;
     if (!customer) return { error: "Enlace no válido o caducado" };
-    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address }, used: links.get(link).used, favs: [...(favsDemo.get(customer.id) ?? [])], products: webProducts(customer, getCatalog(), habitualProducts, (id) => globalThis.__VM_FOTOS__?.[id] ?? null), history: webHistory(customer, getCatalog()), tree: webTree(getCatalog()), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) };
+    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address, re: !!customer.recargoEquivalencia }, used: links.get(link).used, favs: [...(favsDemo.get(customer.id) ?? [])], products: webProducts(customer, getCatalog(), habitualProducts, (id) => globalThis.__VM_FOTOS__?.[id] ?? null), history: webHistory(customer, getCatalog()), tree: webTree(getCatalog()), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) };
   },
   miniSubmit(link, body) {
     const customer = links.get(link)?.customer;

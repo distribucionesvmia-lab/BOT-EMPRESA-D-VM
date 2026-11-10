@@ -13,6 +13,7 @@ export function webProducts(customer, catalog, habitualProducts, imgOf = () => n
       // Mismo criterio que pricing.js (priceLine): precio y descuento especiales del cliente si los hay, si no los de la ficha
       price: customer?.specialPrices?.[String(p.id)] ?? p.price,
       discount: customer?.discounts?.[String(p.id)] ?? p.discount ?? 0,
+      vat: p.vat ?? 21, // tipo de IVA (para enseñar el total con IVA)
       unitsPerBox: Number.isInteger(p.unitsPerBox) && p.unitsPerBox > 1 ? p.unitsPerBox : null,
       ...(({ cat, sub }) => ({ cat, sub }))(categorizar(p)), // categoría y subcategoría (ids) para navegar el catálogo
       ...((img) => (img ? { img } : {}))(imgOf(String(p.id))), // foto del producto (si hay)

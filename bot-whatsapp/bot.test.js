@@ -20,7 +20,8 @@ test("cliente nuevo: flujo completo con texto libre", () => {
   assert.match(r.reply, /Escribe directamente/);
   assert.equal(r.ui, undefined);
   r = say(r.session, "2 aguas y una cerveza");
-  assert.match(r.reply, /Total: 2,80/);
+  assert.match(r.reply, /Total con IVA: 3,39/);
+  assert.match(r.reply, /base 2,80 € \+ IVA 0,59 €/);
   r = say(r.session, "1");
   r = say(r.session, "Ana");
   r = say(r.session, "Calle Sol 5");
@@ -45,7 +46,7 @@ test("cliente nuevo: texto sin producto reconocido se guarda tal cual", () => {
 test("cliente nuevo: se puede añadir más texto antes de continuar", () => {
   let r = say(newSession(), "2 aguas");
   r = say(r.session, "y 3 cervezas");
-  assert.match(r.reply, /Total: 4,40/);
+  assert.match(r.reply, /Total con IVA: 5,32/);
 });
 
 // ---- Cliente conocido: cuestionario con lista y botones ----
@@ -196,7 +197,7 @@ test("«último pedido» e «histórico» llevan además una tabla (cantidad, pr
   const t = r.cards[0];
   assert.equal(t.titulo, "Pedido del 01/10/2026");
   assert.deepEqual(t.filas.map((f) => [f.cant, f.nombre, f.importe]), [["24 uds", "Agua", 24], ["12 uds", "Cerveza Estrella Galicia", 9.6]]);
-  assert.equal(t.total, 33.6);
+  assert.equal(t.total, 40.66); // 33,60 de base + 21 % de IVA
   assert.match(r.reply, /Agua = 24,00/); // el texto sigue siendo el respaldo para WhatsApp
   assert.equal(r.short, "🧾 *Tu último pedido*");
   const h = say(newSession(bar, "/catalogo"), "histórico");
@@ -241,4 +242,11 @@ test("repetir el último pedido y añadir productos: se abre el catálogo con lo
   r = say(say(newSession(bar), "repetir ultimo pedido").session, "c:more");
   assert.equal(r.ui.type, "list");
   assert.ok(r.ui.rows.some((x) => x.id === "p:3") && r.ui.rows.some((x) => x.id === "p:4"));
+});
+
+test("totales para el cliente: llevan IVA (y recargo de equivalencia si lo tiene)", () => {
+  const conRe = { ...bar, recargoEquivalencia: true };
+  const r = say(newSession(conRe), "2 aguas");
+  assert.match(r.reply, /Total con IVA: 2,52/); // 2,00 + 21 % IVA (0,42) + 5,2 % R.E. (0,10)
+  assert.match(r.reply, /R\.E\. 0,10/);
 });
