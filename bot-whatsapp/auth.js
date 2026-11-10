@@ -170,14 +170,14 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
       return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode } }), true;
     }
 
-    // El cliente cambia el código de entrada (los 6 del NIF) por uno personal de 6 a 10 letras o números
+    // El cliente cambia el código de entrada (los 6 del NIF) por uno personal de 6 cifras
     if (p === "/api/codigo" && req.method === "POST") {
       const acc = sessionOf(req);
       if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
       if (!loginLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
-      if (!validCode(b.nuevo)) return send(res, 400, { error: "El código debe tener entre 6 y 10 letras o números." }), true;
+      if (!validCode(b.nuevo)) return send(res, 400, { error: "El PIN debe tener exactamente 6 cifras." }), true;
       if (customers.findByNif(b.nuevo).length) return send(res, 400, { error: "Ese código no está disponible. Elige otro." }), true; // no puede coincidir con el NIF de nadie
       const r = accounts.setCodeKey(acc.id, codeKey(b.nuevo));
       if (r.error) return send(res, 400, { error: r.error }), true;

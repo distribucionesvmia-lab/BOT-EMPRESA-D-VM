@@ -96,3 +96,12 @@ test("PEDIDO WEB: los artículos que se venden en cajas se piden por cajas por d
   assert.match(html, /\[\["caja", "Cajas"\], \["ud", "Uds"\]\]/); // Cajas primero
   assert.match(html, /\.ctl \.bump, \.hstep\.bump, \.step\.bump \{ animation:none !important; \}/);
 });
+
+test("MÓVIL: «Mostrar más» no se sale del ancho y el código/PIN de entrada admite solo 6 cifras", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.match(ped, /m\.style\.width = "calc\(100% - 28px\)"/);
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  for (const id of ["a-nif", "a-pin", "r-pin", "r-pin2", "c-nuevo", "c-nuevo2"]) assert.match(cli, new RegExp(`id="${id}"[^>]*maxlength="6"`), id);
+  assert.match(cli, /replace\(\/\\D\/g, ""\)\.slice\(0, 6\)/);
+});

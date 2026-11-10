@@ -298,6 +298,11 @@
   .step, .step button, .step input, .hstep, .hstep button, .hstep input, .ud, .ud button, .add { touch-action:manipulation; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; }
   .step input, .hstep input { user-select:text; -webkit-user-select:text; }
   .ctl .bump, .hstep.bump, .step.bump { animation:none !important; }
+  /* Nunca scroll lateral: ninguna pantalla puede ser más ancha que el móvil */
+  html, body { max-width:100%; overflow-x:hidden; }
+  main, .screen, .screen .body, #list { max-width:100%; overflow-x:hidden; }
+  .cats > .cat, .subs > .sub, .p { min-width:0; max-width:100%; }
+  .cat b, .cat small { overflow-wrap:anywhere; }
 </style>
 </head>
 <body>
@@ -684,7 +689,7 @@ function renderList() {
   items.slice(0, limite).forEach(p => list.appendChild(row(p)));
   entrada(list, ".p");
   if (items.length > limite) {
-    const m = document.createElement("button"); m.type = "button"; m.className = "big sec"; m.style.margin = "12px 14px";
+    const m = document.createElement("button"); m.type = "button"; m.className = "big sec"; m.style.margin = "12px 14px"; m.style.width = "calc(100% - 28px)"; // sin esto el botón se salía 28 px y la lista se movía de lado
     m.textContent = `Mostrar más (${items.length - limite} restantes)`; m.onclick = () => { limite += 150; renderList(); };
     list.appendChild(m);
   }

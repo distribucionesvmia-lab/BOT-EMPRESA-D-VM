@@ -268,11 +268,11 @@ window.VM = {
   },
   /** Cliente habitual: solo los 6 primeros dígitos del DNI/CIF. El nombre, si se envía, estrecha la búsqueda. */
   loginNif(nif, business) {
-    if (!nifCodes(nif).length && !/^[A-Z0-9]{6,10}$/.test(nifClean(nif))) return { ok: false, error: "Escribe los 6 primeros dígitos de tu DNI o CIF." }; // o el PIN personal
+    if (!nifCodes(nif).length && !/^[0-9]{6}$/.test(nifClean(nif))) return { ok: false, error: "Escribe los 6 primeros dígitos de tu DNI o CIF." }; // o el PIN personal
     const now = Date.now();
     if (nifFails.until > now) return { ok: false, error: "Demasiados intentos. Prueba más tarde o llama a la empresa." };
     // ¿Es el código personal que el cliente eligió en lugar del NIF?
-    const own = /^[A-Z0-9]{6,10}$/.test(nifClean(nif)) && cache.accounts.find((a) => a.codeKey === demoCodeKey(nif) && a.status === "active");
+    const own = /^[0-9]{6}$/.test(nifClean(nif)) && cache.accounts.find((a) => a.codeKey === demoCodeKey(nif) && a.status === "active");
     if (own) { store.set("vm:acc", own.id); return { ok: true, nombre: customerOf(own)?.name ?? "" }; }
     const names = String(business ?? "").trim().length >= 2 ? new Set(findCustomers(cache.customers, business, { lenient: true }).map((c) => c.id)) : null;
     const hits = cache.customers.filter((c) => c.active !== false && (!names || names.has(c.id)) && !cache.accounts.some((a) => a.customerId === c.id && a.codeKey) && demoNifMatches(c.id, nif, c.nifKeys)); // con código personal, el NIF ya no vale
@@ -287,11 +287,11 @@ window.VM = {
   logout() { store.set("vm:acc", null); sessions.clear(); },
   /** Cliente con sesión iniciada (o null). */
   me() { const a = currentAccount(), c = customerOf(a); return c ? { nombre: c.name, codigoPropio: !!cache.accounts.find((x) => x.id === a.id)?.codeKey } : null; },
-  /** El cliente cambia los 6 del NIF por un PIN personal (6 a 10 letras o números), único entre todos los clientes. */
+  /** El cliente cambia los 6 del NIF por un PIN personal (6 cifras), único entre todos los clientes. */
   async changeCode(nuevo) {
     const a = currentAccount();
     if (!a || !a.id.startsWith("n")) return { ok: false, error: "Entra primero con los 6 primeros dígitos de tu DNI." };
-    if (!/^[A-Z0-9]{6,10}$/.test(nifClean(nuevo))) return { ok: false, error: "El código debe tener entre 6 y 10 letras o números." };
+    if (!/^[0-9]{6}$/.test(nifClean(nuevo))) return { ok: false, error: "El PIN debe tener exactamente 6 cifras." };
     if (cache.customers.some((c) => demoNifMatches(c.id, nuevo, c.nifKeys)) || cache.accounts.some((x) => x.codeKey === demoCodeKey(nuevo) && x.id !== a.id)) return { ok: false, error: "Ese código no está disponible. Elige otro." };
     if (!perms.canWrite) return { ok: false, error: "En modo solo lectura no se puede cambiar el PIN." };
     const cur = cache.accounts.find((x) => x.id === a.id);

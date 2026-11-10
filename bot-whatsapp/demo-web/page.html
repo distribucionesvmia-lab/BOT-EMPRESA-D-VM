@@ -338,7 +338,7 @@
         <span class="tag">Cliente habitual</span>
         <h2>Inicia sesión</h2>
         <p>Entra con los <b>6 primeros dígitos de tu DNI o CIF</b> (en un CIF, los 6 primeros números, sin la letra). Una vez dentro podrás <b>cambiar este código por un PIN personal</b> cuando quieras.</p>
-        <label id="l-nif">Primeros 6 dígitos del DNI o CIF<input id="a-nif" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 123456" required></label>
+        <label id="l-nif">Primeros 6 dígitos del DNI o CIF<input id="a-nif" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" placeholder="Ej.: 123456" required></label>
         <label id="l-emp" hidden>Nombre de tu empresa<input id="a-emp" maxlength="80" autocomplete="organization"></label>
         <label id="l-tel" hidden>Teléfono<input id="a-tel" type="tel" inputmode="tel" autocomplete="tel"></label>
         <label id="l-pin" hidden>PIN de 6 cifras<input id="a-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password"></label>
@@ -414,9 +414,9 @@
   <div class="vm-modal" id="m-codigo" hidden>
     <form class="vm-card" id="f-codigo" role="dialog" aria-modal="true" aria-labelledby="t-codigo" autocomplete="off">
       <h2 id="t-codigo">Cambiar mi código de entrada</h2>
-      <p>Elige un PIN personal de <b>6 a 10 letras o números</b>. Desde ese momento entrarás con él en lugar de con los 6 caracteres del NIF.</p>
-      <label>Nuevo PIN<input id="c-nuevo" type="password" maxlength="12" autocomplete="new-password" required></label>
-      <label>Repite el PIN<input id="c-nuevo2" type="password" maxlength="12" autocomplete="new-password" required></label>
+      <p>Elige un PIN personal de <b>6 cifras</b>. Desde ese momento entrarás con él en lugar de con los 6 dígitos del DNI o CIF.</p>
+      <label>Nuevo PIN<input id="c-nuevo" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required></label>
+      <label>Repite el PIN<input id="c-nuevo2" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="new-password" required></label>
       <div class="err" id="c-err" role="alert"></div><div class="okmsg" id="c-ok" role="status"></div>
       <button class="vm-btn primary">Guardar PIN</button>
       <button class="vm-link" type="button" id="c-cerrar">Cerrar</button>
@@ -612,6 +612,11 @@ $("f-registro").onsubmit = async (e) => {
   $("r-ok").textContent = r.mensaje; $("f-registro").reset();
   if (r.estado === "activa") setTimeout(() => { pantallaCliente.reg = false; pantallaCliente(); }, 1800);
 };
+// Códigos de entrada y PIN: solo cifras y como máximo 6 (también si se pega o el teclado deja escribir letras)
+for (const id of ["a-nif", "a-pin", "r-pin", "r-pin2", "c-nuevo", "c-nuevo2"]) {
+  const e = document.getElementById(id);
+  if (e) e.addEventListener("input", () => { const v = e.value.replace(/\D/g, "").slice(0, 6); if (v !== e.value) e.value = v; });
+}
 let conPin = false; // alternativa: teléfono + PIN (clientes dados de alta con solicitud)
 function modoAcceso(pin) {
   conPin = pin;

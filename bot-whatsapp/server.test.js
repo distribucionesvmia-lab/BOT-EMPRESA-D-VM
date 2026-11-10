@@ -407,7 +407,7 @@ test("ACCESO CON NIF: las cuentas ya están creadas y el cliente entra solo con 
   const amb = await entrarNif("122222");
   assert.deepEqual([amb.status, amb.json.necesitaNombre], [409, true]);
   assert.equal((await entrarNif("122222", "bar dos")).json.cliente.nombre, "BAR DOS");
-  assert.equal((await entrarNif("22222A")).status, 401); // los 6 últimos caracteres (como antes) ya no valen
+  assert.equal((await entrarNif("22222A")).status, 400); // los 6 últimos caracteres (como antes) ya no valen: ni con letras
   // la empresa puede bloquear la cuenta: ni con el NIF correcto entra, y al reactivarla vuelve a entrar
   const c = await cuentaDe("7001");
   await call("POST", `/api/admin/cuentas/${c.id}/bloquear`, { admin: true, body: { bloquear: true } });
@@ -425,21 +425,23 @@ test("CAMBIAR EL CÓDIGO: el cliente sustituye los 6 del NIF por uno personal; e
   assert.equal((await call("GET", "/api/yo", { cookie })).json.cliente.codigoPropio, false);
   assert.equal((await call("POST", "/api/codigo", { body: { nuevo: "abcdef" } })).status, 401); // sin sesión
   assert.equal((await call("POST", "/api/codigo", { cookie, body: { nuevo: "123" } })).status, 400); // demasiado corto
+  assert.equal((await call("POST", "/api/codigo", { cookie, body: { nuevo: "1234567" } })).status, 400); // más de 6 cifras
+  assert.equal((await call("POST", "/api/codigo", { cookie, body: { nuevo: "abc123" } })).status, 400); // con letras
   assert.equal((await call("POST", "/api/codigo", { cookie, body: { nuevo: "111111" } })).status, 400); // coincide con un NIF
-  assert.equal((await call("POST", "/api/codigo", { cookie, body: { nuevo: "Mi-Clave7" } })).status, 200);
+  assert.equal((await call("POST", "/api/codigo", { cookie, body: { nuevo: "482915" } })).status, 200);
   assert.equal((await call("GET", "/api/yo", { cookie })).json.cliente.codigoPropio, true);
-  assert.equal((await entrarNif("MiClave7")).json.cliente.nombre, "CAFETERIA IMPORTADA"); // el código personal vale (sin importar mayúsculas ni guiones)
-  assert.equal((await entrarNif("miclave7")).status, 200);
+  assert.equal((await entrarNif("482915")).json.cliente.nombre, "CAFETERIA IMPORTADA"); // el PIN personal (6 cifras) vale
+  assert.equal((await entrarNif("482-915")).status, 200); // los guiones se ignoran
   assert.equal((await entrarNif("111111")).status, 401); // el NIF ya no vale para esa cuenta
   // otro cliente no puede quedarse con el mismo código
   const otro = await entrarNif("122222", "bar uno");
-  assert.equal((await call("POST", "/api/codigo", { cookie: cookieOf(otro), body: { nuevo: "MiClave7" } })).status, 400);
+  assert.equal((await call("POST", "/api/codigo", { cookie: cookieOf(otro), body: { nuevo: "482915" } })).status, 400);
   // la empresa lo restablece: vuelve a valer el NIF
   const c = await cuentaDe("7001");
   assert.equal(c.ownCode, true);
   assert.equal((await call("POST", `/api/admin/cuentas/${c.id}/pin`, { admin: true, body: {} })).status, 200);
   assert.equal((await entrarNif("111111")).status, 200);
-  assert.equal((await entrarNif("MiClave7")).status, 401);
+  assert.equal((await entrarNif("482915")).status, 401);
 });
 
 test("EMPRESA: las solicitudes sin coincidencia muestran por qué y qué clientes podrían ser", async () => {
