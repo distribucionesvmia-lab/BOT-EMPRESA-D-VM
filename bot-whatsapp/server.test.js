@@ -281,7 +281,7 @@ test("APP_MODE=cliente: la aplicación del cliente no tiene NADA de administraci
   const { p, url } = await arrancar("cliente");
   try {
     assert.equal(await status(url + "/cliente"), 200);
-    for (const ruta of ["/empresa", "/distribuidor", "/api/admin/pedidos", "/api/admin/solicitudes", "/api/admin/cuentas", "/api/admin/exportar", "/api/admin/resumen", "/api/admin/vista-previa/productos", "/api/admin/aplicar/clientes", "/api/admin/clientes/lista", "/api/admin/estado"]) {
+    for (const ruta of ["/empresa", "/distribuidor", "/api/admin/pedidos", "/api/admin/solicitudes", "/api/admin/cuentas", "/api/admin/exportar", "/api/admin/resumen", "/api/admin/vista-previa/productos", "/api/admin/aplicar/clientes", "/api/admin/clientes/lista", "/api/admin/estado", "/api/admin/actualizaciones"]) {
       assert.equal(await status(url + ruta, { headers: { Authorization: `Bearer ${ADMIN}` } }), 404, ruta);
     }
   } finally {
@@ -513,6 +513,13 @@ test("ESTADO: /api/admin/estado solo con la clave de la empresa y lista los prob
   assert.equal(r.json.funcionando, true);
   assert.ok(Array.isArray(r.json.problemas) && typeof r.json.pedidos.pendientes === "number");
   assert.ok(r.json.problemas.some((p) => p.clave === "correo-sin-configurar")); // en las pruebas no hay SMTP
+});
+
+test("DATOS Y EXCEL: /api/admin/actualizaciones pide clave y devuelve una lista", async () => {
+  assert.equal((await call("GET", "/api/admin/actualizaciones")).status, 403);
+  const r = await call("GET", "/api/admin/actualizaciones", { admin: true });
+  assert.equal(r.status, 200);
+  assert.ok(Array.isArray(r.json));
 });
 
 test("BUSCADORES: robots.txt lo prohíbe todo y las páginas llevan noindex", async () => {

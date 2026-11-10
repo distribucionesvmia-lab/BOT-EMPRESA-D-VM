@@ -27,6 +27,10 @@
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .err { color: var(--err); } .lines td { border: 0; padding: 2px 8px; font-size: 13px; color: var(--muted); }
   .nuevo td { animation: flash 2.4s ease-out; } @keyframes flash { from { background: var(--soft); } to { background: transparent; } }
   details summary { cursor: pointer; }
+  .datos-wrap { display:grid; gap:14px; }
+  .datos-wrap[hidden] { display:none; }
+  .pasoDx { background:var(--accent-soft, #e8f4ee); color:var(--accent, #0b6e4f); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:700; }
+  .dx-card h2 { text-transform:none; letter-spacing:0; font-size:18px; }
 </style>
 </head>
 <body>
@@ -44,8 +48,8 @@
       <button class="tab" role="tab" data-t="pedidos" aria-selected="true">Pedidos <span class="n" id="n-ped" hidden></span></button>
       <button class="tab" role="tab" data-t="solicitudes" aria-selected="false">Solicitudes de alta <span class="n" id="n-sol" hidden></span></button>
       <button class="tab" role="tab" data-t="clientes" aria-selected="false">Clientes <span class="n" id="n-cli" hidden></span></button>
-      <button class="tab" role="tab" data-t="historial" aria-selected="false">Historial de clientes</button>
       <button class="tab" role="tab" data-t="cuentas" aria-selected="false">Cuentas de clientes <span class="n" id="n-cue" hidden></span></button>
+      <button class="tab" role="tab" data-t="datos" aria-selected="false">📥 Datos y Excel</button>
     </div>
 
     <!-- Pedidos -->
@@ -77,18 +81,6 @@
         <div class="row"><button class="main" id="sync-ahora" type="button" hidden>Sincronizar ahora</button><span class="muted" id="sync-msg" role="status"></span></div>
         <ul id="sync-reg" class="muted" style="margin:8px 0 0;padding-left:18px"></ul>
       </div>
-      <div class="panel" id="act-panel">
-        <h2>Actualizar datos desde Excel</h2>
-        <p class="muted">Sube el Excel de <b>productos</b> o de <b>clientes</b>, o un <b>ZIP de fotos</b> (cada foto con el código del producto como nombre: <code>11098.jpg</code>, en cualquier carpeta). Primero se enseñan los cambios respecto a lo que ya hay y, solo si confirmas, se aplican <b>únicamente las diferencias</b>. El historial de compras se sube en la pestaña «Historial de clientes».</p>
-        <div class="row"><select id="ad-tipo" aria-label="Tipo de datos"><option value="productos">Productos</option><option value="clientes">Clientes</option><option value="fotos">Fotos de productos (ZIP)</option></select><input type="file" id="ad-file" accept=".xlsx,.zip" aria-label="Archivo Excel"><button class="main" id="ad-ver" type="button">Ver cambios</button><button id="ad-aplicar" type="button" hidden>Aplicar cambios</button></div>
-        <p class="muted" id="ad-msg" role="status"></p>
-        <div id="ad-res"></div>
-      </div>
-      <div class="panel">
-        <h2>Importar clientes desde Excel</h2>
-        <p class="muted">Sube la lista de clientes que exporta a3ERP (columnas «Cód. cliente», «Organización», «Razón social», «Población», «Dirección fiscal», «Teléfono», «E-Mail», «Bloqueado», «Obsoleto»). Los nuevos se añaden y los que ya existen se actualizan; no se toca su historial ni sus precios y el NIF <b>no se guarda</b>: solo una huella de sus 6 últimos caracteres.</p>
-        <div class="row"><input type="file" id="f-excel" accept=".xlsx" aria-label="Archivo Excel de clientes"><button class="main" id="importar">Importar</button><span class="muted" id="imp-msg" role="status"></span></div>
-      </div>
       <div class="panel">
         <h2>Clientes</h2>
         <div class="row" style="margin-bottom:10px"><input id="q-cli" type="search" placeholder="Buscar por nombre, código, población, teléfono o correo" aria-label="Buscar cliente" style="min-width:min(100%,380px)"><span class="muted" id="cli-total"></span></div>
@@ -98,14 +90,14 @@
     </div>
 
     <!-- Cuentas -->
-    <div id="p-historial" hidden style="display:grid;gap:14px">
+    <!-- Datos y Excel: todo lo de subir Excel en un solo sitio -->
+    <div id="p-datos" class="datos-wrap" hidden>
       <div class="panel">
-        <h2>Subir historial de clientes</h2>
-        <p class="muted">Sube el Excel con las compras de los clientes (columnas «Cód. cliente», «Fecha», «Documento», «Cód. artículo» y «Cantidad»). Cada línea se <b>relaciona con su cliente por el código</b>: es el historial que le sale al cliente en «Histórico» y «Último pedido». Antes de aplicar se enseña a qué clientes afecta y qué códigos no existen; solo se reescribe el de los clientes cuyo historial cambia. Los clientes tienen que estar ya cargados.</p>
-        <div class="row"><select id="hi-tipo" aria-label="Tipo de datos" hidden><option value="historial">Histórico de compras</option></select><input type="file" id="hi-file" accept=".xlsx" aria-label="Archivo Excel del historial"><button class="main" id="hi-ver" type="button">Ver cambios</button><button id="hi-aplicar" type="button" hidden>Aplicar cambios</button></div>
-        <p class="muted" id="hi-msg" role="status"></p>
-        <div id="hi-res"></div>
+        <h2>Datos y Excel</h2>
+        <p class="muted" style="margin:0 0 10px">Sube aquí los Excel de a3ERP (y las fotos). Siempre pasa lo mismo: <b>1</b> eliges el archivo, <b>2</b> «Ver cambios» te enseña qué se añade, qué cambia y qué se quita <b>sin tocar nada</b>, y <b>3</b> «Aplicar cambios» escribe solo las diferencias. Orden recomendado la primera vez: <b>clientes → productos → historial → fotos</b>.</p>
+        <div id="dx-pasos" class="row" style="gap:8px;flex-wrap:wrap"><span class="pasoDx">1 · Elige el archivo</span><span class="pasoDx">2 · Revisa los cambios</span><span class="pasoDx">3 · Aplica</span></div>
       </div>
+      <div id="dx-tarjetas" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px;align-items:start"></div>
     </div>
     <div class="panel" id="p-cuentas" hidden>
       <h2>Cuentas de clientes</h2>
@@ -319,19 +311,29 @@ $(p + "-aplicar").onclick = async () => {
   catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-aplicar").disabled = false; }
 };
 }
-montarExcel("ad");
-montarExcel("hi");
-$("importar").onclick = async () => {
-  const f = $("f-excel").files[0]; if (!f) { $("imp-msg").textContent = "Elige primero el archivo Excel."; return; }
-  $("importar").disabled = true; $("imp-msg").textContent = "Importando…";
+const TIPOS_DX = [
+  { p: "px", tipo: "productos", icono: "🏷️", titulo: "Productos y precios", acepta: ".xlsx", desc: "Añade los productos nuevos, actualiza precios, IVA, unidades por caja y categorías, y retira los que ya no vienen (pasan a inactivos, no se borran).", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Cód. familia" },
+  { p: "cl", tipo: "clientes", icono: "👥", titulo: "Clientes", acepta: ".xlsx", desc: "Crea los clientes nuevos (con su cuenta) y actualiza nombre, dirección, teléfonos y correos. Los que no vienen en el Excel no se dan de baja solos.", cols: "Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto" },
+  { p: "hi", tipo: "historial", icono: "🧾", titulo: "Historial de compras", acepta: ".xlsx", desc: "Relaciona cada compra con su cliente por el código. Cada cliente conserva sus 10 últimos pedidos. Sube antes el Excel de clientes.", cols: "Cliente · Fecha · Nº Documento · Artículo · Unidades" },
+  { p: "fo", tipo: "fotos", icono: "🖼️", titulo: "Fotos de productos (ZIP)", acepta: ".zip", desc: "Un ZIP con una foto por producto, con el código como nombre (11098.jpg), en cualquier carpeta. Si trae un Excel de control con la columna «tipo» (IA), avisa en el catálogo de las fotos creadas con IA.", cols: "Archivos .jpg, .png o .webp (mejor de 800 px o más)" },
+];
+for (const t of TIPOS_DX) {
+  const c = document.createElement("div"); c.className = "panel dx-card"; c.dataset.tipo = t.tipo;
+  c.innerHTML = `<h2>${t.icono} ${t.titulo}</h2><p class="muted" style="margin:0 0 8px">${t.desc}</p><p class="muted" style="margin:0 0 10px;font-size:13px"><b>Columnas:</b> ${t.cols}</p><p class="ult muted" id="${t.p}-ult" style="margin:0 0 10px;font-size:13px"></p><input type="hidden" id="${t.p}-tipo" value="${t.tipo}"><div class="row"><input type="file" id="${t.p}-file" accept="${t.acepta}" aria-label="Archivo de ${t.titulo}"><button class="main" id="${t.p}-ver" type="button">Ver cambios</button><button id="${t.p}-aplicar" type="button" hidden>Aplicar cambios</button></div><p class="muted" id="${t.p}-msg" role="status"></p><div id="${t.p}-res"></div>`;
+  $("dx-tarjetas").appendChild(c);
+  montarExcel(t.p, () => { ultimasSubidas(); });
+  $(t.p + "-ver").addEventListener("click", () => { c.style.gridColumn = "1 / -1"; }); // la tarjeta que se está revisando ocupa todo el ancho
+}
+const nombreTipo = { productos: "px", clientes: "cl", historial: "hi", fotos: "fo" };
+async function ultimasSubidas() {
   try {
-    const r = await fetch("/api/admin/clientes/importar", { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": "application/octet-stream" }, body: f });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || "No se pudo importar");
-    $("imp-msg").textContent = `Hecho: ${j.importados} clientes (${j.nuevos} nuevos, ${j.actualizados} actualizados). ${j.sinTelefono} sin teléfono y ${j.sinCorreo} sin correo: esos solo podrán darse de alta con tu revisión.${j.inactivos ? ` ${j.inactivos} de baja.` : ""}`;
-    pagCli = 0; $("f-excel").value = ""; refrescar();
-  } catch (e) { $("imp-msg").textContent = e.message; } finally { $("importar").disabled = false; }
-};
+    const lista = await call("/api/admin/actualizaciones");
+    for (const [tipo, p] of Object.entries(nombreTipo)) {
+      const e = lista.find((x) => x.tipo === tipo);
+      $(p + "-ult").textContent = e ? `Última subida: ${new Date(e.at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}${e.fichero ? " · " + e.fichero : ""}` : "Todavía no se ha subido ninguno.";
+    }
+  } catch { /* sin registro */ }
+}
 async function avisos() {
   const r = await call("/api/admin/resumen");
   const n = (id, v) => { $(id).hidden = !v; $(id).textContent = v; };
@@ -343,7 +345,7 @@ async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), 
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-  $("p-pedidos").hidden = b.dataset.t !== "pedidos"; $("p-solicitudes").hidden = b.dataset.t !== "solicitudes"; $("p-clientes").hidden = b.dataset.t !== "clientes"; $("p-cuentas").hidden = b.dataset.t !== "cuentas"; $("p-historial").hidden = b.dataset.t !== "historial";
+  $("p-pedidos").hidden = b.dataset.t !== "pedidos"; $("p-solicitudes").hidden = b.dataset.t !== "solicitudes"; $("p-clientes").hidden = b.dataset.t !== "clientes"; $("p-cuentas").hidden = b.dataset.t !== "cuentas"; $("p-datos").hidden = b.dataset.t !== "datos"; if (b.dataset.t === "datos") ultimasSubidas();
 }));
 async function entrar() { try { await refrescar(); if ($("app").hidden && clave) { await call("/api/admin/resumen"); $("login").hidden = true; $("app").hidden = false; clearInterval(timer); timer = setInterval(refrescar, 15000); } } catch (e) { $("l-err").textContent = e.message; } }
 $("f-login").onsubmit = (e) => { e.preventDefault(); clave = $("clave").value; try { sessionStorage.setItem("vm_admin", clave); } catch {} $("l-err").textContent = ""; entrar(); };
