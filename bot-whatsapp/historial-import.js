@@ -5,7 +5,7 @@ import { readXlsx } from "./xlsx-read.js";
 import { parseNumber } from "./productos-import.js";
 
 const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9%]+/g, " ").trim();
-export const MAX_ORDERS_PER_CUSTOMER = 30;
+export const MAX_ORDERS_PER_CUSTOMER = 10; // el historial de cada cliente son sus 10 últimos pedidos
 
 const FIELDS = [
   ["customer", /^(cod )?cliente$|^cod(igo)?( cliente)?$|^id cliente$/],

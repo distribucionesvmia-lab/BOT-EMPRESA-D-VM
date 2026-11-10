@@ -397,7 +397,7 @@ function showLast(s) {
 }
 /** «Histórico»: sus últimos pedidos con lo que pidió en cada uno y lo que más compra. */
 function showHistory(s) {
-  const orders = pedidosDe(s.customer).map((o) => ({ o, items: itemsFromLines(o.lines) })).filter((x) => x.items.length).slice(0, 5);
+  const orders = pedidosDe(s.customer).map((o) => ({ o, items: itemsFromLines(o.lines) })).filter((x) => x.items.length).slice(0, 10);
   if (!orders.length) return { reply: "Todavía no tengo pedidos tuyos anteriores. ¿Quieres hacer uno?", session: s, ui: s.link ? { type: "link", title: "Hacer pedido", url: s.link } : buttons(["h:open", "Hacer pedido"]) };
   const bloque = ({ o, items }) =>
     `📦 *Pedido del ${fmtDateFull(o.date)}* — ${items.length} artículo${items.length === 1 ? "" : "s"} · ${money(total(items))}\n` +

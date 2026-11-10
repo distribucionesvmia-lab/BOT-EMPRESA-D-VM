@@ -38,18 +38,19 @@ export function conHistorial(clientes, historial = {}) {
  * Suma al historial de a3ERP los pedidos que el cliente ha hecho por la aplicación o el chat (y que a3ERP aún no ha facturado):
  * solo los de fecha igual o posterior al último pedido de a3ERP, para no contarlos dos veces cuando después aparezcan en su historial.
  */
+export const HISTORIAL_MAX = 10; // pedidos que se guardan como historial de cada cliente: al llegar el 11.º se va el más antiguo
+const masRecientes = (orders) => [...orders].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, HISTORIAL_MAX);
 export function withOwnOrders(customer, ownOrders = []) {
-  if (!customer || !ownOrders.length) return customer;
+  if (!customer) return customer;
   const orders = customer.orders ?? [];
   const lastA3 = orders.reduce((m, o) => (String(o.date) > m ? String(o.date) : m), "");
   const seen = new Set(orders.map((o) => String(o.doc)));
   const own = ownOrders.filter((o) => o.date >= lastA3 && !seen.has(String(o.doc)) && o.lines.length);
-  if (!own.length) return customer;
-  return { ...customer, orders: [...own, ...orders].sort((a, b) => String(b.date).localeCompare(String(a.date))) };
+  return { ...customer, orders: masRecientes([...own, ...orders]) }; // historial = sus 10 últimos pedidos (los de a3ERP y los hechos por la aplicación)
 }
 
 /** Últimos pedidos del cliente (los más recientes primero) con sus líneas, para volver a comprarlos o modificarlos. */
-export function webHistory(customer, catalogList, limit = 5) {
+export function webHistory(customer, catalogList, limit = HISTORIAL_MAX) {
   const names = new Map(catalogList.map((p) => [String(p.id), p.name]));
   return [...(customer.orders ?? [])]
     .sort((a, b) => String(b.date).localeCompare(String(a.date)))

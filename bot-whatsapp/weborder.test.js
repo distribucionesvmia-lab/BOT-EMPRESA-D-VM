@@ -75,7 +75,7 @@ test("withOwnOrders: suma los pedidos hechos por la app solo si son posteriores 
   ];
   const r = withOwnOrders(c, propios);
   assert.deepEqual(r.orders.map((o) => o.doc), ["W3", "A2", "A1"]);
-  assert.equal(withOwnOrders(c, []), c); // sin pedidos propios: el mismo cliente
+  assert.deepEqual(withOwnOrders(c, []).orders, c.orders); // sin pedidos propios: el mismo historial
   assert.deepEqual(withOwnOrders({ id: "2", orders: [] }, propios).orders.map((o) => o.doc), ["W2", "W3"].reverse().filter(() => true).length ? ["W3", "W2"] : []);
 });
 
@@ -92,4 +92,27 @@ test("webProducts: avisa de las fotos creadas con IA (solo si el producto tiene 
   const r = webProducts({}, cat, () => [], (id) => (id === "3" ? null : `/img/${id}`), (id) => id !== "2");
   const por = Object.fromEntries(r.map((p) => [p.id, p.ia === true]));
   assert.deepEqual(por, { 1: true, 2: false, 3: false }); // el 3 no tiene foto: sin aviso
+});
+
+test("historial del cliente: solo sus 10 últimos pedidos; al hacer el 11.º se va el más antiguo", async () => {
+  const { withOwnOrders, webHistory, HISTORIAL_MAX } = await import("./weborder.js");
+  assert.equal(HISTORIAL_MAX, 10);
+  const dia = (n) => `2026-10-${String(n).padStart(2, "0")}`;
+  const linea = [{ productId: "1", qty: 1 }];
+  // 10 pedidos ya guardados (del 1 al 10 de octubre)
+  const pedidos = Array.from({ length: 10 }, (_, i) => ({ doc: `P${i + 1}`, date: dia(i + 1), lines: linea }));
+  let c = withOwnOrders({ id: "C", orders: pedidos }, []);
+  assert.equal(c.orders.length, 10);
+  // hace el 11.º por la aplicación: sale el primero que se guardó (P1) y entra el nuevo, el primero de la lista
+  c = withOwnOrders({ id: "C", orders: pedidos }, [{ doc: "VM-11", date: dia(11), lines: linea }]);
+  assert.deepEqual(c.orders.map((o) => o.doc), ["VM-11", "P10", "P9", "P8", "P7", "P6", "P5", "P4", "P3", "P2"]);
+  // el siguiente día vuelve a pedir: sale P2 y se queda siempre en 10
+  c = withOwnOrders({ id: "C", orders: pedidos }, [{ doc: "VM-12", date: dia(12), lines: linea }, { doc: "VM-11", date: dia(11), lines: linea }]);
+  assert.deepEqual(c.orders.map((o) => o.doc).slice(0, 2), ["VM-12", "VM-11"]);
+  assert.equal(c.orders.length, 10);
+  assert.equal(c.orders.some((o) => o.doc === "P2"), false);
+  // si a3ERP trae más de 10, también se quedan los 10 últimos; y la web enseña los 10 para volver a pedirlos
+  const muchos = Array.from({ length: 14 }, (_, i) => ({ doc: `A${i + 1}`, date: dia(i + 1), lines: linea }));
+  const cat = [{ id: "1", name: "AGUA" }];
+  assert.equal(webHistory(withOwnOrders({ id: "C", orders: muchos }, []), cat).length, 10);
 });
