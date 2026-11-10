@@ -782,7 +782,7 @@ function pintarHoja(i) {
       let v = row[c], s = 0; if (v && typeof v === "object") { s = v.s ?? 0; v = v.v; }
       const td = document.createElement("td"); if (s) td.className = "s" + s;
       if (s >= 8 && s <= 10) { td.colSpan = Math.max(1, (sh.widths?.length || 9) - c); td.textContent = v ?? ""; tr.appendChild(td); break; } // observaciones con color: una celda a lo ancho
-      if (s === 7) { td.colSpan = sh.widths?.length || 9; td.textContent = v ?? ""; tr.appendChild(td); break; } // cartel del pedido: una sola celda grande
+      if (s === 7) { td.colSpan = sh.widths?.length || 9; td.textContent = row.map((x) => (x && typeof x === "object" ? x.v : x)).filter((x) => x != null && x !== "").join("   ·   "); tr.appendChild(td); break; } // cartel del pedido: una sola celda grande con «Cliente 5900 · NOMBRE COMERCIAL»
       if (typeof v === "number") { td.className += " n"; td.textContent = Number.isInteger(v) ? String(v) : num(v); } else td.textContent = v ?? "";
       tr.appendChild(td);
     }

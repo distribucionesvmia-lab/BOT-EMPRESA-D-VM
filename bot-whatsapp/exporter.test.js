@@ -109,7 +109,7 @@ test("exportar solo los pedidos elegidos: los demás siguen pendientes y se pued
   assert.equal(runExport(db, { dir }).export.order_count, 1);
 });
 
-test("hoja «Pedidos»: el cartel lleva el código de cliente a la izquierda y el nombre comercial a la derecha, grande y con la fila más alta", () => {
+test("hoja «Pedidos»: el cartel azul lleva «Cliente 5900» y, justo a su derecha, el nombre comercial, grande y con la fila más alta", () => {
   const db = openDb(":memory:"), dir = tmp();
   db.createOrder(pedido("k1", {}));
   db.createOrder(pedido("k2", {}));
@@ -118,7 +118,8 @@ test("hoja «Pedidos»: el cartel lleva el código de cliente a la izquierda y e
   assert.equal(merges.length, 4); // por pedido: A:B (código) y C:I (nombre)
   assert.deepEqual(merges.slice(0, 2), ["A1:B1", "C1:I1"]);
   assert.match(xml, /<row r="1" ht="38" customHeight="1"><c r="A1" s="7"/);
-  assert.match(xml, /<c r="C1" s="11"/); // el nombre, alineado a la derecha
+  assert.match(xml, /<c r="C1" s="7"/); // el nombre, pegado al código (alineado a la izquierda, mismo estilo)
+  assert.doesNotMatch(xml, /<c r="C1" s="11"/);
   assert.match(xml, new RegExp(`<row r="${merges[2].match(/\d+/)[0]}" ht="38"`)); // el segundo pedido también
 });
 

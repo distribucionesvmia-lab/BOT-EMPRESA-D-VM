@@ -40,12 +40,12 @@ const LINE_HEAD = ["Código artículo", "Cajas", "Descripción", "Unidades", "Pr
 const WIDTHS = [18, 16, 46, 16, 12, 10, 12, 8, 40];
 const COLS = LINE_HEAD.length;
 
-// Cartel de cada pedido: «Cliente 9001» a la izquierda (columnas A-B) y el nombre comercial a la derecha (C-I)
+// Cartel de cada pedido (barra azul): «Cliente 9001» (columnas A-B) y, justo a su derecha, el nombre comercial (desde la C), los dos en blanco y grande
 const bannerRow = (o) => {
-  const r = Array(COLS).fill({ v: null, s: STYLE.bannerRight });
+  const r = Array(COLS).fill({ v: null, s: STYLE.banner });
   r[0] = { v: `Cliente ${o.customer_id ?? "—"}`, s: STYLE.banner };
   r[1] = { v: null, s: STYLE.banner };
-  r[2] = { v: o.name ?? "", s: STYLE.bannerRight };
+  r[2] = { v: o.name ?? "", s: STYLE.banner };
   return r;
 };
 const hdr = (cells) => cells.map((v) => ({ v, s: STYLE.header }));
