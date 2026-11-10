@@ -822,9 +822,12 @@ function verHistorial(id) {
 $("q-his").oninput = (e) => { qHis = e.target.value; pagHis = 0; pintarHistorial(); };
 $("his-ant").onclick = () => { pagHis = Math.max(0, pagHis - 1); pintarHistorial(); };
 $("his-sig").onclick = () => { pagHis++; pintarHistorial(); };
-const adEt = { anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", desconocidos: "Códigos de cliente que no existen (ignorados)", clientes: "Clientes con historial distinto", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
+const adEt = { anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", rechazados: "Productos con datos raros (NO se importan)", desconocidos: "Códigos de cliente que no existen (ignorados)", clientes: "Clientes con historial distinto", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
 function adPinta(r, p) {
   const cont = $(p + "-res"); cont.textContent = "";
+  if (r.lectura?.columnas) { const q = document.createElement("p"); q.className = "muted"; const c = r.lectura.columnas; q.textContent = "Cómo se ha leído el Excel · " + Object.entries({ code: "código", name: "nombre", price: "PRECIO", unitsPerBox: "uds/caja", vat: "IVA", discount: "descuento" }).filter(([k]) => c[k]).map(([k, et]) => `${et} = «${c[k]}»`).join(" · "); cont.appendChild(q); }
+  if (r.lectura?.ejemplos?.length) { const ul = document.createElement("ul"); ul.className = "muted"; for (const e of r.lectura.ejemplos) { const li = document.createElement("li"); li.textContent = `${e.codigo} ${e.nombre}: precio ${e.precio} €${e.iva != null ? " · IVA " + e.iva + " %" : ""}${e.unidadesPorCaja ? " · caja de " + e.unidadesPorCaja : ""}${e.descuento ? " · dto. " + e.descuento + " %" : ""}`; ul.appendChild(li); } cont.appendChild(ul); }
+  if (r.confirmar?.length) { const w = document.createElement("div"); w.style.cssText = "border:2px solid #c0392b;border-radius:10px;padding:8px 12px;margin:8px 0;background:#fdecea;color:#7b1d12"; w.appendChild(Object.assign(document.createElement("b"), { textContent: "⚠ Hay que revisar antes de aplicar" })); const ul = document.createElement("ul"); for (const x of r.confirmar) { const li = document.createElement("li"); li.textContent = x; ul.appendChild(li); } w.appendChild(ul); cont.appendChild(w); }
   const t = document.createElement("table"), tb = document.createElement("tbody"); t.appendChild(tb);
   for (const [k, v] of Object.entries(r.resumen)) { const tr = document.createElement("tr"), a = document.createElement("td"), b = document.createElement("td"); a.textContent = adEt[k] ?? k; b.textContent = v; tr.append(a, b); tb.appendChild(tr); }
   cont.appendChild(t);
@@ -843,18 +846,20 @@ function adPinta(r, p) {
   }
 }
 function montarExcel(p, despues) {
-  let fichero = null;
+  let fichero = null, ultimo = null;
 $(p + "-ver").onclick = async () => {
   fichero = $(p + "-file").files[0]; $(p + "-aplicar").hidden = true; $(p + "-res").textContent = "";
   if (!fichero) { $(p + "-msg").textContent = "Elige primero el archivo Excel."; return; }
   $(p + "-ver").disabled = true; $(p + "-msg").textContent = "Comparando con lo que hay…";
-  try { const j = { ok: true, ...VM.vistaPrevia($(p + "-tipo").value, new Uint8Array(await fichero.arrayBuffer())) }; adPinta(j, p); $(p + "-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : "No hay cambios que aplicar (o hay un aviso que lo impide)."; $(p + "-aplicar").hidden = !j.aplicable; }
+  try { const j = { ok: true, ...VM.vistaPrevia($(p + "-tipo").value, new Uint8Array(await fichero.arrayBuffer())) }; ultimo = j; adPinta(j, p); $(p + "-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : "No hay cambios que aplicar (o hay un aviso que lo impide)."; $(p + "-aplicar").hidden = !j.aplicable; }
   catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-ver").disabled = false; }
 };
 $(p + "-aplicar").onclick = async () => {
-  if (!confirm("¿Aplicar estos cambios? Solo se escribirán las diferencias.")) return;
+  const aviso = ultimo?.confirmar?.length ? "⚠ ANTES DE APLICAR, revisa esto:\n\n• " + ultimo.confirmar.join("\n• ") + "\n\n¿Lo has revisado y quieres aplicar los cambios igualmente?" : "¿Aplicar estos cambios? Solo se escribirán las diferencias.";
+  if (!confirm(aviso)) return;
+  const confirmo = !!ultimo?.confirmar?.length;
   $(p + "-aplicar").disabled = true; $(p + "-msg").textContent = "Aplicando…";
-  try { const j = await VM.aplicarDatos($(p + "-tipo").value, new Uint8Array(await fichero.arrayBuffer()), fichero.name); const { resumen, ...r } = j; delete r.ok; delete r.tipo; const et = { anadidos: "añadidos", modificados: "modificados", iguales: "sin cambios", desactivados: "pasan a inactivos", fotosGuardadas: "fotos guardadas", nuevos: "nuevos", actualizados: "actualizados", cuentasNuevas: "cuentas nuevas", clientes: "clientes con historial actualizado", lineas: "líneas" }; $(p + "-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${v} ${et[k] ?? k}`).join(" · "); $(p + "-aplicar").hidden = true; $(p + "-res").textContent = ""; $(p + "-file").value = ""; despues(); }
+  try { const j = await VM.aplicarDatos($(p + "-tipo").value, new Uint8Array(await fichero.arrayBuffer()), fichero.name, confirmo); const { resumen, ...r } = j; delete r.ok; delete r.tipo; const et = { anadidos: "añadidos", modificados: "modificados", iguales: "sin cambios", desactivados: "pasan a inactivos", fotosGuardadas: "fotos guardadas", nuevos: "nuevos", actualizados: "actualizados", cuentasNuevas: "cuentas nuevas", clientes: "clientes con historial actualizado", lineas: "líneas" }; $(p + "-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${v} ${et[k] ?? k}`).join(" · "); $(p + "-aplicar").hidden = true; $(p + "-res").textContent = ""; $(p + "-file").value = ""; despues(); }
   catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-aplicar").disabled = false; }
 };
 }

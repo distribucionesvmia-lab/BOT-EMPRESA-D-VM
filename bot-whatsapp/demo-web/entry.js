@@ -466,9 +466,9 @@ window.VM = {
   /** Excel (productos, clientes o histórico) → { resumen, detalle, aviso, aplicable }. No escribe nada. */
   vistaPrevia(tipo, bytes) { return actualizador.vistaPrevia(tipo, Buffer.from(bytes)); },
   /** Aplica solo las diferencias del Excel. */
-  async aplicarDatos(tipo, bytes, fichero) {
+  async aplicarDatos(tipo, bytes, fichero, confirmo = false) {
     if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para actualizar los datos.");
-    const r = actualizador.aplicar(tipo, Buffer.from(bytes), { fichero });
+    const r = actualizador.aplicar(tipo, Buffer.from(bytes), { fichero, confirmo });
     await Promise.all(pendientes.splice(0));
     return r;
   },

@@ -22,13 +22,15 @@ const fmt = (campo, v) => (v == null ? "—" : campo === "price" ? eur(v) : camp
 
 /** Excel → { productos, sinPrecioIds, filasPorHoja } (todas las hojas con cabecera de productos). */
 export function leerExcel(buf, { iva = {} } = {}) {
-  const productos = [], sinPrecioIds = [], fotos = [], vistos = new Set();
+  const productos = [], sinPrecioIds = [], fotos = [], vistos = new Set(), rechazados = [], avisos = [];
+  let columnas = null;
   const hojas = readXlsxSheets(buf);
   const porHoja = hojas.length ? fotosPorFila(buf) : new Map();
   for (const h of hojas) {
     let r;
     try { r = parseProductos(h.rows); } catch { continue; }
     sinPrecioIds.push(...(r.stats.sinPrecioIds ?? []));
+    rechazados.push(...r.stats.rechazados); avisos.push(...r.stats.avisos); columnas ??= r.stats.columnas;
     for (const [k, p] of r.products.entries()) {
       if (vistos.has(p.id)) continue;
       vistos.add(p.id);
@@ -38,7 +40,7 @@ export function leerExcel(buf, { iva = {} } = {}) {
       if (foto) fotos.push({ id: p.id, ...foto });
     }
   }
-  return { productos, sinPrecioIds, fotos };
+  return { productos, sinPrecioIds, fotos, rechazados, avisos, columnas };
 }
 
 /** Categoría y subcategoría de un producto por su tipo: reglas del nombre + código de familia de a3ERP (mapa familias-categorias.json). */

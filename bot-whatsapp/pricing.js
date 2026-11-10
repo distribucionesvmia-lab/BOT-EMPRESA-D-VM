@@ -16,7 +16,17 @@ export const DEFAULT_VAT = 21;
 // Recargo de equivalencia legal en España según el tipo de IVA (%). Confirmar con la gestoría si hay otros tipos.
 export const RE_RATE = { 21: 5.2, 10: 1.4, 4: 0.5 };
 
-export const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+// Los euros se redondean a céntimos hacia arriba en la mitad (0,005 → 0,01), pero SIN errores de coma flotante: los importes se calculan con ENTEROS
+// (céntimos). Con números decimales normales 300 × 2,286 × 0,875 = 600,075 salía 600,07 en vez de 600,08.
+export const round2 = (n) => Math.round(Number((Math.abs(n) * 100).toPrecision(14))) * Math.sign(n) / 100;
+const escala = (x, dec) => BigInt(Math.round(Number(x) * 10 ** dec)); // x con como mucho «dec» decimales (los precios se guardan a 4 y los descuentos a 2)
+const mitadArriba = (num, den) => (num * 2n + den) / (2n * den); // num/den redondeado al entero, la mitad hacia arriba (num ≥ 0)
+/** Importe de una línea en CÉNTIMOS (entero): unidades × precio × (1 − descuento %), todo exacto. */
+export function importeCentimos(units, price, discount = 0) {
+  const u = escala(units, 3), pr = escala(price, 4), d = escala(discount, 2);
+  const c = mitadArriba(u * pr * (10000n - d) * 100n, 1000n * 10000n * 10000n);
+  return Number(c);
+}
 
 /** Calcula los campos de una línea: { unit, boxes, units, price, discount, vat, amount, unsureBox } */
 export function priceLine(item, product, customer) {
@@ -34,7 +44,7 @@ export function priceLine(item, product, customer) {
     price,
     discount,
     vat: product?.vat ?? DEFAULT_VAT,
-    amount: round2(units * price * (1 - discount / 100)),
+    amount: importeCentimos(units, price, discount) / 100,
     unsureBox: byBox && !upb, // pidió cajas pero no sabemos cuántas unidades trae cada una
   };
 }
@@ -49,19 +59,18 @@ export function priceOrder(order, customer, catalog) {
     const { unsureBox, ...fields } = p;
     return { ...it, ...fields };
   });
-  const base = round2(items.reduce((t, i) => t + i.amount, 0));
+  const base = items.reduce((t, i) => t + Math.round(i.amount * 100), 0) / 100;
   return { ...order, items, review, re: !!customer?.recargoEquivalencia, total: items.length ? base : order.total };
 }
 
 /** Totales de un pedido: bases por tipo de IVA, IVA, R.E. y total del pedido. */
 export function totals(items, re = false) {
-  const byVat = new Map();
-  for (const i of items) byVat.set(i.vat_rate ?? i.vat ?? DEFAULT_VAT, (byVat.get(i.vat_rate ?? i.vat ?? DEFAULT_VAT) ?? 0) + (i.amount ?? 0));
-  const groups = [...byVat].sort((a, b) => b[0] - a[0]).map(([vat, sum]) => {
-    const base = round2(sum);
-    return { vat, base, iva: round2((base * vat) / 100), re: re ? round2((base * (RE_RATE[vat] ?? 0)) / 100) : 0 };
-  });
-  const sum = (k) => round2(groups.reduce((t, g) => t + g[k], 0));
+  const byVat = new Map(); // tipo de IVA → céntimos de base (enteros: sin errores de redondeo)
+  for (const i of items) { const v = i.vat_rate ?? i.vat ?? DEFAULT_VAT; byVat.set(v, (byVat.get(v) ?? 0) + Math.round((i.amount ?? 0) * 100)); }
+  const pct = (cents, rate) => Number(mitadArriba(BigInt(cents) * escala(rate, 2), 10000n)); // cents × rate / 100, a céntimos
+  const groups = [...byVat].sort((a, b) => b[0] - a[0]).map(([vat, base]) => ({ vat, base, iva: pct(base, vat), re: re ? pct(base, RE_RATE[vat] ?? 0) : 0 }));
+  const sum = (k) => groups.reduce((t, g) => t + g[k], 0);
   const base = sum("base"), iva = sum("iva"), reTotal = sum("re");
-  return { groups, base, iva, re: reTotal, total: round2(base + iva + reTotal) };
+  const e = (c) => c / 100;
+  return { groups: groups.map((g) => ({ vat: g.vat, base: e(g.base), iva: e(g.iva), re: e(g.re) })), base: e(base), iva: e(iva), re: e(reTotal), total: e(base + iva + reTotal) };
 }

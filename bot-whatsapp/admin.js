@@ -152,9 +152,9 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       if (!buf || !buf.length) return send(res, 400, { error: `No se recibió el archivo (máximo ${m[2] === "fotos" ? 80 : 25} MB).` }), true;
       try {
         if (m[1] === "vista-previa") return send(res, 200, { ok: true, tipo: m[2], ...actualizador.vistaPrevia(m[2], buf) }), true;
-        return send(res, 200, { ok: true, tipo: m[2], ...actualizador.aplicar(m[2], buf, { fichero: String(url.searchParams.get("fichero") ?? "").slice(0, 120) }) }), true;
+        return send(res, 200, { ok: true, tipo: m[2], ...actualizador.aplicar(m[2], buf, { fichero: String(url.searchParams.get("fichero") ?? "").slice(0, 120), confirmo: url.searchParams.get("confirmo") === "1" }) }), true;
       } catch (e) {
-        return send(res, 400, { error: e.message || "No se pudo leer el Excel." }), true;
+        return send(res, e.confirmar ? 409 : 400, { error: e.message || "No se pudo leer el Excel.", ...(e.confirmar ? { confirmar: e.confirmar } : {}) }), true;
       }
     }
     if (p === "/api/admin/cuentas" && get) return send(res, 200, accounts.listAccounts().map((a) => ({ ...a, cliente: customers.getById(a.customerId)?.name ?? "" }))), true;

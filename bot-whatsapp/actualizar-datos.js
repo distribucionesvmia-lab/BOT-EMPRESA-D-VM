@@ -38,7 +38,7 @@ const claveHistorial = (o) => `${o.date}|${o.doc}|${[...o.lines].map((l) => `${l
 export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir = null, copiaCatalogo = null, familias = {}, registro = () => {}, onChange = () => {} }) {
   // ---------- productos ----------
   function productos(buf) {
-    const { productos: lista, sinPrecioIds, fotos } = leerExcel(buf);
+    const { productos: lista, sinPrecioIds, fotos, rechazados, avisos: avisosLectura, columnas } = leerExcel(buf);
     if (!lista.length) throw new Error("El Excel no tiene productos con precio.");
     const actual = catalogDb.list({ activeOnly: false });
     const activos = actual.filter((p) => p.active !== false).length;
@@ -46,6 +46,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     // Si el Excel trae su propia columna «Categoría», manda esa.
     const nuevos = lista.map((p) => ({ ...p, ...(p.category ? {} : clasificar(p, familias)) }));
     const cmp = compararProductos(actual, nuevos, { sinPrecioIds });
+    const saltos = saltosDePrecio(cmp);
     const aviso = [];
     if (activos >= 20 && lista.length < activos * MIN_RATIO) aviso.push(`El Excel tiene ${lista.length} productos y hay ${activos} activos: parece incompleto. No se puede aplicar.`);
     const sinIva = cmp.anadidos.filter((p) => p.vat === undefined).length;
@@ -62,16 +63,26 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
       const d = dimensiones(f.data); if (d && Math.max(d.w, d.h) < POCA_RESOLUCION) fotosBajaCalidad++;
     }
     if (fotosBajaCalidad) aviso.push(`${fotosBajaCalidad} de las ${fotosNuevas} fotos nuevas del Excel son miniaturas de baja resolución (menos de ${POCA_RESOLUCION} px) y se verán borrosas: es mejor subir fotos grandes en un ZIP.`);
-    const resumen = { anadidos: cmp.anadidos.length, quitados: cmp.quitados.length, modificados: cmp.modificados.length, reactivados: cmp.reactivados.length, sinPrecio: cmp.sinPrecio.length, iguales: cmp.iguales, fotosNuevas, fotosBajaCalidad };
+    const resumen = { rechazados: rechazados.length, anadidos: cmp.anadidos.length, quitados: cmp.quitados.length, modificados: cmp.modificados.length, reactivados: cmp.reactivados.length, sinPrecio: cmp.sinPrecio.length, iguales: cmp.iguales, fotosNuevas, fotosBajaCalidad };
     const detalle = {
       modificados: cmp.modificados.slice(0, MUESTRA).map((m) => ({ id: m.id, nombre: m.name, cambios: m.cambios.map((c) => ({ campo: CAMPOS[c.campo] ?? c.campo, antes: c.antes, despues: c.despues })) })),
       anadidos: cmp.anadidos.slice(0, MUESTRA).map((p) => ({ id: p.id, nombre: p.name, precio: p.price })),
       quitados: cmp.quitados.slice(0, MUESTRA).map((p) => ({ id: p.id, nombre: p.name, motivo: p.motivo })),
-      saltosPrecio: saltosDePrecio(cmp).slice(0, MUESTRA),
+      saltosPrecio: saltos.slice(0, MUESTRA),
+      rechazados: rechazados.slice(0, MUESTRA).map((x) => ({ id: x.id, nombre: x.name, motivo: x.motivo })),
     };
+    // Cómo se ha leído el Excel: qué columna es el precio, etc., y los 3 primeros productos tal como han quedado, para comprobarlo de un vistazo
+    const lectura = { columnas, ejemplos: lista.slice(0, 3).map((p) => ({ codigo: p.id, nombre: p.name, precio: p.price, iva: p.vat ?? null, unidadesPorCaja: p.unitsPerBox ?? null, descuento: p.discount ?? null })) };
+    // Cosas que el empresario tiene que mirar y aceptar expresamente antes de aplicar (dinero en juego)
+    const confirmar = [];
+    if (saltos.length) confirmar.push(`${saltos.length} productos cambian de precio más de un 25 % (el mayor: ${saltos[0].id} ${saltos[0].antes} € → ${saltos[0].despues} €). Compruébalos en la lista de «Precios que cambian mucho».`);
+    if (cmp.quitados.length >= 5 && cmp.quitados.length > activos * 0.1) confirmar.push(`Se quitan ${cmp.quitados.length} productos (el ${Math.round((cmp.quitados.length / activos) * 100)} % del catálogo).`);
+    if (rechazados.length) confirmar.push(`${rechazados.length} productos con datos raros NO se importan (precio disparatado o IVA que no existe).`);
+    for (const x of avisosLectura.slice(0, 5)) aviso.push(x);
+    if (avisosLectura.length > 5) aviso.push(`… y ${avisosLectura.length - 5} avisos más de datos raros.`);
     const hayCambios = !!(cmp.anadidos.length || cmp.quitados.length || cmp.modificados.length || cmp.reactivados.length || fotosNuevas);
     return {
-      resumen, detalle, aviso, aplicable: hayCambios && !aviso.length,
+      resumen, detalle, aviso, lectura, confirmar, aplicable: hayCambios && !aviso.some((x) => /No se puede aplicar|no se pueden añadir/.test(x)),
       aplicar() {
         const resultado = aplicarProductos(actual, nuevos);
         const r = catalogDb.upsertProducts(resultado.map((p) => ({ ...p, unitsPerBox: p.unitsPerBox ?? null })), { partial: true, deactivateMissing: true });
@@ -228,9 +239,14 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
       const { aplicar: _a, ...r } = preparar(tipo, buf);
       return r;
     },
-    aplicar(tipo, buf, { fichero = "" } = {}) {
+    aplicar(tipo, buf, { fichero = "", confirmo = false } = {}) {
       const p = preparar(tipo, buf);
       if (!p.aplicable) throw new Error(p.aviso.find((a) => /No se puede aplicar|no se pueden añadir/.test(a)) ?? "No hay nada que aplicar.");
+      if (p.confirmar?.length && !confirmo) { // hay precios que cambian mucho, productos que se quitan o datos raros: se aplica solo si lo has confirmado
+        const e = new Error("Hay cosas que confirmar antes de aplicar: " + p.confirmar.join(" "));
+        e.confirmar = p.confirmar;
+        throw e;
+      }
       if (tipo === "productos" && copiaCatalogo) try { catalogDb.backupTo(`${copiaCatalogo}.antes-${new Date().toISOString().replace(/[:.]/g, "-")}.bak`); } catch { /* sin copia no se bloquea */ }
       const r = p.aplicar();
       registro({ at: new Date().toISOString(), tipo, fichero, resumen: p.resumen, resultado: r });

@@ -31,7 +31,10 @@ test("parseProductos: reconoce las columnas por la cabecera (aunque haya un tít
   assert.equal(products[1].discount, 5);
   assert.equal(products[2].active, false);
   assert.equal(products[2].unitsPerBox, undefined);
-  assert.deepEqual(stats, { filas: 6, importados: 3, sinPrecio: 1, sinPrecioIds: ["1004"], duplicados: 1, inactivos: 1, descartadas: 1 });
+  const { columnas, rechazados, avisos, ...contadores } = stats;
+  assert.deepEqual(contadores, { filas: 6, importados: 3, sinPrecio: 1, sinPrecioIds: ["1004"], duplicados: 1, inactivos: 1, descartadas: 1 });
+  assert.equal(columnas.price, "Precio venta"); // se enseña qué columna se ha leído como precio
+  assert.deepEqual([rechazados, avisos], [[], []]);
 });
 
 test("parseProductos: sin cabecera reconocible da un error claro", () => {
@@ -47,4 +50,19 @@ test("tarifa con una hoja por proveedor: «Artículo» es el nombre, códigos de
   assert.deepEqual(["21", "RED10", "ORD21", "SRE", "x"].map(tipoIva), [21, 10, 21, 4, null]);
   const d = parseProductos([["Cód. artículo", "Cód. artículo", "Precio venta"], ["9", "PASTA", "1,35"]]);
   assert.equal(d.products[0].name, "PASTA");
+});
+
+test("parseNumber: formato español, inglés y miles; nunca confunde coma y punto", () => {
+  const casos = [["1,89", 1.89], ["1.89", 1.89], ["1.894", 1.894], ["1.234,56", 1234.56], ["1,234.56", 1234.56], ["1.234.567", 1234567], ["12,5 %", 12.5], ["0,05 €", 0.05], ["4.9950000000000001", 4.995], [4.995, 4.995], ["", null], ["#N/A", null], ["abc", null]];
+  for (const [entrada, esperado] of casos) assert.equal(parseNumber(entrada), esperado, String(entrada));
+});
+
+test("parseProductos: no importa lo que parece una celda mal leída (precio disparatado, IVA que no existe) y avisa de lo raro", () => {
+  const r = parseProductos([["Cód. artículo", "Artículo", "Precio venta", "Dto%", "Tipo IVA ventas", "Unidades paquete venta"],
+    ["1", "NORMAL", "1,25", "10", "RED10", "6"], ["2", "PRECIO LOCO", "123456", "", "ORD21", "1"], ["3", "IVA RARO", "2", "", "7", "1"], ["4", "DTO IMPOSIBLE", "2", "250", "ORD21", "1"], ["5", "CAJA RARA", "2", "", "ORD21", "99999"], ["6", "CON RUIDO", "4,9950000000000001", "", "SRE", "1"]]);
+  assert.deepEqual(r.products.map((p) => [p.id, p.price, p.discount, p.vat, p.unitsPerBox]), [["1", 1.25, 10, 10, 6], ["4", 2, undefined, 21, 1], ["5", 2, undefined, 21, undefined], ["6", 4.995, undefined, 4, 1]]);
+  assert.deepEqual(r.stats.rechazados.map((x) => x.id), ["2", "3"]);
+  assert.match(r.stats.rechazados[0].motivo, /precio fuera de lo normal/);
+  assert.match(r.stats.rechazados[1].motivo, /IVA que no existe/);
+  assert.equal(r.stats.avisos.length, 2); // descuento imposible y unidades por caja raras
 });

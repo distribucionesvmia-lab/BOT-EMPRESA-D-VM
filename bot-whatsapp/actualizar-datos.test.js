@@ -132,3 +132,25 @@ test("dimensiones: lee el tamaño de un PNG y de un JPEG, y avisa de las fotos p
   const z = Buffer.from(zip({ "31.png": Buffer.concat([png, Buffer.alloc(300)]) }));
   assert.match(a.vistaPrevia("fotos", z).aviso.join(" "), /baja resolución/);
 });
+
+test("productos: un precio que cambia mucho o datos raros obligan a confirmar antes de aplicar, y se enseña cómo se ha leído el Excel", () => {
+  const { a, catalogDb } = montar();
+  a.aplicar("productos", prod(["1", "AGUA", "0,50", "RED10", "6", "No", "No"], ["2", "LECHE", "1,00", "RED10", "6", "No", "No"]));
+  // el Excel nuevo sube el agua de 0,50 a 5,00 (+900 %), trae una celda disparatada y un IVA que no existe
+  const x = prod(["1", "AGUA", "5,00", "RED10", "6", "No", "No"], ["2", "LECHE", "1,00", "RED10", "6", "No", "No"], ["3", "LOCO", "99999", "RED10", "1", "No", "No"], ["4", "IVA RARO", "2", "7", "1", "No", "No"]);
+  const p = a.vistaPrevia("productos", x);
+  assert.equal(p.aplicable, true);
+  assert.equal(p.confirmar.length, 2); // salto de precio y datos raros
+  assert.match(p.confirmar.join(" "), /más de un 25 %/);
+  assert.equal(p.resumen.rechazados, 2);
+  assert.equal(p.lectura.columnas.price, "Precio venta"); // qué columna se ha tomado como precio
+  assert.deepEqual(p.lectura.ejemplos[0], { codigo: "1", nombre: "AGUA", precio: 5, iva: 10, unidadesPorCaja: 6, descuento: null });
+  // sin confirmar NO se aplica; el precio sigue como estaba
+  assert.throws(() => a.aplicar("productos", x), (e) => e.confirmar?.length === 2 && /confirmar/.test(e.message));
+  assert.equal(catalogDb.list({ activeOnly: false }).find((q) => q.id === "1").price, 0.5);
+  // confirmado: se aplica, y los productos raros no entran
+  a.aplicar("productos", x, { confirmo: true });
+  const lista = catalogDb.list({ activeOnly: false });
+  assert.equal(lista.find((q) => q.id === "1").price, 5);
+  assert.equal(lista.some((q) => q.id === "3" || q.id === "4"), false);
+});

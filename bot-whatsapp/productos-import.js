@@ -11,8 +11,10 @@ export function parseNumber(v) {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
   let t = String(v ?? "").replace(/[€%\s]/g, "");
   if (!t || !/^-?[\d.,]+$/.test(t)) return null;
-  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
-  else if ((t.match(/\./g) ?? []).length > 1) t = t.replace(/\./g, "");
+  const coma = t.lastIndexOf(","), punto = t.lastIndexOf(".");
+  if (coma >= 0 && punto >= 0) t = coma > punto ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, ""); // el último separador es el decimal: «1.234,56» y «1,234.56»
+  else if (coma >= 0) t = t.replace(",", "."); // solo coma: decimal español («1,89»)
+  else if ((t.match(/\./g) ?? []).length > 1) t = t.replace(/\./g, ""); // varios puntos: miles («1.234.567»)
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
 }
@@ -41,6 +43,8 @@ export function tipoIva(v) {
   return m ? Number(m[1]) : null;
 }
 
+export const PRECIO_MAXIMO = 5000; // € por unidad: por encima, casi seguro es una celda mal leída
+
 /** Filas del Excel → { products, stats }. La primera fila con cabecera de código y de descripción es la cabecera. */
 export function parseProductos(rows) {
   const heads = (r) => r.map(norm);
@@ -65,7 +69,9 @@ export function parseProductos(rows) {
   if (col.code >= 0 && muestra.length && muestra.every((r) => /^[+\-*]?$/.test(String(r[col.code] ?? "").trim())) && !heads(rows[hi])[col.code + 1]) col.code++;
   const get = (r, k) => (col[k] >= 0 ? r[col[k]] : undefined);
   const products = [], rowOf = [], seen = new Set(); // rowOf: nº de fila de Excel de cada producto (para emparejar imágenes)
-  const stats = { filas: 0, importados: 0, sinPrecio: 0, duplicados: 0, inactivos: 0, descartadas: 0 };
+  const stats = { filas: 0, importados: 0, sinPrecio: 0, duplicados: 0, inactivos: 0, descartadas: 0, rechazados: [], avisos: [] };
+  const cab = rows[hi];
+  stats.columnas = Object.fromEntries(Object.keys(col).filter((k) => col[k] >= 0 && ["code", "name", "price", "unitsPerBox", "vat", "discount"].includes(k)).map((k) => [k, String(cab[col[k]] ?? "").trim() || "(sin título)"]));
   for (const [k, r] of rows.slice(hi + 1).entries()) {
     if (!r.some((c) => String(c).trim())) continue;
     stats.filas++;
@@ -74,15 +80,20 @@ export function parseProductos(rows) {
     if (seen.has(id)) { stats.duplicados++; continue; }
     const price = parseNumber(get(r, "price"));
     if (price === null || price < 0) { stats.sinPrecio++; (stats.sinPrecioIds ??= []).push(id); continue; }
+    if (price > PRECIO_MAXIMO) { stats.rechazados.push({ id, name, motivo: `precio fuera de lo normal (${price} €)` }); continue; }
+    const ivaCelda = tipoIva(get(r, "vat"));
+    if (ivaCelda !== null && ![4, 10, 21].includes(ivaCelda)) { stats.rechazados.push({ id, name, motivo: `IVA que no existe (${ivaCelda} %): solo hay 4, 10 y 21` }); continue; }
     seen.add(id);
-    const p = { id, name, price, active: !(yes(get(r, "blocked")) || yes(get(r, "obsolete"))) };
+    const p = { id, name, price: Math.round(price * 1e4) / 1e4, active: !(yes(get(r, "blocked")) || yes(get(r, "obsolete"))) };
     const fam = String(get(r, "family") ?? "").trim();
     if (fam) p.family = fam;
     const upb = parseNumber(get(r, "unitsPerBox")), vat = tipoIva(get(r, "vat")), dto = parseNumber(get(r, "discount"));
-    if (upb !== null && Number.isInteger(upb) && upb >= 1) p.unitsPerBox = upb;
+    if (upb !== null && Number.isInteger(upb) && upb >= 1 && upb <= 5000) p.unitsPerBox = upb;
+    else if (upb !== null && upb !== 0 && upb !== 1) stats.avisos.push(`${id} ${name}: unidades por caja raras (${upb}), se ignoran`);
     if (vat !== null && vat >= 0 && vat <= 100) p.vat = vat;
     else if (String(get(r, "vat") ?? "").trim()) p.vatCode = String(get(r, "vat")).trim(); // código de IVA sin porcentaje conocido («SRE»)
     if (dto !== null && dto >= 0 && dto <= 100) p.discount = dto;
+    else if (dto !== null) stats.avisos.push(`${id} ${name}: descuento imposible (${dto} %), se ignora`);
     const cat = String(get(r, "category") ?? "").trim(), sub = String(get(r, "subcategory") ?? "").trim();
     if (cat) p.category = cat;
     if (sub) p.subcategory = sub;
