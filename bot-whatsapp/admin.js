@@ -3,10 +3,12 @@
 import { deliveryInfo } from "./delivery.js";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { send, readJson, makeAdminCheck } from "./auth.js";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2 } from "./pricing.js";
 import { runExport } from "./exporter.js";
+import { execFile } from "node:child_process";
 import { imprimirHtml } from "./export-format.js";
 
 const amountOf = (l) => l.amount ?? round2((l.units ?? l.qty) * (l.price ?? 0) * (1 - (l.discount ?? 0) / 100));
@@ -76,6 +78,27 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
     // ---- Estado del sistema y problemas detectados (para vigilarlo desde fuera) ----
     if (p === "/api/admin/estado" && get) return estado ? send(res, 200, estado()) : send(res, 404, { error: "No disponible." }), true;
 
+    // ---- Versión del programa y «Actualizar ahora» (la tarea «VM Actualizar» del ordenador de la oficina mira GitHub cada 10 minutos) ----
+    if (p === "/api/admin/actualizacion" && get) {
+      const leer = (f) => { try { return fs.readFileSync(f, "utf8").replace(/^\uFEFF/, "").trim(); } catch { return ""; } };
+      const dir = process.env.UPDATE_LOG_DIR ?? "C:\\vm\\logs";
+      execFile("git", ["log", "-1", "--format=%h|%cI|%s"], { cwd: path.dirname(fileURLToPath(import.meta.url)), timeout: 4000 }, (err, out) => {
+        const [version, fecha, resumen] = err ? [] : out.trim().split("|");
+        send(res, 200, {
+          version: version ?? null, fecha: fecha ?? null, resumen: resumen ?? null,
+          ultimaComprobacion: leer(path.join(dir, "actualizar.ultima")) || null,
+          registro: leer(path.join(dir, "actualizar.log")).split(/\r?\n/).filter(Boolean).slice(-6),
+          disponible: process.platform === "win32",
+        });
+      });
+      return true;
+    }
+    if (p === "/api/admin/actualizar" && post) {
+      if (process.platform !== "win32") return send(res, 200, { ok: false, mensaje: "La actualización automática solo funciona en el ordenador de la oficina (Windows)." }), true;
+      execFile("schtasks", ["/Run", "/TN", process.env.UPDATE_TASK ?? "VM Actualizar"], { timeout: 8000 }, (err) =>
+        send(res, 200, err ? { ok: false, mensaje: "No se pudo lanzar la actualización (¿está creada la tarea «VM Actualizar»? Ver instalar-tareas.bat)." } : { ok: true, mensaje: "Buscando mejoras… si hay alguna, el programa se reinicia solo en un minuto." }));
+      return true;
+    }
     // ---- Pedidos ----
     if (p === "/api/admin/pedidos" && get) return send(res, 200, orders.listOrders({ limit: 150 }).map(orderView)), true;
     if (p === "/api/admin/exportar" && post) {

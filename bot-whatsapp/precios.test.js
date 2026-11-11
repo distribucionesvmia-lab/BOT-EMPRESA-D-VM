@@ -217,3 +217,15 @@ test("«¿Te falta algo?» con foto del artículo y entrega: dirección de siemp
   assert.match(ped, /const sinDireccion = \(\) => !String\(data\.customer\.address/);
   assert.match(ped, /\$\("confirm"\)\.onclick = \(\) => \{\s*\$\("err"\)\.textContent = ""; if \(!direccionOk/); // sin dirección válida no se pasa a elegir el día
 });
+
+test("ACTUALIZACIÓN AUTOMÁTICA: cada 10 minutos, con pruebas, comprobación de arranque, vuelta atrás y botón «Actualizar ahora»", async () => {
+  const fs = await import("node:fs");
+  const bat = fs.readFileSync(new URL("./deploy/windows/actualizar-auto.bat", import.meta.url), "utf8");
+  assert.match(bat, /node --test/); assert.match(bat, /localhost:3000\/health/); assert.match(bat, /localhost:3001\/health/);
+  assert.match(bat, /git reset --hard %ANTES%/); assert.match(bat, /actualizar\.mala/); // no reintenta una versión que ya falló
+  assert.doesNotMatch(bat, /\(sin internet\?\)/); // un paréntesis dentro de un bloque rompería el .bat
+  const tareas = fs.readFileSync(new URL("./deploy/windows/instalar-tareas.bat", import.meta.url), "utf8");
+  assert.match(tareas, /\/TN "VM Actualizar".*\/SC MINUTE \/MO 10/);
+  const emp = fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8");
+  assert.match(emp, /id="act-ahora"/); assert.match(emp, /\/api\/admin\/actualizar"/);
+});

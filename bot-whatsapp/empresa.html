@@ -92,6 +92,12 @@
     <!-- Cuentas -->
     <!-- Datos y Excel: todo lo de subir Excel en un solo sitio -->
     <div id="p-datos" class="datos-wrap" hidden>
+      <div class="panel" id="act-panel">
+        <h2>Versión del programa</h2>
+        <p class="muted" id="act-estado" style="margin:0 0 8px">Cargando…</p>
+        <div class="row"><button class="main" id="act-ahora" type="button">Actualizar ahora</button><span class="muted" id="act-msg" role="status"></span></div>
+        <p class="muted" style="margin:8px 0 0">El ordenador mira por sí solo cada 10 minutos si hay mejoras nuevas. Si las hay, comprueba que todo funciona y se actualiza; si algo falla, se queda con la versión anterior. Tus pedidos y datos no se tocan.</p>
+      </div>
       <div class="panel">
         <h2>Datos y Excel</h2>
         <p class="muted" style="margin:0 0 10px">Sube aquí los Excel de a3ERP (y las fotos). Siempre pasa lo mismo: <b>1</b> eliges el archivo, <b>2</b> «Ver cambios» te enseña qué se añade, qué cambia y qué se quita <b>sin tocar nada</b>, y <b>3</b> «Aplicar cambios» escribe solo las diferencias. Orden recomendado la primera vez: <b>clientes → productos → historial → fotos</b>.</p>
@@ -263,6 +269,16 @@ async function cuentas() {
 }
 const hora2 = (iso) => new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
 const ESTADO = { importado: "✔ importado", "sin cambios": "sin cambios", error: "✖ error", "sin fichero": "sin fichero" };
+async function actualizacion() {
+  const r = await call("/api/admin/actualizacion");
+  $("act-estado").textContent = (r.version ? `Versión ${r.version}${r.fecha ? " · del " + hora2(r.fecha) : ""}${r.resumen ? " · " + r.resumen : ""}.` : "Versión no disponible.") + (r.ultimaComprobacion ? ` Última comprobación: ${r.ultimaComprobacion}.` : "");
+  $("act-ahora").disabled = !r.disponible;
+}
+$("act-ahora").onclick = async () => {
+  $("act-ahora").disabled = true; $("act-msg").textContent = "Un momento…";
+  try { const r = await call("/api/admin/actualizar", {}); $("act-msg").textContent = r.mensaje; if (r.ok) { for (let i = 0; i < 12; i++) { await new Promise((x) => setTimeout(x, 10000)); try { await actualizacion(); } catch {} } $("act-msg").textContent = "Si ha cambiado la versión de arriba, ya está actualizado. Recarga la página para ver las novedades."; } }
+  catch (e) { $("act-msg").textContent = e.message; } finally { $("act-ahora").disabled = false; }
+};
 async function sincronizacion() {
   const r = await call("/api/admin/sincronizacion");
   if (!r.configurado) {
@@ -374,7 +390,7 @@ async function avisos() {
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), derechos(), clientes(), avisos(), sincronizacion(), correo()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), derechos(), clientes(), avisos(), sincronizacion(), correo(), actualizacion()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));

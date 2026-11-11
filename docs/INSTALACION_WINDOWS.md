@@ -78,13 +78,15 @@ Hay dos tipos de actualización y ninguna obliga a ir al ordenador:
 - Deja el Excel en la carpeta `datos` de Google Drive desde donde estés: el programa lo recoge solo cada 15 minutos y aplica solo las diferencias; o
 - Entra a la app de la empresa desde fuera con **Tailscale** (paso 7.1) y usa «Actualizar datos desde Excel».
 
-**B) Programa (mejoras nuevas):** actualización automática cada noche.
-1. Ejecuta una vez, como administrador:
+**B) Programa (mejoras nuevas):** actualización automática cada 10 minutos.
+1. `instalar-tareas.bat` (una vez, como administrador) ya crea la tarea «VM Actualizar». Si instalaste antes, ejecuta una vez:
 ```
-schtasks /Create /TN "VM Actualizar" /TR "C:\vm\bot\bot-whatsapp\deploy\windows\actualizar-auto.bat" /SC DAILY /ST 04:00 /RU SYSTEM /F
+schtasks /Create /TN "VM Actualizar" /TR "C:\vm\bot\bot-whatsapp\deploy\windows\actualizar-auto.bat" /SC MINUTE /MO 10 /RU SYSTEM /F
 ```
-2. Cada noche a las 04:00 mira GitHub. Si hay cambios nuevos, los descarga, **pasa las pruebas** y reinicia el programa. Si las pruebas fallan, vuelve a la versión anterior y lo deja anotado en `C:\vm\logs\actualizar.log`.
-3. Las bases de datos y la configuración (`C:\vm\datos`, `C:\vm\config`) no se tocan.
+2. Cada 10 minutos mira GitHub (rama de trabajo). Si no hay nada nuevo, no hace nada. Si hay cambios: los descarga, **pasa las pruebas**, reinicia el programa y **comprueba que responde** en los puertos 3000 y 3001. Si las pruebas fallan o el programa no arranca, vuelve solo a la versión anterior, lo deja anotado en `C:\vm\logs\actualizar.log` y no reintenta esa misma versión hasta que haya otra más nueva.
+3. La última comprobación se ve en `C:\vm\logs\actualizar.ultima` y en la app de la empresa: pestaña «Datos y Excel» → «Versión del programa», con el botón **«Actualizar ahora»** (lanza la comprobación al momento, sin esperar a los 10 minutos).
+4. Las bases de datos y la configuración (`C:\vm\datos`, `C:\vm\config`) no se tocan nunca.
+5. Los pedidos que lleguen justo mientras se reinicia (unos segundos) pueden dar un error de conexión al cliente; vuelve a intentarlo y funciona.
 
 **7.1 Entrar a la app de la empresa desde fuera, sin publicarla:** instala **Tailscale** en el ordenador de la oficina y en tu móvil/portátil (misma cuenta). Desde cualquier sitio abres `http://NOMBRE-DEL-PC:3001/empresa` y entras con tu clave. Solo entran tus dispositivos. Para eso, en `empresa.env` pon `HOST=0.0.0.0` (y no publiques nunca el puerto 3001 en internet).
 
