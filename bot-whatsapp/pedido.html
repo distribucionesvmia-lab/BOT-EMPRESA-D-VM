@@ -41,17 +41,33 @@
     var e = efectivo(), i = 0; for (var j = 0; j < NIVELES.length; j++) if (Math.abs(NIVELES[j] - e) < Math.abs(NIVELES[i] - e)) i = j;
     var n = NIVELES[Math.max(0, Math.min(NIVELES.length - 1, i + delta))]; fijar(n, false);
   }
-  function control(caja) { // «Tamaño de letra»: A−  100 %  A+  · Automático
+  function control(caja, modo) { // «Tamaño de letra»: A−  100 %  A+  · Automático (modo «boton»: todo dentro de un solo botón «Aa» que abre un panelito)
     if (!caja) return;
     caja.className = "letra"; caja.setAttribute("role", "group"); caja.setAttribute("aria-label", "Tamaño de letra");
     function boton(txt, etiqueta, fn) { var b = document.createElement("button"); b.type = "button"; b.textContent = txt; b.setAttribute("aria-label", etiqueta); b.onclick = function (ev) { ev.stopPropagation(); fn(); }; return b; }
     var menos = boton("A−", "Reducir letra", function () { paso(-1); }), mas = boton("A+", "Aumentar letra", function () { paso(1); });
     var auto = boton("Automático", "Tamaño de letra automático", function () { fijar(0, false); }); auto.className = "letra-auto";
     var n = document.createElement("span"); n.className = "letra-n"; n.setAttribute("aria-live", "polite");
-    caja.textContent = ""; caja.appendChild(menos); caja.appendChild(n); caja.appendChild(mas); caja.appendChild(auto);
+    caja.textContent = "";
+    var bt = null, pop = null;
+    if (modo === "boton") {
+      pop = document.createElement("div"); pop.className = "letra-pop"; pop.hidden = true; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Tamaño de letra");
+      var fila = document.createElement("div"); fila.className = "letra-fila"; fila.appendChild(menos); fila.appendChild(n); fila.appendChild(mas);
+      pop.appendChild(fila); pop.appendChild(auto);
+      bt = boton("", "Tamaño de letra", function () {
+        pop.hidden = !pop.hidden; bt.setAttribute("aria-expanded", String(!pop.hidden));
+        if (!pop.hidden) { var r = bt.getBoundingClientRect(); pop.style.top = Math.round(r.bottom + 8) + "px"; pop.style.right = Math.max(8, Math.round(innerWidth - r.right)) + "px"; }
+      });
+      bt.className = "letra-bt"; bt.setAttribute("aria-haspopup", "dialog"); bt.setAttribute("aria-expanded", "false");
+      caja.className = "letra letra-caja"; caja.removeAttribute("role"); caja.appendChild(bt); caja.appendChild(pop);
+      var cerrar = function () { if (!pop.hidden) { pop.hidden = true; bt.setAttribute("aria-expanded", "false"); } };
+      document.addEventListener("pointerdown", function (ev) { if (!caja.contains(ev.target)) cerrar(); });
+      document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") cerrar(); });
+    } else { caja.appendChild(menos); caja.appendChild(n); caja.appendChild(mas); caja.appendChild(auto); }
     function pintar() {
       var e = efectivo(), txt = Math.round(e * 100) + " %";
       n.textContent = nivel ? "Letra " + txt : "Letra " + txt + " (auto)";
+      if (bt) { bt.textContent = ""; var a = document.createElement("b"); a.textContent = "Aa"; var s = document.createElement("small"); s.textContent = txt; bt.appendChild(a); bt.appendChild(s); }
       menos.disabled = e <= NIVELES[0] + 0.001; mas.disabled = e >= NIVELES[NIVELES.length - 1] - 0.001; auto.setAttribute("aria-pressed", String(!nivel));
     }
     oyentes.push(pintar); pintar();
@@ -399,7 +415,7 @@
     .app { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto auto auto auto minmax(0, 1fr); }
     header { grid-column:1 / -1; padding:4px 14px; border-radius:0 0 14px 14px; max-height:72px; flex-wrap:nowrap; }
     header img { height:28px; } .ttl b { font-size:calc(15px / var(--k,1)); -webkit-line-clamp:1; } .cartbtn { min-height:44px; padding:0 14px; margin-left:auto; }
-    #letraBox { flex:none; } header .letra { flex-wrap:nowrap; gap:4px; } header .letra .letra-n { display:none; } header .letra button { padding:0 8px; } header .letra button.letra-auto { font-size:calc(13px / var(--k,1)); } .ayudabtn { padding:0; width:48px; font-size:0; } .ayudabtn::before { content:"?"; font-size:calc(22px / var(--k,1)); font-weight:900; } .ttl { display:none; } .cartbtn { margin-left:auto; } /* apaisado: el control de letra cabe en la misma fila de la cabecera, sin salirse */
+    #letraBox { flex:none; } .ayudabtn { padding:0; width:48px; font-size:0; } .ayudabtn::before { content:"?"; font-size:calc(22px / var(--k,1)); font-weight:900; } .ttl { min-width:0; flex:1 1 0; } .cartbtn { margin-left:auto; } /* apaisado: el control de letra cabe en la misma fila de la cabecera, sin salirse */
     .paso, .guia { display:none; }
     .tabs { grid-column:1; grid-row:3; margin:4px 6px 4px 14px; } .buscar { grid-column:2; grid-row:3; padding:4px 14px 4px 6px; } .buscar input { min-height:44px; } .buscar::before { top:14px; left:calc(6px + 14px); }
     .filbar { grid-column:1 / -1; grid-row:4; padding:0 14px 4px; } main { grid-column:1 / -1; grid-row:5; min-height:0; padding-bottom:78px; }
@@ -483,7 +499,6 @@
   .letra button:disabled { opacity:.45; cursor:default; }
   .letra button.letra-auto { font-size:calc(14px / var(--k,1)); } .letra button.letra-auto[aria-pressed="true"] { background:#d90000; color:#fff; }
   .letra .letra-n { min-width:84px; text-align:center; font-weight:700; font-size:calc(14px / var(--k,1)); line-height:1.2; }
-  header .letra .letra-n { color:#fff; }
   .bar .mpop .letra { padding:10px 14px; border-top:1px solid #eceef0; } .bar .mpop .letra button { display:inline-flex !important; align-items:center; justify-content:center; width:auto !important; min-height:48px !important; padding:0 12px !important; border:2px solid #d90000 !important; background:#fff !important; color:#a80000 !important; border-radius:12px !important; }
   .bar .mpop .letra button.letra-auto[aria-pressed="true"] { background:#d90000 !important; color:#fff !important; } .bar .mpop .letra .letra-n { color:#1d1d1f; }
   .bar .mpop .letra-titulo { padding:10px 14px 0; font-size:calc(13px / var(--k,1)); font-weight:700; color:#5f6368; }
@@ -507,6 +522,23 @@
   .ayuda-btn { display:flex; align-items:center; justify-content:center; min-height:56px; border-radius:14px; background:#d90000; color:#fff; text-decoration:none; font-weight:800; font-size:calc(18px / var(--k,1)); box-shadow:0 3px 0 #a80000; }
   .ayuda-cerrar { min-height:48px; border:2px solid #d9d9dc; border-radius:14px; background:#fff; color:#1d1d1f; font-weight:700; font-size:calc(16px / var(--k,1)); cursor:pointer; }
   .ayudabtn { flex:none; min-height:48px; min-width:48px; padding:0 12px; border:2px solid rgba(255,255,255,.8); border-radius:14px; background:transparent; color:#fff; font-weight:800; font-size:calc(15px / var(--k,1)); cursor:pointer; touch-action:manipulation; } .ayudabtn[hidden] { display:none; }
+  /* «Tamaño de letra» en la cabecera: un solo botón «Aa» que abre un panelito con A− / A+ y Automático */
+  .letra-caja { position:static; }
+  .letra .letra-bt { display:inline-flex; align-items:center; gap:8px; min-height:48px; padding:0 14px; border:0; border-radius:999px; background:#fff; color:#a80000; box-shadow:0 3px 10px rgba(0,0,0,.22); }
+  .letra .letra-bt b { font-size:calc(20px / var(--k,1)); font-weight:900; letter-spacing:-.02em; } .letra .letra-bt small { font-size:calc(13px / var(--k,1)); font-weight:800; color:#5f6368; padding-left:8px; border-left:2px solid #e3e3e6; }
+  .letra .letra-bt[aria-expanded="true"] { background:#fff1f1; box-shadow:0 0 0 3px rgba(255,255,255,.55), 0 3px 10px rgba(0,0,0,.22); }
+  .letra-pop { position:fixed; z-index:95; width:min(300px, calc(100vw - 16px)); padding:12px; border-radius:18px; background:#fff; color:#1d1d1f; box-shadow:0 14px 40px rgba(0,0,0,.35); display:flex; flex-direction:column; gap:10px; animation:letrapop .16s ease-out; }
+  .letra-pop[hidden] { display:none; } @keyframes letrapop { from { opacity:0; transform:translateY(-6px); } } @media (prefers-reduced-motion: reduce) { .letra-pop { animation:none; } }
+  .letra-pop .letra-fila { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .letra-pop .letra-n { flex:1; min-width:0; color:#1d1d1f !important; font-size:calc(15px / var(--k,1)); }
+  .letra-pop button { border:2px solid #f0c4c4; background:#fff; color:#a80000; border-radius:14px; min-height:52px; }
+  .letra-pop .letra-fila button { min-width:56px; font-size:calc(20px / var(--k,1)); }
+  .letra-pop button.letra-auto { width:100%; font-size:calc(16px / var(--k,1)); } .letra-pop button.letra-auto[aria-pressed="true"] { background:#d90000; border-color:#d90000; color:#fff; }
+  .ud button { padding:0 2px; min-width:0; font-size:calc(14px / var(--k,1)); line-height:1.2; }
+  .keepbtn { padding:12px 16px; line-height:1.25; }
+  .tl .tl-obs button { padding:10px 14px; text-align:left; line-height:1.25; }
+  .big, .opt, .cat, .sub { line-height:1.25; }
+  .big { padding-left:16px; padding-right:16px; }
 </style>
 </head>
 <body>
@@ -1373,7 +1405,7 @@ const obs = new MutationObserver(capasCambian);
   data = await r.json();
   data.products.forEach(p => productoPorId.set(p.id, p));
   pintarAviso();
-  window.vmLetra.control($("letraBox"));
+  window.vmLetra.control($("letraBox"), "boton");
   if (data.ayuda) { $("ayudaBtn").hidden = false; $("ayudaBtn").onclick = () => abrirAyuda(data.ayuda, data.customer.name); }
   document.title = "Pedido a " + data.business;
   $("ttl").textContent = "Hola, " + data.customer.name;

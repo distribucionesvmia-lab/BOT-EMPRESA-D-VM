@@ -41,17 +41,33 @@
     var e = efectivo(), i = 0; for (var j = 0; j < NIVELES.length; j++) if (Math.abs(NIVELES[j] - e) < Math.abs(NIVELES[i] - e)) i = j;
     var n = NIVELES[Math.max(0, Math.min(NIVELES.length - 1, i + delta))]; fijar(n, false);
   }
-  function control(caja) { // «Tamaño de letra»: A−  100 %  A+  · Automático
+  function control(caja, modo) { // «Tamaño de letra»: A−  100 %  A+  · Automático (modo «boton»: todo dentro de un solo botón «Aa» que abre un panelito)
     if (!caja) return;
     caja.className = "letra"; caja.setAttribute("role", "group"); caja.setAttribute("aria-label", "Tamaño de letra");
     function boton(txt, etiqueta, fn) { var b = document.createElement("button"); b.type = "button"; b.textContent = txt; b.setAttribute("aria-label", etiqueta); b.onclick = function (ev) { ev.stopPropagation(); fn(); }; return b; }
     var menos = boton("A−", "Reducir letra", function () { paso(-1); }), mas = boton("A+", "Aumentar letra", function () { paso(1); });
     var auto = boton("Automático", "Tamaño de letra automático", function () { fijar(0, false); }); auto.className = "letra-auto";
     var n = document.createElement("span"); n.className = "letra-n"; n.setAttribute("aria-live", "polite");
-    caja.textContent = ""; caja.appendChild(menos); caja.appendChild(n); caja.appendChild(mas); caja.appendChild(auto);
+    caja.textContent = "";
+    var bt = null, pop = null;
+    if (modo === "boton") {
+      pop = document.createElement("div"); pop.className = "letra-pop"; pop.hidden = true; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Tamaño de letra");
+      var fila = document.createElement("div"); fila.className = "letra-fila"; fila.appendChild(menos); fila.appendChild(n); fila.appendChild(mas);
+      pop.appendChild(fila); pop.appendChild(auto);
+      bt = boton("", "Tamaño de letra", function () {
+        pop.hidden = !pop.hidden; bt.setAttribute("aria-expanded", String(!pop.hidden));
+        if (!pop.hidden) { var r = bt.getBoundingClientRect(); pop.style.top = Math.round(r.bottom + 8) + "px"; pop.style.right = Math.max(8, Math.round(innerWidth - r.right)) + "px"; }
+      });
+      bt.className = "letra-bt"; bt.setAttribute("aria-haspopup", "dialog"); bt.setAttribute("aria-expanded", "false");
+      caja.className = "letra letra-caja"; caja.removeAttribute("role"); caja.appendChild(bt); caja.appendChild(pop);
+      var cerrar = function () { if (!pop.hidden) { pop.hidden = true; bt.setAttribute("aria-expanded", "false"); } };
+      document.addEventListener("pointerdown", function (ev) { if (!caja.contains(ev.target)) cerrar(); });
+      document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") cerrar(); });
+    } else { caja.appendChild(menos); caja.appendChild(n); caja.appendChild(mas); caja.appendChild(auto); }
     function pintar() {
       var e = efectivo(), txt = Math.round(e * 100) + " %";
       n.textContent = nivel ? "Letra " + txt : "Letra " + txt + " (auto)";
+      if (bt) { bt.textContent = ""; var a = document.createElement("b"); a.textContent = "Aa"; var s = document.createElement("small"); s.textContent = txt; bt.appendChild(a); bt.appendChild(s); }
       menos.disabled = e <= NIVELES[0] + 0.001; mas.disabled = e >= NIVELES[NIVELES.length - 1] - 0.001; auto.setAttribute("aria-pressed", String(!nivel));
     }
     oyentes.push(pintar); pintar();
@@ -295,6 +311,11 @@
   .ayuda-cerrar { min-height:48px; border:2px solid #d9d9dc; border-radius:14px; background:#fff; color:#1d1d1f; font-weight:700; font-size:calc(16px / var(--k,1)); cursor:pointer; }
   .ayudabtn { flex:none; min-height:48px; min-width:48px; padding:0 12px; border:2px solid rgba(255,255,255,.8); border-radius:14px; background:transparent; color:#fff; font-weight:800; font-size:calc(15px / var(--k,1)); cursor:pointer; touch-action:manipulation; } .ayudabtn[hidden] { display:none; }
   #c-chat .mpop, .bar .mpop { max-height:calc(100vh - 76px); max-height:calc(100dvh - 76px); overflow-y:auto; } /* el menú nunca se sale de la pantalla (apaisado): se desplaza por dentro */
+  /* Botones: el texto siempre con aire a los lados y arriba/abajo, y zonas de toque de 44-48 px */
+  .quick button { min-height:48px !important; padding:10px 16px !important; line-height:1.2; }
+  .bar .mpop button { padding:12px 16px !important; line-height:1.25; min-height:50px !important; height:auto; }
+  #ir-pin { min-height:44px; display:inline-flex; align-items:center; justify-content:center; text-align:center; }
+  .vm details summary { min-height:44px; display:flex; align-items:center; padding:0 6px; }
 </style>
 </head>
 <body>

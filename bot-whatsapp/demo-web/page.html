@@ -42,17 +42,33 @@
     var e = efectivo(), i = 0; for (var j = 0; j < NIVELES.length; j++) if (Math.abs(NIVELES[j] - e) < Math.abs(NIVELES[i] - e)) i = j;
     var n = NIVELES[Math.max(0, Math.min(NIVELES.length - 1, i + delta))]; fijar(n, false);
   }
-  function control(caja) { // «Tamaño de letra»: A−  100 %  A+  · Automático
+  function control(caja, modo) { // «Tamaño de letra»: A−  100 %  A+  · Automático (modo «boton»: todo dentro de un solo botón «Aa» que abre un panelito)
     if (!caja) return;
     caja.className = "letra"; caja.setAttribute("role", "group"); caja.setAttribute("aria-label", "Tamaño de letra");
     function boton(txt, etiqueta, fn) { var b = document.createElement("button"); b.type = "button"; b.textContent = txt; b.setAttribute("aria-label", etiqueta); b.onclick = function (ev) { ev.stopPropagation(); fn(); }; return b; }
     var menos = boton("A−", "Reducir letra", function () { paso(-1); }), mas = boton("A+", "Aumentar letra", function () { paso(1); });
     var auto = boton("Automático", "Tamaño de letra automático", function () { fijar(0, false); }); auto.className = "letra-auto";
     var n = document.createElement("span"); n.className = "letra-n"; n.setAttribute("aria-live", "polite");
-    caja.textContent = ""; caja.appendChild(menos); caja.appendChild(n); caja.appendChild(mas); caja.appendChild(auto);
+    caja.textContent = "";
+    var bt = null, pop = null;
+    if (modo === "boton") {
+      pop = document.createElement("div"); pop.className = "letra-pop"; pop.hidden = true; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Tamaño de letra");
+      var fila = document.createElement("div"); fila.className = "letra-fila"; fila.appendChild(menos); fila.appendChild(n); fila.appendChild(mas);
+      pop.appendChild(fila); pop.appendChild(auto);
+      bt = boton("", "Tamaño de letra", function () {
+        pop.hidden = !pop.hidden; bt.setAttribute("aria-expanded", String(!pop.hidden));
+        if (!pop.hidden) { var r = bt.getBoundingClientRect(); pop.style.top = Math.round(r.bottom + 8) + "px"; pop.style.right = Math.max(8, Math.round(innerWidth - r.right)) + "px"; }
+      });
+      bt.className = "letra-bt"; bt.setAttribute("aria-haspopup", "dialog"); bt.setAttribute("aria-expanded", "false");
+      caja.className = "letra letra-caja"; caja.removeAttribute("role"); caja.appendChild(bt); caja.appendChild(pop);
+      var cerrar = function () { if (!pop.hidden) { pop.hidden = true; bt.setAttribute("aria-expanded", "false"); } };
+      document.addEventListener("pointerdown", function (ev) { if (!caja.contains(ev.target)) cerrar(); });
+      document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") cerrar(); });
+    } else { caja.appendChild(menos); caja.appendChild(n); caja.appendChild(mas); caja.appendChild(auto); }
     function pintar() {
       var e = efectivo(), txt = Math.round(e * 100) + " %";
       n.textContent = nivel ? "Letra " + txt : "Letra " + txt + " (auto)";
+      if (bt) { bt.textContent = ""; var a = document.createElement("b"); a.textContent = "Aa"; var s = document.createElement("small"); s.textContent = txt; bt.appendChild(a); bt.appendChild(s); }
       menos.disabled = e <= NIVELES[0] + 0.001; mas.disabled = e >= NIVELES[NIVELES.length - 1] - 0.001; auto.setAttribute("aria-pressed", String(!nivel));
     }
     oyentes.push(pintar); pintar();
@@ -131,6 +147,10 @@
   .web iframe { flex: 1; border: 0; width: 100%; background: #fff; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; box-shadow: var(--shadow); }
   .panel + .panel { margin-top: 16px; }
+  .rec-plegable { padding:0; } .rec-plegable > summary { list-style:none; display:flex; align-items:center; gap:10px; min-height:52px; padding:10px 16px; font-weight:700; cursor:pointer; border-radius:14px; } .rec-plegable > summary::-webkit-details-marker { display:none; }
+  .rec-plegable > summary::after { content:"Ver"; margin-left:auto; padding:6px 14px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-size:calc(13px / var(--k,1)); } .rec-plegable[open] > summary::after { content:"Ocultar"; }
+  .rec-plegable > summary b { min-width:26px; height:26px; line-height:26px; text-align:center; border-radius:999px; background:#d90000; color:#fff; font-size:calc(13px / var(--k,1)); }
+  .rec-plegable > :not(summary) { margin-left:16px; margin-right:16px; } .rec-plegable[open] { padding-bottom:16px; }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
   .btn { font: inherit; font-weight: 600; font-size:calc(14px / var(--k,1)); border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 9px; padding: 9px 14px; cursor: pointer; }
   .btn.main { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
@@ -385,6 +405,11 @@
   .ui.multi .mrow-sel span { display:flex; flex-direction:column; min-width:0; } .ui.multi .mrow-sel b { font-size:calc(15px / var(--k,1)); color:#1d1d1f; } .ui.multi .mrow-sel small { color:#5f6368; font-size:calc(13px / var(--k,1)); overflow-wrap:anywhere; }
   .ui.multi .pill:disabled { opacity:.5; box-shadow:none; }
   #c-chat .mpop, .bar .mpop { max-height:calc(100vh - 76px); max-height:calc(100dvh - 76px); overflow-y:auto; } /* el menú nunca se sale de la pantalla (apaisado): se desplaza por dentro */
+  /* Botones: el texto siempre con aire a los lados y arriba/abajo, y zonas de toque de 44-48 px */
+  .quick button { min-height:48px !important; padding:10px 16px !important; line-height:1.2; }
+  #c-chat .bar .mpop button { padding:12px 16px !important; line-height:1.25; min-height:50px !important; height:auto; }
+  #ir-pin { min-height:44px; display:inline-flex; align-items:center; justify-content:center; text-align:center; }
+  .vm details summary { min-height:44px; display:flex; align-items:center; padding:0 6px; }
 </style>
 
 <button type="button" class="tecnico-btn" id="tecnico-btn">Técnico</button>
@@ -547,11 +572,11 @@
       </div>
 
       <div id="p-pedidos" style="display:grid;gap:16px">
-        <div class="panel" id="rec-panel" hidden>
-          <h2>Recordatorios de hoy</h2>
-          <p class="msg">Clientes a los que les toca reponer (por su ciclo habitual de compra o por su pedido fijo). «Abrir WhatsApp» abre el mensaje ya escrito: lo envías tú; no se manda nada solo.</p>
+        <details class="panel rec-plegable" id="rec-panel" hidden>
+          <summary><span>Recordatorios de hoy</span> <b id="rec-n"></b></summary>
+          <p class="msg" style="margin-top:10px">Clientes a los que les toca reponer (por su ciclo habitual de compra o por su pedido fijo). «Abrir WhatsApp» abre el mensaje ya escrito: lo envías tú; no se manda nada solo.</p>
           <div class="scroll"><table><thead><tr><th>Cliente</th><th>Último pedido</th><th>Por qué</th><th></th></tr></thead><tbody id="rec"></tbody></table></div>
-        </div>
+        </details>
         <div class="panel">
           <h2>Pedidos recibidos</h2>
           <div class="actions">
@@ -949,7 +974,7 @@ function actualizarSel() {
 $("sel-todos").onchange = (e) => { document.querySelectorAll("#tabla input.sel:not(.re)").forEach((c) => { c.checked = e.target.checked; e.target.checked ? selOrd.add(c.dataset.id) : selOrd.delete(c.dataset.id); }); actualizarSel(); };
 const recOcultos = new Set(); // «Ya avisado» / «No avisar más» en esta sesión de la demo
 function pintarRecordatorios() {
-  const filas = VM.recordatorios().filter((x) => !recOcultos.has(x.id)), tb = $("rec"); tb.innerHTML = ""; $("rec-panel").hidden = !filas.length;
+  const filas = VM.recordatorios().filter((x) => !recOcultos.has(x.id)), tb = $("rec"); tb.innerHTML = ""; $("rec-panel").hidden = !filas.length; $("rec-n").textContent = filas.length ? String(filas.length) : "";
   for (const x of filas.slice(0, 30)) {
     const tr = document.createElement("tr"), acc = el("td"), box = el("div", "", { className: "row2" });
     const wa = el("a", "Abrir WhatsApp", { href: `https://wa.me/${x.wa}?text=${encodeURIComponent(x.texto)}`, target: "_blank", rel: "noopener", className: "btn main" }); wa.style.textDecoration = "none";

@@ -27,6 +27,10 @@
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .err { color: var(--err); } .lines td { border: 0; padding: 2px 8px; font-size: 13px; color: var(--muted); }
   .nuevo td { animation: flash 2.4s ease-out; } @keyframes flash { from { background: var(--soft); } to { background: transparent; } }
   details summary { cursor: pointer; }
+  .rec-plegable { padding:0; } .rec-plegable > summary { list-style:none; display:flex; align-items:center; gap:10px; min-height:52px; padding:10px 16px; font-weight:700; border-radius:14px; } .rec-plegable > summary::-webkit-details-marker { display:none; }
+  .rec-plegable > summary::after { content:"Ver"; margin-left:auto; padding:6px 14px; border-radius:999px; background:var(--accent-soft, #e0f1e8); color:var(--accent, #0f7a4d); font-size:13px; } .rec-plegable[open] > summary::after { content:"Ocultar"; }
+  .rec-plegable > summary b { min-width:26px; height:26px; line-height:26px; text-align:center; border-radius:999px; background:#d90000; color:#fff; font-size:13px; }
+  .rec-plegable > :not(summary) { margin-left:16px; margin-right:16px; } .rec-plegable[open] { padding-bottom:16px; }
   .datos-wrap { display:grid; gap:14px; }
   .datos-wrap[hidden] { display:none; }
   .pasoDx { background:var(--accent-soft, #e8f4ee); color:var(--accent, #0b6e4f); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:700; }
@@ -54,11 +58,11 @@
 
     <!-- Pedidos -->
     <div id="p-pedidos">
-      <div class="panel" id="rec-panel" hidden>
-        <h2>Recordatorios de hoy</h2>
-        <p class="muted" style="margin:0 0 8px">Clientes a los que les toca reponer (por su ciclo habitual de compra o porque hoy es su día de pedido fijo). Pulsa «Abrir WhatsApp»: se abre con el mensaje ya escrito, lo puedes cambiar y lo envías tú. No se manda nada solo.</p>
+      <details class="panel rec-plegable" id="rec-panel" hidden>
+        <summary><span>Recordatorios de hoy</span> <b id="rec-n"></b></summary>
+        <p class="muted" style="margin:10px 0 8px">Clientes a los que les toca reponer (por su ciclo habitual de compra o porque hoy es su día de pedido fijo). Pulsa «Abrir WhatsApp»: se abre con el mensaje ya escrito, lo puedes cambiar y lo envías tú. No se manda nada solo.</p>
         <div class="scroll"><table><thead><tr><th>Cliente</th><th>Último pedido</th><th>Por qué</th><th></th></tr></thead><tbody id="rec"></tbody></table></div>
-      </div>
+      </details>
       <div class="panel">
         <h2>Pedidos recibidos</h2>
         <p class="muted" id="correo-estado" style="margin:0 0 8px"></p>
@@ -277,7 +281,7 @@ const hora2 = (iso) => new Date(iso).toLocaleString("es-ES", { dateStyle: "short
 const ESTADO = { importado: "importado", "sin cambios": "sin cambios", error: "✖ error", "sin fichero": "sin fichero" };
 async function recordatorios() {
   const r = await call("/api/admin/recordatorios"), tb = $("rec"); tb.innerHTML = "";
-  $("rec-panel").hidden = !r.filas.length;
+  $("rec-panel").hidden = !r.filas.length; $("rec-n").textContent = r.filas.length ? String(r.filas.length) : "";
   for (const x of r.filas) {
     const tr = document.createElement("tr"), ult = x.ultimo ? x.ultimo.split("-").reverse().join("/") : "—";
     const acc = el("td"); const box = el("div", "", { className: "row" });
