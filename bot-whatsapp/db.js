@@ -146,6 +146,13 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
       db.prepare("SELECT * FROM orders WHERE customer_id = ? AND status != 'cancelled' ORDER BY id DESC LIMIT ?").all(String(customerId), limit).map(withLines)
         .map((o) => ({ doc: o.ref ?? `W${o.id}`, date: String(o.created_at).slice(0, 10), lines: o.items.map((i) => ({ productId: String(i.product_id ?? i.id), qty: i.units ?? i.qty })).filter((l) => l.qty > 0) })),
 
+    /** Todos los pedidos de un cliente tal como se guardaron (derecho de acceso y portabilidad): sin claves internas. */
+    ordersFull: (customerId) =>
+      db.prepare("SELECT * FROM orders WHERE customer_id = ? ORDER BY id").all(String(customerId)).map(withLines).map((o) => ({
+        referencia: o.ref, fecha: o.created_at, estado: o.status, entrega: o.delivery_date ?? null, nombre: o.name, direccion: o.address, poblacion: o.city ?? null, telefono: o.phone, nota: o.note ?? null, total_base: o.total,
+        lineas: o.items.map((i) => ({ codigo: i.id, descripcion: i.name, cantidad: i.qty, unidad: i.unit, cajas: i.boxes, unidades: i.units, precio: i.price, descuento: i.discount, iva: i.vat_rate, importe: i.amount, nota: i.note ?? null })),
+      })),
+
     listOrders({ exportStatus, limit = 200 } = {}) {
       const rows = exportStatus
         ? db.prepare("SELECT * FROM orders WHERE export_status = ? ORDER BY id DESC LIMIT ?").all(exportStatus, limit)

@@ -4,10 +4,11 @@
 // cliente enviado por el navegador, así que un cliente no puede pedir el historial de otro.
 import crypto from "node:crypto";
 import { normalizePhone, validEmail, pinValido } from "./cuentas-db.js";
-import { nifCodes } from "./nif-codes.js";
+import { nifCodes, nifClean } from "./nif-codes.js";
 import { codeKey, validCode } from "./nif-key.js";
 
 const COOKIE = "vm_session";
+const MENSAJE_ELIMINADA = "Esta cuenta se eliminó. Si quieres volver a usar la aplicación, llámanos o solicita el alta de nuevo.";
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 
 /** Límite de intentos en memoria: máximo `max` por `windowMs` para cada clave. */
@@ -74,7 +75,7 @@ export { send, readJson };
  * accounts: base de cuentas · customers: { getById(id), matchRegistration(), nameMatches() }
  * secure: cookie solo por HTTPS · trustProxy: usar X-Forwarded-For para la IP
  */
-export function createAuth({ accounts, customers, secure = false, trustProxy = false }) {
+export function createAuth({ accounts, customers, misDatos = null, secure = false, trustProxy = false }) {
   // Límites por IP (configurables para las pruebas): accesos cada 10 minutos y solicitudes de alta cada hora
   const loginLimit = rateLimiter(Number(process.env.LOGIN_LIMIT ?? 20), 10 * 60_000);
   // Acceso solo con NIF (sin nombre): no hay una cuenta a la que contar los fallos, así que se limita más por IP y en conjunto
@@ -99,6 +100,8 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
       const empresa = String(b.empresa ?? "").trim().replace(/\s+/g, " ");
       const correo = String(b.correo ?? "").trim();
       const pin = String(b.pin ?? "");
+      const nif = nifClean(b.nif);
+      if (!/^[A-Z0-9]{8,10}$/.test(nif) || nif.replace(/\D/g, "").length < 6) return send(res, 400, { error: "Escribe tu DNI, NIE o CIF (por ejemplo 12345678Z o B12345678)." }), true;
       if (empresa.length < 2 || empresa.length > 80) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
       if (!normalizePhone(b.telefono)) return send(res, 400, { error: "El teléfono no es válido." }), true;
       if (!validEmail(correo)) return send(res, 400, { error: "El correo no es válido." }), true;
@@ -110,9 +113,9 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
         const dato = [m.matched.phone ? "teléfono" : null, m.matched.email ? "correo" : null].filter(Boolean).join(" y ");
         const r = accounts.registerAuto({ phone: b.telefono, email: correo, business: empresa, pin, customerId: m.customer.id, matched: `nombre + ${dato}` });
         if (r.error) return send(res, 400, { error: r.error }), true;
-        return send(res, 200, { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono, el nombre de tu empresa y tu PIN." }), true;
+        return send(res, 200, { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono, el nombre de tu empresa y tu contraseña." }), true;
       }
-      const r = accounts.requestRegistration({ phone: b.telefono, email: correo, business: empresa, pin });
+      const r = accounts.requestRegistration({ phone: b.telefono, email: correo, business: empresa, pin, nif }); // el DNI/CIF solo se guarda aquí (cliente nuevo) y se borra al resolver la solicitud
       if (r.error) return send(res, 400, { error: r.error }), true;
       const motivo = { ambiguo: "Hay varios clientes que encajan", contacto: "El nombre coincide pero no el teléfono ni el correo", nombre: "No hay ningún cliente con ese nombre" }[m.reason];
       accounts.setMatched(r.id, motivo);
@@ -142,19 +145,26 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
         // Si nadie coincide no hay cuenta a la que anotar el fallo: se cuenta en conjunto y, si hay demasiados, se frena a todo el mundo un rato
         if (!ids.length) {
           if (!nifGlobalFails("fallos")) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde o llama a la empresa." }), true;
-          return send(res, 401, { error: "NIF incorrecto." }), true;
+          return send(res, 401, { error: "Ese NIF no consta entre los clientes habituales. Si eres un cliente nuevo, solicita el alta (más abajo); si ya lo eres, llámanos." }), true;
         }
         // Varios negocios con el mismo NIF (p. ej. un mismo titular con dos locales): se pide además el nombre, sin anotar fallo
         if (ids.length > 1 && !nombre) return send(res, 409, { necesitaNombre: true, error: "Hay varios negocios con ese NIF. Escribe también el nombre de tu empresa." }), true;
         const r = accounts.loginNif(ids, () => true);
+        if (r.reason === "deleted") return send(res, 401, { error: MENSAJE_ELIMINADA }), true;
         if (!r.ok || ids.length > 1) return send(res, 401, { error: r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "NIF incorrecto. Si te sigue fallando, llama a la empresa." }), true;
         const customer = customers.getById(r.account.customerId);
         return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": cookie(r.token, 30 * 86400) }), true;
       }
       if (empresa.trim().length < 2) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
       // Teléfono + PIN + nombre de la empresa: el nombre debe coincidir con el del cliente guardado en la base de datos
-      const r = accounts.login(b.telefono, b.pin, undefined, (acc) => customers.nameMatches(customers.getById(acc.customerId), empresa));
-      if (!r.ok) return send(res, 401, { error: r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Teléfono o PIN incorrectos." }), true;
+      const registrada = accounts.hasPhone(b.telefono);
+      let r = accounts.login(b.telefono, b.pin, undefined, (acc) => customers.nameMatches(customers.getById(acc.customerId), empresa));
+      // Cliente habitual: el teléfono con el que suele contactar con nosotros (el de la lista de clientes) + la contraseña personal que eligió dentro de la aplicación
+      if (!r.ok && !registrada && r.reason === "invalid" && validCode(b.pin)) {
+        const c = customers.getByPhone(b.telefono);
+        if (c && customers.nameMatches(c, empresa)) r = accounts.loginCustomerCode(c.id, codeKey(b.pin));
+      }
+      if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Teléfono, contraseña o nombre de la empresa incorrectos. Usa el teléfono con el que sueles contactar con nosotros." }), true;
       const customer = customers.getById(r.account.customerId);
       return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": cookie(r.token, 30 * 86400) }), true;
     }
@@ -182,6 +192,38 @@ export function createAuth({ accounts, customers, secure = false, trustProxy = f
       const r = accounts.setCodeKey(acc.id, codeKey(b.nuevo));
       if (r.error) return send(res, 400, { error: r.error }), true;
       return send(res, 200, { ok: true }), true;
+    }
+
+    // ── Derechos sobre los datos (RGPD): descargar lo que guardamos, pedir que se corrija/limite/deje de usarse y eliminar la cuenta ──
+    if (p === "/api/mis-datos" && req.method === "GET") {
+      const acc = sessionOf(req);
+      if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
+      if (!loginLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+      const datos = misDatos ? misDatos(acc) : { cuenta: { telefono: acc.phone, correo: acc.email } };
+      const fecha = new Date().toISOString().slice(0, 10);
+      return send(res, 200, datos, { "Content-Disposition": `attachment; filename="mis-datos-${fecha}.json"` }), true;
+    }
+
+    if (p === "/api/derechos" && req.method === "POST") {
+      const acc = sessionOf(req);
+      if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
+      if (!registerLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+      const b = await readJson(req);
+      if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
+      const r = accounts.addRightsRequest({ customerId: acc.customerId, tipo: b.tipo, texto: b.texto });
+      if (r.error) return send(res, 400, { error: r.error }), true;
+      return send(res, 200, { ok: true, mensaje: "Recibido. La empresa te contestará en el plazo máximo de un mes." }), true;
+    }
+
+    if (p === "/api/eliminar-cuenta" && req.method === "POST") {
+      const acc = sessionOf(req);
+      if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
+      if (!loginLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+      const b = await readJson(req);
+      if (!b || String(b.confirmo ?? "").trim().toUpperCase() !== "ELIMINAR") return send(res, 400, { error: "Para eliminar la cuenta escribe ELIMINAR." }), true;
+      const r = accounts.deleteAccount(acc.id);
+      if (!r.ok) return send(res, 400, { error: "No se pudo eliminar la cuenta." }), true;
+      return send(res, 200, { ok: true, mensaje: "Tu cuenta se ha eliminado." }, { "Set-Cookie": cookie("", 0) }), true;
     }
 
     return false;

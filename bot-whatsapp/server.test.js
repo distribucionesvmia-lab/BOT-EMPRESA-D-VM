@@ -42,7 +42,7 @@ const cookieOf = (r) => r.setCookie.split(";")[0];
 
 // Alta de un cliente: se registra con el PIN que elige. Devuelve { cookie, pin, estado }
 async function registrar(telefono, empresa, correo, pin) {
-  const r = await call("POST", "/api/registro", { body: { telefono, correo, empresa, pin } });
+  const r = await call("POST", "/api/registro", { body: { telefono, correo, empresa, pin, nif: "12345678Z" } });
   assert.equal(r.status, 200, JSON.stringify(r.json));
   return r.json.estado;
 }
@@ -70,7 +70,9 @@ test("la administración exige la clave de la empresa", async () => {
 
 test("registro: valida los datos", async () => {
   const mal = (body) => call("POST", "/api/registro", { body });
-  const ok = { telefono: "600000001", correo: "a@ejemplo.es", empresa: "Bar El Ejemplo", pin: "111111" };
+  const ok = { telefono: "600000001", correo: "a@ejemplo.es", empresa: "Bar El Ejemplo", pin: "111111", nif: "12345678Z" };
+  assert.equal((await mal({ ...ok, nif: undefined })).status, 400); // el DNI/NIE/CIF es obligatorio
+  assert.equal((await mal({ ...ok, nif: "123" })).status, 400);
   assert.equal((await mal({ ...ok, telefono: "12" })).status, 400);
   assert.equal((await mal({ ...ok, correo: "mal" })).status, 400);
   assert.equal((await mal({ ...ok, empresa: " " })).status, 400);
@@ -559,4 +561,60 @@ test("RENDIMIENTO: las páginas y los datos van comprimidos (gzip) cuando el nav
   const plano = await fetch(`${BASE}/cliente`, { headers: { "Accept-Encoding": "identity" } });
   assert.equal(plano.headers.get("content-encoding"), null);
   assert.match(await plano.text(), /Primeros 6 dígitos/);
+});
+
+test("DERECHOS Y ACCESO DEL CLIENTE HABITUAL: teléfono de la lista + contraseña, descargar mis datos, pedir cambios y eliminar la cuenta", async () => {
+  const lista = Buffer.from(buildWorkbook([{ name: "CLIENTES", rows: [cabecera, ["    7777", "TABERNA DERECHOS", "TABERNA DERECHOS SL", "MEDINA DEL CAMPO", "CL. SEIS 6", "655444333", "taberna@derechos.es", "X7654321L", "No", "No", "1"]] }]));
+  assert.equal((await subir(lista)).status, 200);
+  // aún sin contraseña personal: solo entra con el NIF (los 6 primeros dígitos), no con el teléfono
+  assert.equal((await call("POST", "/api/acceso", { body: { telefono: "655444333", empresa: "Taberna Derechos", pin: "Ab12Cd" } })).status, 401);
+  const nif = await entrarNif("765432");
+  assert.equal(nif.status, 200, JSON.stringify(nif.json));
+  const cookie0 = cookieOf(nif);
+  assert.equal((await call("POST", "/api/codigo", { cookie: cookie0, body: { nuevo: "Ab12Cd" } })).status, 200); // elige su contraseña personal
+  // ahora SÍ entra con el teléfono de siempre + la contraseña (sin importar mayúsculas) + el nombre de su empresa
+  const t = await call("POST", "/api/acceso", { body: { telefono: "655 44 43 33".replace(/ /g, ""), empresa: "taberna derechos", pin: "aB12cD" } });
+  assert.equal(t.status, 200, JSON.stringify(t.json));
+  assert.equal((await call("POST", "/api/acceso", { body: { telefono: "655444333", empresa: "Taberna Derechos", pin: "Ab12Ce" } })).status, 401);
+  assert.equal((await call("POST", "/api/acceso", { body: { telefono: "655444333", empresa: "Otra empresa", pin: "Ab12Cd" } })).status, 401);
+  assert.equal((await call("POST", "/api/acceso", { body: { telefono: "600999888", empresa: "Taberna Derechos", pin: "Ab12Cd" } })).status, 401); // otro teléfono
+  const cookie = cookieOf(t);
+
+  // DERECHO DE ACCESO / PORTABILIDAD: descarga lo que se guarda (sin DNI ni contraseña)
+  assert.equal((await call("GET", "/api/mis-datos")).status, 401);
+  const md = await call("GET", "/api/mis-datos", { cookie });
+  assert.equal(md.status, 200);
+  assert.match(md.headers.get("content-disposition"), /attachment; filename="mis-datos-\d{4}-\d{2}-\d{2}\.json"/);
+  assert.equal(md.json.cliente.codigo, "7777");
+  assert.ok(Array.isArray(md.json.pedidos_hechos_en_la_aplicacion) && Array.isArray(md.json.favoritos) && Array.isArray(md.json.historial_de_compras));
+  const texto = JSON.stringify(md.json);
+  for (const prohibido of ["X7654321L", "765432", "Ab12Cd", "AB12CD", "pin_hash", "code_key"]) assert.equal(texto.includes(prohibido), false, "no debe salir " + prohibido);
+  // un cliente no ve los datos de otro: es siempre el de su sesión
+  assert.equal((await call("GET", "/api/mis-datos?cliente=7001", { cookie })).json.cliente.codigo, "7777");
+
+  // RECTIFICACIÓN / LIMITACIÓN / OPOSICIÓN: llega a la empresa
+  assert.equal((await call("POST", "/api/derechos", { body: { tipo: "corregir", texto: "mi teléfono ha cambiado" } })).status, 401);
+  assert.equal((await call("POST", "/api/derechos", { cookie, body: { tipo: "borrar-todo", texto: "x" } })).status, 400);
+  assert.equal((await call("POST", "/api/derechos", { cookie, body: { tipo: "corregir", texto: "mi teléfono ha cambiado" } })).status, 200);
+  const pend = (await call("GET", "/api/admin/derechos", { admin: true })).json.filter((d) => d.estado === "pendiente" && d.clienteId === "7777");
+  assert.equal(pend.length, 1);
+  assert.deepEqual([pend[0].cliente, pend[0].tipo, pend[0].texto], ["TABERNA DERECHOS", "corregir", "mi teléfono ha cambiado"]);
+  assert.equal((await call("GET", "/api/admin/derechos")).status, 403); // solo la empresa
+  assert.equal((await call("POST", `/api/admin/derechos/${pend[0].id}/atender`, { admin: true, body: {} })).status, 200);
+  assert.equal((await call("GET", "/api/admin/resumen", { admin: true })).json.derechosPendientes >= 0, true);
+
+  // SUPRESIÓN: eliminar la cuenta pide confirmación, cierra la sesión y no deja volver a entrar
+  assert.equal((await call("POST", "/api/eliminar-cuenta", { body: { confirmo: "ELIMINAR" } })).status, 401);
+  assert.equal((await call("POST", "/api/eliminar-cuenta", { cookie, body: { confirmo: "si" } })).status, 400);
+  const del = await call("POST", "/api/eliminar-cuenta", { cookie, body: { confirmo: "eliminar" } });
+  assert.equal(del.status, 200);
+  assert.equal((await call("GET", "/api/yo", { cookie })).status, 401); // la sesión ya no vale
+  const volver = await call("POST", "/api/acceso", { body: { telefono: "655444333", empresa: "Taberna Derechos", pin: "Ab12Cd" } });
+  assert.equal(volver.status, 401);
+  const volverNif = await entrarNif("765432");
+  assert.equal(volverNif.status, 401);
+  assert.match(volverNif.json.error, /se eliminó/);
+  const cuenta = (await call("GET", "/api/admin/cuentas", { admin: true })).json.find((c) => c.customerId === "7777");
+  assert.deepEqual([cuenta.status, cuenta.phone, cuenta.email], ["deleted", null, null]); // la empresa ve que está eliminada
+  assert.ok((await call("GET", "/api/admin/derechos", { admin: true })).json.some((d) => d.tipo === "supresion" && d.clienteId === "7777")); // y queda constancia
 });

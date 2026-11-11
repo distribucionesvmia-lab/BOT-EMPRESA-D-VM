@@ -350,7 +350,7 @@
     .paso, .guia { display:none; }
     .tabs { grid-column:1; grid-row:2; margin:4px 6px 4px 14px; } .buscar { grid-column:2; grid-row:2; padding:4px 14px 4px 6px; } .buscar input { min-height:44px; } .buscar::before { top:14px; left:calc(6px + 14px); }
     .filbar { grid-column:1 / -1; grid-row:3; padding:0 14px 4px; } main { grid-column:1 / -1; grid-row:4; min-height:0; padding-bottom:78px; }
-    .app.compacto header, .app.compacto .tabs { max-height:0; }
+    .app.compacto header, .app.compacto .tabs, .app.compacto .buscar { max-height:0; opacity:0; overflow:hidden; padding-top:0; padding-bottom:0; margin-top:0; margin-bottom:0; pointer-events:none; } /* al bajar por la lista se pliega todo lo de arriba */
     footer { padding:6px 14px calc(6px + env(safe-area-inset-bottom)); } footer .big, #verCarrito { min-height:48px; }
     .p { margin:6px 12px; padding:8px; grid-template-columns:72px minmax(0, 1fr) 300px; gap:10px; contain-intrinsic-size:auto 112px; }
     .p .av { width:72px; height:72px; font-size:calc(22px / var(--k,1)); }
@@ -382,15 +382,15 @@
   .tl .cp { color:var(--gris); font-size:calc(13px / var(--k,1)); margin-top:2px; }
   .tl-cant { text-align:center; white-space:nowrap; }
   .tl-ctl { display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:center; }
-  .tl .ud { min-width:112px; height:44px; } .tl .ud button { min-height:40px; }
-  .tl .hstep { display:flex; align-items:center; border:2px solid var(--rojo); border-radius:12px; overflow:hidden; background:#fff; height:44px; }
-  .tl .hstep button { width:44px; height:100%; border:0; background:var(--rojo-s); color:var(--rojo-o); font-size:calc(24px / var(--k,1)); font-weight:700; cursor:pointer; }
+  .tl .ud { min-width:112px; height:48px; } .tl .ud button { min-height:48px; }
+  .tl .hstep { display:flex; align-items:center; border:2px solid var(--rojo); border-radius:12px; overflow:hidden; background:#fff; height:48px; }
+  .tl .hstep button { width:48px; height:100%; border:0; background:var(--rojo-s); color:var(--rojo-o); font-size:calc(24px / var(--k,1)); font-weight:700; cursor:pointer; }
   .tl .hstep input { width:56px; height:100%; border:0; text-align:center; font-size:calc(19px / var(--k,1)); font-weight:800; outline:none; -moz-appearance:textfield; }
   .tl .hstep input::-webkit-outer-spin-button, .tl .hstep input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
   .tl-imp { text-align:right; white-space:nowrap; }
   td.tl-imp b { display:block; font-size:calc(18px / var(--k,1)); } td.tl-imp small { display:block; color:var(--gris); font-size:calc(12px / var(--k,1)); }
-  .tl .cx { border:0; background:none; color:var(--gris); font-size:calc(13px / var(--k,1)); min-height:44px; padding:0 4px; cursor:pointer; margin-top:2px; }
-  .tl .tl-obs button { border:0; background:none; color:var(--rojo-o); font-weight:700; font-size:calc(14px / var(--k,1)); min-height:40px; padding:0; cursor:pointer; }
+  .tl .cx { border:0; background:none; color:var(--gris); font-size:calc(13px / var(--k,1)); min-height:48px; padding:0 4px; cursor:pointer; margin-top:2px; }
+  .tl .tl-obs button { border:0; background:none; color:var(--rojo-o); font-weight:700; font-size:calc(14px / var(--k,1)); min-height:48px; padding:0; cursor:pointer; }
   .tl .tl-obs input { width:100%; border:2px solid var(--linea); border-radius:10px; padding:10px; font:inherit; font-size:calc(16px / var(--k,1)); }
   @media (max-width:560px) { /* móvil: cada fila de la tabla en dos renglones (artículo arriba; cantidad e importe debajo) para que el nombre no se parta en vertical */
     .tl, .tl tbody { display:block; } .tl thead { display:none; }
@@ -413,6 +413,7 @@
     .tl-art { width:44%; }
   }
   @media (min-width:700px) { .tl-ctl { flex-wrap:nowrap; } .tl-art { width:44%; } }
+  footer[hidden] { display:none !important; } .app.sin-carrito main { padding-bottom:24px; }
 </style>
 </head>
 <body>
@@ -433,7 +434,7 @@
   <div class="filbar" id="filbar" hidden><button class="fil" id="fil" type="button" aria-pressed="false">☑ Ver solo lo que he marcado</button><span id="filinfo"></span></div>
   <main id="list"></main>
   <div id="toast" role="status" aria-live="polite" hidden></div>
-  <footer><button class="big" id="verCarrito" type="button" disabled>Añade productos para empezar</button></footer>
+  <footer hidden><button class="big" id="verCarrito" type="button" disabled>Añade productos para empezar</button></footer>
 
   <section class="screen" id="cart" hidden>
     <div class="head"><button id="back" type="button" aria-label="Volver a los productos">←</button><div><small>Paso 2 de 3</small><h2>Revisa tu pedido</h2></div></div>
@@ -511,6 +512,8 @@ const count = () => lines().length;
 // Importes EXACTOS (en céntimos, con enteros): el mismo cálculo que el servidor (pricing.js), sin errores de coma flotante
 const escala = (x, dec) => BigInt(Math.round(Number(x) * 10 ** dec));
 const mitadArriba = (num, den) => (num * 2n + den) / (2n * den);
+// Precio de UNA caja (unidades por caja × precio − descuento), con el mismo cálculo exacto del importe de línea
+const precioCaja = p => Number(mitadArriba(escala(p.unitsPerBox, 3) * escala(p.price, 4) * (10000n - escala(p.discount || 0, 2)) * 100n, 1000n * 10000n * 10000n)) / 100;
 const importeCent = l => Number(mitadArriba(escala(uds(l), 3) * escala(l.price, 4) * (10000n - escala(l.discount || 0, 2)) * 100n, 1000n * 10000n * 10000n));
 const importe = l => importeCent(l) / 100;
 const RE_TIPO = { 21: 5.2, 10: 1.4, 4: 0.5 };
@@ -660,7 +663,7 @@ function row(p) {
   const pr = document.createElement("div"); pr.className = "pr";
   const price = document.createElement("b"); price.textContent = eurp(p.price); pr.appendChild(price);
   if (p.discount) { const dto = document.createElement("span"); dto.className = "dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} % dto.`; dto.style.cssText = "color:#0a7a3b;font-weight:700;font-size:calc(14px / var(--k,1));margin-left:4px"; pr.appendChild(dto); } // el descuento del cliente se ve ya en la fila
-  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " uds"; // (las unidades que lleva pedidas ya salen bajo el contador: así la tarjeta no cambia de alto)
+  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " uds · " + eur(precioCaja(p)); // (las unidades que lleva pedidas ya salen bajo el contador: así la tarjeta no cambia de alto)
   info.append(n, c);
   if (p.ia) { const ia = document.createElement("div"); ia.className = "ia"; ia.textContent = "Foto orientativa creada con IA"; ia.style.cssText = "font-size:calc(11px / var(--k,1));color:#8a8a8a;font-style:italic;margin:1px 0 2px"; info.appendChild(ia); }
   info.append(pr);
@@ -707,7 +710,7 @@ let nav = { cat: null, sub: null }; // sub: null = elegir subcategoría; "*" = t
       subida = 0;
       desdeFinal = t >= max - 4;
       // solo se pliega con margen de sobra hasta el final y yendo hacia abajo con ganas
-      if (!compacto && d > 6 && t > 80 && max - t > 260) cambia(true);
+      if (!compacto && d > 6 && t > 60 && max - t > (innerHeight <= 520 ? 100 : 260)) cambia(true);
     } else if (d < 0) {
       subida += -d;
       if (compacto && subida > (desdeFinal ? 90 : 36)) { cambia(false); desdeFinal = false; }
@@ -894,7 +897,7 @@ function refresh() {
   $("cnt").textContent = n;
   $("verCarrito").textContent = n ? `🛒 Ver carrito · ${n} artículo${n === 1 ? "" : "s"} · ${eur(total())}` : "Añade productos para empezar";
   $("guia").innerHTML = n ? `✔ Llevas <b>${n} artículo${n === 1 ? "" : "s"}</b>. Cuando termines, pulsa el botón rojo de abajo.` : "Toca <b>«+ Añadir»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.";
-  $("verCarrito").disabled = !n;
+  $("verCarrito").disabled = !n; document.querySelector("footer").hidden = !n; document.querySelector(".app").classList.toggle("sin-carrito", !n); // sin nada en el carrito no hay barra fija que tape la lista
   const fila = bumpId && !bumpFav && !(tab === "hab" && soloCantidad) ? $("list").querySelector(`.p[data-id="${CSS.escape(bumpId)}"]`) : null;
   const prod = fila && productoPorId.get(bumpId);
   if (fila && prod) fila.replaceWith(row(prod)); // cambio de cantidad: solo se repinta ese producto (antes se repintaba toda la lista, fotos incluidas)

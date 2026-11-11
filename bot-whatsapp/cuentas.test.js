@@ -167,3 +167,64 @@ test("contraseña con letras: mayúsculas y minúsculas valen igual, y el hash e
   for (const escrito of ["Ab12Cd", "ab12cd", "AB12CD", "aB12cD", " ab12cd "]) assert.equal(db.login("600111222", escrito).ok, true, escrito);
   assert.equal(db.login("600111222", "ab12ce").ok, false);
 });
+
+test("alta de un cliente nuevo: el DNI/NIE/CIF se guarda en la solicitud (para darlo de alta) y se borra al aprobar o rechazar", () => {
+  const db = openAccountsDb(":memory:");
+  assert.match(db.requestRegistration(solicitud({ nif: "123" })).error, /DNI/);
+  const { id } = db.requestRegistration(solicitud({ nif: "12.345.678-z" }));
+  assert.equal(db.listRegistrations("pending")[0].nif, "12345678Z"); // limpio y en mayúsculas
+  assert.equal(db.approve(id, "9001").account.customerId, "9001");
+  const otra = db.requestRegistration(solicitud({ phone: "699111222", nif: "B12345678" })).id;
+  assert.equal(db.reject(otra), true);
+  const todas = [...db.listRegistrations("approved"), ...db.listRegistrations("rejected")];
+  assert.equal(todas.length, 2);
+  assert.ok(todas.every((r) => r.nif === null), "al resolver la solicitud el DNI/CIF ya no se conserva");
+});
+
+test("derechos: pedir corregir/limitar/oponerse llega a la empresa y se puede marcar como atendido", () => {
+  const db = openAccountsDb(":memory:");
+  assert.match(db.addRightsRequest({ customerId: "9001", tipo: "borrar-todo", texto: "x" }).error, /qué quieres pedir/);
+  assert.match(db.addRightsRequest({ customerId: "9001", tipo: "corregir", texto: " " }).error, /Cuéntanos/);
+  const { id } = db.addRightsRequest({ customerId: "9001", tipo: "corregir", texto: "Mi teléfono   ya no es ese" });
+  const [r] = db.listRightsRequests("pendiente");
+  assert.deepEqual([r.id, r.tipo, r.texto, r.estado], [id, "corregir", "Mi teléfono ya no es ese", "pendiente"]);
+  assert.equal(db.resolveRightsRequest(id), true);
+  assert.equal(db.resolveRightsRequest(id), false); // ya atendida
+  assert.equal(db.listRightsRequests("pendiente").length, 0);
+});
+
+test("supresión: eliminar la cuenta borra acceso, contactos, favoritos y solicitudes; la cuenta no vuelve a crearse y se deja constancia", () => {
+  const db = openAccountsDb(":memory:");
+  const { id } = db.requestRegistration(solicitud());
+  const acc = db.approve(id, "9001").account;
+  db.setFavorite("9001", "P1", true);
+  const s = db.login("600111222", "654321");
+  const r0 = db.registerAuto({ ...solicitud({ phone: "699000111" }), pin: "ABC123", customerId: "9002", matched: "x" });
+  assert.equal(db.deleteAccount(acc.id).ok, true);
+  const [a] = db.listAccounts().filter((x) => x.id === acc.id);
+  assert.deepEqual([a.status, a.phone, a.email], ["deleted", null, null]);
+  assert.deepEqual(db.favorites("9001"), []);
+  assert.equal(db.sessionAccount(s.token ?? "x"), null);
+  assert.deepEqual(db.login("600111222", "654321"), { ok: false, reason: "invalid" }); // el teléfono ya no está
+  assert.equal(db.ensureMany(["9001"]), 0); // la sincronización con a3ERP no la crea otra vez
+  assert.equal(db.listRightsRequests().find((x) => x.tipo === "supresion").estado, "atendida"); // queda anotado para la empresa
+  assert.equal(r0.account.customerId, "9002"); // las demás cuentas no se tocan
+  assert.equal(db.login("699000111", "abc123").ok, true);
+  // si el cliente vuelve a darse de alta, la cuenta se reactiva; una bloqueada por la empresa no
+  const nuevo = db.requestRegistration(solicitud({ phone: "677000111" })).id;
+  assert.equal(db.approve(nuevo, "9001").account.status, "active");
+});
+
+test("cliente habitual: teléfono de la lista + contraseña personal (solo si la ha puesto); los fallos cuentan y una cuenta eliminada lo dice", () => {
+  const db = openAccountsDb(":memory:");
+  db.ensureMany(["7001"]);
+  const acc = db.listAccounts().find((a) => a.customerId === "7001");
+  assert.equal(db.loginCustomerCode("7001", "huella").ok, false); // aún no tiene contraseña personal
+  db.setCodeKey(acc.id, "huella");
+  assert.equal(db.loginCustomerCode("7001", "otra").ok, false);
+  assert.equal(db.loginCustomerCode("7001", "huella").ok, true);
+  for (let i = 0; i < 5; i++) db.loginCustomerCode("7001", "mal");
+  assert.deepEqual(db.loginCustomerCode("7001", "huella"), { ok: false, reason: "locked" }); // 5 fallos seguidos la bloquean un rato
+  db.deleteAccount(acc.id);
+  assert.deepEqual(db.loginCustomerCode("7001", "huella"), { ok: false, reason: "deleted" });
+});

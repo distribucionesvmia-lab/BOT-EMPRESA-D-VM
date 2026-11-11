@@ -87,7 +87,11 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   };
   // Favoritos del cliente (privados, por cliente; no los toca la sincronización con a3ERP)
   db.exec("CREATE TABLE IF NOT EXISTS favorites (customer_id TEXT NOT NULL, product_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (customer_id, product_id))");
+  // Derechos de protección de datos que el cliente ejerce desde la aplicación (corregir, limitar, oponerse, otra) y bajas de cuenta
+  db.exec("CREATE TABLE IF NOT EXISTS rights (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, tipo TEXT NOT NULL, texto TEXT, estado TEXT NOT NULL DEFAULT 'pendiente', created_at TEXT NOT NULL, resolved_at TEXT)");
+  addCol("accounts", "deleted_at", "TEXT");
   addCol("registrations", "pin_hash", "TEXT");
+  addCol("registrations", "nif", "TEXT"); // DNI/NIE/CIF que escribe un cliente nuevo: la empresa lo necesita para darlo de alta; se borra al resolver la solicitud
   addCol("registrations", "matched", "TEXT");
   addCol("accounts", "verified", "INTEGER NOT NULL DEFAULT 1");
   addCol("accounts", "code_key", "TEXT"); // huella del código personal que sustituye a los 6 del NIF
@@ -150,7 +154,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       const rows = [...new Set(customerIds.map(String))].map((id) => ensure(id, now));
       const isLocked = (r) => r.status !== "active" || (r.locked_until && r.locked_until > now);
       const live = rows.filter((r) => !isLocked(r));
-      if (!live.length) return { ok: false, reason: rows.length ? "locked" : "invalid" };
+      if (!live.length) return { ok: false, reason: rows.length && rows.every((r) => r.status === "deleted") ? "deleted" : rows.length ? "locked" : "invalid" };
       const hits = live.filter((r) => check(r.customer_id));
       if (hits.length !== 1) {
         for (const r of live) recordFail(r, now);
@@ -193,7 +197,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     },
 
     /** El cliente pide acceso. Devuelve { id } o { error }. Una solicitud pendiente del mismo teléfono se actualiza. */
-    requestRegistration({ phone, email, business, pin }, now = new Date().toISOString()) {
+    requestRegistration({ phone, email, business, pin, nif }, now = new Date().toISOString()) {
       const p = normalizePhone(phone);
       const biz = String(business ?? "").trim().replace(/\s+/g, " ");
       if (!p) return { error: "El teléfono no es válido." };
@@ -201,19 +205,21 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       if (biz.length < 2 || biz.length > 80) return { error: "Escribe el nombre de tu empresa." };
       if (pin !== undefined && !pinValido(pin)) return { error: "La contraseña debe tener 6 letras o números." };
       const mail = String(email).trim();
+      const dni = nif === undefined ? null : String(nif).toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (dni !== null && !/^[A-Z0-9]{8,10}$/.test(dni)) return { error: "Escribe tu DNI, NIE o CIF." };
       const hash = pin === undefined ? null : hashPin(normPin(pin));
       const open = db.prepare("SELECT id FROM registrations WHERE phone = ? AND status = 'pending'").get(p);
       if (open) {
-        db.prepare("UPDATE registrations SET email = ?, business = ?, pin_hash = ?, created_at = ? WHERE id = ?").run(mail, biz, hash, now, open.id);
+        db.prepare("UPDATE registrations SET email = ?, business = ?, pin_hash = ?, nif = ?, created_at = ? WHERE id = ?").run(mail, biz, hash, dni, now, open.id);
         return { id: Number(open.id) };
       }
       if (db.prepare("SELECT COUNT(*) AS n FROM registrations WHERE status = 'pending'").get().n >= 300) return { error: "Hay demasiadas solicitudes pendientes. Inténtalo más tarde." };
-      return { id: Number(db.prepare("INSERT INTO registrations (phone, email, business, pin_hash, created_at) VALUES (?, ?, ?, ?, ?)").run(p, mail, biz, hash, now).lastInsertRowid) };
+      return { id: Number(db.prepare("INSERT INTO registrations (phone, email, business, pin_hash, nif, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(p, mail, biz, hash, dni, now).lastInsertRowid) };
     },
     /** Anota qué datos coincidieron con la base de clientes (se muestra a la empresa). */
     setMatched: (id, text) => void db.prepare("UPDATE registrations SET matched = ? WHERE id = ?").run(text, id),
     listRegistrations: (status = "pending") =>
-      db.prepare("SELECT id, phone, email, business, status, customer_id AS customerId, matched, created_at AS createdAt FROM registrations WHERE status = ? ORDER BY id").all(status).map((r) => ({ ...r })),
+      db.prepare("SELECT id, phone, email, business, nif, status, customer_id AS customerId, matched, created_at AS createdAt FROM registrations WHERE status = ? ORDER BY id").all(status).map((r) => ({ ...r })),
 
     /** La empresa aprueba: liga el teléfono al cliente elegido y genera el PIN (se devuelve UNA vez). */
     approve(id, customerId, now = new Date().toISOString()) {
@@ -228,10 +234,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         const pre = byCustomer.get(String(customerId));
         let accId;
         if (pre && !pre.phone) {
-          db.prepare("UPDATE accounts SET phone = ?, email = ?, pin_hash = ? WHERE id = ?").run(r.phone, r.email, r.pin_hash ?? hashPin(pin), pre.id);
+          db.prepare("UPDATE accounts SET phone = ?, email = ?, pin_hash = ?, status = CASE WHEN status = 'deleted' THEN 'active' ELSE status END WHERE id = ?").run(r.phone, r.email, r.pin_hash ?? hashPin(pin), pre.id);
           accId = pre.id;
         } else accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, created_at) VALUES (?, ?, ?, ?, ?)").run(String(customerId), r.phone, r.email, r.pin_hash ?? hashPin(pin), now).lastInsertRowid);
-        db.prepare("UPDATE registrations SET status = 'approved', customer_id = ?, decided_at = ? WHERE id = ?").run(String(customerId), now, id);
+        db.prepare("UPDATE registrations SET status = 'approved', nif = NULL, customer_id = ?, decided_at = ? WHERE id = ?").run(String(customerId), now, id);
         db.exec("COMMIT");
         return { account: accountOut(byId.get(accId)), ...(pin ? { pin } : {}) };
       } catch (e) {
@@ -255,7 +261,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         const pre = byCustomer.get(String(customerId));
         let accId;
         if (pre && !pre.phone) {
-          db.prepare("UPDATE accounts SET phone = ?, email = ?, pin_hash = ? WHERE id = ?").run(p, String(email).trim(), hashPin(normPin(pin)), pre.id);
+          db.prepare("UPDATE accounts SET phone = ?, email = ?, pin_hash = ?, status = CASE WHEN status = 'deleted' THEN 'active' ELSE status END WHERE id = ?").run(p, String(email).trim(), hashPin(normPin(pin)), pre.id);
           accId = pre.id;
         } else accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, verified, created_at) VALUES (?, ?, ?, ?, 0, ?)").run(String(customerId), p, String(email).trim(), hashPin(normPin(pin)), now).lastInsertRowid);
         db.exec("COMMIT");
@@ -268,7 +274,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     /** La empresa confirma una cuenta automática: sus pedidos ya no se retienen. */
     confirm: (accountId) => db.prepare("UPDATE accounts SET verified = 1 WHERE id = ?").run(accountId).changes === 1,
     reject(id, now = new Date().toISOString()) {
-      return db.prepare("UPDATE registrations SET status = 'rejected', decided_at = ? WHERE id = ? AND status = 'pending'").run(now, id).changes === 1;
+      return db.prepare("UPDATE registrations SET status = 'rejected', nif = NULL, decided_at = ? WHERE id = ? AND status = 'pending'").run(now, id).changes === 1;
     },
 
     listAccounts: () => db.prepare("SELECT * FROM accounts ORDER BY id").all().map(accountOut),
@@ -281,6 +287,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         checkPin(String(pin ?? ""), DUMMY); // mismo coste que un intento real
         return { ok: false, reason: "invalid" };
       }
+      if (row.status === "deleted") return { ok: false, reason: "deleted" };
       if (row.status !== "active") return { ok: false, reason: "locked" };
       if (row.locked_until && row.locked_until > now) return { ok: false, reason: "locked" };
       // verify(cuenta): comprobación extra (p. ej. el nombre de empresa escrito coincide con el cliente de la cuenta)
@@ -291,6 +298,55 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       db.prepare("UPDATE accounts SET failed = 0, lock_count = 0, locked_until = NULL, last_login = ? WHERE id = ?").run(now, row.id);
       return { ok: true, token: openSession(row, now), account: accountOut(byId.get(row.id)) };
     },
+
+    /**
+     * Acceso de un cliente habitual con el teléfono que consta en la lista de clientes + la contraseña personal que eligió dentro de la aplicación.
+     * Los fallos se anotan en su cuenta (5 seguidos la bloquean 15 minutos, como en el resto de accesos).
+     */
+    loginCustomerCode(customerId, key, now = new Date().toISOString()) {
+      const row = byCustomer.get(String(customerId));
+      if (!row) return { ok: false, reason: "invalid" };
+      if (row.status === "deleted") return { ok: false, reason: "deleted" };
+      if (row.status !== "active" || (row.locked_until && row.locked_until > now)) return { ok: false, reason: "locked" };
+      if (!row.code_key || row.code_key !== key) { recordFail(row, now); return { ok: false, reason: "invalid" }; }
+      db.prepare("UPDATE accounts SET failed = 0, lock_count = 0, locked_until = NULL, last_login = ? WHERE id = ?").run(now, row.id);
+      return { ok: true, token: openSession(row, now), account: accountOut(byId.get(row.id)) };
+    },
+
+    /** Solicitud de un derecho (corregir, limitar, oponerse, otra) que llega a la empresa. { id } o { error }. */
+    addRightsRequest({ customerId, tipo, texto }, now = new Date().toISOString()) {
+      if (!["corregir", "limitar", "oponerme", "otra"].includes(tipo)) return { error: "Elige qué quieres pedir." };
+      const t = String(texto ?? "").trim().replace(/\s+/g, " ").slice(0, 500);
+      if (t.length < 3) return { error: "Cuéntanos qué necesitas (unas palabras bastan)." };
+      return { id: Number(db.prepare("INSERT INTO rights (customer_id, tipo, texto, created_at) VALUES (?, ?, ?, ?)").run(String(customerId), tipo, t, now).lastInsertRowid) };
+    },
+    listRightsRequests: (estado = null) => db.prepare(`SELECT * FROM rights ${estado ? "WHERE estado = ?" : ""} ORDER BY id DESC LIMIT 300`).all(...(estado ? [estado] : [])),
+    resolveRightsRequest: (id, now = new Date().toISOString()) => db.prepare("UPDATE rights SET estado = 'atendida', resolved_at = ? WHERE id = ? AND estado = 'pendiente'").run(now, Number(id)).changes === 1,
+    /**
+     * Baja de la cuenta a petición del cliente (derecho de supresión): se borran su acceso (teléfono, correo, contraseñas), sus sesiones, sus favoritos y sus
+     * solicitudes de alta. La cuenta queda marcada como eliminada (así la sincronización con a3ERP no la vuelve a crear). Los pedidos y las facturas
+     * se conservan, bloqueados, durante los plazos que exige la ley, y no los ve nadie del lado del cliente. Queda anotado para la empresa.
+     */
+    deleteAccount(accountId, now = new Date().toISOString()) {
+      const row = byId.get(Number(accountId));
+      if (!row) return { ok: false };
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        dropSessions.run(row.id);
+        db.prepare("DELETE FROM favorites WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM registrations WHERE customer_id = ? OR (phone = ? AND ? IS NOT NULL)").run(row.customer_id, row.phone, row.phone);
+        db.prepare("UPDATE accounts SET phone = NULL, email = NULL, pin_hash = NULL, code_key = NULL, status = 'deleted', verified = 0, failed = 0, lock_count = 0, locked_until = NULL, deleted_at = ? WHERE id = ?").run(now, row.id);
+        db.prepare("INSERT INTO rights (customer_id, tipo, texto, estado, created_at, resolved_at) VALUES (?, 'supresion', ?, 'atendida', ?, ?)").run(row.customer_id, "El cliente eliminó su cuenta desde la aplicación (acceso, contactos y favoritos borrados; pedidos conservados por obligación legal).", now, now);
+        db.exec("COMMIT");
+        return { ok: true };
+      } catch (e) {
+        db.exec("ROLLBACK");
+        throw e;
+      }
+    },
+
+    /** ¿Hay una cuenta registrada con este teléfono? (solo para decidir por dónde seguir; nunca se le dice al visitante) */
+    hasPhone: (phone) => { const p = normalizePhone(phone); return !!p && !!byPhone.get(p); },
 
     /** Cuenta de una sesión válida (activa y sin caducar), o null. */
     sessionAccount(token, now = new Date().toISOString()) {

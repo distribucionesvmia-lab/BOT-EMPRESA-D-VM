@@ -69,7 +69,7 @@
     <div class="panel" id="p-solicitudes" hidden>
       <h2>Solicitudes de alta pendientes</h2>
       <p class="muted">Aquí solo llegan las que el sistema <b>no ha podido comprobar solo</b> (el nombre, el teléfono o el correo no coinciden con la base de clientes, o el cliente está de baja). Las que coinciden entran automáticamente y aparecen en «Cuentas de clientes» por confirmar. Si apruebas, vale el PIN que eligió el cliente.</p>
-      <div class="scroll"><table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Correo</th><th>Qué encajó</th><th>Cliente de la base de datos</th><th></th></tr></thead><tbody id="sol"></tbody></table></div>
+      <div class="scroll"><table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Correo</th><th>DNI/CIF</th><th>Qué encajó</th><th>Cliente de la base de datos</th><th></th></tr></thead><tbody id="sol"></tbody></table></div>
       <p class="muted" id="sol-vacio" hidden>No hay solicitudes pendientes.</p>
     </div>
 
@@ -102,6 +102,9 @@
     <div class="panel" id="p-cuentas" hidden>
       <h2>Cuentas de clientes</h2>
       <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
+      <h2 style="margin-top:22px">Derechos de protección de datos</h2>
+      <p class="muted" style="margin:0 0 8px">Lo que piden los clientes desde la aplicación («Mis datos y privacidad»): corregir sus datos, limitar su uso u oponerse. <b>Hay que contestarles en un plazo máximo de un mes.</b> Cuando un cliente elimina su cuenta, aquí queda anotado (se borran su acceso, contactos y favoritos; los pedidos se conservan por obligación legal).</p>
+      <div class="scroll"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Qué pide</th><th>Detalle</th><th>Estado</th><th></th></tr></thead><tbody id="der"></tbody></table></div>
     </div>
   </div>
 </main>
@@ -213,19 +216,29 @@ async function solicitudes() {
     const no = el("button", "Rechazar"); no.onclick = async () => { await call(`/api/admin/solicitudes/${s.id}/rechazar`, {}); refrescar(); };
     const td = el("td"); const box = el("div", "", { className: "row" }); box.append(sel, buscar); td.appendChild(box);
     const acc = el("td"); acc.append(ok, " ", no);
-    tr.append(el("td", s.business), el("td", s.phone), el("td", s.email), el("td", s.matched || "—", { className: "muted" }), td, acc); tb.appendChild(tr);
+    tr.append(el("td", s.business), el("td", s.phone), el("td", s.email), el("td", s.nif || "—"), el("td", s.matched || "—", { className: "muted" }), td, acc); tb.appendChild(tr);
+  }
+}
+const TIPO_DERECHO = { corregir: "Corregir sus datos", limitar: "Limitar el uso de sus datos", oponerme: "Oponerse al tratamiento", otra: "Otra petición", supresion: "Eliminó su cuenta" };
+async function derechos() {
+  const lista = await call("/api/admin/derechos"); const tb = $("der"); tb.innerHTML = "";
+  if (!lista.length) { const tr = document.createElement("tr"); tr.append(el("td", "Todavía no hay peticiones.", { className: "muted" })); tb.appendChild(tr); return; }
+  for (const d of lista) {
+    const tr = document.createElement("tr"), td = el("td");
+    if (d.estado === "pendiente") { const ok = el("button", "Marcar atendida", { className: "main" }); ok.onclick = async () => { await call(`/api/admin/derechos/${d.id}/atender`, {}); refrescar(); }; td.append(ok); }
+    tr.append(el("td", hora2(d.creada)), el("td", d.cliente), el("td", TIPO_DERECHO[d.tipo] ?? d.tipo), el("td", d.texto || ""), el("td", d.estado === "pendiente" ? "⏳ Pendiente" : "✔ Atendida"), td); tb.appendChild(tr);
   }
 }
 async function cuentas() {
   const cue = await call("/api/admin/cuentas"); const tc = $("cue"); tc.innerHTML = "";
   for (const a of cue) {
     const tr = document.createElement("tr");
-    const estado = a.status === "blocked" ? "Bloqueada" : a.locked ? "Bloqueo temporal" : a.verified ? "Activa" : a.phone ? "Automática: sin confirmar" : "Creada: aún no ha entrado";
+    const estado = a.status === "deleted" ? "Eliminada por el cliente" : a.status === "blocked" ? "Bloqueada" : a.locked ? "Bloqueo temporal" : a.verified ? "Activa" : a.phone ? "Automática: sin confirmar" : "Creada: aún no ha entrado";
     const pin = el("button", "Nuevo PIN"); pin.onclick = async () => { const r = await call(`/api/admin/cuentas/${a.id}/pin`, {}); mostrarPin(`Nuevo PIN para ${a.cliente} (${a.phone || "sin teléfono"}):`, r.pin); refrescar(); };
     const blq = el("button", a.status === "blocked" ? "Reactivar" : "Bloquear"); blq.onclick = async () => { await call(`/api/admin/cuentas/${a.id}/bloquear`, { bloquear: a.status !== "blocked" }); refrescar(); };
     const td = el("td");
     if (!a.verified) { const cf = el("button", "Confirmar", { className: "main" }); cf.title = "Compruebo que es el cliente: sus pedidos dejan de retenerse"; cf.onclick = async () => { await call(`/api/admin/cuentas/${a.id}/confirmar`, {}); refrescar(); }; td.append(cf, " "); }
-    td.append(pin, " ", blq);
+    if (a.status !== "deleted") td.append(pin, " ", blq);
     tr.append(el("td", a.cliente || a.customerId), el("td", a.phone || "— (entra con NIF)"), el("td", a.email || ""), el("td", estado), el("td", a.lastLogin ? hora(a.lastLogin) : "—"), td); tc.appendChild(tr);
   }
 }
@@ -338,11 +351,11 @@ async function ultimasSubidas() {
 async function avisos() {
   const r = await call("/api/admin/resumen");
   const n = (id, v) => { $(id).hidden = !v; $(id).textContent = v; };
-  n("n-ped", r.pedidosPendientes + r.pedidosRetenidos); n("n-sol", r.solicitudes); n("n-cue", r.cuentasSinConfirmar);
+  n("n-ped", r.pedidosPendientes + r.pedidosRetenidos); n("n-sol", r.solicitudes); n("n-cue", r.cuentasSinConfirmar + (r.derechosPendientes || 0));
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), clientes(), avisos(), sincronizacion(), correo()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), derechos(), clientes(), avisos(), sincronizacion(), correo()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));

@@ -225,12 +225,14 @@ window.VM = {
    * si coinciden el nombre y el teléfono (o el correo) de UN cliente, la cuenta queda activa al momento (sin confirmar); si no,
    * pasa a «Solicitudes de alta» para que la revise la empresa.
    */
-  async requestAccess({ phone, email, business, pin }) {
+  async requestAccess({ phone, email, business, pin, nif }) {
     const p = phone9(phone), biz = String(business ?? "").trim().replace(/\s+/g, " "), mail = String(email ?? "").trim();
     if (biz.length < 2 || biz.length > 80) return { error: "Escribe el nombre de tu empresa." };
     if (!p) return { error: "El teléfono no es válido." };
     if (!validEmail(mail)) return { error: "El correo no es válido." };
     if (!/^[A-Z0-9]{6}$/.test(nifClean(pin))) return { error: "Elige una contraseña de 6 letras o números." };
+    const dni = nifClean(nif);
+    if (!/^[A-Z0-9]{8,10}$/.test(dni) || dni.replace(/\D/g, "").length < 6) return { error: "Escribe tu DNI, NIE o CIF (por ejemplo 12345678Z o B12345678)." };
     if (!perms.canWrite) return { error: "Solo lectura: no se pueden enviar solicitudes con este acceso." };
     const now = new Date().toISOString();
     const m = matchRegistration({ phone: p, email: mail, business: biz });
@@ -240,11 +242,11 @@ window.VM = {
       await backend.set("accounts", id, { id, customerId: m.customer.id, phone: p, email: mail, pinHash: pinHash(p, pin), status: "active", verified: false, createdAt: now });
       const rid = `r${Date.now().toString(36)}${uid()}`;
       await backend.set("registrations", rid, { id: rid, phone: p, email: mail, business: biz, status: "auto", customerId: m.customer.id, matched: `nombre + ${[m.matched.phone ? "teléfono" : null, m.matched.email ? "correo" : null].filter(Boolean).join(" y ")}`, createdAt: now });
-      return { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono, el nombre de tu empresa y tu PIN." };
+      return { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono, el nombre de tu empresa y tu contraseña." };
     }
     const open = cache.registrations.find((r) => r.phone === p && r.status === "pending");
     const id = open?.id ?? `r${Date.now().toString(36)}${uid()}`;
-    const doc = { id, phone: p, email: mail, business: biz, status: "pending", pinHash: pinHash(p, pin), matched: MOTIVOS[m.reason], createdAt: now };
+    const doc = { id, phone: p, email: mail, business: biz, status: "pending", pinHash: pinHash(p, pin), nif: dni, matched: MOTIVOS[m.reason], createdAt: now };
     await (open ? backend.update("registrations", id, doc) : backend.set("registrations", id, doc));
     return { ok: true, estado: "pendiente", mensaje: "Hemos recibido tu solicitud. En un plazo de 24 a 48 horas nos pondremos en contacto contigo y se aceptará tu cuenta para que puedas hacer pedidos." };
   },
@@ -254,14 +256,20 @@ window.VM = {
     if (String(business ?? "").trim().length < 2) return { ok: false, error: "Escribe el nombre de tu empresa." };
     const st = attempts.get(p) ?? { fails: 0, until: 0 };
     if (st.until > Date.now()) return { ok: false, error: "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." };
-    const acc = cache.accounts.find((a) => a.phone === p && a.status === "active");
+    let acc = cache.accounts.find((a) => a.phone === p && a.status === "active");
+    if (!acc && !cache.accounts.some((a) => a.phone === p)) { // cliente habitual: teléfono de la lista de clientes + la contraseña personal que eligió dentro
+      const delTel = cache.customers.filter((c) => c.active !== false && phonesOf(c).includes(p));
+      const c = delTel.length === 1 ? delTel[0] : null, propia = c && cache.accounts.find((a) => a.customerId === c.id && a.codeKey);
+      if (propia && propia.status === "active" && propia.codeKey === demoCodeKey(pin)) acc = { ...nifAccount(c), codeKey: propia.codeKey };
+    }
+    if (cache.accounts.some((a) => a.status === "deleted" && (a.phone === p || phonesOf(cache.customers.find((c) => c.id === a.customerId) ?? {}).includes(p)))) return { ok: false, error: "Esta cuenta se eliminó. Si quieres volver a usar la aplicación, llámanos o solicita el alta de nuevo." };
     const customer = customerOf(acc);
     const nombreOk = !!customer && findCustomers([customer], business).length > 0; // el nombre se compara con la base de clientes
-    if (!acc || !nombreOk || !/^[A-Z0-9]{6}$/.test(nifClean(pin)) || acc.pinHash !== pinHash(p, nifClean(pin))) {
+    if (!acc || !nombreOk || !/^[A-Z0-9]{6}$/.test(nifClean(pin)) || (acc.id.startsWith("n") ? acc.codeKey !== demoCodeKey(pin) : acc.pinHash !== pinHash(p, nifClean(pin)))) {
       st.fails += 1;
       if (st.fails >= 5) { st.fails = 0; st.until = Date.now() + 15 * 60_000; }
       attempts.set(p, st);
-      return { ok: false, error: "Teléfono, empresa o PIN incorrectos." };
+      return { ok: false, error: "Teléfono, contraseña o nombre de la empresa incorrectos. Usa el teléfono con el que sueles contactar con nosotros." };
     }
     attempts.delete(p);
     store.set("vm:acc", acc.id);
@@ -276,11 +284,12 @@ window.VM = {
     const own = /^[A-Z0-9]{6}$/.test(nifClean(nif)) && cache.accounts.find((a) => a.codeKey === demoCodeKey(nif) && a.status === "active");
     if (own) { store.set("vm:acc", own.id); return { ok: true, nombre: customerOf(own)?.name ?? "" }; }
     const names = String(business ?? "").trim().length >= 2 ? new Set(findCustomers(cache.customers, business, { lenient: true }).map((c) => c.id)) : null;
+    if (cache.customers.some((c) => cache.accounts.some((a) => a.customerId === c.id && a.status === "deleted") && demoNifMatches(c.id, nif, c.nifKeys))) return { ok: false, error: "Esta cuenta se eliminó. Si quieres volver a usar la aplicación, llámanos o solicita el alta de nuevo." };
     const hits = cache.customers.filter((c) => c.active !== false && (!names || names.has(c.id)) && !cache.accounts.some((a) => a.customerId === c.id && a.codeKey) && demoNifMatches(c.id, nif, c.nifKeys)); // con código personal, el NIF ya no vale
     if (hits.length > 1 && !names) return { ok: false, necesitaNombre: true, error: "Hay varios negocios con ese NIF. Escribe también el nombre de tu empresa." };
     if (hits.length !== 1) {
       if (!hits.length && ++nifFails.n >= 15) { nifFails.n = 0; nifFails.until = now + 60 * 60_000; } // como el servidor: pocos fallos por hora entre todos
-      return { ok: false, error: "NIF incorrecto." + (hits.length > 1 ? " Si te sigue fallando, llama a la empresa." : "") };
+      return { ok: false, error: hits.length > 1 ? "NIF incorrecto. Si te sigue fallando, llama a la empresa." : "Ese NIF no consta entre los clientes habituales. Si eres un cliente nuevo, solicita el alta (más abajo); si ya lo eres, llámanos." };
     }
     store.set("vm:acc", "n" + hits[0].id);
     return { ok: true, nombre: hits[0].name };
@@ -298,6 +307,45 @@ window.VM = {
     const cur = cache.accounts.find((x) => x.id === a.id);
     await backend.set("accounts", a.id, { ...(cur ?? { id: a.id, customerId: a.customerId, status: "active", verified: true, createdAt: new Date().toISOString() }), codeKey: demoCodeKey(nuevo) });
     return { ok: true };
+  },
+  /** Derecho de acceso y portabilidad: todo lo que la demo guarda del cliente de la sesión (sin DNI ni contraseña). */
+  misDatos() {
+    const a = currentAccount(), c = customerOf(a);
+    if (!c) return null;
+    return {
+      aviso: "Estos son los datos que Distribuciones Valentín Martín guarda sobre ti. No guardamos tu DNI/CIF ni tu contraseña en claro.", generado: new Date().toISOString(),
+      cuenta: { telefono: a.phone ?? null, correo: cache.accounts.find((x) => x.id === a.id)?.email ?? null, estado: a.status },
+      cliente: { codigo: c.id, nombre: c.name, razon_social: c.legalName ?? "", poblacion: c.city ?? "", direccion: c.address ?? "", telefonos: c.phones ?? [], correos: c.emails ?? [] },
+      historial_de_compras: (c.orders ?? []).map((o) => ({ documento: o.doc, fecha: o.date, lineas: o.lines })),
+      pedidos_hechos_en_la_aplicacion: cache.orders.filter((o) => o.customer_id === c.id).map((o) => ({ referencia: o.ref ?? o.id, fecha: o.created_at, entrega: o.delivery_date ?? null, nota: o.note ?? null, lineas: o.items })),
+      favoritos: [...(favsDemo.get(c.id) ?? [])],
+    };
+  },
+  /** Corregir / limitar / oponerse: llega a la empresa (en la demo se guarda en memoria). */
+  async derechos(tipo, texto) {
+    const a = currentAccount();
+    if (!a) return { ok: false, error: "No has iniciado sesión." };
+    if (!["corregir", "limitar", "oponerme", "otra"].includes(tipo)) return { ok: false, error: "Elige qué quieres pedir." };
+    const t = String(texto ?? "").trim().replace(/\s+/g, " ").slice(0, 500);
+    if (t.length < 3) return { ok: false, error: "Cuéntanos qué necesitas (unas palabras bastan)." };
+    const id = "d" + Date.now().toString(36) + uid();
+    await backend.set("registrations", id, { id, status: "derecho", customerId: a.customerId, tipo, texto: t, estado: "pendiente", creada: new Date().toISOString() }); // (en la demo, junto a las solicitudes, con su propio estado)
+    return { ok: true, mensaje: "Recibido. La empresa te contestará en el plazo máximo de un mes." };
+  },
+  /** Supresión: se borran acceso, contactos y favoritos; la cuenta queda marcada como eliminada y se deja constancia. */
+  async eliminarCuenta(confirmo) {
+    const a = currentAccount();
+    if (!a) return { ok: false, error: "No has iniciado sesión." };
+    if (String(confirmo ?? "").trim().toUpperCase() !== "ELIMINAR") return { ok: false, error: "Para eliminar la cuenta escribe ELIMINAR." };
+    if (!perms.canWrite) return { ok: false, error: "En modo solo lectura no se puede eliminar la cuenta." };
+    const ahora = new Date().toISOString();
+    for (const x of cache.accounts.filter((x) => x.customerId === a.customerId)) await backend.update("accounts", x.id, { status: "deleted", phone: null, email: null, pinHash: null, codeKey: null, deletedAt: ahora });
+    if (!cache.accounts.some((x) => x.customerId === a.customerId)) await backend.set("accounts", "x" + a.customerId, { id: "x" + a.customerId, customerId: a.customerId, status: "deleted", phone: null, email: null, deletedAt: ahora, createdAt: ahora });
+    favsDemo.delete(a.customerId);
+    const id = "d" + Date.now().toString(36) + uid();
+    await backend.set("registrations", id, { id, status: "derecho", customerId: a.customerId, tipo: "supresion", texto: "El cliente eliminó su cuenta desde la aplicación (acceso, contactos y favoritos borrados; pedidos conservados por obligación legal).", estado: "atendida", creada: ahora });
+    store.set("vm:acc", null); sessions.clear();
+    return { ok: true, mensaje: "Tu cuenta se ha eliminado." };
   },
   resetChat: () => sessions.clear(),
   /** Un mensaje del cliente al bot (texto libre o id de botón/fila). El cliente sale SIEMPRE de la cuenta con sesión. */

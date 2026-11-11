@@ -63,6 +63,8 @@ export const getAccountsDb = () => (accountsDb ??= openAccountsDb());
 export const customerDirectory = {
   list: () => dbs().customersDb.list(),
   getById: (id) => dbs().customersDb.getById(id),
+  /** Cliente cuyo teléfono habitual de contacto coincide (si lo comparten varios, ninguno). */
+  getByPhone: (phone) => dbs().customersDb.getByPhone(phone),
   /** Comprueba una solicitud de alta contra los clientes guardados (ver clientes-db.js). */
   matchRegistration: (x) => dbs().customersDb.matchRegistration(x),
   /** Clientes que podrían ser el que pide acceso, con el motivo (nombre, teléfono, correo). */

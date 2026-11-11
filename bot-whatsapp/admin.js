@@ -66,7 +66,7 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
     // ---- Resumen para los avisos ----
     if (p === "/api/admin/resumen" && get) {
       const list = orders.listOrders({ exportStatus: "pending", limit: 500 }).map(orderView);
-      return send(res, 200, { clientes: customers.search({ limit: 1 }).total, cuentasSinConfirmar: accounts.listAccounts().filter((a) => !a.verified).length, solicitudes: accounts.listRegistrations("pending").length, pedidosPendientes: list.filter((o) => o.estado === "pendiente").length, pedidosRetenidos: list.filter((o) => o.estado === "retenido").length }), true;
+      return send(res, 200, { clientes: customers.search({ limit: 1 }).total, cuentasSinConfirmar: accounts.listAccounts().filter((a) => !a.verified && a.status !== "deleted").length, derechosPendientes: accounts.listRightsRequests("pendiente").length, solicitudes: accounts.listRegistrations("pending").length, pedidosPendientes: list.filter((o) => o.estado === "pendiente").length, pedidosRetenidos: list.filter((o) => o.estado === "retenido").length }), true;
     }
 
     // ---- Últimas subidas de Excel (para la sección «Datos y Excel») ----
@@ -160,6 +160,9 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
         return send(res, e.confirmar ? 409 : 400, { error: e.message || "No se pudo leer el Excel.", ...(e.confirmar ? { confirmar: e.confirmar } : {}) }), true;
       }
     }
+    // ---- Derechos de protección de datos que piden los clientes desde la aplicación (corregir, limitar, oponerse… y bajas de cuenta) ----
+    if (p === "/api/admin/derechos" && get) return send(res, 200, accounts.listRightsRequests().map((r) => ({ id: r.id, tipo: r.tipo, texto: r.texto, estado: r.estado, creada: r.created_at, atendida: r.resolved_at, clienteId: r.customer_id, cliente: customers.getById(r.customer_id)?.name ?? r.customer_id }))), true;
+    if (post && (m = /^\/api\/admin\/derechos\/(\d+)\/atender$/.exec(p))) return send(res, accounts.resolveRightsRequest(Number(m[1])) ? 200 : 404, { ok: true }), true;
     if (p === "/api/admin/cuentas" && get) return send(res, 200, accounts.listAccounts().map((a) => ({ ...a, cliente: customers.getById(a.customerId)?.name ?? "" }))), true;
     m = /^\/api\/admin\/(solicitudes|cuentas)\/(\d+)\/(aprobar|rechazar|pin|bloquear|confirmar)$/.exec(p);
     if (m && post) {

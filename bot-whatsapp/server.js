@@ -330,9 +330,23 @@ function validSignature(raw, header) {
 const APP_MODE = process.env.APP_MODE ?? "todo";
 const clientEnabled = APP_MODE !== "empresa";
 const adminEnabled = APP_MODE !== "cliente";
+// Lo que guardamos de un cliente (derecho de acceso y portabilidad): cuenta, ficha, histórico de a3ERP, pedidos de la aplicación y favoritos
+const datosDelCliente = (acc) => {
+  const c = customerDirectory.getById(acc.customerId);
+  return {
+    aviso: "Estos son los datos que Distribuciones Valentín Martín guarda sobre ti. No guardamos tu DNI/CIF ni tu contraseña en claro.",
+    generado: new Date().toISOString(),
+    cuenta: { telefono: acc.phone ?? null, correo: acc.email ?? null, estado: acc.status, creada: acc.createdAt ?? null, ultimo_acceso: acc.lastLogin ?? null },
+    cliente: c ? { codigo: c.id, nombre: c.name, razon_social: c.legalName, poblacion: c.city, direccion: c.address, telefonos: c.phones, correos: c.emails, recargo_equivalencia: c.recargoEquivalencia } : null,
+    historial_de_compras: (c?.orders ?? []).map((o) => ({ documento: o.doc, fecha: o.date, lineas: o.lines })),
+    pedidos_hechos_en_la_aplicacion: getDb().ordersFull(acc.customerId),
+    favoritos: getAccountsDb().favorites(acc.customerId),
+  };
+};
 const auth = createAuth({
   accounts: getAccountsDb(),
   customers: customerDirectory,
+  misDatos: datosDelCliente,
   secure: PUBLIC_URL.startsWith("https://"),
   trustProxy: process.env.TRUST_PROXY === "1",
 });
