@@ -229,3 +229,33 @@ test("ACTUALIZACIÓN AUTOMÁTICA: cada 10 minutos, con pruebas, comprobación de
   const emp = fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8");
   assert.match(emp, /id="act-ahora"/); assert.match(emp, /\/api\/admin\/actualizar"/);
 });
+
+test("PAQUETE «COMPRAR MÁS FÁCIL» A+B: lo que ya compra arriba, «Lo más pedido», atajos, deshacer con pausa y ayuda con datos de la empresa", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  // F-21
+  assert.match(ped, /className = "lo-compras"/); assert.match(ped, /else if \(arbol\) items = \[\.\.\.items\.filter\(p => p\.count > 0\)/);
+  assert.match(ped, /Lo más pedido/); assert.match(ped, /data\.top/);
+  // F-22
+  assert.match(ped, /className = "atajos"/); assert.match(ped, /\["\+6", 6\], \["\+12", 12\]/); assert.match(ped, /inp\.pattern = "\[0-9\]\*"/);
+  assert.match(ped, /\.atajos button \{ min-height:48px/);
+  // F-23
+  assert.match(ped, /"Quitado: " \+/); assert.match(ped, /deshacer \? 8000 : 4000/); assert.match(ped, /t\.onpointerenter = t\.onfocusin/); assert.match(ped, /#toast\.arriba \{ bottom:auto/);
+  assert.match(ped, /id="vaciar"/); assert.match(ped, /aria-label", "Quitar " \+ l\.name/);
+  // F-24
+  assert.match(ped, /function abrirAyuda\(a, nombre\)/); assert.match(cli, /function abrirAyuda\(a, nombre\)/);
+  assert.match(ped, /if \(data\.ayuda\) \{ \$\("ayudaBtn"\)\.hidden = false/); assert.match(cli, /fetch\("\/api\/ayuda"\)/);
+});
+
+test("AYUDA: sin datos rellenados no hay botón; con teléfono o WhatsApp se ofrecen solo esos y el horario", async () => {
+  const { ayudaPublica, AYUDA } = await import("./config.js");
+  assert.equal(ayudaPublica(), null, "la empresa aún no ha rellenado teléfono ni WhatsApp: el botón no aparece");
+  Object.assign(AYUDA, { telefono: "983 123 456", whatsapp: "600 111 222", horario: "L-V 8:00-14:00" });
+  const a = ayudaPublica();
+  assert.equal(a.telHref, "tel:+34983123456"); assert.equal(a.whatsappHref, "https://wa.me/34600111222"); assert.equal(a.horario, "L-V 8:00-14:00");
+  Object.assign(AYUDA, { telefono: "", whatsapp: "600111222", horario: "" });
+  const b = ayudaPublica(); assert.equal(b.telHref, undefined); assert.equal(b.whatsappHref, "https://wa.me/34600111222"); // solo lo rellenado
+  Object.assign(AYUDA, { telefono: "", whatsapp: "", horario: "solo horario" });
+  assert.equal(ayudaPublica(), null); // un horario sin teléfono ni WhatsApp no sirve de nada
+});

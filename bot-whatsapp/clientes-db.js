@@ -226,6 +226,8 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
         .get(like, like, like, like, like, like, like).n;
       return { total, rows: rows.map((r) => ({ id: r.id, name: r.name, legalName: r.legal_name ?? "", city: r.city ?? "", phones: r.phones ? r.phones.split(" ") : [], emails: r.emails ? r.emails.split(" ") : [], active: !!r.active })) };
     },
+    /** Los artículos que más clientes distintos compran (solo identificadores y nunca de quién): mínimo 3 clientes, para no delatar a ninguno. */
+    topProducts: (limit = 8) => db.prepare("SELECT product_id AS id FROM purchases GROUP BY product_id HAVING COUNT(DISTINCT customer_id) >= 3 ORDER BY COUNT(DISTINCT customer_id) DESC, COUNT(*) DESC LIMIT ?").all(limit).map((r) => r.id),
     /** Lista ligera para paneles: sin historial. */
     list: () =>
       db.prepare("SELECT c.*, (SELECT COUNT(DISTINCT doc || date) FROM purchases p WHERE p.customer_id = c.id) AS n_orders, (SELECT MAX(date) FROM purchases p WHERE p.customer_id = c.id) AS last_order FROM customers c ORDER BY name")

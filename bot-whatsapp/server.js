@@ -17,6 +17,14 @@ import { sendMail } from "./mailer.js";
 import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "./delivery.js";
 // Lo que el catálogo necesita para el aviso «entrega hoy» y las opciones de día: se calcula SIEMPRE en el servidor con la hora de Madrid
+// «Lo más pedido» (para un cliente sin historial): identificadores de los artículos que más clientes compran, sin ningún dato personal; se recalcula cada 10 minutos
+let topCache = { at: 0, ids: [] };
+const topIds = () => {
+  if (Date.now() - topCache.at > 600_000) {
+    try { const conocidos = new Set(catalogNow().map((p) => String(p.id))); topCache = { at: Date.now(), ids: (customers.top?.(30) ?? []).map(String).filter((id) => conocidos.has(id)).slice(0, 8) }; } catch { topCache = { at: Date.now(), ids: [] }; }
+  }
+  return topCache.ids;
+};
 const avisoEntrega = (customer) => ({ entregaHoy: entregaHoyDisponible(customer), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) });
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
@@ -25,7 +33,7 @@ import { crearNotificador } from "./notificaciones.js";
 import { scheduleBackups } from "./backup.js";
 import { sourceFromEnv } from "./drive.js";
 import nodePath from "node:path";
-import { BUSINESS } from "./config.js";
+import { BUSINESS, ayudaPublica } from "./config.js";
 
 if (process.env.DEMO === "1") {
   // La demo usa su propia base de datos y carpeta, para no mezclarse con pedidos reales
@@ -286,6 +294,9 @@ function webOrderRoutes(req, res, url) {
         products,
         history: webHistory(view, catalogNow()),
         tree: webTree(catalogNow()),
+        top: topIds(),
+      ayuda: ayudaPublica(),
+        ayuda: ayudaPublica(),
         ...avisoEntrega(customer),
       });
     }
@@ -473,6 +484,7 @@ async function appRoutes(req, res, url) {
     if (!account) return void res.writeHead(302, { Location: "/cliente" }).end();
     return void enviar(res, 200, HTML, page("pedido.html"));
   }
+  if (p === "/api/ayuda" && req.method === "GET") return void sendJson(res, 200, { ayuda: ayudaPublica() }); // datos públicos de contacto de la empresa
   if (p === "/catalogo/aviso" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     return void sendJson(res, 200, avisoEntrega(clienteConPedidos(account.customerId)));
@@ -489,6 +501,7 @@ async function appRoutes(req, res, url) {
       products: webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa),
       history: webHistory(customer, catalogNow()),
       tree: webTree(catalogNow()),
+      top: topIds(),
       ...avisoEntrega(customer),
     });
   }

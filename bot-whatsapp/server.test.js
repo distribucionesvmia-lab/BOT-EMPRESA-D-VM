@@ -643,3 +643,11 @@ test("USO: el catálogo anota contadores (repetir, abandono, pedido) sin datos p
   assert.equal((await call("GET", "/api/admin/uso")).status, 403); // solo la empresa
   assert.doesNotMatch(JSON.stringify(despues), /7001|CAFETERIA|111111/); // sin datos de nadie
 });
+
+test("AYUDA y «LO MÁS PEDIDO»: /api/ayuda es público y sin datos rellenados no ofrece nada; el catálogo trae «top» sin datos personales", async () => {
+  const j = (await call("GET", "/api/ayuda")).json;
+  assert.deepEqual(j, { ayuda: null }); // la empresa aún no ha puesto teléfono ni WhatsApp
+  const enlace = (await call("GET", "/api/admin/exportaciones", { admin: true })).status; assert.equal(enlace, 200);
+  const cat = (await call("GET", "/catalogo/datos", { cookie: await (async () => { const r = await call("POST", "/api/login-nif", { body: { nif: "123456", empresa: "ejemplo" } }); return r.cookie; })() })).json;
+  if (cat && cat.products) { assert.ok(Array.isArray(cat.top)); assert.ok(cat.top.every((id) => typeof id === "string")); assert.ok("ayuda" in cat); }
+});

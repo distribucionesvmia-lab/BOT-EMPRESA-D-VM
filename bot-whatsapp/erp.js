@@ -62,6 +62,7 @@ export const getAccountsDb = () => (accountsDb ??= openAccountsDb());
 /** Lo que necesitan las cuentas y la administración: ficha, comprobación de altas, búsqueda e importación de clientes. */
 export const customerDirectory = {
   list: () => dbs().customersDb.list(),
+  top: (n) => dbs().customersDb.topProducts(n),
   getById: (id) => dbs().customersDb.getById(id),
   /** Cliente cuyo teléfono habitual de contacto coincide (si lo comparten varios, ninguno). */
   getByPhone: (phone) => dbs().customersDb.getByPhone(phone),

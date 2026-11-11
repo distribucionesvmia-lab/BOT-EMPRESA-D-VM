@@ -103,6 +103,12 @@ const currentAccount = () => {
 // El cliente con su historial MÁS lo que ha pedido en la demo (para «histórico» y «último pedido»)
 const propios = (id) => [...cache.orders].filter((o) => o.customer_id === id).sort((a, b) => (a.created_at < b.created_at ? 1 : -1)).slice(0, 10)
   .map((o) => ({ doc: o.id, date: String(o.created_at).slice(0, 10), lines: o.items.map((i) => ({ productId: String(i.id), qty: i.units ?? i.qty })).filter((l) => l.qty > 0) }));
+// «Lo más pedido»: artículos que compran al menos 3 clientes distintos (solo identificadores, sin datos personales)
+const topIdsDemo = () => {
+  const n = new Map(), conocidos = new Set(getCatalog().map((p) => String(p.id)));
+  for (const c of cache.customers) for (const id of new Set((c.orders ?? []).flatMap((o) => o.lines.map((l) => String(l.productId))))) n.set(id, (n.get(id) ?? 0) + 1);
+  return [...n].filter(([id, k]) => k >= 3 && conocidos.has(id)).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([id]) => id);
+};
 const customerOf = (acc) => { const c = acc ? cache.customers.find((x) => x.id === acc.customerId) ?? null : null; return c && withOwnOrders(c, propios(c.id)); };
 const phonesOf = (c) => (c.phones?.length ? c.phones : [phone9(c.phone)].filter(Boolean));
 // Compara una solicitud con la base de clientes. Acceso automático solo si hay UN cliente cuyo nombre (comercial o razón social)
@@ -379,7 +385,7 @@ window.VM = {
   miniData(link) {
     const customer = links.get(link)?.customer;
     if (!customer) return { error: "Enlace no válido o caducado" };
-    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address, re: !!customer.recargoEquivalencia }, used: links.get(link).used, favs: [...(favsDemo.get(customer.id) ?? [])], products: webProducts(customer, getCatalog(), habitualProducts, (id) => globalThis.__VM_FOTOS__?.[id] ?? null, (id) => !!globalThis.__VM_FOTOS_IA__?.includes(id)), history: webHistory(customer, getCatalog()), tree: webTree(getCatalog()), ...this.miniAviso(link) };
+    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address, re: !!customer.recargoEquivalencia }, used: links.get(link).used, favs: [...(favsDemo.get(customer.id) ?? [])], products: webProducts(customer, getCatalog(), habitualProducts, (id) => globalThis.__VM_FOTOS__?.[id] ?? null, (id) => !!globalThis.__VM_FOTOS_IA__?.includes(id)), history: webHistory(customer, getCatalog()), tree: webTree(getCatalog()), top: topIdsDemo(), ...this.miniAviso(link) };
   },
   /** Lo mismo que el servidor: aviso «entrega hoy» y opciones de día, con la hora de Madrid y las mismas funciones. */
   miniAviso(link) {
