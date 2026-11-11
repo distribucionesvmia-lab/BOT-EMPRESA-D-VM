@@ -90,7 +90,7 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 | N-01 | Carrito: controles a 48 px (Cajas/Uds 61×42, − y + 44×40, cantidad 56×40, «+ Añadir observación» 251×40) | Medio | Bajo | Propuesta (nueva) | Hallada al verificar M-03 |
 | N-02 | Quitar la barra gris «Añade productos para empezar» mientras el carrito esté vacío; en apaisado, cabecera que se colapsa al hacer scroll | Medio | Bajo | Propuesta (nueva) | Hallada al verificar M-01 |
 | M-04 / F-07 | Vista de escritorio en tabla / 2 columnas | Medio | Medio | Propuesta | |
-| M-05 / F-08 | Respetar letra del sistema + A−/A+ | Medio | Bajo | Propuesta | Necesita tu decisión |
+| M-05 / F-08 | Respetar letra del sistema (hasta +30 %) + A−/A+ | Medio | Bajo | **Aprobada** (11-nov) | Decisión 1 = sí. Prompt listo: `PROMPT_CONSTRUCTOR_letra_y_aviso_entrega.md` |
 | M-06 / F-06 | Poca cobertura: carrito local + instalable | Alto | Medio | Propuesta | Medir primero con red lenta |
 | M-07 | Quitar el «Hacer pedido» repetido | Bajo | Bajo | Propuesta | |
 | M-08 | Precio de caja en la fila | Medio | Bajo | Propuesta | |
@@ -104,6 +104,7 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 | F-11 | Ofertas y venta cruzada | Medio | Medio | Propuesta | Necesito vuestras ofertas |
 | F-12 | Escáner de barras | Bajo-Medio | Alto | Propuesta | Depende de los EAN |
 | F-13 | Pedido asistido por el comercial | Medio | Medio | Propuesta | |
+| F-15 | Aviso «Si haces el pedido antes de las 10:00, te lo entregamos hoy» (solo Medina del Campo, día laborable, antes de las 10:00; desaparece a las 10:00) | Medio | Bajo | **Aprobada** (11-nov) | Regla dada por el dueño. Mismo prompt que M-05. Casos de hora a probar incluidos |
 | F-14 | Medir el uso | Alto | Bajo-Medio | Propuesta | Sin esto no hay seguimiento real |
 
 **Mi recomendación de orden:** 1) M-02 + M-03 (lo que notas ya hoy), 2) M-01, 3) F-02, 4) F-14, 5) F-01.
@@ -112,6 +113,7 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 
 | Fecha | Qué se hizo |
 |---|---|
+| 11-nov-2026 | Decisiones: letra = respetarla (aprobada); aviso de entrega hoy antes de las 10:00 en Medina del Campo (nueva F-15, aprobada). Prompt para el constructor en `PROMPT_CONSTRUCTOR_letra_y_aviso_entrega.md`. |
 | 11-nov-2026 | Tras tus arreglos, nueva medición de la versión `1794389456-64de` en los 9 tamaños: M-02 y M-03 (lista) verificadas, M-01 mejorada, nuevas N-01 y N-02; resto sin cambios. PDF actualizado. |
 | 10-nov-2026 | Informe en PDF (`Investigacion_mejoras_app_pedidos.pdf`) con la comparativa de empresas, la medición, las propuestas por fases y las 8 decisiones pendientes. |
 | 10-nov-2026 | Ronda 1: medición del artefacto actual en 9 tamaños, 4 grupos de búsqueda (pedido B2B, móvil, Sysco, pedido rápido, WhatsApp Flows, accesibilidad), primeras 9 observaciones y 14 ideas. |
