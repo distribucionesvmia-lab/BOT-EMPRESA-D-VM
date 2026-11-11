@@ -63,6 +63,7 @@ export const getAccountsDb = () => (accountsDb ??= openAccountsDb());
 export const customerDirectory = {
   list: () => dbs().customersDb.list(),
   top: (n) => dbs().customersDb.topProducts(n),
+  fechasPedidos: () => dbs().customersDb.fechasPedidos(),
   getById: (id) => dbs().customersDb.getById(id),
   /** Cliente cuyo teléfono habitual de contacto coincide (si lo comparten varios, ninguno). */
   getByPhone: (phone) => dbs().customersDb.getByPhone(phone),

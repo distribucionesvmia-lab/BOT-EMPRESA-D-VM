@@ -86,6 +86,9 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     if (!db.prepare(`PRAGMA table_info(${table})`).all().some((x) => x.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`);
   };
   // Favoritos del cliente (privados, por cliente; no los toca la sincronización con a3ERP)
+  // Pedido fijo semanal (F-16): la plantilla de líneas y los días de reparto; NUNCA se envía solo, el cliente la revisa cada día que toca
+  db.exec("CREATE TABLE IF NOT EXISTS standing_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, days TEXT NOT NULL, paused INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)");
+  db.exec("CREATE TABLE IF NOT EXISTS reminders (customer_id TEXT NOT NULL, day TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY (customer_id, day))"); // day = '' para «no avisar más»
   db.exec("CREATE TABLE IF NOT EXISTS favorites (customer_id TEXT NOT NULL, product_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (customer_id, product_id))");
   // Derechos de protección de datos que el cliente ejerce desde la aplicación (corregir, limitar, oponerse, otra) y bajas de cuenta
   // Uso de la aplicación: solo contadores por día y tipo de suceso (repetir, abandono, pedido…); no se guarda quién ni qué pide
@@ -179,6 +182,24 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       db.prepare("INSERT OR IGNORE INTO favorites (customer_id, product_id, created_at) VALUES (?, ?, ?)").run(c, p, now);
       return true;
     },
+    /** Pedido fijo del cliente: { lines:[{id,qty,unit,note}], days:[1..5], paused } o null. */
+    getStanding(customerId) {
+      const r = db.prepare("SELECT * FROM standing_orders WHERE customer_id = ?").get(String(customerId));
+      return r ? { lines: JSON.parse(r.lines), days: JSON.parse(r.days), paused: !!r.paused, updatedAt: r.updated_at } : null;
+    },
+    setStanding(customerId, { lines, days }, now = new Date().toISOString()) {
+      const ls = (Array.isArray(lines) ? lines : []).slice(0, 80).map((l) => ({ id: String(l.id), qty: Math.min(999, Math.max(1, Math.floor(Number(l.qty)))), unit: l.unit === "caja" ? "caja" : "ud", note: String(l.note ?? "").slice(0, 120) })).filter((l) => l.id && Number.isFinite(l.qty));
+      const ds = [...new Set((Array.isArray(days) ? days : []).map(Number).filter((d) => Number.isInteger(d) && d >= 1 && d <= 5))].sort();
+      if (!ls.length || !ds.length) return false;
+      db.prepare("INSERT INTO standing_orders (customer_id, lines, days, paused, updated_at) VALUES (?, ?, ?, 0, ?) ON CONFLICT(customer_id) DO UPDATE SET lines = excluded.lines, days = excluded.days, paused = 0, updated_at = excluded.updated_at").run(String(customerId), JSON.stringify(ls), JSON.stringify(ds), now);
+      return true;
+    },
+    allStanding() { const m = new Map(); for (const r of db.prepare("SELECT customer_id, days, paused FROM standing_orders").all()) m.set(r.customer_id, { days: JSON.parse(r.days), paused: !!r.paused }); return m; },
+    /** «Ya avisado» (solo hoy) o «No avisar más» (siempre) para un cliente. */
+    markReminder(customerId, state, day) { if (state === "nunca") db.prepare("INSERT OR REPLACE INTO reminders (customer_id, day, state) VALUES (?, '', 'nunca')").run(String(customerId)); else db.prepare("INSERT OR REPLACE INTO reminders (customer_id, day, state) VALUES (?, ?, 'avisado')").run(String(customerId), String(day)); return true; },
+    reminderSets(day) { const r = db.prepare("SELECT customer_id, day, state FROM reminders WHERE day = '' OR day = ?").all(String(day)); return { avisadosHoy: new Set(r.filter((x) => x.state === "avisado").map((x) => x.customer_id)), nunca: new Set(r.filter((x) => x.state === "nunca").map((x) => x.customer_id)) }; },
+    pauseStanding: (customerId, paused) => db.prepare("UPDATE standing_orders SET paused = ? WHERE customer_id = ?").run(paused ? 1 : 0, String(customerId)).changes === 1,
+    deleteStanding: (customerId) => db.prepare("DELETE FROM standing_orders WHERE customer_id = ?").run(String(customerId)).changes === 1,
     hasOwnCode: (customerId) => !!byCustomer.get(String(customerId))?.code_key,
     /** Guarda la huella del código personal de la cuenta. { ok:true } o { error } si otro cliente ya usa ese código. */
     setCodeKey(accountId, key) {
@@ -352,6 +373,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       try {
         dropSessions.run(row.id);
         db.prepare("DELETE FROM favorites WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM standing_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM registrations WHERE customer_id = ? OR (phone = ? AND ? IS NOT NULL)").run(row.customer_id, row.phone, row.phone);
         db.prepare("UPDATE accounts SET phone = NULL, email = NULL, pin_hash = NULL, code_key = NULL, status = 'deleted', verified = 0, failed = 0, lock_count = 0, locked_until = NULL, deleted_at = ? WHERE id = ?").run(now, row.id);
         db.prepare("INSERT INTO rights (customer_id, tipo, texto, estado, created_at, resolved_at) VALUES (?, 'supresion', ?, 'atendida', ?, ?)").run(row.customer_id, "El cliente eliminó su cuenta desde la aplicación (acceso, contactos y favoritos borrados; pedidos conservados por obligación legal).", now, now);

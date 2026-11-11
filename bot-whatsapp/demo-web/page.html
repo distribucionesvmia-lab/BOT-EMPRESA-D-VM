@@ -836,10 +836,21 @@ function inicio(ui) {
     for (const l of ui.last.lineas) { const li = document.createElement("li"); li.textContent = l; ul.appendChild(li); }
     if (ui.last.mas) { const li = document.createElement("li"); li.textContent = "… y " + ui.last.mas + " más"; ul.appendChild(li); }
     t.append(s, b, ul);
+    const sem = document.createElement("button"); sem.type = "button"; sem.className = "vm-link"; sem.style.cssText = "min-height:48px;padding:0;text-align:left;font-weight:700"; sem.textContent = "🔁 Repetir cada semana"; sem.onclick = () => abrirMini(ui.url + "#" + ui.last.repetir + "&f=1"); t.appendChild(sem);
     const bt = document.createElement("button"); bt.type = "button"; bt.textContent = "Repetir y revisar"; bt.onclick = () => abrirMini(ui.url + "#" + ui.last.repetir);
     f.append(t, bt); c.appendChild(f);
   }
   chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
+  { // «Hoy toca tu pedido de los martes»: solo en sus días y nunca se envía solo; se abre para revisarlo
+    const j = pedidoFijoDemo("GET", "/api/pedido-fijo").json;
+    if (j.fijo && j.hoy.toca && !j.hoy.yaPidio) {
+      const f = document.createElement("div"); f.className = "fila fijo"; f.setAttribute("role", "status");
+      const t = document.createElement("div"); const s = document.createElement("small"); s.textContent = "Tu pedido fijo"; const b = document.createElement("b"); b.textContent = `Hoy toca tu pedido de los ${j.hoy.nombre}`; t.append(s, b);
+      const bt = document.createElement("button"); bt.type = "button"; bt.textContent = "Revisar y enviar";
+      bt.onclick = () => abrirMini(ui.url + "#c=" + j.fijo.lineas.map((l) => encodeURIComponent(l.id) + "." + l.uds).join(",") + "&r=1");
+      f.append(t, bt); c.insertBefore(f, c.firstChild);
+    }
+  }
 }
 const sinEmoji = (t) => String(t ?? "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim();
 document.querySelectorAll("#quick button").forEach((b) => (b.onclick = () => enviar(b.dataset.q, b.textContent)));
@@ -879,6 +890,23 @@ function abrirMini(url) {
   const fr = el("iframe", "", { title: "Catálogo de pedido", srcdoc: MINI_HTML.replace("<head>", `<head><script>window.vmLetraInicial=${window.vmLetra.nivel()};${pre ? `window.vmPrecarga=${JSON.stringify(pre)};` : ""}<\/script>`) }); web.append(bar, fr); web.hidden = false;
   setTimeout(() => { if (miniState && !miniState.ready) { fr.remove(); web.appendChild(el("p", "Este visor no permite abrir el catálogo. Puedes pedir escribiendo en el chat, por ejemplo «2 aguas».", { style: "padding:16px;color:var(--muted)" })); } }, 2500);
 }
+// Pedido fijo semanal en la demo: se guarda en este navegador (en el programa real, en la cuenta del cliente) y nunca se envía solo
+const FIJO_DEMO = "vm:demo:pedido-fijo"; let fijoMem = null;
+const leerFijo = () => { try { return JSON.parse(localStorage.getItem(FIJO_DEMO) || "null") ?? fijoMem; } catch { return fijoMem; } };
+const guardarFijo = (f) => { fijoMem = f; try { f ? localStorage.setItem(FIJO_DEMO, JSON.stringify(f)) : localStorage.removeItem(FIJO_DEMO); } catch {} };
+function pedidoFijoDemo(method, url, bodyTxt) {
+  const body = bodyTxt ? JSON.parse(bodyTxt) : {}, f = leerFijo();
+  if (method === "GET") {
+    const dow = new Date().getDay(), nombres = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+    return { status: 200, json: { fijo: f && { dias: f.dias, pausado: !!f.pausado, lineas: f.lineas.map((l) => ({ ...l, nombre: l.nombre ?? l.id, uds: l.qty })), faltan: 0 }, hoy: { dia: dow, nombre: nombres[dow], toca: !!f && !f.pausado && f.dias.includes(dow), yaPidio: false } } };
+  }
+  if (/\/pausa$/.test(url)) { if (f) guardarFijo({ ...f, pausado: body.pausado !== false }); return { status: 200, json: { ok: !!f } }; }
+  if (/\/borrar$/.test(url)) { guardarFijo(null); return { status: 200, json: { ok: !!f } }; }
+  const dias = [...new Set((body.dias ?? []).map(Number).filter((d) => d >= 1 && d <= 5))].sort(), lineas = (body.lineas ?? []).filter((l) => l && l.id && l.qty > 0);
+  if (!dias.length || !lineas.length) return { status: 400, json: { error: "Elige al menos un artículo y un día de reparto." } };
+  guardarFijo({ dias, lineas: lineas.map((l) => ({ id: String(l.id), qty: Math.min(999, Math.floor(l.qty)), unit: l.unit === "caja" ? "caja" : "ud" })), pausado: false });
+  return { status: 200, json: { ok: true } };
+}
 window.addEventListener("message", (e) => {
   const d = e.data; if (!d || !miniState) return;
   if (d.vmReady) { miniState.ready = true; return; }
@@ -886,6 +914,8 @@ window.addEventListener("message", (e) => {
   if (d.vmApi) {
     let status = 200, json;
     if (d.method === "POST" && /\/api\/uso$/.test(d.url || "")) json = { ok: true }; // contadores de uso: en la demo no se guardan (¡y no son un pedido!)
+    else if (/\/api\/pedido-fijo/.test(d.url || "")) ({ status, json } = pedidoFijoDemo(d.method, d.url, d.body));
+    else if (/\/catalogo\/pedido\?/.test(d.url || "")) ({ status, json } = VM.miniPedido(miniState.link, decodeURIComponent((/[?&]ref=([^&]*)/.exec(d.url) || [])[1] || "")));
     else if (d.method === "POST" && /\/favorito$/.test(d.url || "")) ({ status, json } = VM.miniFav(miniState.link, JSON.parse(d.body || "{}")));
     else if (d.method === "POST") ({ status, json } = VM.miniSubmit(miniState.link, JSON.parse(d.body || "{}")));
     else if (/\/aviso$/.test(d.url || "")) { json = VM.miniAviso(miniState.link); if (json.error) status = 410; }
@@ -921,6 +951,7 @@ function pintarPedidos() {
     const cli = el("td"); cli.append(el("b", o.cliente), el("div", o.codigo ? "Cód. " + o.codigo : "Cliente nuevo", { className: "sub" }));
     const est = el("td"); est.appendChild(el("span", o.estado[0].toUpperCase() + o.estado.slice(1), { className: "badge " + o.estado, title: o.motivo }));
     if (o.motivo) est.appendChild(el("div", o.motivo, { className: "sub" }));
+    if (o.modificado) est.appendChild(el("div", "✏️ Modificado " + new Date(o.modificado).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }), { className: "sub" }));
     if (o.estado === "retenido" && o.codigo) { const b = el("button", "Revisado: exportar", { type: "button", className: "btn" }); b.onclick = () => VM.approveOrder(o.id).catch((e) => toast(e.message)); est.appendChild(b); }
     const chk = el("td");
     if (o.estado === "pendiente" || o.estado === "exportado") { const c = el("input", "", { type: "checkbox", className: "sel" + (o.estado === "exportado" ? " re" : "") }); c.dataset.id = o.id; c.checked = selOrd.has(o.id); c.setAttribute("aria-label", (o.estado === "exportado" ? "Volver a exportar " : "Exportar ") + o.ref); c.onchange = () => { c.checked ? selOrd.add(o.id) : selOrd.delete(o.id); actualizarSel(); }; chk.appendChild(c); }

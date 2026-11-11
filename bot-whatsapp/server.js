@@ -34,7 +34,8 @@ import { scheduleBackups } from "./backup.js";
 import { sourceFromEnv } from "./drive.js";
 import nodePath from "node:path";
 import { BUSINESS, ayudaPublica } from "./config.js";
-import { puedeEditarPedido } from "./delivery.js";
+import { puedeEditarPedido, weekday } from "./delivery.js";
+const DIAS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
 if (process.env.DEMO === "1") {
   // La demo usa su propia base de datos y carpeta, para no mezclarse con pedidos reales
@@ -354,6 +355,7 @@ const datosDelCliente = (acc) => {
     historial_de_compras: (c?.orders ?? []).map((o) => ({ documento: o.doc, fecha: o.date, lineas: o.lines })),
     pedidos_hechos_en_la_aplicacion: getDb().ordersFull(acc.customerId),
     favoritos: getAccountsDb().favorites(acc.customerId),
+    pedido_fijo_semanal: getAccountsDb().getStanding(acc.customerId),
   };
 };
 const auth = createAuth({
@@ -520,6 +522,31 @@ async function appRoutes(req, res, url) {
     if (!catalogNow().some((x) => String(x.id) === id)) return void sendJson(res, 400, { error: "Producto no válido" });
     if (!getAccountsDb().setFavorite(account.customerId, id, body?.on !== false)) return void sendJson(res, 400, { error: "Has llegado al máximo de favoritos (300)" });
     return void sendJson(res, 200, { ok: true, favs: getAccountsDb().favorites(account.customerId) });
+  }
+  // ── Pedido fijo semanal (F-16): se guarda la plantilla; nunca se envía solo ──
+  if (p === "/api/pedido-fijo" && req.method === "GET") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const f = getAccountsDb().getStanding(account.customerId);
+    const hoy = madridDay(), dow = weekday(hoy), cat = new Map(catalogNow().map((x) => [String(x.id), x]));
+    const lineas = (f?.lines ?? []).map((l) => { const pr = cat.get(l.id); if (!pr) return null; const k = Number.isInteger(pr.unitsPerBox) && pr.unitsPerBox > 1 ? pr.unitsPerBox : 1; return { ...l, nombre: pr.name, uds: l.unit === "caja" ? l.qty * k : l.qty }; }).filter(Boolean);
+    const yaPidio = getDb().recentOrders(account.customerId, 5).some((o) => madridDay(o.created_at) === hoy);
+    return void sendJson(res, 200, { fijo: f && { dias: f.days, pausado: f.paused, lineas, faltan: f.lines.length - lineas.length }, hoy: { dia: dow, nombre: DIAS_ES[dow], toca: !!f && !f.paused && f.days.includes(dow) && lineas.length > 0, yaPidio } });
+  }
+  if (p === "/api/pedido-fijo" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const body = await readJson(req), cat = new Set(catalogNow().map((x) => String(x.id)));
+    const ok = getAccountsDb().setStanding(account.customerId, { lines: (body?.lineas ?? []).filter((l) => cat.has(String(l?.id))), days: body?.dias });
+    return void sendJson(res, ok ? 200 : 400, ok ? { ok: true } : { error: "Elige al menos un artículo y un día de reparto." });
+  }
+  if (p === "/api/pedido-fijo/pausa" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const body = await readJson(req);
+    return void sendJson(res, 200, { ok: getAccountsDb().pauseStanding(account.customerId, body?.pausado !== false) });
+  }
+  if (p === "/api/pedido-fijo/borrar" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    return void sendJson(res, 200, { ok: getAccountsDb().deleteStanding(account.customerId) });
   }
   if (p === "/api/mis-pedidos" && req.method === "GET") { // «Mis pedidos»: los últimos y si todavía se pueden modificar (hasta la hora límite y mientras no se exporten)
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });

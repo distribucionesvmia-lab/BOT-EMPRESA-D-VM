@@ -1,6 +1,6 @@
 // Rutas HTTP de la EMPRESA (el empresario): pedidos recibidos y su exportación a Excel, solicitudes de alta de
 // clientes y cuentas. Es una aplicación aparte de la del cliente: todo va bajo /api/admin y exige la clave de la empresa.
-import { deliveryInfo } from "./delivery.js";
+import { deliveryInfo, madridDay } from "./delivery.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,7 @@ import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2 } from "./pricing.js";
 import { runExport } from "./exporter.js";
 import { execFile } from "node:child_process";
+import { recordatoriosDeHoy } from "./recordatorios.js";
 import { imprimirHtml } from "./export-format.js";
 
 const amountOf = (l) => l.amount ?? round2((l.units ?? l.qty) * (l.price ?? 0) * (1 - (l.discount ?? 0) / 100));
@@ -98,6 +99,19 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       execFile("schtasks", ["/Run", "/TN", process.env.UPDATE_TASK ?? "VM Actualizar"], { timeout: 8000 }, (err) =>
         send(res, 200, err ? { ok: false, mensaje: "No se pudo lanzar la actualización (¿está creada la tarea «VM Actualizar»? Ver instalar-tareas.bat)." } : { ok: true, mensaje: "Buscando mejoras… si hay alguna, el programa se reinicia solo en un minuto." }));
       return true;
+    }
+    // ---- Recordatorios de hoy (F-17): a quién le toca reponer; la empresa envía a mano por WhatsApp ----
+    if (p === "/api/admin/recordatorios" && get) {
+      const hoy = madridDay(), fechas = customers.fechasPedidos?.() ?? new Map(), app = orders.orderDays?.() ?? new Map();
+      const clientes = customers.list().filter((c) => c.active !== false).map((c) => ({ id: c.id, name: c.name, phone: c.phone, fechas: [...(fechas.get(c.id) ?? []), ...(app.get(c.id) ?? [])] }));
+      const { avisadosHoy, nunca } = accounts.reminderSets(hoy);
+      return send(res, 200, { hoy, filas: recordatoriosDeHoy({ hoy, clientes, fijos: accounts.allStanding(), avisadosHoy, nunca, enlace: process.env.PUBLIC_URL ?? "" }) }), true;
+    }
+    if (post && (p === "/api/admin/recordatorios/avisado" || p === "/api/admin/recordatorios/no-avisar")) {
+      const body = (await readJson(req)) ?? {};
+      if (typeof body.id !== "string" || !body.id) return send(res, 400, { error: "Falta el cliente." }), true;
+      accounts.markReminder(body.id, p.endsWith("/avisado") ? "avisado" : "nunca", madridDay());
+      return send(res, 200, { ok: true }), true;
     }
     // ---- Pedidos ----
     if (p === "/api/admin/pedidos" && get) return send(res, 200, orders.listOrders({ limit: 150 }).map(orderView)), true;

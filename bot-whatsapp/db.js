@@ -8,6 +8,7 @@
 //              Chat: "wa:<id del mensaje de WhatsApp>"; mini-app: "web:<identificador del enlace>".
 
 import { DatabaseSync } from "node:sqlite";
+import { madridDay } from "./delivery.js";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS orders (
@@ -159,6 +160,12 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
         lineas: o.items.map((i) => ({ codigo: i.id, descripcion: i.name, cantidad: i.qty, unidad: i.unit, cajas: i.boxes, unidades: i.units, precio: i.price, descuento: i.discount, iva: i.vat_rate, importe: i.amount, nota: i.note ?? null })),
       })),
 
+    /** Días en que cada cliente hizo pedidos desde la aplicación: Map(idCliente → [AAAA-MM-DD…]). */
+    orderDays() {
+      const m = new Map();
+      for (const r of db.prepare("SELECT customer_id, created_at FROM orders WHERE customer_id IS NOT NULL AND status != 'cancelled'").all()) { const d = madridDay(r.created_at); (m.get(r.customer_id) ?? m.set(r.customer_id, []).get(r.customer_id)).push(d); }
+      return m;
+    },
     getOrderByRef: (ref) => withLines(db.prepare("SELECT * FROM orders WHERE ref = ?").get(String(ref))) ?? null,
     /** Sustituye el contenido de un pedido pendiente (el cliente lo modifica): mismo número de pedido, sin duplicados, marcado como modificado. null si ya no está pendiente. */
     replaceOrder(ref, o, now = new Date().toISOString()) {

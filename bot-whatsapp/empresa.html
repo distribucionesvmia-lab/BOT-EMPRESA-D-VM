@@ -54,6 +54,11 @@
 
     <!-- Pedidos -->
     <div id="p-pedidos">
+      <div class="panel" id="rec-panel" hidden>
+        <h2>Recordatorios de hoy</h2>
+        <p class="muted" style="margin:0 0 8px">Clientes a los que les toca reponer (por su ciclo habitual de compra o porque hoy es su día de pedido fijo). Pulsa «Abrir WhatsApp»: se abre con el mensaje ya escrito, lo puedes cambiar y lo envías tú. No se manda nada solo.</p>
+        <div class="scroll"><table><thead><tr><th>Cliente</th><th>Último pedido</th><th>Por qué</th><th></th></tr></thead><tbody id="rec"></tbody></table></div>
+      </div>
       <div class="panel">
         <h2>Pedidos recibidos</h2>
         <p class="muted" id="correo-estado" style="margin:0 0 8px"></p>
@@ -270,6 +275,20 @@ async function cuentas() {
 }
 const hora2 = (iso) => new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
 const ESTADO = { importado: "✔ importado", "sin cambios": "sin cambios", error: "✖ error", "sin fichero": "sin fichero" };
+async function recordatorios() {
+  const r = await call("/api/admin/recordatorios"), tb = $("rec"); tb.innerHTML = "";
+  $("rec-panel").hidden = !r.filas.length;
+  for (const x of r.filas) {
+    const tr = document.createElement("tr"), ult = x.ultimo ? x.ultimo.split("-").reverse().join("/") : "—";
+    const acc = el("td"); const box = el("div", "", { className: "row" });
+    const wa = el("a", "💬 Abrir WhatsApp", { href: `https://wa.me/${x.wa}?text=${encodeURIComponent(x.texto)}`, target: "_blank", rel: "noopener", className: "btn" }); wa.style.cssText = "display:inline-block;padding:8px 12px;border-radius:8px;background:#1a7f4b;color:#fff;font-weight:700;text-decoration:none";
+    const ya = el("button", "Ya avisado", { type: "button" }); ya.onclick = async () => { await call("/api/admin/recordatorios/avisado", { id: x.id }); refrescar(); };
+    const no = el("button", "No avisar más", { type: "button" }); no.onclick = async () => { if (confirm(`¿No volver a recordar nada a ${x.nombre}?`)) { await call("/api/admin/recordatorios/no-avisar", { id: x.id }); refrescar(); } };
+    box.append(wa, ya, no); acc.appendChild(box);
+    const cli = el("td"); cli.append(el("b", x.nombre), el("div", x.telefono, { className: "muted" }));
+    tr.append(cli, el("td", ult), el("td", x.motivo), acc); tb.appendChild(tr);
+  }
+}
 async function actualizacion() {
   const r = await call("/api/admin/actualizacion");
   $("act-estado").textContent = (r.version ? `Versión ${r.version}${r.fecha ? " · del " + hora2(r.fecha) : ""}${r.resumen ? " · " + r.resumen : ""}.` : "Versión no disponible.") + (r.ultimaComprobacion ? ` Última comprobación: ${r.ultimaComprobacion}.` : "");
@@ -391,7 +410,7 @@ async function avisos() {
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), derechos(), clientes(), avisos(), sincronizacion(), correo(), actualizacion()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), derechos(), clientes(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));

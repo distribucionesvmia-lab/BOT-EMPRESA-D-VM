@@ -687,3 +687,43 @@ test("MODIFICAR UN PEDIDO ENVIADO: sustituye al anterior (mismo número, sin dup
   assert.equal((await call("GET", "/api/mis-pedidos", { cookie: A })).json.pedidos[0].editable, false);
   assert.equal((await call("GET", `/catalogo/pedido?ref=${ref}`, { cookie: A })).status, 409);
 });
+
+test("PEDIDO FIJO SEMANAL: se guarda la plantilla y los días, se puede pausar y borrar, «toca hoy» solo en sus días y nunca se envía nada solo", async () => {
+  assert.equal((await call("GET", "/api/pedido-fijo")).status, 401);
+  const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar uno"));
+  const antes = (await call("GET", "/api/admin/pedidos", { admin: true })).json.length;
+  assert.equal((await call("GET", "/api/pedido-fijo", { cookie: A })).json.fijo, null);
+  assert.equal((await call("POST", "/api/pedido-fijo", { cookie: A, body: { lineas: [{ id: "1010", qty: 2 }], dias: [] } })).status, 400); // sin días
+  assert.equal((await call("POST", "/api/pedido-fijo", { cookie: A, body: { lineas: [{ id: "NOEXISTE", qty: 2 }], dias: [2] } })).status, 400); // sin artículos válidos
+  const r = await call("POST", "/api/pedido-fijo", { cookie: A, body: { lineas: [{ id: "1010", qty: 2, unit: "ud" }, { id: "NOEXISTE", qty: 1 }], dias: [1, 2, 3, 4, 5, 6, 0] } });
+  assert.equal(r.status, 200);
+  const g = (await call("GET", "/api/pedido-fijo", { cookie: A })).json;
+  assert.deepEqual(g.fijo.dias, [1, 2, 3, 4, 5]); // solo lunes a viernes
+  assert.equal(g.fijo.lineas.length, 1); assert.ok(g.fijo.lineas[0].nombre && g.fijo.lineas[0].uds >= 2);
+  const laborable = g.hoy.dia >= 1 && g.hoy.dia <= 5;
+  assert.equal(g.hoy.toca, laborable); // «Hoy toca tu pedido de los …» solo en sus días
+  // pausado: no toca; reanudado: vuelve a tocar
+  assert.equal((await call("POST", "/api/pedido-fijo/pausa", { cookie: A, body: { pausado: true } })).json.ok, true);
+  const p = (await call("GET", "/api/pedido-fijo", { cookie: A })).json; assert.equal(p.fijo.pausado, true); assert.equal(p.hoy.toca, false);
+  await call("POST", "/api/pedido-fijo/pausa", { cookie: A, body: { pausado: false } });
+  // otro cliente no ve el de este
+  assert.equal((await call("GET", "/api/pedido-fijo", { cookie: B })).json.fijo, null);
+  // NO se ha creado ningún pedido solo
+  assert.equal((await call("GET", "/api/admin/pedidos", { admin: true })).json.length, antes);
+  // lo que se descarga en «mis datos» lo incluye, y borrar lo quita
+  assert.ok((await call("GET", "/api/mis-datos", { cookie: A })).json.pedido_fijo_semanal);
+  assert.equal((await call("POST", "/api/pedido-fijo/borrar", { cookie: A, body: {} })).json.ok, true);
+  assert.equal((await call("GET", "/api/pedido-fijo", { cookie: A })).json.fijo, null);
+});
+
+test("RECORDATORIOS DE HOY: solo la empresa los ve; «Ya avisado» y «No avisar más» los quitan", async () => {
+  assert.equal((await call("GET", "/api/admin/recordatorios")).status, 403);
+  const r = (await call("GET", "/api/admin/recordatorios", { admin: true })).json;
+  assert.ok(Array.isArray(r.filas) && /^\d{4}-\d{2}-\d{2}$/.test(r.hoy));
+  assert.equal((await call("POST", "/api/admin/recordatorios/avisado", { body: { id: "x" } })).status, 403);
+  assert.equal((await call("POST", "/api/admin/recordatorios/avisado", { admin: true, body: {} })).status, 400);
+  assert.equal((await call("POST", "/api/admin/recordatorios/avisado", { admin: true, body: { id: "7001" } })).status, 200);
+  assert.equal((await call("POST", "/api/admin/recordatorios/no-avisar", { admin: true, body: { id: "7001" } })).status, 200);
+  const despues = (await call("GET", "/api/admin/recordatorios", { admin: true })).json;
+  assert.ok(!despues.filas.some((f) => f.id === "7001"));
+});

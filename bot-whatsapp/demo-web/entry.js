@@ -4,7 +4,7 @@
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog, habitualProducts } from "../bot.js";
 import { priceOrder, totals } from "../pricing.js";
 import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, conHistorial } from "../weborder.js";
-import { deliveryOptions, deliveryInfo, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "../delivery.js";
+import { deliveryOptions, deliveryInfo, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible, puedeEditarPedido } from "../delivery.js";
 import { findCustomers } from "../identify.js";
 import { FORMAT, imprimirHtml, madrid, madridTime } from "../export-format.js";
 import { workbookFiles, estiloCss, estiloDecimales } from "../xlsx-files.js";
@@ -154,7 +154,7 @@ function saveOrder(order, customer) {
   if (!perms.canWrite) return false;
   const row = newOrderRow(order, customer);
   backend.set("orders", row.id, row).catch(report);
-  return true;
+  return row;
 }
 
 function buildExport(rows, fileName, extra = {}) {
@@ -396,13 +396,35 @@ window.VM = {
   miniSubmit(link, body) {
     const customer = links.get(link)?.customer;
     if (!customer) return { status: 410, json: { error: "Enlace no válido o caducado" } };
+    if (typeof body?.replaces === "string" && body.replaces) { // modificar un pedido ya enviado: sustituye al anterior, mismo número
+      const viejo = withRefs().find((o) => o.ref === body.replaces);
+      if (!viejo || viejo.customer_id !== customer.id) return { status: 404, json: { error: "No encontramos ese pedido." } };
+      if (!puedeEditarPedido(viejo).ok) return { status: 409, json: { error: "Ya no se puede modificar este pedido. Llámanos y lo cambiamos." } };
+      const b2 = webOrderFromBody(body, customer, { key: `web:${link}`, phone: currentAccount()?.phone ?? PHONE }, getCatalog());
+      if (b2.error) return { status: 400, json: { error: b2.error } };
+      if (!perms.canWrite) return { status: 200, json: { ok: true, modificado: true, ref: viejo.ref, message: "✅ Pedido modificado (esta cuenta no puede guardar cambios)." } };
+      const fila = newOrderRow(holdIfUnconfirmed(currentAccount(), b2.order), customer);
+      backend.update("orders", viejo.id, { address: fila.address, city: fila.city, text: fila.text, note: fila.note, delivery_date: fila.delivery_date, total: fila.total, review: fila.review, reason: fila.reason, re: fila.re, items: fila.items, modified_at: new Date().toISOString() }).catch(report);
+      const pe = puedeEditarPedido({ ...viejo, delivery_date: fila.delivery_date });
+      return { status: 200, json: { ok: true, modificado: true, ref: viejo.ref, ...(pe.ok ? { modificable: pe.texto || "Puedes seguir modificándolo mientras no lo preparemos" } : {}), message: `✅ Pedido modificado (${viejo.ref}). ${fila.items.length} artículos, total aprox. ${Number(fila.total).toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.` } };
+    }
     if (links.get(link).used) return { status: 409, json: { error: "Este pedido ya se envió" } };
     const built = webOrderFromBody(body, customer, { key: `web:${link}`, phone: currentAccount()?.phone ?? PHONE }, getCatalog());
     if (built.error) return { status: 400, json: { error: built.error } };
     links.get(link).used = true;
     const priced = priceOrder(built.order, customer, getCatalog());
-    saveOrder(holdIfUnconfirmed(currentAccount(), built.order), customer);
-    return { status: 200, json: { ok: true, message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} artículos, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.\n\n${BUSINESS.payment}` } };
+    const fila = saveOrder(holdIfUnconfirmed(currentAccount(), built.order), customer);
+    const mia = fila && withRefs().find((o) => o.id === fila.id), pe = mia ? puedeEditarPedido(mia) : { ok: false };
+    return { status: 200, json: { ok: true, ...(mia ? { ref: mia.ref } : {}), ...(pe.ok ? { modificable: pe.texto || "Puedes seguir modificándolo mientras no lo preparemos" } : {}), message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} artículos, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.\n\n${BUSINESS.payment}` } };
+  },
+
+  /** Contenido de un pedido modificable (para volver a abrirlo en el catálogo). */
+  miniPedido(link, ref) {
+    const customer = links.get(link)?.customer, o = withRefs().find((x) => x.ref === ref);
+    if (!customer || !o || o.customer_id !== customer.id) return { status: 404, json: { error: "No encontramos ese pedido." } };
+    const pe = puedeEditarPedido(o);
+    if (!pe.ok) return { status: 409, json: { error: "Ya no se puede modificar este pedido. Llámanos y lo cambiamos." } };
+    return { status: 200, json: { ref: o.ref, hasta: pe.texto, entrega: o.delivery_date ?? null, nota: (o.note ?? "").replace(/^ENTREGA EN [^:]*: [^·]*(?: · )?/, ""), direccion: /^ENTREGA EN /.test(o.note ?? "") ? o.address : "", lineas: o.items.map((i) => ({ id: String(i.id), qty: i.qty, unit: i.unit, note: i.note ?? "" })) } };
   },
 
   // ---- Vista del distribuidor ----
@@ -410,7 +432,7 @@ window.VM = {
   customers: () => cache.customers.map((c) => ({ id: c.id, name: c.name, phone: c.phone, recargoEquivalencia: !!c.recargoEquivalencia, orders: c.orders.length, lastOrder: c.orders[0]?.date ?? null })),
   orders: () =>
     withRefs().reverse().map((o) => ({
-      id: o.id, ref: o.ref, hora: madridTime(o.created_at), cliente: o.name, codigo: o.customer_id, lineas: o.items.length,
+      id: o.id, ref: o.ref, hora: madridTime(o.created_at), modificado: o.modified_at ?? null, cliente: o.name, codigo: o.customer_id, lineas: o.items.length,
       nota: o.note || "",
       entrega: deliveryInfo(o.delivery_date, o.created_at),
       resumen: o.items.map((i) => `${i.boxes ?? i.units} ${i.boxes ? "caja" + (i.boxes > 1 ? "s" : "") : "ud"} ${i.name}`).join(" · "),

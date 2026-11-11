@@ -488,6 +488,8 @@
   .atajos { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; } .atajos button { min-height:48px; min-width:56px; padding:0 12px; border:2px solid var(--rojo); border-radius:12px; background:#fff; color:var(--rojo-o); font-weight:800; font-size:calc(15px / var(--k,1)); cursor:pointer; touch-action:manipulation; }
   .atajos button:active { background:var(--rojo-s); }
   .vaciar { display:block; width:calc(100% - 28px); margin:0 14px 12px; min-height:48px; border:2px solid var(--linea); border-radius:14px; background:#fff; color:var(--gris); font-weight:700; font-size:calc(16px / var(--k,1)); cursor:pointer; }
+  .diasfijo { display:flex; flex-wrap:wrap; gap:6px; } .diasfijo button { min-width:56px; min-height:48px; padding:0 12px; border:2px solid var(--linea); border-radius:12px; background:#fff; color:var(--gris); font-weight:800; font-size:calc(16px / var(--k,1)); cursor:pointer; touch-action:manipulation; }
+  .diasfijo button[aria-pressed="true"] { background:var(--rojo); border-color:var(--rojo); color:#fff; }
   .lo-compras { display:inline-block; vertical-align:middle; margin-left:4px; padding:1px 8px; border-radius:999px; background:#e3f4ea; color:#0b6b3a; font-size:calc(12px / var(--k,1)); font-weight:700; white-space:nowrap; }
   .top-tit { margin:14px 14px 4px; font-size:calc(18px / var(--k,1)); }
   .addropc { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
@@ -543,6 +545,9 @@
         </div>
         <input id="addrOtra" type="text" maxlength="160" autocomplete="street-address" placeholder="Calle, número y localidad" aria-label="Dirección de entrega" hidden>
       </div>
+      <div class="card" id="fijoCard" hidden><div class="ctit">🔁 Repetir cada semana</div><p class="cval" id="fijoTxt" style="margin:0 0 8px"></p>
+        <div id="fijoDias" class="diasfijo" role="group" aria-label="Días de reparto"></div>
+        <button class="big sec" id="fijoGuardar" type="button" style="margin-top:10px">Guardar como pedido fijo</button><div class="nota" id="fijoMsg" role="status" aria-live="polite"></div></div>
       <div class="card"><label for="note" class="ctit">💬 Observaciones del pedido</label><textarea id="note" placeholder="Ej.: avísame por teléfono antes de entregar (opcional)" maxlength="200"></textarea></div>
       <div class="nota" id="priceNote"></div>
       <div class="err" id="err" role="alert"></div>
@@ -1136,6 +1141,25 @@ async function modificar(ref) {
   ["done", "when", "resumen"].forEach(id => ($(id).hidden = true)); refresh(); showCart(true);
   if (falta) aviso(falta === 1 ? "1 artículo ya no está disponible." : falta + " artículos ya no están disponibles.");
 }
+// ── Pedido fijo semanal (F-16): se guarda la plantilla y los días; nunca se envía solo ──
+const DIA_NOMBRES = { 1: "Lun", 2: "Mar", 3: "Mié", 4: "Jue", 5: "Vie" }, DIA_LARGO = { 1: "lunes", 2: "martes", 3: "miércoles", 4: "jueves", 5: "viernes" };
+let fijoDias = new Set(), fijoInfo = null;
+function pintarFijoCard() {
+  const box = $("fijoDias"); box.innerHTML = "";
+  for (const d of [1, 2, 3, 4, 5]) { const b = document.createElement("button"); b.type = "button"; b.textContent = DIA_NOMBRES[d]; b.setAttribute("aria-label", DIA_LARGO[d]); b.setAttribute("aria-pressed", String(fijoDias.has(d))); b.onclick = () => { fijoDias.has(d) ? fijoDias.delete(d) : fijoDias.add(d); pintarFijoCard(); }; box.appendChild(b); }
+  const f = fijoInfo && fijoInfo.fijo;
+  $("fijoTxt").textContent = f ? `Ya tienes un pedido fijo (los ${f.dias.map(d => DIA_LARGO[d]).join(", ")}${f.pausado ? ", en pausa" : ""}). Si lo guardas, sustituye al que tienes. Nunca se envía solo: ese día te lo enseñamos para que lo revises.` : "Guarda este pedido y los días que elijas te lo enseñamos para que lo revises y lo envíes. Nunca se envía solo.";
+}
+fetch("/api/pedido-fijo").then(r => (r.ok ? r.json() : null)).then(j => { if (!j) return; fijoInfo = j; if (j.fijo) fijoDias = new Set(j.fijo.dias); $("fijoCard").hidden = false; pintarFijoCard(); }).catch(() => {});
+$("fijoGuardar").onclick = async () => {
+  const m = $("fijoMsg"); m.textContent = "";
+  if (!count()) { m.textContent = "Añade algún artículo al pedido primero."; return; }
+  if (!fijoDias.size) { m.textContent = "Elige al menos un día de reparto."; return; }
+  const r = await fetch("/api/pedido-fijo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dias: [...fijoDias], lineas: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })) }) }).catch(() => null);
+  const j = r && await r.json().catch(() => null);
+  if (r && r.ok) { m.textContent = `✔ Guardado: se repite los ${[...fijoDias].sort().map(d => DIA_LARGO[d]).join(", ")}. Puedes verlo, cambiarlo, pausarlo o borrarlo en el menú del chat, en «Mi pedido fijo».`; fijoInfo = { fijo: { dias: [...fijoDias], pausado: false } }; pintarFijoCard(); }
+  else m.textContent = (j && j.error) || "No se ha podido guardar. Inténtalo de nuevo.";
+};
 function precargar() {
   const mod = /[#&]m=([\w-]+)/.exec(String(window.vmPrecarga ?? location.hash)); // «Modificar pedido» desde el chat
   if (mod) { setTimeout(() => modificar(mod[1]), 0); return; }
@@ -1150,6 +1174,7 @@ function precargar() {
     unitOf.set(id, "ud"); qty.set(id, u); n++;
   }
   if (faltan) setTimeout(() => aviso(faltan === 1 ? "1 artículo ya no está disponible." : faltan + " artículos ya no están disponibles."), 600);
+  if (n && /[#&]f=1(?:&|$)/.test(String(window.vmPrecarga ?? location.hash))) setTimeout(() => { const c = $("fijoCard"); if (!c.hidden) c.scrollIntoView({ block: "center" }); }, 700); // «Repetir cada semana»: se lleva a la opción del pedido fijo
   if (n && /[#&]r=1(?:&|$)/.test(String(window.vmPrecarga ?? location.hash))) { uso("repetir"); setTimeout(() => showCart(true), 0); } // «Repetir y revisar»: se cuenta y se abre el carrito para revisarlo
   if (n) { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); aviso(`Tu pedido anterior ya está en el carrito (${n} artículo${n === 1 ? "" : "s"}). Añade lo que quieras del catálogo y finaliza.`); }
 }

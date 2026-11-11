@@ -228,6 +228,12 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
     },
     /** Los artículos que más clientes distintos compran (solo identificadores y nunca de quién): mínimo 3 clientes, para no delatar a ninguno. */
     topProducts: (limit = 8) => db.prepare("SELECT product_id AS id FROM purchases GROUP BY product_id HAVING COUNT(DISTINCT customer_id) >= 3 ORDER BY COUNT(DISTINCT customer_id) DESC, COUNT(*) DESC LIMIT ?").all(limit).map((r) => r.id),
+    /** Días en que cada cliente hizo pedidos (de a3ERP): Map(idCliente → [AAAA-MM-DD…] sin repetir y ordenadas). */
+    fechasPedidos() {
+      const m = new Map();
+      for (const r of db.prepare("SELECT DISTINCT customer_id, date FROM purchases ORDER BY date").all()) { const d = String(r.date).slice(0, 10); (m.get(r.customer_id) ?? m.set(r.customer_id, []).get(r.customer_id)).push(d); }
+      return m;
+    },
     /** Lista ligera para paneles: sin historial. */
     list: () =>
       db.prepare("SELECT c.*, (SELECT COUNT(DISTINCT doc || date) FROM purchases p WHERE p.customer_id = c.id) AS n_orders, (SELECT MAX(date) FROM purchases p WHERE p.customer_id = c.id) AS last_order FROM customers c ORDER BY name")
