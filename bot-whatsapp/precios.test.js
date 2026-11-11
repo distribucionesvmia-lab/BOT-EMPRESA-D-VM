@@ -259,3 +259,11 @@ test("AYUDA: sin datos rellenados no hay botón; con teléfono o WhatsApp se ofr
   Object.assign(AYUDA, { telefono: "", whatsapp: "", horario: "solo horario" });
   assert.equal(ayudaPublica(), null); // un horario sin teléfono ni WhatsApp no sirve de nada
 });
+
+test("DIRECCIÓN DE ENTREGA: lo oculto se oculta de verdad y solo se obliga a escribirla si el cliente no tiene dirección guardada", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.match(ped, /\[hidden\] \{ display:none !important; \}/); // sin esto, .addropc { display:flex } pisaba el atributo hidden
+  assert.match(ped, /const modoDir = \(\) => \(sinDireccion\(\) \? "otra" : document\.querySelector/); // con dirección guardada manda lo que elija (de siempre = puede seguir)
+  assert.match(ped, /if \(modoDir\(\) === "otra" && dirEntrega\(\)\.length < 5\)/); // solo se exige texto si es «otra» o no hay dirección
+});

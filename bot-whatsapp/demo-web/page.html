@@ -384,6 +384,7 @@
   .ui.multi .mrow-sel input { width:24px; height:24px; accent-color:#d90000; flex:none; margin:0; }
   .ui.multi .mrow-sel span { display:flex; flex-direction:column; min-width:0; } .ui.multi .mrow-sel b { font-size:calc(15px / var(--k,1)); color:#1d1d1f; } .ui.multi .mrow-sel small { color:#5f6368; font-size:calc(13px / var(--k,1)); overflow-wrap:anywhere; }
   .ui.multi .pill:disabled { opacity:.5; box-shadow:none; }
+  #c-chat .mpop, .bar .mpop { max-height:calc(100vh - 76px); max-height:calc(100dvh - 76px); overflow-y:auto; } /* el menú nunca se sale de la pantalla (apaisado): se desplaza por dentro */
 </style>
 
 <button type="button" class="tecnico-btn" id="tecnico-btn">Técnico</button>
@@ -495,7 +496,7 @@
     <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-datos" style="max-height:92vh;overflow:auto">
       <h2 id="t-datos">Mis datos y privacidad</h2>
       <p>Puedes ejercer aquí tus derechos sobre tus datos.</p>
-      <button class="vm-btn ghost" type="button" id="d-bajar">⬇ Descargar mis datos</button>
+      <button class="vm-btn ghost" type="button" id="d-bajar">Descargar mis datos</button>
       <p style="font-size:calc(13px / var(--k,1))">Todo lo que guardamos de ti en un archivo (derecho de acceso y de portabilidad).</p>
       <form id="f-derechos" autocomplete="off">
         <label>Quiero pedir que…<select id="d-tipo"><option value="corregir">corrijan mis datos</option><option value="limitar">limiten el uso de mis datos</option><option value="oponerme">dejen de usar mis datos (oposición)</option><option value="otra">otra cosa sobre mis datos</option></select></label>
@@ -504,7 +505,7 @@
         <button class="vm-btn primary">Enviar a la empresa</button>
       </form>
       <hr style="border:0;border-top:1px solid #e3e3e6;width:100%">
-      <button class="vm-btn ghost" type="button" id="d-borrar">🗑 Eliminar mi cuenta</button>
+      <button class="vm-btn ghost" type="button" id="d-borrar">Eliminar mi cuenta</button>
       <div id="d-confirma" hidden>
         <p><b>¿Seguro?</b> Se borrarán tu acceso, tu teléfono y correo de la aplicación y tus favoritos, y ya no podrás entrar. Los pedidos y facturas ya hechos se conservan, bloqueados, el tiempo que obliga la ley. Para confirmar, escribe <b>ELIMINAR</b>.</p>
         <label>Escribe ELIMINAR<input id="d-eliminar" autocomplete="off" autocapitalize="characters"></label>
@@ -542,7 +543,7 @@
         <button class="tab" role="tab" type="button" data-t="historial" aria-selected="false">Historial de clientes</button>
         <button class="tab" role="tab" type="button" data-t="cuentas" aria-selected="false">Cuentas de clientes <span class="cnt" id="n-cue" hidden></span></button>
         <button class="tab" role="tab" type="button" data-t="bases" aria-selected="false">Productos</button>
-        <button class="tab" role="tab" type="button" data-t="datos" aria-selected="false">📥 Datos y Excel</button>
+        <button class="tab" role="tab" type="button" data-t="datos" aria-selected="false">Datos y Excel</button>
       </div>
 
       <div id="p-pedidos" style="display:grid;gap:16px">
@@ -570,7 +571,7 @@
         </div>
         <div class="panel" id="xlpanel" hidden>
           <h2>Excel generado</h2>
-          <div class="actions"><span class="file" id="xlfile"></span><button class="btn" id="descargar" type="button">Descargar .xlsx</button><button class="btn" id="imprimir" type="button">🖨 Imprimir</button><span class="msg" id="dlmsg"></span></div>
+          <div class="actions"><span class="file" id="xlfile"></span><button class="btn" id="descargar" type="button">Descargar .xlsx</button><button class="btn" id="imprimir" type="button">Imprimir</button><span class="msg" id="dlmsg"></span></div>
           <div class="tabs" role="tablist" id="xltabs"></div>
           <div class="scroll"><table class="xl" id="xl"></table></div>
         </div>
@@ -841,7 +842,7 @@ function inicio(ui) {
     for (const l of ui.last.lineas) { const li = document.createElement("li"); li.textContent = l; ul.appendChild(li); }
     if (ui.last.mas) { const li = document.createElement("li"); li.textContent = "… y " + ui.last.mas + " más"; ul.appendChild(li); }
     t.append(s, b, ul);
-    const sem = document.createElement("button"); sem.type = "button"; sem.className = "vm-link"; sem.style.cssText = "min-height:48px;padding:0;text-align:left;font-weight:700"; sem.textContent = "🔁 Repetir cada semana"; sem.onclick = () => abrirMini(ui.url + "#" + ui.last.repetir + "&f=1"); t.appendChild(sem);
+    const sem = document.createElement("button"); sem.type = "button"; sem.className = "vm-link"; sem.style.cssText = "min-height:48px;padding:0;text-align:left;font-weight:700"; sem.textContent = "Repetir cada semana"; sem.onclick = () => abrirMini(ui.url + "#" + ui.last.repetir + "&f=1"); t.appendChild(sem);
     const bt = document.createElement("button"); bt.type = "button"; bt.textContent = "Repetir y revisar"; bt.onclick = () => abrirMini(ui.url + "#" + ui.last.repetir);
     f.append(t, bt); c.appendChild(f);
   }
@@ -951,7 +952,7 @@ function pintarRecordatorios() {
   const filas = VM.recordatorios().filter((x) => !recOcultos.has(x.id)), tb = $("rec"); tb.innerHTML = ""; $("rec-panel").hidden = !filas.length;
   for (const x of filas.slice(0, 30)) {
     const tr = document.createElement("tr"), acc = el("td"), box = el("div", "", { className: "row2" });
-    const wa = el("a", "💬 Abrir WhatsApp", { href: `https://wa.me/${x.wa}?text=${encodeURIComponent(x.texto)}`, target: "_blank", rel: "noopener", className: "btn main" }); wa.style.textDecoration = "none";
+    const wa = el("a", "Abrir WhatsApp", { href: `https://wa.me/${x.wa}?text=${encodeURIComponent(x.texto)}`, target: "_blank", rel: "noopener", className: "btn main" }); wa.style.textDecoration = "none";
     const ya = el("button", "Ya avisado", { type: "button", className: "btn" }); ya.onclick = () => { recOcultos.add(x.id); pintarRecordatorios(); };
     const no = el("button", "No avisar más", { type: "button", className: "btn" }); no.onclick = () => { recOcultos.add(x.id); pintarRecordatorios(); };
     box.append(wa, ya, no); acc.appendChild(box);
@@ -970,11 +971,11 @@ function pintarPedidos() {
     const cli = el("td"); cli.append(el("b", o.cliente), el("div", o.codigo ? "Cód. " + o.codigo : "Cliente nuevo", { className: "sub" }));
     const est = el("td"); est.appendChild(el("span", o.estado[0].toUpperCase() + o.estado.slice(1), { className: "badge " + o.estado, title: o.motivo }));
     if (o.motivo) est.appendChild(el("div", o.motivo, { className: "sub" }));
-    if (o.modificado) est.appendChild(el("div", "✏️ Modificado " + new Date(o.modificado).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }), { className: "sub" }));
+    if (o.modificado) est.appendChild(el("div", "Modificado " + new Date(o.modificado).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }), { className: "sub" }));
     if (o.estado === "retenido" && o.codigo) { const b = el("button", "Revisado: exportar", { type: "button", className: "btn" }); b.onclick = () => VM.approveOrder(o.id).catch((e) => toast(e.message)); est.appendChild(b); }
     const chk = el("td");
     if (o.estado === "pendiente" || o.estado === "exportado") { const c = el("input", "", { type: "checkbox", className: "sel" + (o.estado === "exportado" ? " re" : "") }); c.dataset.id = o.id; c.checked = selOrd.has(o.id); c.setAttribute("aria-label", (o.estado === "exportado" ? "Volver a exportar " : "Exportar ") + o.ref); c.onchange = () => { c.checked ? selOrd.add(o.id) : selOrd.delete(o.id); actualizarSel(); }; chk.appendChild(c); }
-    tr.append(chk, el("td", o.ref, { className: "ref" }), el("td", o.hora), cli, (() => { const td = el("td", o.resumen); if (o.entrega) { const b = el("div", o.entrega.texto); b.style.cssText = `font-weight:700;padding:4px 8px;border-radius:6px;margin-top:5px;display:block;width:fit-content;background:${{ rojo: "#ff0000", amarillo: "#ffff00", verde: "#92d050" }[o.entrega.color]};color:${o.entrega.color === "rojo" ? "#fff" : "#000"}`; td.append(b); } if (o.nota) td.append(el("div", "📝 Observaciones: " + o.nota, { className: "muted" })); return td; })(), el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
+    tr.append(chk, el("td", o.ref, { className: "ref" }), el("td", o.hora), cli, (() => { const td = el("td", o.resumen); if (o.entrega) { const b = el("div", o.entrega.texto); b.style.cssText = `font-weight:700;padding:4px 8px;border-radius:6px;margin-top:5px;display:block;width:fit-content;background:${{ rojo: "#ff0000", amarillo: "#ffff00", verde: "#92d050" }[o.entrega.color]};color:${o.entrega.color === "rojo" ? "#fff" : "#000"}`; td.append(b); } if (o.nota) td.append(el("div", "Observaciones: " + o.nota, { className: "muted" })); return td; })(), el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
   }
   $("tabla").hidden = !list.length; $("vacio").hidden = !!list.length;
   actualizarSel();
@@ -1029,7 +1030,7 @@ function pintarHistorial() {
   for (const e of list.slice(0, 8)) {
     const li = el("li"); const ver = el("button", "Ver", { type: "button", className: "btn" }); const dl = el("button", "Descargar", { type: "button", className: "btn" });
     ver.onclick = () => { const x = VM.regenerate(e.id); if (x) mostrarExcel(x); }; dl.onclick = () => { const x = VM.regenerate(e.id); if (x) descargar(x, $("expmsg")); };
-    const im = el("button", "🖨 Imprimir", { type: "button", className: "btn" }); im.onclick = () => { const x = VM.regenerate(e.id); if (x) imprimir(x, $("expmsg")); };
+    const im = el("button", "Imprimir", { type: "button", className: "btn" }); im.onclick = () => { const x = VM.regenerate(e.id); if (x) imprimir(x, $("expmsg")); };
     li.append(el("span", `${e.fileName} · ${plural(e.orderCount, "pedido", "pedidos")} · ${plural(e.lineCount, "línea", "líneas")}`, { className: "file" }), ver, dl, im); ul.appendChild(li);
   }
 }
@@ -1069,7 +1070,7 @@ function adPinta(r, p) {
   const cont = $(p + "-res"); cont.textContent = "";
   if (r.lectura?.columnas) { const q = document.createElement("p"); q.className = "muted"; const c = r.lectura.columnas; q.textContent = "Cómo se ha leído el Excel · " + Object.entries({ code: "código", name: "nombre", price: "PRECIO", unitsPerBox: "uds/caja", vat: "IVA", discount: "descuento" }).filter(([k]) => c[k]).map(([k, et]) => `${et} = «${c[k]}»`).join(" · "); cont.appendChild(q); }
   if (r.lectura?.ejemplos?.length) { const ul = document.createElement("ul"); ul.className = "muted"; for (const e of r.lectura.ejemplos) { const li = document.createElement("li"); li.textContent = `${e.codigo} ${e.nombre}: precio ${e.precio} €${e.iva != null ? " · IVA " + e.iva + " %" : ""}${e.unidadesPorCaja ? " · caja de " + e.unidadesPorCaja : ""}${e.descuento ? " · dto. " + e.descuento + " %" : ""}`; ul.appendChild(li); } cont.appendChild(ul); }
-  if (r.confirmar?.length) { const w = document.createElement("div"); w.style.cssText = "border:2px solid #c0392b;border-radius:10px;padding:8px 12px;margin:8px 0;background:#fdecea;color:#7b1d12"; w.appendChild(Object.assign(document.createElement("b"), { textContent: "⚠ Hay que revisar antes de aplicar" })); const ul = document.createElement("ul"); for (const x of r.confirmar) { const li = document.createElement("li"); li.textContent = x; ul.appendChild(li); } w.appendChild(ul); cont.appendChild(w); }
+  if (r.confirmar?.length) { const w = document.createElement("div"); w.style.cssText = "border:2px solid #c0392b;border-radius:10px;padding:8px 12px;margin:8px 0;background:#fdecea;color:#7b1d12"; w.appendChild(Object.assign(document.createElement("b"), { textContent: "Hay que revisar antes de aplicar" })); const ul = document.createElement("ul"); for (const x of r.confirmar) { const li = document.createElement("li"); li.textContent = x; ul.appendChild(li); } w.appendChild(ul); cont.appendChild(w); }
   const t = document.createElement("table"), tb = document.createElement("tbody"); t.appendChild(tb);
   for (const [k, v] of Object.entries(r.resumen)) { const tr = document.createElement("tr"), a = document.createElement("td"), b = document.createElement("td"); a.textContent = adEt[k] ?? k; b.textContent = v; tr.append(a, b); tb.appendChild(tr); }
   cont.appendChild(t);
@@ -1097,7 +1098,7 @@ $(p + "-ver").onclick = async () => {
   catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-ver").disabled = false; }
 };
 $(p + "-aplicar").onclick = async () => {
-  const aviso = ultimo?.confirmar?.length ? "⚠ ANTES DE APLICAR, revisa esto:\n\n• " + ultimo.confirmar.join("\n• ") + "\n\n¿Lo has revisado y quieres aplicar los cambios igualmente?" : "¿Aplicar estos cambios? Solo se escribirán las diferencias.";
+  const aviso = ultimo?.confirmar?.length ? "ANTES DE APLICAR, revisa esto:\n\n• " + ultimo.confirmar.join("\n• ") + "\n\n¿Lo has revisado y quieres aplicar los cambios igualmente?" : "¿Aplicar estos cambios? Solo se escribirán las diferencias.";
   if (!confirm(aviso)) return;
   const confirmo = !!ultimo?.confirmar?.length;
   $(p + "-aplicar").disabled = true; $(p + "-msg").textContent = "Aplicando…";
@@ -1106,16 +1107,16 @@ $(p + "-aplicar").onclick = async () => {
 };
 }
 const TIPOS_DX = [
-  { p: "px", tipo: "productos", icono: "🏷️", titulo: "Productos y precios", acepta: ".xlsx", desc: "Añade los productos nuevos, actualiza precios, IVA, unidades por caja y categorías, y retira los que ya no vienen (pasan a inactivos, no se borran).", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Cód. familia" },
-  { p: "cl", tipo: "clientes", icono: "👥", titulo: "Clientes", acepta: ".xlsx", desc: "Crea los clientes nuevos (con su cuenta) y actualiza nombre, dirección, teléfonos y correos. Los que no vienen en el Excel no se dan de baja solos.", cols: "Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto" },
-  { p: "hi", tipo: "historial", icono: "🧾", titulo: "Historial de compras", acepta: ".xlsx", desc: "Relaciona cada compra con su cliente por el código. Cada cliente conserva sus 10 últimos pedidos. Sube antes el Excel de clientes.", cols: "Cliente · Fecha · Nº Documento · Artículo · Unidades" },
-  { p: "fo", tipo: "fotos", icono: "🖼️", titulo: "Fotos de productos (ZIP)", acepta: ".zip", desc: "Un ZIP con una foto por producto, con el código como nombre (11098.jpg), en cualquier carpeta. Si trae un Excel de control con la columna «tipo» (IA), avisa en el catálogo de las fotos creadas con IA.", cols: "Archivos .jpg, .png o .webp (mejor de 800 px o más)" },
+  { p: "px", tipo: "productos", icono: "", titulo: "Productos y precios", acepta: ".xlsx", desc: "Añade los productos nuevos, actualiza precios, IVA, unidades por caja y categorías, y retira los que ya no vienen (pasan a inactivos, no se borran).", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Cód. familia" },
+  { p: "cl", tipo: "clientes", icono: "", titulo: "Clientes", acepta: ".xlsx", desc: "Crea los clientes nuevos (con su cuenta) y actualiza nombre, dirección, teléfonos y correos. Los que no vienen en el Excel no se dan de baja solos.", cols: "Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto" },
+  { p: "hi", tipo: "historial", icono: "", titulo: "Historial de compras", acepta: ".xlsx", desc: "Relaciona cada compra con su cliente por el código. Cada cliente conserva sus 10 últimos pedidos. Sube antes el Excel de clientes.", cols: "Cliente · Fecha · Nº Documento · Artículo · Unidades" },
+  { p: "fo", tipo: "fotos", icono: "", titulo: "Fotos de productos (ZIP)", acepta: ".zip", desc: "Un ZIP con una foto por producto, con el código como nombre (11098.jpg), en cualquier carpeta. Si trae un Excel de control con la columna «tipo» (IA), avisa en el catálogo de las fotos creadas con IA.", cols: "Archivos .jpg, .png o .webp (mejor de 800 px o más)" },
 ];
 const ultSubida = {};
 function ultimasSubidas() { for (const t of TIPOS_DX) $(t.p + "-ult").textContent = ultSubida[t.tipo] ? "Última subida: " + ultSubida[t.tipo] : "Todavía no se ha subido ninguno (en esta demo)."; }
 for (const t of TIPOS_DX) {
   const c = document.createElement("div"); c.className = "panel";
-  c.innerHTML = `<h2>${t.icono} ${t.titulo}</h2><p class="msg">${t.desc}</p><p class="msg" style="font-size:calc(13px / var(--k,1))"><b>Columnas:</b> ${t.cols}</p><p class="msg" id="${t.p}-ult" style="font-size:calc(13px / var(--k,1))"></p><input type="hidden" id="${t.p}-tipo" value="${t.tipo}"><div class="row2"><input type="file" id="${t.p}-file" accept="${t.acepta}" aria-label="Archivo de ${t.titulo}"><button class="btn main" id="${t.p}-ver" type="button">Ver cambios</button><button class="btn" id="${t.p}-aplicar" type="button" hidden>Aplicar cambios</button></div><p class="msg" id="${t.p}-msg" role="status"></p><div id="${t.p}-res"></div>`;
+  c.innerHTML = `<h2>${t.titulo}</h2><p class="msg">${t.desc}</p><p class="msg" style="font-size:calc(13px / var(--k,1))"><b>Columnas:</b> ${t.cols}</p><p class="msg" id="${t.p}-ult" style="font-size:calc(13px / var(--k,1))"></p><input type="hidden" id="${t.p}-tipo" value="${t.tipo}"><div class="row2"><input type="file" id="${t.p}-file" accept="${t.acepta}" aria-label="Archivo de ${t.titulo}"><button class="btn main" id="${t.p}-ver" type="button">Ver cambios</button><button class="btn" id="${t.p}-aplicar" type="button" hidden>Aplicar cambios</button></div><p class="msg" id="${t.p}-msg" role="status"></p><div id="${t.p}-res"></div>`;
   $("dx-tarjetas").appendChild(c);
   montarExcel(t.p, () => { ultSubida[t.tipo] = new Date().toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }); ultimasSubidas(); pintarClientes(); pintarHistorial(); });
   $(t.p + "-ver").addEventListener("click", () => { c.style.gridColumn = "1 / -1"; });

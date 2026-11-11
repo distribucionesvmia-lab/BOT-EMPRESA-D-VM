@@ -294,6 +294,7 @@
   .ayuda-btn { display:flex; align-items:center; justify-content:center; min-height:56px; border-radius:14px; background:#d90000; color:#fff; text-decoration:none; font-weight:800; font-size:calc(18px / var(--k,1)); box-shadow:0 3px 0 #a80000; }
   .ayuda-cerrar { min-height:48px; border:2px solid #d9d9dc; border-radius:14px; background:#fff; color:#1d1d1f; font-weight:700; font-size:calc(16px / var(--k,1)); cursor:pointer; }
   .ayudabtn { flex:none; min-height:48px; min-width:48px; padding:0 12px; border:2px solid rgba(255,255,255,.8); border-radius:14px; background:transparent; color:#fff; font-weight:800; font-size:calc(15px / var(--k,1)); cursor:pointer; touch-action:manipulation; } .ayudabtn[hidden] { display:none; }
+  #c-chat .mpop, .bar .mpop { max-height:calc(100vh - 76px); max-height:calc(100dvh - 76px); overflow-y:auto; } /* el menú nunca se sale de la pantalla (apaisado): se desplaza por dentro */
 </style>
 </head>
 <body>
@@ -337,7 +338,7 @@
           <li><span>Marca las cantidades y usa el filtro <b>«Solo con cantidad»</b> para ver solo lo que llevas. Revisa el carrito, añade tus <b>observaciones</b> si las necesitas y confirma el pedido.</span></li>
         </ol>
       </section>
-      <details class="vm-card" id="instalar" style="font-size:calc(14px / var(--k,1))"><summary style="cursor:pointer;font-weight:600">📱 Instalar en el móvil como app</summary>
+      <details class="vm-card" id="instalar" style="font-size:calc(14px / var(--k,1))"><summary style="cursor:pointer;font-weight:600">Instalar en el móvil como app</summary>
         <p style="margin:8px 0 0"><b>iPhone:</b> abre esta página en Safari, pulsa el botón Compartir y elige «Añadir a pantalla de inicio».<br><b>Android:</b> en Chrome, menú ⋮ → «Instalar aplicación» (o «Añadir a pantalla de inicio»).</p>
         <button class="vm-btn ghost" type="button" id="instalar-btn" hidden style="margin-top:8px">Instalar ahora</button></details>
       <p class="foot">Distribuciones Valentín · Medina del Campo</p>
@@ -404,7 +405,7 @@
     <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-datos" style="max-height:92vh;overflow:auto">
       <h2 id="t-datos">Mis datos y privacidad</h2>
       <p>Puedes ejercer aquí tus derechos sobre tus datos.</p>
-      <button class="vm-btn ghost" type="button" id="d-bajar">⬇ Descargar mis datos</button>
+      <button class="vm-btn ghost" type="button" id="d-bajar">Descargar mis datos</button>
       <p style="font-size:calc(13px / var(--k,1))">Todo lo que guardamos de ti en un archivo (derecho de acceso y de portabilidad).</p>
       <form id="f-derechos" autocomplete="off">
         <label>Quiero pedir que…<select id="d-tipo"><option value="corregir">corrijan mis datos</option><option value="limitar">limiten el uso de mis datos</option><option value="oponerme">dejen de usar mis datos (oposición)</option><option value="otra">otra cosa sobre mis datos</option></select></label>
@@ -413,7 +414,7 @@
         <button class="vm-btn primary">Enviar a la empresa</button>
       </form>
       <hr style="border:0;border-top:1px solid #e3e3e6;width:100%">
-      <button class="vm-btn ghost" type="button" id="d-borrar" style="color:#a80000">🗑 Eliminar mi cuenta</button>
+      <button class="vm-btn ghost" type="button" id="d-borrar" style="color:#a80000">Eliminar mi cuenta</button>
       <div id="d-confirma" hidden>
         <p><b>¿Seguro?</b> Se borrarán tu acceso, tu teléfono y correo de la aplicación y tus favoritos, y ya no podrás entrar. Los pedidos y facturas ya hechos se conservan, bloqueados, el tiempo que obliga la ley. Para confirmar, escribe <b>ELIMINAR</b>.</p>
         <label>Escribe ELIMINAR<input id="d-eliminar" autocomplete="off" autocapitalize="characters"></label>
@@ -601,7 +602,7 @@ function inicio(ui) {
     for (const l of ui.last.lineas) { const li = document.createElement("li"); li.textContent = l; ul.appendChild(li); }
     if (ui.last.mas) { const li = document.createElement("li"); li.textContent = "… y " + ui.last.mas + " más"; ul.appendChild(li); }
     t.append(s, b, ul);
-    const sem = document.createElement("button"); sem.type = "button"; sem.className = "vm-link"; sem.style.cssText = "min-height:48px;padding:0;text-align:left;font-weight:700"; sem.textContent = "🔁 Repetir cada semana"; // abre el catálogo con este pedido y la opción del pedido fijo a la vista
+    const sem = document.createElement("button"); sem.type = "button"; sem.className = "vm-link"; sem.style.cssText = "min-height:48px;padding:0;text-align:left;font-weight:700"; sem.textContent = "Repetir cada semana"; // abre el catálogo con este pedido y la opción del pedido fijo a la vista
     sem.onclick = () => { location.href = ui.url + "#" + ui.last.repetir + "&f=1"; }; t.appendChild(sem);
     const bt = document.createElement("button"); bt.type = "button"; bt.textContent = "Repetir y revisar"; bt.onclick = () => { location.href = ui.url + "#" + ui.last.repetir; };
     f.append(t, bt); c.appendChild(f);
@@ -669,9 +670,9 @@ function abrirAyuda(a, nombre) {
   const c = document.createElement("div"); c.className = "ayuda-caja";
   const h = document.createElement("h2"); h.textContent = "¿Necesitas ayuda?"; c.appendChild(h);
   const enlace = (txt, href, ext) => { const l = document.createElement("a"); l.className = "ayuda-btn"; l.href = href; l.textContent = txt; if (ext) { l.target = "_blank"; l.rel = "noopener"; } c.appendChild(l); };
-  if (a.telHref) enlace("📞 Llamar" + (a.tel ? " · " + a.tel : ""), a.telHref);
-  if (a.whatsappHref) enlace("💬 WhatsApp", a.whatsappHref + "?text=" + encodeURIComponent("Hola, necesito ayuda con mi pedido" + (nombre ? ". Soy " + nombre : "")), true);
-  if (a.horario) { const p = document.createElement("p"); p.textContent = "🕘 " + a.horario; c.appendChild(p); }
+  if (a.telHref) enlace("Llamar" + (a.tel ? " · " + a.tel : ""), a.telHref);
+  if (a.whatsappHref) enlace("WhatsApp", a.whatsappHref + "?text=" + encodeURIComponent("Hola, necesito ayuda con mi pedido" + (nombre ? ". Soy " + nombre : "")), true);
+  if (a.horario) { const p = document.createElement("p"); p.textContent = "" + a.horario; c.appendChild(p); }
   const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Cerrar";
   const cerrar = () => { f.remove(); document.removeEventListener("keydown", esc); }; const esc = (e) => { if (e.key === "Escape") cerrar(); };
   x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);

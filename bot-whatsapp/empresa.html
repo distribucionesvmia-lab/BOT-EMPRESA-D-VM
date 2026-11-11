@@ -49,7 +49,7 @@
       <button class="tab" role="tab" data-t="solicitudes" aria-selected="false">Solicitudes de alta <span class="n" id="n-sol" hidden></span></button>
       <button class="tab" role="tab" data-t="clientes" aria-selected="false">Clientes <span class="n" id="n-cli" hidden></span></button>
       <button class="tab" role="tab" data-t="cuentas" aria-selected="false">Cuentas de clientes <span class="n" id="n-cue" hidden></span></button>
-      <button class="tab" role="tab" data-t="datos" aria-selected="false">📥 Datos y Excel</button>
+      <button class="tab" role="tab" data-t="datos" aria-selected="false">Datos y Excel</button>
     </div>
 
     <!-- Pedidos -->
@@ -147,11 +147,11 @@ function mostrarPin(texto, pin) { const p = $("pin"); p.hidden = false; p.textCo
 async function correo() {
   const r = await call("/api/admin/correo"), el0 = $("correo-estado");
   el0.innerHTML = "";
-  if (!r.configurado) { el0.textContent = "✉️ Avisos por correo: no configurados (ver .env.example: SMTP_HOST y MAIL_TO)."; return; }
-  el0.append(`✉️ Cada pedido se avisa por correo a ${r.destino.join(", ")}. `);
+  if (!r.configurado) { el0.textContent = "Avisos por correo: no configurados (ver .env.example: SMTP_HOST y MAIL_TO)."; return; }
+  el0.append(`Cada pedido se avisa por correo a ${r.destino.join(", ")}. `);
   const b = el("button", "Enviar correo de prueba"); b.onclick = async () => { b.disabled = true; try { await call("/api/admin/correo/prueba", {}); mostrarAviso("Correo de prueba enviado: revisa la bandeja."); } catch (e) { alert(e.message); } finally { b.disabled = false; } };
   el0.appendChild(b);
-  if (r.ultimoError) el0.append(el("div", `⚠️ Último error: ${r.ultimoError.message}`, { className: "muted" }));
+  if (r.ultimoError) el0.append(el("div", `Último error: ${r.ultimoError.message}`, { className: "muted" }));
 }
 // ---- Pedidos ----
 const sel = new Set(); // referencias de los pedidos marcados para exportar (se conservan al refrescar)
@@ -171,12 +171,12 @@ async function pedidos() {
     const det = el("details"); det.appendChild(el("summary", resumen.length > 90 ? resumen.slice(0, 88) + "…" : resumen));
     if (o.entrega) { const b = el("div", o.entrega.texto, { className: "entrega" }); b.style.cssText = `font-weight:700;padding:5px 9px;border-radius:7px;margin-top:6px;display:block;width:fit-content;background:${{ rojo: "#ff0000", amarillo: "#ffff00", verde: "#92d050" }[o.entrega.color]};color:${o.entrega.color === "rojo" ? "#fff" : "#000"}`; det.appendChild(b); }
     const t = document.createElement("table"); t.className = "lines";
-    for (const l of o.lineas) { const r = document.createElement("tr"); r.append(el("td", l.id), el("td", l.nombre), el("td", `${l.unidades} uds`), el("td", `${eurp(l.precio)}${l.descuento ? " −" + l.descuento + "%" : ""}`), el("td", eur(l.importe)), el("td", l.nota ? "📝 " + l.nota : "")); t.appendChild(r); }
-    det.appendChild(t); if (o.nota) det.appendChild(el("p", "📝 Observaciones: " + o.nota, { className: "muted" }));
+    for (const l of o.lineas) { const r = document.createElement("tr"); r.append(el("td", l.id), el("td", l.nombre), el("td", `${l.unidades} uds`), el("td", `${eurp(l.precio)}${l.descuento ? " −" + l.descuento + "%" : ""}`), el("td", eur(l.importe)), el("td", l.nota ? "" + l.nota : "")); t.appendChild(r); }
+    det.appendChild(t); if (o.nota) det.appendChild(el("p", "Observaciones: " + o.nota, { className: "muted" }));
     const cli = el("td"); cli.append(el("b", o.cliente), el("div", o.codigo ? "Cód. " + o.codigo : "Cliente nuevo", { className: "muted" }));
     const est = el("td"); est.appendChild(el("span", o.estado[0].toUpperCase() + o.estado.slice(1), { className: "badge " + o.estado }));
     if (o.motivo) est.appendChild(el("div", o.motivo, { className: "muted" }));
-    if (o.modificado) est.appendChild(el("div", "✏️ Modificado " + hora(o.modificado), { className: "muted" })); // el cliente lo cambió después de enviarlo
+    if (o.modificado) est.appendChild(el("div", "Modificado " + hora(o.modificado), { className: "muted" })); // el cliente lo cambió después de enviarlo
     if (o.estado === "retenido" && o.codigo) { const b = el("button", "Revisado: exportar"); b.onclick = async () => { await call(`/api/admin/pedidos/${o.ref}/aprobar`, {}); refrescar(); }; est.appendChild(b); }
     const detTd = el("td"); detTd.appendChild(det);
     const chk = el("td");
@@ -192,7 +192,7 @@ async function pedidos() {
   const th = $("hist"); th.innerHTML = "";
   for (const e of h.slice(0, 30)) {
     const b = el("button", "Descargar"); b.onclick = () => descargar(e);
-    const im = el("button", "🖨 Imprimir", { type: "button" }); im.style.marginLeft = "8px"; im.onclick = () => imprimir(e);
+    const im = el("button", "Imprimir", { type: "button" }); im.style.marginLeft = "8px"; im.onclick = () => imprimir(e);
     const tr = document.createElement("tr"); const td = el("td"); td.append(b, im);
     tr.append(el("td", e.archivo, { className: "ref" }), el("td", hora(e.fecha)), el("td", `${e.pedidos} pedido${e.pedidos === 1 ? "" : "s"} · ${e.lineas} línea${e.lineas === 1 ? "" : "s"}`), td); th.appendChild(tr);
   }
@@ -252,7 +252,7 @@ async function derechos() {
   for (const d of lista) {
     const tr = document.createElement("tr"), td = el("td");
     if (d.estado === "pendiente") { const ok = el("button", "Marcar atendida", { className: "main" }); ok.onclick = async () => { await call(`/api/admin/derechos/${d.id}/atender`, {}); refrescar(); }; td.append(ok); }
-    tr.append(el("td", hora2(d.creada)), el("td", d.cliente), el("td", TIPO_DERECHO[d.tipo] ?? d.tipo), el("td", d.texto || ""), el("td", d.estado === "pendiente" ? "⏳ Pendiente" : "✔ Atendida"), td); tb.appendChild(tr);
+    tr.append(el("td", hora2(d.creada)), el("td", d.cliente), el("td", TIPO_DERECHO[d.tipo] ?? d.tipo), el("td", d.texto || ""), el("td", d.estado === "pendiente" ? "Pendiente" : "Atendida"), td); tb.appendChild(tr);
   }
 }
 async function usoApp() {
@@ -274,14 +274,14 @@ async function cuentas() {
   }
 }
 const hora2 = (iso) => new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
-const ESTADO = { importado: "✔ importado", "sin cambios": "sin cambios", error: "✖ error", "sin fichero": "sin fichero" };
+const ESTADO = { importado: "importado", "sin cambios": "sin cambios", error: "✖ error", "sin fichero": "sin fichero" };
 async function recordatorios() {
   const r = await call("/api/admin/recordatorios"), tb = $("rec"); tb.innerHTML = "";
   $("rec-panel").hidden = !r.filas.length;
   for (const x of r.filas) {
     const tr = document.createElement("tr"), ult = x.ultimo ? x.ultimo.split("-").reverse().join("/") : "—";
     const acc = el("td"); const box = el("div", "", { className: "row" });
-    const wa = el("a", "💬 Abrir WhatsApp", { href: `https://wa.me/${x.wa}?text=${encodeURIComponent(x.texto)}`, target: "_blank", rel: "noopener", className: "btn" }); wa.style.cssText = "display:inline-block;padding:8px 12px;border-radius:8px;background:#1a7f4b;color:#fff;font-weight:700;text-decoration:none";
+    const wa = el("a", "Abrir WhatsApp", { href: `https://wa.me/${x.wa}?text=${encodeURIComponent(x.texto)}`, target: "_blank", rel: "noopener", className: "btn" }); wa.style.cssText = "display:inline-block;padding:8px 12px;border-radius:8px;background:#1a7f4b;color:#fff;font-weight:700;text-decoration:none";
     const ya = el("button", "Ya avisado", { type: "button" }); ya.onclick = async () => { await call("/api/admin/recordatorios/avisado", { id: x.id }); refrescar(); };
     const no = el("button", "No avisar más", { type: "button" }); no.onclick = async () => { if (confirm(`¿No volver a recordar nada a ${x.nombre}?`)) { await call("/api/admin/recordatorios/no-avisar", { id: x.id }); refrescar(); } };
     box.append(wa, ya, no); acc.appendChild(box);
@@ -338,7 +338,7 @@ function adPinta(r, p) {
   const cont = $(p + "-res"); cont.textContent = "";
   if (r.lectura?.columnas) { const q = document.createElement("p"); q.className = "muted"; const c = r.lectura.columnas; q.textContent = "Cómo se ha leído el Excel · " + Object.entries({ code: "código", name: "nombre", price: "PRECIO", unitsPerBox: "uds/caja", vat: "IVA", discount: "descuento" }).filter(([k]) => c[k]).map(([k, et]) => `${et} = «${c[k]}»`).join(" · "); cont.appendChild(q); }
   if (r.lectura?.ejemplos?.length) { const ul = document.createElement("ul"); ul.className = "muted"; for (const e of r.lectura.ejemplos) { const li = document.createElement("li"); li.textContent = `${e.codigo} ${e.nombre}: precio ${e.precio} €${e.iva != null ? " · IVA " + e.iva + " %" : ""}${e.unidadesPorCaja ? " · caja de " + e.unidadesPorCaja : ""}${e.descuento ? " · dto. " + e.descuento + " %" : ""}`; ul.appendChild(li); } cont.appendChild(ul); }
-  if (r.confirmar?.length) { const w = document.createElement("div"); w.style.cssText = "border:2px solid #c0392b;border-radius:10px;padding:8px 12px;margin:8px 0;background:#fdecea;color:#7b1d12"; w.appendChild(Object.assign(document.createElement("b"), { textContent: "⚠ Hay que revisar antes de aplicar" })); const ul = document.createElement("ul"); for (const x of r.confirmar) { const li = document.createElement("li"); li.textContent = x; ul.appendChild(li); } w.appendChild(ul); cont.appendChild(w); }
+  if (r.confirmar?.length) { const w = document.createElement("div"); w.style.cssText = "border:2px solid #c0392b;border-radius:10px;padding:8px 12px;margin:8px 0;background:#fdecea;color:#7b1d12"; w.appendChild(Object.assign(document.createElement("b"), { textContent: "Hay que revisar antes de aplicar" })); const ul = document.createElement("ul"); for (const x of r.confirmar) { const li = document.createElement("li"); li.textContent = x; ul.appendChild(li); } w.appendChild(ul); cont.appendChild(w); }
   const t = document.createElement("table"), tb = document.createElement("tbody"); t.appendChild(tb);
   for (const [k, v] of Object.entries(r.resumen)) { const tr = document.createElement("tr"), a = document.createElement("td"), b = document.createElement("td"); a.textContent = adEt[k] ?? k; b.textContent = v; tr.append(a, b); tb.appendChild(tr); }
   cont.appendChild(t);
@@ -372,7 +372,7 @@ $(p + "-ver").onclick = async () => {
   catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-ver").disabled = false; }
 };
 $(p + "-aplicar").onclick = async () => {
-  const aviso = ultimo?.confirmar?.length ? "⚠ ANTES DE APLICAR, revisa esto:\n\n• " + ultimo.confirmar.join("\n• ") + "\n\n¿Lo has revisado y quieres aplicar los cambios igualmente?" : "¿Aplicar estos cambios? Solo se escribirán las diferencias.";
+  const aviso = ultimo?.confirmar?.length ? "ANTES DE APLICAR, revisa esto:\n\n• " + ultimo.confirmar.join("\n• ") + "\n\n¿Lo has revisado y quieres aplicar los cambios igualmente?" : "¿Aplicar estos cambios? Solo se escribirán las diferencias.";
   if (!confirm(aviso)) return;
   const confirmo = !!ultimo?.confirmar?.length;
   $(p + "-aplicar").disabled = true; $(p + "-msg").textContent = "Aplicando…";
@@ -381,14 +381,14 @@ $(p + "-aplicar").onclick = async () => {
 };
 }
 const TIPOS_DX = [
-  { p: "px", tipo: "productos", icono: "🏷️", titulo: "Productos y precios", acepta: ".xlsx", desc: "Añade los productos nuevos, actualiza precios, IVA, unidades por caja y categorías, y retira los que ya no vienen (pasan a inactivos, no se borran).", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Cód. familia" },
-  { p: "cl", tipo: "clientes", icono: "👥", titulo: "Clientes", acepta: ".xlsx", desc: "Crea los clientes nuevos (con su cuenta) y actualiza nombre, dirección, teléfonos y correos. Los que no vienen en el Excel no se dan de baja solos.", cols: "Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto" },
-  { p: "hi", tipo: "historial", icono: "🧾", titulo: "Historial de compras", acepta: ".xlsx", desc: "Relaciona cada compra con su cliente por el código. Cada cliente conserva sus 10 últimos pedidos. Sube antes el Excel de clientes.", cols: "Cliente · Fecha · Nº Documento · Artículo · Unidades" },
-  { p: "fo", tipo: "fotos", icono: "🖼️", titulo: "Fotos de productos (ZIP)", acepta: ".zip", desc: "Un ZIP con una foto por producto, con el código como nombre (11098.jpg), en cualquier carpeta. Si trae un Excel de control con la columna «tipo» (IA), avisa en el catálogo de las fotos creadas con IA.", cols: "Archivos .jpg, .png o .webp (mejor de 800 px o más)" },
+  { p: "px", tipo: "productos", icono: "", titulo: "Productos y precios", acepta: ".xlsx", desc: "Añade los productos nuevos, actualiza precios, IVA, unidades por caja y categorías, y retira los que ya no vienen (pasan a inactivos, no se borran).", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Cód. familia" },
+  { p: "cl", tipo: "clientes", icono: "", titulo: "Clientes", acepta: ".xlsx", desc: "Crea los clientes nuevos (con su cuenta) y actualiza nombre, dirección, teléfonos y correos. Los que no vienen en el Excel no se dan de baja solos.", cols: "Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto" },
+  { p: "hi", tipo: "historial", icono: "", titulo: "Historial de compras", acepta: ".xlsx", desc: "Relaciona cada compra con su cliente por el código. Cada cliente conserva sus 10 últimos pedidos. Sube antes el Excel de clientes.", cols: "Cliente · Fecha · Nº Documento · Artículo · Unidades" },
+  { p: "fo", tipo: "fotos", icono: "", titulo: "Fotos de productos (ZIP)", acepta: ".zip", desc: "Un ZIP con una foto por producto, con el código como nombre (11098.jpg), en cualquier carpeta. Si trae un Excel de control con la columna «tipo» (IA), avisa en el catálogo de las fotos creadas con IA.", cols: "Archivos .jpg, .png o .webp (mejor de 800 px o más)" },
 ];
 for (const t of TIPOS_DX) {
   const c = document.createElement("div"); c.className = "panel dx-card"; c.dataset.tipo = t.tipo;
-  c.innerHTML = `<h2>${t.icono} ${t.titulo}</h2><p class="muted" style="margin:0 0 8px">${t.desc}</p><p class="muted" style="margin:0 0 10px;font-size:13px"><b>Columnas:</b> ${t.cols}</p><p class="ult muted" id="${t.p}-ult" style="margin:0 0 10px;font-size:13px"></p><input type="hidden" id="${t.p}-tipo" value="${t.tipo}"><div class="row"><input type="file" id="${t.p}-file" accept="${t.acepta}" aria-label="Archivo de ${t.titulo}"><button class="main" id="${t.p}-ver" type="button">Ver cambios</button><button id="${t.p}-aplicar" type="button" hidden>Aplicar cambios</button></div><p class="muted" id="${t.p}-msg" role="status"></p><div id="${t.p}-res"></div>`;
+  c.innerHTML = `<h2>${t.titulo}</h2><p class="muted" style="margin:0 0 8px">${t.desc}</p><p class="muted" style="margin:0 0 10px;font-size:13px"><b>Columnas:</b> ${t.cols}</p><p class="ult muted" id="${t.p}-ult" style="margin:0 0 10px;font-size:13px"></p><input type="hidden" id="${t.p}-tipo" value="${t.tipo}"><div class="row"><input type="file" id="${t.p}-file" accept="${t.acepta}" aria-label="Archivo de ${t.titulo}"><button class="main" id="${t.p}-ver" type="button">Ver cambios</button><button id="${t.p}-aplicar" type="button" hidden>Aplicar cambios</button></div><p class="muted" id="${t.p}-msg" role="status"></p><div id="${t.p}-res"></div>`;
   $("dx-tarjetas").appendChild(c);
   montarExcel(t.p, () => { ultimasSubidas(); });
   $(t.p + "-ver").addEventListener("click", () => { c.style.gridColumn = "1 / -1"; }); // la tarjeta que se está revisando ocupa todo el ancho
