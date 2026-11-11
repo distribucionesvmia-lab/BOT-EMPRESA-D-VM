@@ -546,6 +546,11 @@
       </div>
 
       <div id="p-pedidos" style="display:grid;gap:16px">
+        <div class="panel" id="rec-panel" hidden>
+          <h2>Recordatorios de hoy</h2>
+          <p class="msg">Clientes a los que les toca reponer (por su ciclo habitual de compra o por su pedido fijo). «Abrir WhatsApp» abre el mensaje ya escrito: lo envías tú; no se manda nada solo.</p>
+          <div class="scroll"><table><thead><tr><th>Cliente</th><th>Último pedido</th><th>Por qué</th><th></th></tr></thead><tbody id="rec"></tbody></table></div>
+        </div>
         <div class="panel">
           <h2>Pedidos recibidos</h2>
           <div class="actions">
@@ -941,7 +946,21 @@ function actualizarSel() {
   $("sel-todos").checked = pend.length > 0 && pend.every((c) => c.checked); $("sel-todos").disabled = !pend.length;
 }
 $("sel-todos").onchange = (e) => { document.querySelectorAll("#tabla input.sel:not(.re)").forEach((c) => { c.checked = e.target.checked; e.target.checked ? selOrd.add(c.dataset.id) : selOrd.delete(c.dataset.id); }); actualizarSel(); };
+const recOcultos = new Set(); // «Ya avisado» / «No avisar más» en esta sesión de la demo
+function pintarRecordatorios() {
+  const filas = VM.recordatorios().filter((x) => !recOcultos.has(x.id)), tb = $("rec"); tb.innerHTML = ""; $("rec-panel").hidden = !filas.length;
+  for (const x of filas.slice(0, 30)) {
+    const tr = document.createElement("tr"), acc = el("td"), box = el("div", "", { className: "row2" });
+    const wa = el("a", "💬 Abrir WhatsApp", { href: `https://wa.me/${x.wa}?text=${encodeURIComponent(x.texto)}`, target: "_blank", rel: "noopener", className: "btn main" }); wa.style.textDecoration = "none";
+    const ya = el("button", "Ya avisado", { type: "button", className: "btn" }); ya.onclick = () => { recOcultos.add(x.id); pintarRecordatorios(); };
+    const no = el("button", "No avisar más", { type: "button", className: "btn" }); no.onclick = () => { recOcultos.add(x.id); pintarRecordatorios(); };
+    box.append(wa, ya, no); acc.appendChild(box);
+    const cli = el("td"); cli.append(el("b", x.nombre), el("div", x.telefono, { className: "sub" }));
+    tr.append(cli, el("td", x.ultimo ? x.ultimo.split("-").reverse().join("/") : "—"), el("td", x.motivo), acc); tb.appendChild(tr);
+  }
+}
 function pintarPedidos() {
+  pintarRecordatorios();
   const list = VM.orders();
   const vivos = new Set(list.filter((o) => o.estado === "pendiente" || o.estado === "exportado").map((o) => o.id)); for (const id of [...selOrd]) if (!vivos.has(id)) selOrd.delete(id);
   const tb = document.querySelector("#tabla tbody"); tb.innerHTML = "";

@@ -669,7 +669,7 @@ function setQty(id, n) {
   if (n > 999) { n = 999; aviso("La cantidad máxima por artículo es 999."); }
   if (n) qty.set(id, n); else {
     qty.delete(id); unitOf.delete(id); notes.delete(id);
-    if (antes) aviso("Quitado: " + (productoPorId.get(id)?.name ?? "artículo"), () => { qty.set(id, antes); if (u) unitOf.set(id, u); if (nota) notes.set(id, nota); refresh(); });
+    if (antes) { const enCarrito = !$("cart").hidden; aviso("Quitado: " + (productoPorId.get(id)?.name ?? "artículo"), () => { qty.set(id, antes); if (u) unitOf.set(id, u); if (nota) notes.set(id, nota); refresh(); if (enCarrito) showCart(true); }); }
   }
   refresh();
 }
@@ -1138,7 +1138,7 @@ async function modificar(ref) {
   modificando = { ref: j.ref, hasta: j.hasta };
   $("note").value = j.nota || ""; if (j.direccion) { document.querySelector('input[name="addrmode"][value="otra"]').checked = true; $("addrOtra").value = j.direccion; } pintarDireccion();
   $("modBanner").hidden = false; $("modBanner").textContent = `✏️ Estás modificando el pedido ${j.ref}. ${j.hasta}.`;
-  ["done", "when", "resumen"].forEach(id => ($(id).hidden = true)); refresh(); showCart(true);
+  ["done", "when", "resumen"].forEach(id => ($(id).hidden = true)); $("confirm").disabled = false; $("resOk").disabled = false; pedidoEnviado = false; refresh(); showCart(true);
   if (falta) aviso(falta === 1 ? "1 artículo ya no está disponible." : falta + " artículos ya no están disponibles.");
 }
 // ── Pedido fijo semanal (F-16): se guarda la plantilla y los días; nunca se envía solo ──

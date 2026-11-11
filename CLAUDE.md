@@ -46,6 +46,13 @@ Si algo sale mal tras reiniciar: `git log -3`, vuelve al commit anterior (`git r
 - «Tu pedido de siempre» (portada del chat): enseña las líneas del último pedido y el botón «Repetir y revisar» abre el catálogo con ese pedido puesto para revisarlo (el flujo antiguo de «repetir» con listas sigue sin existir).
 - **Aviso de «entrega hoy»**: «Si haces el pedido antes de las 10:00, te lo entregamos hoy.» solo si el cliente es de Medina del Campo (municipio 47085), es laborable y son antes de las 10:00 de Madrid; sale de `entregaHoyDisponible` (delivery.js), la misma regla que la opción «Hoy».
 
+- **Modificar un pedido enviado** (`delivery.js` → `puedeEditarPedido`, `LIMITE_EDICION_HORA`): hasta las 10:00 (Madrid) del último día laborable anterior a la entrega (en el día, hasta las 10:00 de hoy) y nunca si ya está exportado. Sustituye al pedido (mismo número, `replaceOrder`), queda «modificado» en el panel. **Es un supuesto: pendiente de confirmar por la empresa.**
+- **Pedido fijo semanal**: plantilla por cliente (`standing_orders`), nunca se envía solo; el día que toca sale «Hoy toca tu pedido de los martes» → «Revisar y enviar» (abre el carrito para revisar). **Recordatorios de hoy** (`recordatorios.js`, panel de la empresa): ciclo = mediana de días entre pedidos (mín. 3), aparece entre el 75 % y el 100 % del ciclo o en su día de pedido fijo; la empresa envía a mano por WhatsApp.
+- **Ayuda** («¿Necesitas ayuda?»): teléfono, WhatsApp y horario en `config.js` (`AYUDA`) o variables `AYUDA_TEL`, `AYUDA_WHATSAPP`, `AYUDA_HORARIO`; sin datos no sale el botón.
+- **Direcciones de entrega**: la de siempre u otra distinta (`deliveryAddress`); un cliente nuevo debe escribirla. Si es otra, el pedido lleva «ENTREGA EN OTRA DIRECCIÓN: …» en las observaciones (panel y Excel).
+- **Excel**: se puede volver a exportar cualquier pedido ya exportado, las veces que haga falta (`export_orders`); botón «Imprimir» (hoja A4 directa).
+- **Actualización automática** (`deploy/windows/actualizar-auto.bat`, tarea «VM Actualizar» cada 10 minutos): pasa las pruebas, comprueba que arranca y vuelve atrás si falla; botón «Actualizar ahora» en «Datos y Excel».
+
 ## Vigilancia
 El programa envía correos `[VM vigilancia]` (avisos) y `[VM informe]` (diario, 08:30). Si te piden «mira cómo va todo»: lee `/api/admin/estado`, `C:\vm\logs\*.log` y `C:\vm\logs\actualizar.log`, y resume problemas y qué hacer.
 

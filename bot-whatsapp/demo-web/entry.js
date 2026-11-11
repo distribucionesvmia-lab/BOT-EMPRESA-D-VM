@@ -4,6 +4,7 @@
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog, habitualProducts } from "../bot.js";
 import { priceOrder, totals } from "../pricing.js";
 import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, conHistorial } from "../weborder.js";
+import { recordatoriosDeHoy } from "../recordatorios.js";
 import { deliveryOptions, deliveryInfo, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible, puedeEditarPedido } from "../delivery.js";
 import { findCustomers } from "../identify.js";
 import { FORMAT, imprimirHtml, madrid, madridTime } from "../export-format.js";
@@ -418,6 +419,13 @@ window.VM = {
     return { status: 200, json: { ok: true, ...(mia ? { ref: mia.ref } : {}), ...(pe.ok ? { modificable: pe.texto || "Puedes seguir modificándolo mientras no lo preparemos" } : {}), message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} artículos, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.\n\n${BUSINESS.payment}` } };
   },
 
+  /** «Recordatorios de hoy» (mismos cálculos que el programa real): a quién le toca reponer. La empresa envía a mano por WhatsApp. */
+  recordatorios() {
+    const hoy = madridDay(), app = new Map();
+    for (const o of cache.orders) if (o.customer_id) (app.get(o.customer_id) ?? app.set(o.customer_id, []).get(o.customer_id)).push(madridDay(o.created_at));
+    const clientes = cache.customers.filter((c) => c.active !== false).map((c) => ({ id: c.id, name: c.name, phone: c.phone, fechas: [...(c.orders ?? []).map((o) => String(o.date).slice(0, 10)), ...(app.get(c.id) ?? [])] }));
+    return recordatoriosDeHoy({ hoy, clientes, enlace: "" });
+  },
   /** Contenido de un pedido modificable (para volver a abrirlo en el catálogo). */
   miniPedido(link, ref) {
     const customer = links.get(link)?.customer, o = withRefs().find((x) => x.ref === ref);
