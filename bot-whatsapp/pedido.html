@@ -478,6 +478,13 @@
   .bar .mpop .letra { padding:10px 14px; border-top:1px solid #eceef0; } .bar .mpop .letra button { display:inline-flex !important; align-items:center; justify-content:center; width:auto !important; min-height:48px !important; padding:0 12px !important; border:2px solid #d90000 !important; background:#fff !important; color:#a80000 !important; border-radius:12px !important; }
   .bar .mpop .letra button.letra-auto[aria-pressed="true"] { background:#d90000 !important; color:#fff !important; } .bar .mpop .letra .letra-n { color:#1d1d1f; }
   .bar .mpop .letra-titulo { padding:10px 14px 0; font-size:calc(13px / var(--k,1)); font-weight:700; color:#5f6368; }
+  .addropc { display:flex; flex-direction:column; gap:6px; margin-top:10px; }
+  .addrop { display:flex; align-items:center; gap:12px; min-height:48px; padding:6px 10px; border:2px solid var(--linea); border-radius:14px; cursor:pointer; font-size:calc(16px / var(--k,1)); font-weight:600; }
+  .addrop input { width:24px; height:24px; accent-color:var(--rojo); flex:none; margin:0; } .addrop:has(input:checked) { border-color:var(--rojo); background:var(--rojo-s); }
+  #addrOtra { width:100%; margin-top:10px; min-height:52px; border:2px solid var(--linea); border-radius:14px; padding:0 14px; font:inherit; font-size:calc(17px / var(--k,1)); }
+  #addrOtra:focus { border-color:var(--rojo); outline:none; } #addrOtra[hidden] { display:none; }
+  .falta-fila .falta-av { flex:none; width:56px; height:56px; border-radius:12px; overflow:hidden; display:grid; place-items:center; color:#fff; font-weight:800; border:0; padding:0; cursor:pointer; }
+  .falta-fila .falta-av img { width:100%; height:100%; object-fit:contain; background:#fff; display:block; }
 </style>
 </head>
 <body>
@@ -508,7 +515,13 @@
     <div class="body cartbody">
       <div class="cartcount" id="cartCount"></div>
       <div id="cartLines"></div>
-      <div class="card"><div class="ctit">📍 Entrega en</div><div id="addr" class="cval"></div></div>
+      <div class="card" id="entregaCard"><div class="ctit" id="addrTit">📍 Entrega en</div><div id="addr" class="cval"></div>
+        <div id="addrOpc" class="addropc" role="radiogroup" aria-label="Dónde entregamos">
+          <label class="addrop"><input type="radio" name="addrmode" value="hab" checked><span>En la dirección de siempre</span></label>
+          <label class="addrop"><input type="radio" name="addrmode" value="otra"><span>En otra dirección distinta</span></label>
+        </div>
+        <input id="addrOtra" type="text" maxlength="160" autocomplete="street-address" placeholder="Calle, número y localidad" aria-label="Dirección de entrega" hidden>
+      </div>
       <div class="card"><label for="note" class="ctit">💬 Observaciones del pedido</label><textarea id="note" placeholder="Ej.: avísame por teléfono antes de entregar (opcional)" maxlength="200"></textarea></div>
       <div class="nota" id="priceNote"></div>
       <div class="err" id="err" role="alert"></div>
@@ -955,9 +968,11 @@ function pintarFalta(box) {
   const h3 = document.createElement("h3"); h3.textContent = "¿Te falta algo?"; const p = document.createElement("p"); p.textContent = "Lo que sueles pedir y esta vez no llevas:"; s.append(h3, p);
   for (const x of falta) {
     const f = document.createElement("div"); f.className = "falta-fila";
+    const av = document.createElement("button"); av.type = "button"; av.className = "falta-av"; av.style.background = hue(x.name); av.textContent = initials(x.name); av.setAttribute("aria-label", x.img ? "Ampliar la foto de " + x.name : x.name);
+    if (x.img) { const im = document.createElement("img"); im.src = x.img; im.alt = ""; im.loading = "lazy"; av.textContent = ""; im.onerror = () => { im.remove(); av.textContent = initials(x.name); }; av.appendChild(im); av.onclick = () => verFoto(x); } else av.style.cursor = "default";
     const n = document.createElement("span"); n.className = "falta-n"; n.textContent = x.name + " · " + eurp(x.price) + (x.unitsPerBox ? " · caja de " + x.unitsPerBox : "");
     const b = document.createElement("button"); b.type = "button"; b.className = "add"; b.textContent = "+ Añadir"; b.setAttribute("aria-label", "Añadir " + x.name); b.onclick = () => setQty(x.id, 1);
-    f.append(n, b); s.appendChild(f);
+    f.append(av, n, b); s.appendChild(f);
   }
   box.appendChild(s);
 }
@@ -1022,7 +1037,24 @@ $("verCarrito").onclick = $("cartIcon").onclick = () => count() && showCart(true
 $("back").onclick = $("keep").onclick = () => showCart(false);
 
 // Finalizar: primero se pregunta el día de entrega y, al elegirlo, se envía el pedido
+// Dirección de entrega: la de siempre o una distinta; un cliente nuevo (sin dirección guardada) tiene que escribirla
+const sinDireccion = () => !String(data.customer.address || "").trim();
+const modoDir = () => (sinDireccion() ? "otra" : document.querySelector('input[name="addrmode"]:checked').value);
+const dirEntrega = () => (modoDir() === "otra" ? $("addrOtra").value.replace(/\s+/g, " ").trim() : "");
+const dirFinal = () => dirEntrega() || String(data.customer.address || "").trim();
+function pintarDireccion() {
+  const nuevo = sinDireccion();
+  $("addrTit").textContent = nuevo ? "📍 ¿Dónde te lo llevamos?" : "📍 Entrega en";
+  $("addr").hidden = nuevo; $("addrOpc").hidden = nuevo; $("addrOtra").hidden = modoDir() !== "otra";
+  $("addrOtra").setAttribute("aria-required", nuevo ? "true" : "false");
+}
+document.querySelectorAll('input[name="addrmode"]').forEach(r => (r.onchange = () => { pintarDireccion(); if (modoDir() === "otra") $("addrOtra").focus(); }));
+function direccionOk(errBox) {
+  if (modoDir() === "otra" && dirEntrega().length < 5) { errBox.textContent = sinDireccion() ? "Escribe a dónde te lo llevamos." : "Escribe la otra dirección de entrega, o elige «En la dirección de siempre»."; $("addrOtra").hidden = false; $("addrOtra").focus(); return false; }
+  return true;
+}
 $("confirm").onclick = () => {
+  $("err").textContent = ""; if (!direccionOk($("err"))) return;
   if (!(data.delivery || []).length) return enviarPedido(null, $("err"));
   $("errWhen").textContent = ""; pintarOpciones(); $("when").hidden = false;
 };
@@ -1079,7 +1111,7 @@ let diaElegido = null;
 function resumen(day) {
   diaElegido = day;
   $("resDia").textContent = largo(day).replace(/^./, c => c.toUpperCase());
-  $("resAddr").textContent = "📍 " + (data.customer.address || "La dirección que tenemos de tu negocio (la confirmaremos contigo)");
+  $("resAddr").textContent = "📍 " + (dirFinal() || "La dirección que tenemos de tu negocio (la confirmaremos contigo)");
   const box = $("resLineas"); box.innerHTML = "";
   for (const l of lines()) {
     const k = l.unitsPerBox || 1, cj = unit(l.id) === "caja", d = document.createElement("div");
@@ -1101,7 +1133,7 @@ async function enviarPedido(delivery, errBox) {
   const opts = [...document.querySelectorAll("#whenOpts .opt")], btn = $("confirm");
   opts.forEach(o => (o.disabled = true)); btn.disabled = true; $("resOk").disabled = true; errBox.textContent = "";
   try {
-    const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value, delivery }) });
+    const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value, deliveryAddress: dirEntrega(), delivery }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "No se ha podido enviar el pedido");
     pedidoEnviado = true; uso("pedido", Math.round((Date.now() - tAbierto) / 1000));
@@ -1183,6 +1215,7 @@ const obs = new MutationObserver(capasCambian);
   $("ttl").textContent = "Hola, " + data.customer.name;
   $("sub").textContent = "Haz tu pedido a " + data.business;
   $("addr").textContent = data.customer.address || "La dirección que tenemos de tu negocio (la confirmaremos contigo).";
+  pintarDireccion();
   $("priceNote").textContent = data.priceNote || "";
   if (data.used) { $("doneT").textContent = "Este pedido ya se envió"; $("doneP").textContent = "Vuelve al chat para hacer otro pedido."; $("done").hidden = false; return; }
   if (!data.products.some(p => p.count > 0)) { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); }

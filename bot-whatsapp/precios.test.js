@@ -208,3 +208,12 @@ test("«¿Te falta algo?» antes de enviar, aviso de entrega hoy renovable y med
   assert.match(ped, /Ya no llegamos a entregarlo hoy: elige otro día\./);
   assert.match(ped, /\/api\/uso/);
 });
+
+test("«¿Te falta algo?» con foto del artículo y entrega: dirección de siempre u otra distinta (obligatoria sin dirección guardada)", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.match(ped, /className = "falta-av"/); assert.match(ped, /\.falta-fila \.falta-av \{ flex:none; width:56px; height:56px/);
+  assert.match(ped, /name="addrmode" value="otra"/); assert.match(ped, /deliveryAddress: dirEntrega\(\)/);
+  assert.match(ped, /const sinDireccion = \(\) => !String\(data\.customer\.address/);
+  assert.match(ped, /\$\("confirm"\)\.onclick = \(\) => \{\s*\$\("err"\)\.textContent = ""; if \(!direccionOk/); // sin dirección válida no se pasa a elegir el día
+});

@@ -122,3 +122,21 @@ test("el pedido lleva la población del cliente (sale bajo el nombre en el Excel
   assert.equal(order.city, "MEDINA DEL CAMPO");
   assert.equal(webOrderFromBody({ lines: [{ id: "B", qty: 1 }] }, cliente, ctx, catalogo).order.city, ""); // sin población: vacía, no «undefined»
 });
+
+test("dirección de entrega: la de siempre por defecto, otra distinta si la escribe, y obligatoria en un cliente nuevo", () => {
+  const lineas = [{ id: "A", qty: 1 }];
+  // por defecto: la dirección guardada, sin marcas en las observaciones
+  let r = webOrderFromBody({ lines: lineas }, cliente, ctx, catalogo);
+  assert.equal(r.order.address, "Calle 1"); assert.equal(r.order.note, "");
+  // otra dirección: se entrega allí y la empresa lo ve en las observaciones (panel y Excel)
+  r = webOrderFromBody({ lines: lineas, note: "jueves", deliveryAddress: "  Plaza Mayor 3,   Medina  " }, cliente, ctx, catalogo);
+  assert.equal(r.order.address, "Plaza Mayor 3, Medina");
+  assert.equal(r.order.note, "ENTREGA EN OTRA DIRECCIÓN: Plaza Mayor 3, Medina · jueves");
+  assert.match(r.order.text, /Plaza Mayor 3, Medina/);
+  assert.match(webOrderFromBody({ lines: lineas, deliveryAddress: "x" }, cliente, ctx, catalogo).error, /demasiado corta/);
+  // cliente nuevo (sin dirección guardada): tiene que decir a dónde se lo llevamos
+  const nuevo = { id: "N1", name: "Nuevo", address: "" };
+  assert.equal(webOrderFromBody({ lines: lineas }, nuevo, ctx, catalogo).error, "Indica a dónde te lo llevamos.");
+  r = webOrderFromBody({ lines: lineas, deliveryAddress: "Calle Real 5, Medina" }, nuevo, ctx, catalogo);
+  assert.equal(r.order.address, "Calle Real 5, Medina"); assert.match(r.order.note, /cliente nuevo/);
+});

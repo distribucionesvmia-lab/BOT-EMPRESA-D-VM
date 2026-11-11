@@ -65,8 +65,8 @@ const S = {
 // Estilo de una celda de línea: tipo + si la fila es la gris (alterna con la blanca). Bordes finos oscuros: separan líneas y columnas.
 const linea = (extra, gris) => estilo({ h: "center", v: "center", ...(gris ? { fill: FILA_GRIS } : {}), border: { side: "all", style: "thin", color: RAYA }, ...extra });
 const LS = (gris) => ({
-  box: linea({ sz: 24, name: "Segoe UI Symbol" }, gris), // casilla casi tan grande como la celda
-  cajas: linea({ b: 1, sz: 18 }, gris),
+  box: linea({ sz: 40, name: "Segoe UI Symbol" }, gris), // casilla casi tan grande como la celda
+  cajas: linea({ b: 1, sz: 22 }, gris),
   texto: linea({}, gris),
   descripcion: linea({ h: "left", indent: 1 }, gris),
   negrita: linea({ b: 1 }, gris),
@@ -126,7 +126,7 @@ function orderSheet(o) {
     nuevaFila([
       { v: l.id, s: st.texto, from: 0 }, { v: "☐", s: st.box, from: 1 }, { v: porCajas ? l.boxes : null, s: st.cajas, from: 2 }, { v: l.name, s: st.descripcion, from: 3 },
       { v: l.units ?? l.qty, s: porCajas ? st.grisNum : st.unidadesNegras, from: 4 }, { v: l.price ?? null, s: st.precio, from: 5 }, { v: l.discount || null, s: st.grisNum, from: 6 }, { v: l.amount, s: st.importe, from: 7 },
-    ], 28); // filas más altas para que quepa la casilla grande
+    ], 44); // filas más altas para que quepa la casilla grande
   });
   // TOTALES (justo debajo de las líneas, de la D a la H)
   const total = (text, value, fin) => nuevaFila([{ v: text, s: S.totalLabel, from: 3, to: 6 }, { v: value, s: fin ? S.totalFinal : S.totalGris, from: 7 }], 17);
@@ -139,7 +139,7 @@ function orderSheet(o) {
   nuevaFila([{ v: nota || null, s: nota ? S.obsBox : S.obsEmpty, from: 3, to: 7 }], 54);
   // OBSERVACIONES DE LÍNEA, al pie de la hoja (solo si alguna línea las lleva; si no, no se escribe nada)
   const conNota = lines.filter((l) => String(l.note ?? "").trim());
-  const widths = [autoWidth(lines.map((l) => l.id), 12, 16), 6, 8, autoWidth(lines.map((l) => l.name), 26, 52), 11, 9, 7, 11];
+  const widths = [autoWidth(lines.map((l) => l.id), 12, 16), 9, 9, autoWidth(lines.map((l) => l.name), 26, 52), 11, 9, 7, 11];
   if (conNota.length) {
     const usado = Object.values(heights).reduce((s, h) => s + h, 0);
     const seccion = 17 + conNota.length * 34, cap = capacidadPagina(widths), margen = 40;
@@ -188,8 +188,8 @@ ${conNota.length ? `<div class="obsl"><b>Observaciones línea</b>${conNota.map((
 .ciudad { background:#1f3864; color:#fff; padding:0 12px 6px 40%; font-size:15px; }
 .cab { display:flex; gap:24px; padding:6px 4px; background:#dce6f4; } .cab small { display:block; font-weight:700; font-size:10px; } .cab span:first-child { flex:1; }
 table { width:100%; border-collapse:collapse; } th { background:#dce6f4; padding:4px; border:1px solid #404040; font-size:11px; }
-td { border:1px solid #404040; padding:0 4px; height:11mm; vertical-align:middle; } tr.g td { background:#f2f2f2; }
-td.c { text-align:center; width:20mm; } td.chk { text-align:center; width:12mm; font-size:26px; line-height:1; padding:0; } td.cajas { text-align:center; width:15mm; font-weight:700; font-size:20px; }
+td { border:1px solid #404040; padding:0 4px; height:15mm; vertical-align:middle; } tr.g td { background:#f2f2f2; }
+td.c { text-align:center; width:20mm; } td.chk { text-align:center; width:17mm; font-size:44px; line-height:1; padding:0; } td.cajas { text-align:center; width:15mm; font-weight:700; font-size:24px; }
 td.d { padding-left:6px; } td.n { text-align:right; white-space:nowrap; width:20mm; } .gr { color:#808080; } .b { font-weight:700; color:#000; }
 .tot { width:60%; margin-left:auto; } .tot td { border:0; height:6mm; font-weight:700; } .tot td.n { font-weight:400; color:#808080; } .tot tr.fin td.n { color:#000; font-weight:700; }
 .entrega { margin:6px 0; padding:6px 10px; font-weight:700; border-radius:6px; }

@@ -80,7 +80,13 @@ export function webOrderFromBody(body, customer, { key, phone, at = new Date().t
   }
   const items = [...merged.values()];
   if (!items.length) return { error: "El pedido está vacío" };
-  const note = typeof body?.note === "string" ? body.note.trim().slice(0, 200) : "";
+  const nota = typeof body?.note === "string" ? body.note.trim().slice(0, 200) : "";
+  // Dirección de entrega: la de siempre, o la que escribe el cliente («otra dirección»). Un cliente nuevo (sin dirección guardada) tiene que ponerla.
+  const otra = typeof body?.deliveryAddress === "string" ? body.deliveryAddress.replace(/\s+/g, " ").trim().slice(0, 160) : "";
+  const habitual = String(customer.address ?? "").trim();
+  if (!habitual && !otra) return { error: "Indica a dónde te lo llevamos." };
+  if (otra && otra.length < 5) return { error: "La dirección de entrega es demasiado corta." };
+  const note = otra ? `ENTREGA EN ${habitual ? "OTRA DIRECCIÓN" : "ESTA DIRECCIÓN (cliente nuevo)"}: ${otra}${nota ? " · " + nota : ""}` : nota; // llega así al panel de la empresa y al Excel
   // Día de entrega elegido (uno de los botones o cualquier día del calendario): debe ser una fecha real, de hoy en adelante
   let delivery = null;
   if (body?.delivery != null && body.delivery !== "") {
@@ -97,7 +103,7 @@ export function webOrderFromBody(body, customer, { key, phone, at = new Date().t
       phone,
       customerId: customer.id,
       name: customer.name,
-      address: customer.address,
+      address: otra || customer.address,
       city: customer.city ?? "",
       text: items.map((i) => `${i.qty} ${i.unit === "caja" ? "cajas de " : ""}${i.name}`).join(" + ") + (note ? ` · Nota: ${note}` : ""),
       items,
