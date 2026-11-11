@@ -283,6 +283,10 @@
   .bar .mpop .letra { padding:10px 14px; border-top:1px solid #eceef0; } .bar .mpop .letra button { display:inline-flex !important; align-items:center; justify-content:center; width:auto !important; min-height:48px !important; padding:0 12px !important; border:2px solid #d90000 !important; background:#fff !important; color:#a80000 !important; border-radius:12px !important; }
   .bar .mpop .letra button.letra-auto[aria-pressed="true"] { background:#d90000 !important; color:#fff !important; } .bar .mpop .letra .letra-n { color:#1d1d1f; }
   .bar .mpop .letra-titulo { padding:10px 14px 0; font-size:calc(13px / var(--k,1)); font-weight:700; color:#5f6368; }
+  .ui.multi .mrow-sel { display:flex; align-items:center; gap:12px; background:#fff; border:2px solid #f2c9c9; border-radius:14px; padding:8px 12px; min-height:52px; cursor:pointer; }
+  .ui.multi .mrow-sel input { width:24px; height:24px; accent-color:#d90000; flex:none; margin:0; }
+  .ui.multi .mrow-sel span { display:flex; flex-direction:column; min-width:0; } .ui.multi .mrow-sel b { font-size:calc(15px / var(--k,1)); color:#1d1d1f; } .ui.multi .mrow-sel small { color:#5f6368; font-size:calc(13px / var(--k,1)); overflow-wrap:anywhere; }
+  .ui.multi .pill:disabled { opacity:.5; box-shadow:none; }
 </style>
 </head>
 <body>
@@ -559,6 +563,18 @@ function interactivo(ui) {
   if (ui.type === "link" && ui.home) { inicio(ui); if (ui.open) setTimeout(() => { location.href = ui.url; }, 800); return; }
   if (ui.type === "link") { const l = pill(ui.title, null, ui.url); l.classList.add("primary"); box.appendChild(l); if (ui.open) setTimeout(() => { location.href = ui.url; }, 800); } // «ui.open»: el cliente lo ha pedido por texto, se abre solo
   else if (ui.type === "buttons") ui.buttons.forEach((b) => box.appendChild(pill(b.title, () => enviar(b.id, b.title))));
+  else if (ui.type === "multi") {
+    const marcados = new Set(); box.classList.add("multi");
+    const btn = pill("", () => { const ids = [...marcados]; enviar("ps:" + ids.join(","), "Añadir " + ids.length + (ids.length === 1 ? " producto" : " productos")); });
+    const pintar = () => { btn.textContent = marcados.size ? "Añadir al pedido (" + marcados.size + ")" : "Marca lo que quieras añadir"; btn.disabled = !marcados.size; };
+    ui.rows.forEach((r) => {
+      const lab = document.createElement("label"); lab.className = "mrow-sel"; const c = document.createElement("input"); c.type = "checkbox"; c.setAttribute("aria-label", "Marcar " + r.title);
+      const txt = document.createElement("span"); const a = document.createElement("b"); const [nom, ...resto] = r.description.split(" · "); a.textContent = nom || r.title; const d = document.createElement("small"); d.textContent = resto.join(" · "); txt.append(a, d);
+      c.onchange = () => { const id = r.id.replace(/^p:/, ""); if (c.checked) marcados.add(id); else marcados.delete(id); pintar(); };
+      lab.append(c, txt); box.appendChild(lab);
+    });
+    btn.classList.add("primary"); pintar(); box.appendChild(btn);
+  }
   else box.appendChild(pill(ui.button, () => {
     sheet.innerHTML = "";
     const h = document.createElement("div"); h.className = "h"; const t = document.createElement("span"); t.textContent = ui.section;

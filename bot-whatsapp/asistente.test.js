@@ -106,7 +106,7 @@ test("recomendaciones: vino con características, precio máximo y «el más bar
 test("recomendar y añadir: lista con botones para añadir, «añade el segundo» y lo que ya compra va primero", () => {
   let r = di(medina, "¿Qué vino tinto joven me recomiendas?");
   assert.match(r.reply, /Esto es lo que mejor encaja/);
-  assert.equal(r.ui.type, "list");
+  assert.equal(r.ui.type, "multi");
   assert.equal(r.ui.rows[0].id, "p:V1"); // el que ya compra (V1) primero
   assert.ok(r.ui.rows.every((x) => /^p:/.test(x.id) && x.title.length <= 24 && x.description.length <= 72));
   assert.equal(r.session.cart.length, 0, "recomendar no apunta nada solo");
@@ -116,12 +116,17 @@ test("recomendar y añadir: lista con botones para añadir, «añade el segundo�
   assert.equal(sig.session.askUnit?.[0]?.id ?? sig.session.pick?.id, r.ui.rows[1].id.slice(2));
   // elegir de la lista (p:V1) sigue el camino de siempre
   assert.match(di(medina, "p:V1", LUNES_930, r.session).reply, /V|VINO/i);
+  // varios marcados con las casillas (ps:v1,v2 → llegan en minúsculas): 1 caja de cada uno al carrito
+  const dos = di(medina, "ps:" + r.ui.rows.slice(0, 2).map((x) => x.id.slice(2).toLowerCase()).join(","), LUNES_930, r.session);
+  assert.match(dos.reply, /Anotado/);
+  assert.equal(dos.session.cart.length, 2);
+  assert.ok(dos.session.cart.every((i) => i.qty === 1));
 });
 
 test("necesidades y negocios: «¿qué me sirve para un bar de tapas?» recomienda por tipos de producto", () => {
   const r = di(medina, "¿Qué me sirve para un bar de tapas?");
   assert.match(r.reply, /Para un bar de tapas/);
-  assert.equal(r.ui.type, "list");
+  assert.equal(r.ui.type, "multi");
   const ids = r.ui.rows.map((x) => x.id.slice(2));
   assert.ok(ids.includes("C1") && ids.includes("P1") && ids.includes("S1"), "cerveza, patatas y servilletas: " + ids);
   assert.match(di(medina, "teneis algún producto para una cafetería de desayunos").reply, /cafetería/);
@@ -131,7 +136,7 @@ test("necesidades y negocios: «¿qué me sirve para un bar de tapas?» recomien
 
 test("precios y existencias: «¿cuánto vale la cerveza?» y lo que no existe se dice claro", () => {
   const r = di(medina, "¿cuánto vale la cerveza?");
-  assert.match(r.reply, /CERVEZA/); assert.equal(r.ui.type, "list");
+  assert.match(r.reply, /CERVEZA/); assert.equal(r.ui.type, "multi");
   const nada = di(medina, "¿tenéis caviar beluga?");
   assert.match(nada.reply, /No encuentro nada/); assert.equal(nada.session.cart.length, 0);
 });

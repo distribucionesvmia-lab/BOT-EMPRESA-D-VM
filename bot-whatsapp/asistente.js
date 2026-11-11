@@ -232,7 +232,7 @@ export function responder(texto, ctx) {
     }
     if (!grupos.length) return { tipo: "respuesta", reply: `No encuentro en el catálogo productos que encajen con ${usoDe.nombre}. Prueba a escribirme algo más concreto (por ejemplo «cerveza» o «café»).`, productos: [], accion: "abrir" };
     const linea = (g) => `• *${g.concepto[0].toUpperCase() + g.concepto.slice(1)}:* ${g.p.name} — ${ctx.fmtPrecio ? ctx.fmtPrecio(g.p) : precioOf(g.p)}`;
-    return { tipo: "respuesta", reply: `Para ${usoDe.nombre} suele hacer falta esto; te dejo lo más acertado de tu catálogo (lo que ya compras va primero):\n\n${grupos.map(linea).join("\n")}\n\nElige uno de la lista y lo añado a tu pedido (te pregunto cuántas cajas o unidades).`, productos: grupos.map((g) => g.p), accion: null };
+    return { tipo: "respuesta", reply: `Para ${usoDe.nombre} suele hacer falta esto; te dejo lo más acertado de tu catálogo (lo que ya compras va primero):\n\n${grupos.map(linea).join("\n")}\n\nMarca con la casilla los que quieras y pulsa «Añadir al pedido» (pongo 1 caja o unidad de cada uno; luego lo cambias en el catálogo).`, productos: grupos.map((g) => g.p), accion: null };
   }
   const conceptos = conceptosDe(texto);
   if (!conceptos.length) return null;
@@ -243,5 +243,5 @@ export function responder(texto, ctx) {
   }
   const lineaP = (p, i) => `${i + 1}. ${p.name} — ${ctx.fmtPrecio ? ctx.fmtPrecio(p) : precioOf(p)}`;
   const intro = hits.length === 1 ? "Te recomiendo este:" : barato ? "Estos son los más económicos que encajan:" : caro ? "Estos son de gama más alta:" : "Esto es lo que mejor encaja con lo que buscas (lo que ya compras va primero):";
-  return { tipo: "respuesta", reply: `${intro}\n\n${hits.map(lineaP).join("\n")}\n\nElige uno de la lista (o escribe «añade el primero») y lo añado a tu pedido.`, productos: hits, accion: null };
+  return { tipo: "respuesta", reply: `${intro}\n\n${hits.map(lineaP).join("\n")}\n\nMarca los que quieras en la lista de abajo y pulsa «Añadir al pedido» (o escribe «añade el primero»).`, productos: hits, accion: null };
 }

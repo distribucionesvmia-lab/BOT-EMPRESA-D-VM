@@ -383,7 +383,7 @@ function asistir(s, rawText, now, ctx) {
   s.reco = r.productos.map((p) => String(p.id));
   let ui;
   if (r.productos.length) {
-    ui = { type: "list", button: "Añadir al pedido", section: "Te recomiendo", rows: r.productos.map((p) => ({ id: `p:${p.id}`, title: trunc(p.name, 24), description: trunc(`${p.name} · ${moneyP(priceOf(p))}${upbOf(p) ? ` · caja de ${upbOf(p)}` : ""}${habituales.has(String(p.id)) ? " · ya lo has pedido" : ""}`, 72) })) };
+    ui = { type: "multi", button: "Añadir al pedido", section: "Te recomiendo", rows: r.productos.map((p) => ({ id: `p:${p.id}`, title: trunc(p.name, 24), description: trunc(`${p.name} · ${moneyP(priceOf(p))}${upbOf(p) ? ` · caja de ${upbOf(p)}` : ""}${habituales.has(String(p.id)) ? " · ya lo has pedido" : ""}`, 72) })) };
   } else if (r.accion === "repetir" && ultimo && s.link) {
     ui = { type: "link", title: "Repetir y revisar", url: `${s.link}#${hashRepetir(ultimo.items)}`, open: false };
   } else if (r.accion) {
@@ -705,6 +705,18 @@ function handleMessageInner(session, rawText, ctx = {}) {
       return { ...confirmReply(s), session: s };
     }
     if (text === "lista" && ["menu", "cart"].includes(s.state)) return showList(s, 0, "Elige un artículo:");
+    // varios productos marcados a la vez en las recomendaciones: 1 caja (o 1 unidad si no se vende en cajas) de cada uno
+    const varios = /^ps:(.+)$/.exec(text);
+    if (varios && ["menu", "cart", "qty"].includes(s.state)) {
+      const nombres = [];
+      for (const id of varios[1].split(",")) {
+        const p = CATALOG.find((x) => String(x.id).toLowerCase() === id);
+        if (!p) continue;
+        addToCart(s, mkItem(p, 1, upbOf(p) ? "caja" : "ud"));
+        nombres.push(p.name);
+      }
+      if (nombres.length) { s.state = "cart"; return showCart(s, `Anotado ✅ ${nombres.length === 1 ? "1 producto" : nombres.length + " productos"} (1 caja o unidad de cada uno). Puedes cambiar las cantidades en el catálogo.\n\n`); }
+    }
     const pick = /^p:(.+)$/.exec(text);
     if (pick && ["menu", "cart", "qty"].includes(s.state)) {
       // el texto llega en minúsculas: los códigos de artículo con letras se comparan sin distinguir mayúsculas
