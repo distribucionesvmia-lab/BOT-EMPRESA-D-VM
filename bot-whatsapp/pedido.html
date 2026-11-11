@@ -176,6 +176,11 @@
   .buscar::before { content:"🔍"; position:absolute; left:calc(max(14px, (100% - 860px) / 2) + 14px); top:9px; font-size:calc(20px / var(--k,1)); }
   .filbar { display:flex; align-items:center; gap:12px; padding:0 14px 10px; flex-wrap:wrap; }
   .filbar[hidden] { display:none; }
+  .busqfil { display:flex; flex-wrap:wrap; gap:6px; align-items:center; width:100%; } .busqfil:empty { display:none; }
+  .busqfil .grp { display:flex; flex-wrap:nowrap; overflow-x:auto; gap:6px; align-items:center; width:100%; scrollbar-width:none; -webkit-overflow-scrolling:touch; } .busqfil .grp::-webkit-scrollbar { display:none; } .busqfil .grp > * { flex:none; } .busqfil .gt { font-size:calc(13px / var(--k,1)); font-weight:700; color:var(--gris); margin-right:2px; }
+  .busqfil button { min-height:48px; padding:0 14px; border:2px solid var(--linea); border-radius:999px; background:#fff; color:var(--gris); font-weight:700; font-size:calc(15px / var(--k,1)); cursor:pointer; touch-action:manipulation; }
+  .busqfil button[aria-pressed="true"] { background:var(--rojo); border-color:var(--rojo); color:#fff; }
+  .busqfil small { opacity:.8; font-weight:600; }
   .filbar .fil { border:2px solid var(--linea); background:#fff; min-height:40px; padding:0 16px; border-radius:14px; font-size:calc(16px / var(--k,1)); font-weight:700; color:var(--gris); cursor:pointer; }
   .filbar .fil[aria-pressed="true"] { background:var(--rojo); border-color:var(--rojo); color:#fff; }
   .filbar span { color:var(--gris); font-size:calc(15px / var(--k,1)); }
@@ -518,7 +523,7 @@
   </nav>
   <div class="buscar"><input id="q" type="search" placeholder="Buscar un producto…" autocomplete="off" aria-label="Buscar un producto"></div>
   <!-- Filtro de ida y vuelta, solo en la pestaña «Histórico» (data-t="hab") -->
-  <div class="filbar" id="filbar" hidden><button class="fil" id="fil" type="button" aria-pressed="false">☑ Ver solo lo que he marcado</button><span id="filinfo"></span></div>
+  <div class="filbar" id="filbar" hidden><button class="fil" id="fil" type="button" aria-pressed="false">☑ Ver solo lo que he marcado</button><span id="filinfo"></span><div id="busqfil" class="busqfil"></div></div>
   <main id="list"></main>
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <footer hidden><button class="big" id="verCarrito" type="button" disabled>Añade productos para empezar</button></footer>
@@ -889,6 +894,43 @@ const coincide = (p, q) => {
   const n = norm(p.name), toks = n.split(/[^a-z0-9]+/).filter(Boolean);
   return q.split(/\s+/).every(w => n.includes(w) || p.id.includes(w) || (w.length >= 5 && toks.some(t => Math.abs(t.length - w.length) <= 1 && dist(w, t) <= 1)));
 };
+// ── Búsqueda: filtros por marca (la subcategoría de la tarifa) y por formato (sacado del nombre: 33 cl, 1,5 l, 500 gr…) ──
+const FORMATO_RE = /(\d+(?:[.,]\d+)?)\s?(cl|ml|lt|l|kg|gr|g)\b/i;
+function formatoDe(p) {
+  const m = FORMATO_RE.exec(p.name); if (!m) return null;
+  let u = m[2].toLowerCase(); if (u === "lt") u = "l"; if (u === "gr") u = "g";
+  return `${String(Number(m[1].replace(",", "."))).replace(".", ",")} ${u}`;
+}
+const marcaDe = p => { const c = (data.tree || []).find(x => x.id === p.cat); const s = c && c.subs.find(x => x.id === p.sub); return s ? s.nombre : null; };
+let fMarca = null, fFormato = null;
+function pintarFiltrosBusqueda(base) { // base: todos los resultados de la búsqueda, sin filtrar
+  const box = $("busqfil"); box.innerHTML = "";
+  const cuenta = fn => { const m = new Map(); for (const p of base) { const k = fn(p); if (k) m.set(k, (m.get(k) || 0) + 1); } return [...m].sort((a, b) => b[1] - a[1]).slice(0, 8); };
+  const grupo = (titulo, pares, actual, poner) => {
+    if (pares.length < 2 && !actual) return;
+    const g = document.createElement("div"); g.className = "grp"; const t = document.createElement("span"); t.className = "gt"; t.textContent = titulo; g.appendChild(t);
+    for (const [k, n] of pares) {
+      const b = document.createElement("button"); b.type = "button"; b.setAttribute("aria-pressed", String(actual === k)); b.setAttribute("aria-label", `${titulo} ${k}, ${n} resultados${actual === k ? " (quitar filtro)" : ""}`);
+      b.append(k + " "); const s = document.createElement("small"); s.textContent = "(" + n + ")"; b.appendChild(s);
+      b.onclick = () => { poner(actual === k ? null : k); renderList(); }; g.appendChild(b);
+    }
+    box.appendChild(g);
+  };
+  grupo("Marca:", cuenta(marcaDe), fMarca, v => (fMarca = v));
+  const conFormato = base.filter(p => formatoDe(p)).length;
+  if (conFormato >= base.length * 0.4) grupo("Formato:", cuenta(formatoDe), fFormato, v => (fFormato = v)); // solo si el formato sale de forma fiable en los nombres
+}
+// Búsquedas recientes (las últimas 5, en este dispositivo)
+const RECIENTES = "vm:busquedas";
+const leerRecientes = () => { try { return JSON.parse(localStorage.getItem(RECIENTES) || "[]").filter(x => typeof x === "string").slice(0, 5); } catch { return []; } };
+function anotarBusqueda(q) { q = q.trim(); if (q.length < 3) return; try { localStorage.setItem(RECIENTES, JSON.stringify([q, ...leerRecientes().filter(x => norm(x) !== norm(q))].slice(0, 5))); } catch {} }
+function pintarRecientes() {
+  const box = $("busqfil"), r = leerRecientes(); box.innerHTML = "";
+  if (!r.length || query.trim()) return;
+  const g = document.createElement("div"); g.className = "grp"; const t = document.createElement("span"); t.className = "gt"; t.textContent = "Búsquedas recientes:"; g.appendChild(t);
+  for (const x of r) { const b = document.createElement("button"); b.type = "button"; b.textContent = x; b.setAttribute("aria-label", "Buscar de nuevo " + x); b.onpointerdown = ev => ev.preventDefault(); b.onclick = () => { $("q").value = x; query = x; limite = 150; fMarca = fFormato = null; renderList(); }; g.appendChild(b); }
+  box.appendChild(g);
+}
 let limite = 150; // productos pintados a la vez; «Mostrar más» amplía
 let soloCantidad = false; // filtro de la pestaña de habituales: ocultar los artículos sin cantidad marcada
 // Entrada escalonada de lo que se ve (solo los primeros 12): se pide al cambiar de vista, no al cambiar una cantidad
@@ -899,8 +941,11 @@ function entrada(list, sel) {
 }
 function renderList() {
   const list = $("list"); list.innerHTML = "";
-  $("filbar").hidden = tab !== "hab";
   const q = norm(query.trim());
+  const enBusqueda = !!q;
+  $("fil").hidden = $("filinfo").hidden = enBusqueda || tab !== "hab";
+  $("filbar").hidden = !(tab === "hab" && !enBusqueda) && !enBusqueda && !$("busqfil").children.length; // en una búsqueda la barra trae marca y formato; si no, solo en «Histórico»
+  if (!enBusqueda) { if ($("busqfil").dataset.modo === "recientes") pintarRecientes(); else $("busqfil").innerHTML = ""; }
   const filtra = tab === "hab" && soloCantidad;
   // Catálogo sin buscar: primero se eligen categoría y subcategoría
   const arbol = tab === "all" && !q && (data.tree || []).length > 0;
@@ -915,6 +960,11 @@ function renderList() {
   }
   let items = data.products.filter(p => (tab === "all" || p.count > 0 || favs.has(p.id) || q) && (!q || coincide(p, q)) && (!filtra || qty.get(p.id) > 0)
     && (!arbol || (p.cat === nav.cat && (nav.sub === "*" || p.sub === nav.sub))));
+  if (enBusqueda) { // la búsqueda mira TODO el catálogo; debajo, filtros de marca y formato (se quitan con un toque)
+    const base = items; pintarFiltrosBusqueda(base);
+    if (fMarca) items = items.filter(p => marcaDe(p) === fMarca); if (fFormato) items = items.filter(p => formatoDe(p) === fFormato);
+    $("filbar").hidden = !$("busqfil").children.length;
+  }
   $("fil").setAttribute("aria-pressed", String(soloCantidad));
   $("filinfo").textContent = filtra ? `Mostrando ${items.length} con cantidad` : "";
   if (cabecera) cabecera();
@@ -922,6 +972,7 @@ function renderList() {
     const d = document.createElement("div"); d.className = "vacio";
     d.textContent = filtra ? "Aún no has marcado ninguna cantidad. Pulsa «Ver solo lo que he marcado» para volver a ver todos." : tab === "hab" && !q ? "Aún no tienes histórico ni favoritos. Mira el catálogo y pulsa ♡ en lo que más pidas." : q ? `No hemos encontrado «${query.trim()}». Prueba con menos palabras o revisa cómo está escrito.` : "No hay resultados.";
     if (q) { const b = document.createElement("button"); b.type = "button"; b.className = "lnk"; b.textContent = "Borrar la búsqueda"; b.onclick = () => { $("q").value = ""; query = ""; renderList(); $("q").focus(); }; d.append(document.createElement("br"), b); }
+    if (q && data.ayuda) { const h = document.createElement("button"); h.type = "button"; h.className = "big sec"; h.style.cssText = "margin:12px 0 0;width:100%"; h.textContent = "Hablar con una persona"; h.onclick = () => abrirAyuda(data.ayuda, data.customer.name); d.appendChild(h); }
     list.appendChild(d); return;
   }
   if (tab === "hab" && !q) items = [...items.filter(p => favs.has(p.id)), ...items.filter(p => !favs.has(p.id))]; // los favoritos van primero
@@ -1085,7 +1136,11 @@ function precargar() {
 }
 $("fil").onclick = () => { soloCantidad = !soloCantidad; renderList(); }; // ida y vuelta
 let tBusca = 0;
-$("q").oninput = e => { query = e.target.value; limite = 150; clearTimeout(tBusca); tBusca = setTimeout(renderList, 140); };
+$("q").oninput = e => { query = e.target.value; limite = 150; fMarca = fFormato = null; clearTimeout(tBusca); tBusca = setTimeout(() => { renderList(); clearTimeout(tReciente); tReciente = setTimeout(() => anotarBusqueda(query), 1800); }, 140); };
+let tReciente = 0;
+$("q").onfocus = () => { if (!query.trim() && leerRecientes().length) { $("busqfil").dataset.modo = "recientes"; $("filbar").hidden = false; pintarRecientes(); } };
+$("q").onblur = () => setTimeout(() => { if (!query.trim()) { $("busqfil").dataset.modo = ""; $("busqfil").innerHTML = ""; renderList(); } }, 200);
+$("q").addEventListener("search", () => anotarBusqueda($("q").value)); // Enter o la X de borrar
 $("verCarrito").onclick = $("cartIcon").onclick = () => count() && showCart(true);
 $("back").onclick = $("keep").onclick = () => showCart(false);
 $("vaciar").onclick = () => { // vacía todo el pedido, con «Deshacer» durante 8 segundos
