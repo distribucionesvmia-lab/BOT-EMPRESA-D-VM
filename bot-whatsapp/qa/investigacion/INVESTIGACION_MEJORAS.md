@@ -2,7 +2,7 @@
 
 **Qué es:** investigación continua para que al cliente le sea fácil, rápido y cómodo pedir, y para vender mejor.
 **Cómo se trabaja:** yo investigo, mido y propongo; tú decides. Cada propuesta tiene un código y un estado (tabla de seguimiento, sección 5). Nada se cambia en la app sin tu «aplícalo».
-**Última actualización:** 10-nov-2026 · **Ronda:** 1
+**Última actualización:** 11-nov-2026 · **Ronda:** 1 (con verificación de tus arreglos)
 
 ---
 
@@ -31,6 +31,8 @@
 \* Alto de pantalla menos la cabecera fija y la barra inferior «Ver carrito». Alto del botón «+ Añadir»: 46 px en todos. Sin errores de JavaScript en ningún tamaño.
 
 **Lo que está bien:** nada se sale de la pantalla en ningún tamaño; el alto de los botones principales es constante (46–58 px); las fotos de producto y las tarjetas de categoría se ven limpias; la pantalla del carrito y la del día de entrega son claras; el aviso «Después podrás revisar el pedido y confirmarlo» ya está corregido.
+
+> **Actualización 11-nov (versión `1794389456-64de`):** M-02 **hecho y verificado**, M-03 **hecho en la lista**, M-01 **mejorado** (apaisado: 100 px útiles en la lista y 159 en el carrito, antes 82 y 0). Quedan N-01 y N-02 (nuevos), M-04…M-09 sin cambios. Los textos de la tabla describen el problema original.
 
 ## 3. Hallazgos de diseño (lo que hace que botones y pantallas «se muevan» o cuesten)
 
@@ -82,9 +84,11 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 
 | Código | Resumen | Impacto | Esfuerzo | Estado | Notas |
 |---|---|---|---|---|---|
-| M-01 | Catálogo usable en apaisado | Alto | Bajo | Propuesta | |
-| M-02 | Botón y contador de tamaño estable | Alto | Bajo-Medio | Propuesta | Lo que más te preocupa |
-| M-03 | Zonas táctiles ≥ 48 px | Medio | Bajo | Propuesta | |
+| M-01 | Catálogo usable en apaisado | Alto | Bajo | **Mejorada** (11-nov) | Apaisado: lista 82 → 100 px útiles, carrito 0 → 159 px. Resto: N-02 |
+| M-02 | Botón y contador de tamaño estable | Alto | Bajo-Medio | **Hecha y verificada** (11-nov) | Un tamaño por pantalla; la tarjeta no cambia de alto al pulsar (216 px antes y después) |
+| M-03 | Zonas táctiles ≥ 44 px | Medio | Bajo | **Hecha en la lista** (11-nov) | Lista: 98 → 0 zonas pequeñas. Carrito: ver N-01 |
+| N-01 | Carrito: controles a 48 px (Cajas/Uds 61×42, − y + 44×40, cantidad 56×40, «+ Añadir observación» 251×40) | Medio | Bajo | Propuesta (nueva) | Hallada al verificar M-03 |
+| N-02 | Quitar la barra gris «Añade productos para empezar» mientras el carrito esté vacío; en apaisado, cabecera que se colapsa al hacer scroll | Medio | Bajo | Propuesta (nueva) | Hallada al verificar M-01 |
 | M-04 / F-07 | Vista de escritorio en tabla / 2 columnas | Medio | Medio | Propuesta | |
 | M-05 / F-08 | Respetar letra del sistema + A−/A+ | Medio | Bajo | Propuesta | Necesita tu decisión |
 | M-06 / F-06 | Poca cobertura: carrito local + instalable | Alto | Medio | Propuesta | Medir primero con red lenta |
@@ -108,6 +112,7 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 
 | Fecha | Qué se hizo |
 |---|---|
+| 11-nov-2026 | Tras tus arreglos, nueva medición de la versión `1794389456-64de` en los 9 tamaños: M-02 y M-03 (lista) verificadas, M-01 mejorada, nuevas N-01 y N-02; resto sin cambios. PDF actualizado. |
 | 10-nov-2026 | Informe en PDF (`Investigacion_mejoras_app_pedidos.pdf`) con la comparativa de empresas, la medición, las propuestas por fases y las 8 decisiones pendientes. |
 | 10-nov-2026 | Ronda 1: medición del artefacto actual en 9 tamaños, 4 grupos de búsqueda (pedido B2B, móvil, Sysco, pedido rápido, WhatsApp Flows, accesibilidad), primeras 9 observaciones y 14 ideas. |
 
@@ -151,7 +156,7 @@ El informe completo, con tabla y fiabilidad de cada fuente, está en `Investigac
 ## 9. Decisiones pendientes del usuario
 
 1. Letra: ¿respetar la del móvil del cliente (hasta +30 %) con control A−/A+, o fija?
-2. ¿Aprobar la Fase 1 (M-02, M-03, M-01, M-07, M-08)?
+2. Restos de la Fase 1: ¿cerramos N-01 (carrito a 48 px), N-02 (quitar la barra vacía) y M-07 / M-08?
 3. ¿«Tu pedido de siempre» como botón principal de la portada?
 4. Reglas de reparto y compra (hora límite, mínimo, portes gratis, días y zonas) para F-05.
 5. Ofertas y novedades: ¿existen y de dónde salen? (F-11)
