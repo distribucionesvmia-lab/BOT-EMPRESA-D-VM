@@ -39,6 +39,11 @@ CREATE TABLE IF NOT EXISTS exports (
   order_count INTEGER NOT NULL,
   line_count  INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS export_orders ( -- pedidos que entran en un Excel al VOLVER a exportarlos (el pedido conserva su exportación original)
+  export_id INTEGER NOT NULL REFERENCES exports(id),
+  order_id  INTEGER NOT NULL REFERENCES orders(id),
+  PRIMARY KEY (export_id, order_id)
+);
 CREATE TABLE IF NOT EXISTS order_lines (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id   INTEGER NOT NULL REFERENCES orders(id),
@@ -178,7 +183,10 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
         const allReady = pending.filter((o) => !o.review && o.customer_id && o.items.length);
         const held = pending.length - allReady.length;
         // refs: la empresa elige qué pedidos exportar; los demás siguen pendientes para otra exportación
-        const ready = refs ? allReady.filter((o) => refs.has(o.ref)) : allReady;
+        const nuevos = refs ? allReady.filter((o) => refs.has(o.ref)) : allReady;
+        // volver a exportar: los pedidos ya exportados que la empresa elige se incluyen otra vez, tantas veces como quiera
+        const repetidos = refs ? db.prepare("SELECT * FROM orders WHERE export_status = 'exported' AND status = 'confirmed' ORDER BY id").all().map(withLines).filter((o) => refs.has(o.ref) && o.customer_id && o.items.length) : [];
+        const ready = [...nuevos, ...repetidos].sort((a, b) => a.id - b.id);
         if (!ready.length) {
           db.exec("COMMIT");
           return { export: null, held };
@@ -189,7 +197,9 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
           .run(now, built.format, built.fileName, built.sha256, ready.length, built.lineCount);
         const exportId = Number(r.lastInsertRowid);
         const mark = db.prepare("UPDATE orders SET export_status = 'exported', exported_at = ?, export_id = ? WHERE id = ? AND export_status = 'pending'");
-        for (const o of ready) if (mark.run(now, exportId, o.id).changes !== 1) throw new Error(`El pedido ${o.ref} ya no estaba pendiente`);
+        for (const o of nuevos) if (mark.run(now, exportId, o.id).changes !== 1) throw new Error(`El pedido ${o.ref} ya no estaba pendiente`);
+        const unir = db.prepare("INSERT OR IGNORE INTO export_orders (export_id, order_id) VALUES (?, ?)");
+        for (const o of repetidos) unir.run(exportId, o.id);
         db.exec("COMMIT");
         return { export: { id: exportId, ...db.prepare("SELECT * FROM exports WHERE id = ?").get(exportId) }, held };
       } catch (err) {
@@ -201,7 +211,7 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
 
     listExports: (limit = 100) => db.prepare("SELECT * FROM exports ORDER BY id DESC LIMIT ?").all(limit),
     getExport: (id) => db.prepare("SELECT * FROM exports WHERE id = ?").get(id) ?? null,
-    exportedOrders: (exportId) => db.prepare("SELECT * FROM orders WHERE export_id = ? ORDER BY id").all(exportId).map(withLines),
+    exportedOrders: (exportId) => db.prepare("SELECT * FROM orders WHERE export_id = ? OR id IN (SELECT order_id FROM export_orders WHERE export_id = ?) ORDER BY id").all(exportId, exportId).map(withLines),
 
     /** Un responsable da por revisado un pedido retenido (marcado "revisar"), para que entre en la siguiente exportación. */
     approveOrder(ref) {

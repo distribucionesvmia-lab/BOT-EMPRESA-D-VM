@@ -104,10 +104,22 @@ test("exportar solo los pedidos elegidos: los demás siguen pendientes y se pued
   assert.equal(hojas.length, 3); // una hoja por pedido exportado (2) + la hoja plana «Líneas»
   assert.equal(hojas[2], "Líneas");
   assert.deepEqual(db.listOrders().map((o) => [o.ref, o.export_status]).sort(), [[refs[0], "exported"], [refs[1], "pending"], [refs[2], "exported"]]);
-  // una referencia que no existe o ya exportada no exporta nada
-  assert.equal(runExport(db, { dir, refs: [refs[0], "VM-2026-999999"] }).export, null);
-  // el pedido que quedó se exporta después
-  assert.equal(runExport(db, { dir }).export.order_count, 1);
+  // una referencia que no existe no exporta nada
+  assert.equal(runExport(db, { dir, refs: ["VM-2026-999999"] }).export, null);
+  // un pedido YA exportado se puede volver a exportar las veces que haga falta (conserva su exportación original)
+  const r2 = runExport(db, { dir, refs: [refs[0], "VM-2026-999999"] });
+  assert.equal(r2.export.order_count, 1); assert.notEqual(r2.export.id, r1.export.id);
+  const r3 = runExport(db, { dir, refs: [refs[0], refs[2]] });
+  assert.equal(r3.export.order_count, 2);
+  assert.deepEqual(db.exportedOrders(r3.export.id).map((o) => o.ref), [refs[0], refs[2]]); // imprimir/ver esa exportación enseña sus pedidos
+  assert.deepEqual(db.exportedOrders(r1.export.id).map((o) => o.ref), [refs[0], refs[2]]); // la exportación original sigue igual
+  assert.equal(db.listOrders().find((o) => o.ref === refs[0]).export_id, r1.export.id);
+  // exportar elegidos y ya exportados a la vez: el pendiente se marca, el exportado se repite
+  const r4 = runExport(db, { dir, refs: [refs[0], refs[1]] });
+  assert.equal(r4.export.order_count, 2);
+  assert.deepEqual(db.listOrders().map((o) => o.export_status).sort(), ["exported", "exported", "exported"]);
+  // y ya sin pendientes, «exportar todos» no saca nada
+  assert.equal(runExport(db, { dir }).export, null);
 });
 
 // Estilos de una celda ya escrita: { negrita, color, relleno, alineado } leídos de styles.xml

@@ -502,13 +502,15 @@ window.VM = {
     if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para exportar.");
     const all = withRefs();
     const pending = all.filter((o) => o.export_status === "pending");
-    const rows = pending.filter(isReady).filter((o) => !ids || ids.includes(o.id));
+    const nuevos = pending.filter(isReady).filter((o) => !ids || ids.includes(o.id));
+    const repetidos = ids ? all.filter((o) => o.export_status === "exported" && ids.includes(o.id)) : []; // volver a exportar pedidos ya exportados
+    const rows = [...nuevos, ...repetidos];
     const held = pending.length - pending.filter(isReady).length;
     if (!rows.length) return { export: null, held };
     const id = `e${Date.now().toString(36)}${uid()}`;
     const exp = buildExport(rows, stampName(), { id });
     await backend.set("exports", id, { fileName: exp.fileName, createdAt: new Date().toISOString(), orderCount: exp.orderCount, lineCount: exp.lineCount, orderIds: rows.map((r) => r.id) });
-    for (const r of rows) await backend.update("orders", r.id, { export_status: "exported", export_id: id });
+    for (const r of nuevos) await backend.update("orders", r.id, { export_status: "exported", export_id: id });
     return { export: exp, held };
   },
   /** Vuelve a generar un Excel ya exportado (mismos pedidos, mismos datos). */
