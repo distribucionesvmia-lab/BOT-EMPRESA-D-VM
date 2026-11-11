@@ -95,7 +95,7 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 | M-07 | Quitar el «Hacer pedido» repetido | Bajo | Bajo | Propuesta | |
 | M-08 | Precio de caja en la fila | Medio | Bajo | Propuesta | |
 | F-01 | Pedido rápido por lista | Alto | Medio | Propuesta | |
-| F-02 | «Tu pedido de siempre» en la portada | Alto | Bajo | Propuesta | Buen primer paso |
+| F-02 | «Tu pedido de siempre» en la portada | Alto | Bajo | **Aprobada** (11-nov) | Buen primer paso · Incluida en `PROMPT_CONSTRUCTOR_paquete_compra_facil.md` |
 | F-03 | Listas guardadas | Medio | Medio | Propuesta | |
 | F-04 | «¿Te falta algo?» | Alto | Medio | Propuesta | |
 | F-05 | Hora límite, mínimos, agotados | Medio | Medio | Propuesta | Necesito vuestras reglas |
@@ -105,15 +105,15 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 | F-12 | Escáner de barras | Bajo-Medio | Alto | Propuesta | Depende de los EAN |
 | F-13 | Pedido asistido por el comercial | Medio | Medio | Propuesta | |
 | F-15 | Aviso «Si haces el pedido antes de las 10:00, te lo entregamos hoy» (solo Medina del Campo, día laborable, antes de las 10:00; desaparece a las 10:00) | Medio | Bajo | **Aprobada** (11-nov) | Regla dada por el dueño. Mismo prompt que M-05. Casos de hora a probar incluidos |
-| F-16 | Pedido fijo semanal: «cada martes lo mismo» genera un borrador que el cliente revisa y confirma | Alto | Medio-Alto | Propuesta (nueva) | Orumio, The Usual, Commercetools. Siempre con revisión: las modificaciones manuales causan errores |
-| F-17 | Recordatorio por WhatsApp cuando toca reponer («¿te preparo tu pedido de siempre? Responde SÍ») | Alto | Medio-Alto | Propuesta (nueva) | Necesita API de Meta y plantillas aprobadas (decisión 6). Enviar al 75–85 % del ciclo habitual, con opción de baja |
-| F-18 | Poder editar el pedido ya enviado hasta una hora límite, y repetir la hora límite al confirmar | Medio-Alto | Medio | Propuesta (nueva) | Ordermentum, Sysco. Hay que fijar la hora límite de edición |
+| F-16 | Pedido fijo semanal: «cada martes lo mismo» genera un borrador que el cliente revisa y confirma | Alto | Medio-Alto | **Aprobada** (11-nov) | Orumio, The Usual, Commercetools. Siempre con revisión: las modificaciones manuales causan errores · Incluida en `PROMPT_CONSTRUCTOR_paquete_compra_facil.md` |
+| F-17 | Recordatorio por WhatsApp cuando toca reponer («¿te preparo tu pedido de siempre? Responde SÍ») | Alto | Medio-Alto | **Aprobada** (11-nov) | Necesita API de Meta y plantillas aprobadas (decisión 6). Enviar al 75–85 % del ciclo habitual, con opción de baja · Incluida en `PROMPT_CONSTRUCTOR_paquete_compra_facil.md` |
+| F-18 | Poder editar el pedido ya enviado hasta una hora límite, y repetir la hora límite al confirmar | Medio-Alto | Medio | **Aprobada** (11-nov) | Ordermentum, Sysco. Hay que fijar la hora límite de edición · Incluida en `PROMPT_CONSTRUCTOR_paquete_compra_facil.md` |
 | F-19 | «Mis pedidos» con estado (recibido / preparado / en reparto) y albarán | Medio | Medio | Propuesta (nueva) | Sin seguimiento el cliente llama (Edify). Necesita que la empresa cambie el estado en su panel |
-| F-20 | Búsqueda para un catálogo grande (640+ productos): sugerencias desde la 1.ª letra, filtros por marca y formato, búsquedas recientes | Alto | Medio | Propuesta (nueva) | Baymard: en catálogos grandes la búsqueda es la navegación principal. Disbesa filtra por marca y formato |
-| F-21 | Abrir en «lo mío»: histórico por frecuencia primero y, en cada categoría, lo que ya compra arriba; a clientes nuevos, lo más pedido por otros | Alto | Bajo-Medio | Propuesta (nueva) | Instacart. Comprobar con un cliente real con historial qué pestaña abre hoy |
-| F-22 | Cantidades rápidas: teclado numérico al tocar el número y saltos «+6 / +12 / +1 caja» | Medio-Alto | Bajo | Propuesta (nueva) | Observación propia (hoy «−/+» de uno en uno); sin fuente externa |
-| F-23 | «Quitado · Deshacer» al borrar un artículo, anunciado de forma accesible | Medio | Bajo | Propuesta (nueva) | W3C: deshacer errores reduce el coste de un fallo |
-| F-24 | Botón fijo «¿Necesitas ayuda?»: llamar o WhatsApp con el comercial en un toque | Medio | Bajo | Propuesta (nueva) | Guías de accesibilidad para mayores. Necesita teléfono y horario |
+| F-20 | Búsqueda para un catálogo grande (640+ productos): sugerencias desde la 1.ª letra, filtros por marca y formato, búsquedas recientes | Alto | Medio | **Aprobada** (11-nov) | Baymard: en catálogos grandes la búsqueda es la navegación principal. Disbesa filtra por marca y formato · Incluida en `PROMPT_CONSTRUCTOR_paquete_compra_facil.md` |
+| F-21 | Abrir en «lo mío»: histórico por frecuencia primero y, en cada categoría, lo que ya compra arriba; a clientes nuevos, lo más pedido por otros | Alto | Bajo-Medio | **Aprobada** (11-nov) | Instacart. Comprobar con un cliente real con historial qué pestaña abre hoy · Incluida en `PROMPT_CONSTRUCTOR_paquete_compra_facil.md` |
+| F-22 | Cantidades rápidas: teclado numérico al tocar el número y saltos «+6 / +12 / +1 caja» | Medio-Alto | Bajo | **Aprobada** (11-nov) | Observación propia (hoy «−/+» de uno en uno); sin fuente externa · Incluida en `PROMPT_CONSTRUCTOR_paquete_compra_facil.md` |
+| F-23 | «Quitado · Deshacer» al borrar un artículo, anunciado de forma accesible | Medio | Bajo | **Aprobada** (11-nov) | W3C: deshacer errores reduce el coste de un fallo · Incluida en `PROMPT_CONSTRUCTOR_paquete_compra_facil.md` |
+| F-24 | Botón fijo «¿Necesitas ayuda?»: llamar o WhatsApp con el comercial en un toque | Medio | Bajo | **Aprobada** (11-nov) | Guías de accesibilidad para mayores. Necesita teléfono y horario · Incluida en `PROMPT_CONSTRUCTOR_paquete_compra_facil.md` |
 | F-25 | Recordar notas del cliente («descargar por detrás», «llamar antes») y precargarlas | Medio | Bajo-Medio | Propuesta (nueva) | Observación propia; sin fuente externa |
 | F-14 | Medir el uso | Alto | Bajo-Medio | Propuesta | Sin esto no hay seguimiento real |
 
@@ -123,6 +123,7 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 
 | Fecha | Qué se hizo |
 |---|---|
+| 11-nov-2026 | Aprobadas e incluidas en el prompt del constructor `PROMPT_CONSTRUCTOR_paquete_compra_facil.md`: F-02, F-16, F-17 (versión sin API: lista en el panel + botón wa.me), F-18, F-20, F-21, F-22, F-23, F-24. Excluidas por decisión: F-19 y F-25. |
 | 11-nov-2026 | Segunda búsqueda de ideas para facilitar la compra: añadidas F-16 a F-25 (pedido fijo, recordatorio por WhatsApp, editar pedido enviado, estado del pedido, búsqueda, abrir en «lo mío», cantidades rápidas, deshacer, ayuda, notas recordadas). |
 | 11-nov-2026 | Decisiones: letra = respetarla (aprobada); aviso de entrega hoy antes de las 10:00 en Medina del Campo (nueva F-15, aprobada). Prompt para el constructor en `PROMPT_CONSTRUCTOR_letra_y_aviso_entrega.md`. |
 | 11-nov-2026 | Tras tus arreglos, nueva medición de la versión `1794389456-64de` en los 9 tamaños: M-02 y M-03 (lista) verificadas, M-01 mejorada, nuevas N-01 y N-02; resto sin cambios. PDF actualizado. |
