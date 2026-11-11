@@ -268,3 +268,12 @@ test("DIRECCIÓN DE ENTREGA: lo oculto se oculta de verdad y solo se obliga a es
   assert.match(ped, /const modoDir = \(\) => \(sinDireccion\(\) \? "otra" : document\.querySelector/); // con dirección guardada manda lo que elija (de siempre = puede seguir)
   assert.match(ped, /if \(modoDir\(\) === "otra" && dirEntrega\(\)\.length < 5\)/); // solo se exige texto si es «otra» o no hay dirección
 });
+
+test("CABECERA DEL CATÁLOGO: compacta (logo, nombre, «Aa» y carrito en una fila) y en vertical no se pliega al bajar, para que el logo no se mueva", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.match(ped, /\.app\.compacto \.paso \{ max-height:0;/); // al bajar solo se pliega el rótulo «Paso 1 de 3»
+  assert.doesNotMatch(ped, /\.app\.compacto header, \.app\.compacto \.paso, \.app\.compacto \.tabs \{/); // la cabecera ya no se pliega en vertical
+  assert.match(ped, /\.app\.compacto header, \.app\.compacto \.tabs, \.app\.compacto \.buscar \{ max-height:0;/); // solo en apaisado se pliega todo
+  assert.match(ped, /header img \{ height:34px; \}/); assert.match(ped, /\.letra \.letra-bt small \{ display:none; \}/);
+});
