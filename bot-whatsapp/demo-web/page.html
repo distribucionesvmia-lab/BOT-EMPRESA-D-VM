@@ -564,7 +564,7 @@
         </div>
         <div class="panel" id="xlpanel" hidden>
           <h2>Excel generado</h2>
-          <div class="actions"><span class="file" id="xlfile"></span><button class="btn" id="descargar" type="button">Descargar .xlsx</button><span class="msg" id="dlmsg"></span></div>
+          <div class="actions"><span class="file" id="xlfile"></span><button class="btn" id="descargar" type="button">Descargar .xlsx</button><button class="btn" id="imprimir" type="button">🖨 Imprimir</button><span class="msg" id="dlmsg"></span></div>
           <div class="tabs" role="tablist" id="xltabs"></div>
           <div class="scroll"><table class="xl" id="xl"></table></div>
         </div>
@@ -965,12 +965,21 @@ async function descargar(exp, msg) {
   const a = el("a", "", { href: url, download: exp.fileName }); a.click(); setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 $("descargar").onclick = () => lastExport && descargar(lastExport, $("dlmsg"));
+function imprimir(exp, msg) { // imprime directamente la hoja de pedidos (sin Excel)
+  if (!exp?.html) return;
+  let fr = document.getElementById("marco-imprimir"); if (fr) fr.remove();
+  fr = el("iframe", "", { id: "marco-imprimir" }); fr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  fr.onload = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (x) { msg.textContent = "Este navegador no permite imprimir desde aquí; descarga el Excel."; } };
+  fr.srcdoc = exp.html; document.body.appendChild(fr);
+}
+$("imprimir").onclick = () => lastExport && imprimir(lastExport, $("dlmsg"));
 function pintarHistorial() {
   const list = VM.exports(); $("histpanel").hidden = !list.length; const ul = $("hist"); ul.innerHTML = "";
   for (const e of list.slice(0, 8)) {
     const li = el("li"); const ver = el("button", "Ver", { type: "button", className: "btn" }); const dl = el("button", "Descargar", { type: "button", className: "btn" });
     ver.onclick = () => { const x = VM.regenerate(e.id); if (x) mostrarExcel(x); }; dl.onclick = () => { const x = VM.regenerate(e.id); if (x) descargar(x, $("expmsg")); };
-    li.append(el("span", `${e.fileName} · ${plural(e.orderCount, "pedido", "pedidos")} · ${plural(e.lineCount, "línea", "líneas")}`, { className: "file" }), ver, dl); ul.appendChild(li);
+    const im = el("button", "🖨 Imprimir", { type: "button", className: "btn" }); im.onclick = () => { const x = VM.regenerate(e.id); if (x) imprimir(x, $("expmsg")); };
+    li.append(el("span", `${e.fileName} · ${plural(e.orderCount, "pedido", "pedidos")} · ${plural(e.lineCount, "línea", "líneas")}`, { className: "file" }), ver, dl, im); ul.appendChild(li);
   }
 }
 async function exportarPedidos(ids) {

@@ -7,6 +7,7 @@ import { send, readJson, makeAdminCheck } from "./auth.js";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2 } from "./pricing.js";
 import { runExport } from "./exporter.js";
+import { imprimirHtml } from "./export-format.js";
 
 const amountOf = (l) => l.amount ?? round2((l.units ?? l.qty) * (l.price ?? 0) * (1 - (l.discount ?? 0) / 100));
 
@@ -100,6 +101,13 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       const file = e && /^[\w.-]+\.xlsx$/.test(e.file_name) ? path.join(exportDir(), e.file_name) : null;
       if (!file || !fs.existsSync(file)) return send(res, 404, { error: "No existe el archivo." }), true;
       res.writeHead(200, { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${e.file_name}"`, "Cache-Control": "no-store" }).end(fs.readFileSync(file));
+      return true;
+    }
+    m = /^\/api\/admin\/exportaciones\/(\d+)\/imprimir$/.exec(p);
+    if (m && get) { // hoja para imprimir directamente (A4, un pedido por página), sin pasar por Excel
+      const e = orders.getExport(Number(m[1]));
+      if (!e) return send(res, 404, { error: "No existe la exportación." }), true;
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }).end(imprimirHtml(orders.exportedOrders(e.id), { autoprint: false }));
       return true;
     }
     m = /^\/api\/admin\/pedidos\/([\w-]+)\/aprobar$/.exec(p);

@@ -6,7 +6,7 @@ import { priceOrder, totals } from "../pricing.js";
 import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, conHistorial } from "../weborder.js";
 import { deliveryOptions, deliveryInfo, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "../delivery.js";
 import { findCustomers } from "../identify.js";
-import { FORMAT, madrid, madridTime } from "../export-format.js";
+import { FORMAT, imprimirHtml, madrid, madridTime } from "../export-format.js";
 import { workbookFiles, estiloCss, estiloDecimales } from "../xlsx-files.js";
 import { zipStore } from "./zip-browser.js";
 import { BUSINESS } from "../config.js";
@@ -153,7 +153,7 @@ function saveOrder(order, customer) {
 
 function buildExport(rows, fileName, extra = {}) {
   const { sheets, lineCount } = FORMAT.build(rows);
-  return { fileName, orderCount: rows.length, lineCount, bytes: zipStore(workbookFiles(sheets)), sheets, ...extra };
+  return { fileName, orderCount: rows.length, lineCount, bytes: zipStore(workbookFiles(sheets)), sheets, html: imprimirHtml(rows, { autoprint: false }), ...extra };
 }
 const stampName = () => `pedidos-${madrid(new Date().toISOString()).replace(/[-: ]/g, "").replace(/^(\d{8})/, "$1-")}.xlsx`;
 

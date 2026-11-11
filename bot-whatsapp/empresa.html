@@ -180,9 +180,20 @@ async function pedidos() {
   const th = $("hist"); th.innerHTML = "";
   for (const e of h.slice(0, 10)) {
     const b = el("button", "Descargar"); b.onclick = () => descargar(e);
-    const tr = document.createElement("tr"); const td = el("td"); td.appendChild(b);
+    const im = el("button", "🖨 Imprimir", { type: "button" }); im.style.marginLeft = "8px"; im.onclick = () => imprimir(e);
+    const tr = document.createElement("tr"); const td = el("td"); td.append(b, im);
     tr.append(el("td", e.archivo, { className: "ref" }), el("td", hora(e.fecha)), el("td", `${e.pedidos} pedido${e.pedidos === 1 ? "" : "s"} · ${e.lineas} línea${e.lineas === 1 ? "" : "s"}`), td); th.appendChild(tr);
   }
+}
+/** Imprime directamente la hoja de pedidos (sin abrir Excel): la pide al programa y abre el cuadro de impresión. */
+async function imprimir(e) {
+  const r = await call(`/api/admin/exportaciones/${e.id}/imprimir`, null, true);
+  if (!r.ok) return alert("No se puede preparar la impresión.");
+  const html = await r.text();
+  let fr = document.getElementById("marco-imprimir"); if (fr) fr.remove();
+  fr = document.createElement("iframe"); fr.id = "marco-imprimir"; fr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  fr.onload = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (x) { alert("No se pudo abrir la impresión."); } };
+  fr.srcdoc = html; document.body.appendChild(fr);
 }
 async function descargar(e) {
   const r = await call(`/api/admin/exportaciones/${e.id}/descargar`, null, true);

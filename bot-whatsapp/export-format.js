@@ -65,7 +65,8 @@ const S = {
 // Estilo de una celda de línea: tipo + si la fila es la gris (alterna con la blanca). Bordes finos oscuros: separan líneas y columnas.
 const linea = (extra, gris) => estilo({ h: "center", v: "center", ...(gris ? { fill: FILA_GRIS } : {}), border: { side: "all", style: "thin", color: RAYA }, ...extra });
 const LS = (gris) => ({
-  box: linea({ sz: 14, name: "Segoe UI Symbol" }, gris),
+  box: linea({ sz: 24, name: "Segoe UI Symbol" }, gris), // casilla casi tan grande como la celda
+  cajas: linea({ b: 1, sz: 18 }, gris),
   texto: linea({}, gris),
   descripcion: linea({ h: "left", indent: 1 }, gris),
   negrita: linea({ b: 1 }, gris),
@@ -123,9 +124,9 @@ function orderSheet(o) {
   lines.forEach((l, k) => {
     const st = LINE_STYLES[k % 2], porCajas = l.boxes != null && l.boxes !== 0; // k par = blanca, k impar = gris claro
     nuevaFila([
-      { v: l.id, s: st.texto, from: 0 }, { v: "☐", s: st.box, from: 1 }, { v: porCajas ? l.boxes : null, s: st.negrita, from: 2 }, { v: l.name, s: st.descripcion, from: 3 },
+      { v: l.id, s: st.texto, from: 0 }, { v: "☐", s: st.box, from: 1 }, { v: porCajas ? l.boxes : null, s: st.cajas, from: 2 }, { v: l.name, s: st.descripcion, from: 3 },
       { v: l.units ?? l.qty, s: porCajas ? st.grisNum : st.unidadesNegras, from: 4 }, { v: l.price ?? null, s: st.precio, from: 5 }, { v: l.discount || null, s: st.grisNum, from: 6 }, { v: l.amount, s: st.importe, from: 7 },
-    ], 17);
+    ], 28); // filas más altas para que quepa la casilla grande
   });
   // TOTALES (justo debajo de las líneas, de la D a la H)
   const total = (text, value, fin) => nuevaFila([{ v: text, s: S.totalLabel, from: 3, to: 6 }, { v: value, s: fin ? S.totalFinal : S.totalGris, from: 7 }], 17);
@@ -138,7 +139,7 @@ function orderSheet(o) {
   nuevaFila([{ v: nota || null, s: nota ? S.obsBox : S.obsEmpty, from: 3, to: 7 }], 54);
   // OBSERVACIONES DE LÍNEA, al pie de la hoja (solo si alguna línea las lleva; si no, no se escribe nada)
   const conNota = lines.filter((l) => String(l.note ?? "").trim());
-  const widths = [autoWidth(lines.map((l) => l.id), 12, 16), 5, 7, autoWidth(lines.map((l) => l.name), 26, 52), 11, 9, 7, 11];
+  const widths = [autoWidth(lines.map((l) => l.id), 12, 16), 6, 8, autoWidth(lines.map((l) => l.name), 26, 52), 11, 9, 7, 11];
   if (conNota.length) {
     const usado = Object.values(heights).reduce((s, h) => s + h, 0);
     const seccion = 17 + conNota.length * 34, cap = capacidadPagina(widths), margen = 40;
@@ -148,6 +149,53 @@ function orderSheet(o) {
     for (const l of conNota) nuevaFila([{ v: l.id, s: S.lineaObsCod, from: 0 }, { v: `${l.name}\n*${String(l.note).trim()}`, s: S.lineaObsTxt, from: 3 }], 34);
   }
   return { name: sheetName(o), widths, rows, merges, heights, print: { area: `A1:${LAST}${rows.length}`, footerLeft: "", margins: MARGEN } };
+}
+
+
+const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const eur = (n) => (n == null || n === "" ? "" : Number(n).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const eur3 = (n) => (n == null || n === "" ? "" : Number(n).toLocaleString("es-ES", { minimumFractionDigits: 3, maximumFractionDigits: 3 }));
+const COLOR_ENTREGA = { rojo: "#ff0000;color:#fff", amarillo: "#ffff00;color:#000", verde: "#92d050;color:#000" };
+
+/** Página lista para imprimir (A4 vertical, un pedido por página) con la misma disposición que la hoja de Excel. Se imprime sola al abrirse. */
+export function imprimirHtml(orders, { autoprint = true } = {}) {
+  const hojas = orders.map((o) => {
+    const lines = linesOf(o);
+    const t = totals(lines.map((l) => ({ ...l, vat: l.vat_rate })), o.re);
+    const d = deliveryInfo(o.delivery_date, o.created_at);
+    const filas = lines.map((l, k) => {
+      const porCajas = l.boxes != null && l.boxes !== 0;
+      return `<tr class="${k % 2 ? "g" : ""}"><td class="c">${esc(l.id)}</td><td class="chk">☐</td><td class="cajas">${porCajas ? esc(l.boxes) : ""}</td><td class="d">${esc(l.name)}</td>` +
+        `<td class="n ${porCajas ? "gr" : "b"}">${esc(l.units ?? l.qty)}</td><td class="n gr">${eur3(l.price)}</td><td class="n gr">${l.discount ? esc(l.discount) : ""}</td><td class="n gr">${eur(l.amount)}</td></tr>`;
+    }).join("");
+    const conNota = lines.filter((l) => String(l.note ?? "").trim());
+    const nota = String(o.note ?? "").trim();
+    return `<section class="hoja">
+<div class="cartel"><span>Cliente ${esc(o.customer_id ?? "—")}</span><b>${esc(o.name ?? "")}</b></div>${o.city ? `<div class="ciudad">${esc(o.city)}</div>` : ""}
+<div class="cab"><span><small>Nº pedido</small>${esc(o.ref)}</span><span><small>Fecha recep.</small>${esc(madridDate(o.created_at))}</span><span><small>Hora</small>${esc(madridTime(o.created_at))}</span></div>
+<table><thead><tr><th>Código artículo</th><th></th><th>Cajas</th><th>Descripción</th><th>Unidades</th><th>Precio</th><th>Dto. %</th><th>Importe</th></tr></thead><tbody>${filas}</tbody></table>
+<table class="tot"><tr><td>Total base imponible</td><td class="n">${eur(t.base)}</td></tr><tr><td>Total IVA</td><td class="n">${eur(t.iva)}</td></tr><tr><td>Total R.E.</td><td class="n">${eur(t.re)}</td></tr><tr class="fin"><td>TOTAL PEDIDO</td><td class="n">${eur(t.total)}</td></tr></table>
+<div class="entrega" style="background:${d ? COLOR_ENTREGA[d.color] : "transparent"}">${esc(d?.texto ?? "ENTREGA: SIN DÍA ELEGIDO")}</div>
+<div class="obs"><b>Observaciones del cliente</b><div class="caja${nota ? " rojo" : ""}">${esc(nota)}</div></div>
+${conNota.length ? `<div class="obsl"><b>Observaciones línea</b>${conNota.map((l) => `<p><span>${esc(l.id)}</span>${esc(l.name)}<br><i>*${esc(String(l.note).trim())}</i></p>`).join("")}</div>` : ""}
+</section>`;
+  }).join("");
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pedidos</title><style>
+@page { size: A4 portrait; margin: 10mm; }
+* { box-sizing: border-box; } body { margin:0; font:12px/1.25 Calibri, Arial, sans-serif; color:#000; }
+.hoja { page-break-after: always; break-after: page; } .hoja:last-child { page-break-after: auto; break-after: auto; }
+.cartel { background:#1f3864; color:#fff; display:flex; gap:16px; align-items:center; padding:8px 12px; font-size:22px; } .cartel b { flex:1; }
+.ciudad { background:#1f3864; color:#fff; padding:0 12px 6px 40%; font-size:15px; }
+.cab { display:flex; gap:24px; padding:6px 4px; background:#dce6f4; } .cab small { display:block; font-weight:700; font-size:10px; } .cab span:first-child { flex:1; }
+table { width:100%; border-collapse:collapse; } th { background:#dce6f4; padding:4px; border:1px solid #404040; font-size:11px; }
+td { border:1px solid #404040; padding:0 4px; height:11mm; vertical-align:middle; } tr.g td { background:#f2f2f2; }
+td.c { text-align:center; width:20mm; } td.chk { text-align:center; width:12mm; font-size:26px; line-height:1; padding:0; } td.cajas { text-align:center; width:15mm; font-weight:700; font-size:20px; }
+td.d { padding-left:6px; } td.n { text-align:right; white-space:nowrap; width:20mm; } .gr { color:#808080; } .b { font-weight:700; color:#000; }
+.tot { width:60%; margin-left:auto; } .tot td { border:0; height:6mm; font-weight:700; } .tot td.n { font-weight:400; color:#808080; } .tot tr.fin td.n { color:#000; font-weight:700; }
+.entrega { margin:6px 0; padding:6px 10px; font-weight:700; border-radius:6px; }
+.caja { border:1px solid #7f7f7f; min-height:20mm; padding:6px 8px; white-space:pre-wrap; } .caja.rojo { color:#c00000; font-weight:700; }
+.obsl { margin-top:8px; font-size:11px; } .obsl p { margin:3px 0; padding:3px 6px; border:1px solid #404040; } .obsl span { display:inline-block; width:22mm; font-weight:700; } .obsl i { color:#c00000; }
+</style></head><body>${hojas}${autoprint ? "<script>addEventListener('load',()=>setTimeout(()=>print(),300))</script>" : ""}</body></html>`;
 }
 
 export const FORMAT = {

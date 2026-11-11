@@ -9,7 +9,7 @@ import { openDb } from "./db.js";
 import { runExport } from "./exporter.js";
 import { buildXlsx, buildWorkbook } from "./xlsx.js";
 import { priceOrder } from "./pricing.js";
-import { madrid, madridDate, FORMAT, capacidadPagina } from "./export-format.js";
+import { madrid, madridDate, FORMAT, capacidadPagina, imprimirHtml } from "./export-format.js";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "vm-exp-"));
 const catalogo = [
@@ -154,12 +154,13 @@ test("hoja de pedido: cabecera sin código ni nombre de cliente, líneas con ☐
   assert.equal(Object.keys(f).some((n) => /drawing|vml|ctrlProp/i.test(n)), false);
 });
 
-test("hoja de pedido: formato de las líneas (alto 17, filas alternas, cajas en negrita, cantidades y precios en gris, sin cajas → unidades en negrita y negro, centrado salvo descripción)", () => {
+test("hoja de pedido: formato de las líneas (alto 28, casilla ☐ y cajas grandes, filas alternas, cajas en negrita, cantidades y precios en gris, sin cajas → unidades en negrita y negro, centrado salvo descripción)", () => {
   const f = exportar([pedido("k1", {})]);
   const xml = f["xl/worksheets/sheet1.xml"];
-  assert.equal([...xml.matchAll(/<row r="[56]" ht="17" customHeight="1">/g)].length, 2); // las dos líneas, filas de 17
+  assert.equal([...xml.matchAll(/<row r="[56]" ht="28" customHeight="1">/g)].length, 2); // las dos líneas, filas de 28
   const caja = (ref) => estiloDe(f, xml, ref);
   assert.equal(caja("C5").negrita, true); // valor de cajas en negrita
+  assert.match(f["xl/styles.xml"], /<sz val="24"/); assert.match(f["xl/styles.xml"], /<sz val="18"/); // casilla ☐ de 24 pt y cajas de 18 pt
   assert.equal(caja("E5").color, "808080"); assert.equal(caja("E5").negrita, false); // con cajas: unidades en gris
   for (const c of ["F5", "G5", "H5"]) assert.equal(caja(c).color, "808080", c); // precio, dto. e importe en gris
   assert.deepEqual([caja("E6").negrita, caja("E6").color], [true, "000000"]); // sin cajas: unidades en negrita y negro
@@ -288,4 +289,17 @@ test("madrid(): hora local con cambio de horario", () => {
   assert.equal(madrid("2026-07-01T10:00:00Z"), "2026-07-01 12:00");
   assert.equal(madrid("2026-12-01T10:00:00Z"), "2026-12-01 11:00");
   assert.equal(madridDate("2026-10-28T10:00:00Z"), "28/10/2026");
+});
+
+test("imprimir directamente: una página por pedido con casilla ☐ y cajas grandes, textos escapados y sin pasar por Excel", () => {
+  const db = openDb(":memory:");
+  db.createOrder(pedido("p1", { note: "Llamar <antes>" })); db.createOrder(pedido("p2"));
+  const e = runExport(db, { dir: tmp() });
+  const html = imprimirHtml(db.exportedOrders(e.export.id), { autoprint: false });
+  assert.equal((html.match(/<section class="hoja">/g) ?? []).length, 2); // un pedido por página
+  assert.match(html, /<td class="chk">☐<\/td><td class="cajas">2<\/td>/); // línea por cajas: casilla y nº de cajas
+  assert.match(html, /td\.chk \{[^}]*font-size:26px/); assert.match(html, /td\.cajas \{[^}]*font-size:20px/);
+  assert.match(html, /Artículo A &amp; &lt;B&gt;/); assert.match(html, /Llamar &lt;antes&gt;/); // nada sin escapar
+  assert.match(html, /TOTAL PEDIDO/); assert.doesNotMatch(html, /<script>/); // sin autoimpresión cuando va dentro de la aplicación
+  assert.match(imprimirHtml(db.exportedOrders(e.export.id)), /<script>addEventListener\('load'/); // abierta sola, se imprime sola
 });
