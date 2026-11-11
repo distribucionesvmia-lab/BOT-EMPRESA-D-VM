@@ -81,6 +81,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   // Acceso solo con NIF (sin nombre): no hay una cuenta a la que contar los fallos, así que se limita más por IP y en conjunto
   const nifLimit = rateLimiter(Number(process.env.NIF_LIMIT ?? 10), 10 * 60_000);
   const nifGlobalFails = rateLimiter(Number(process.env.NIF_GLOBAL_FAILS ?? 15), 60 * 60_000); // fallos de NIF por hora, entre todos los clientes
+  const usoLimit = rateLimiter(300, 10 * 60_000); // contadores: muchos permitidos, pero no infinitos por IP
   const registerLimit = rateLimiter(Number(process.env.REGISTER_LIMIT ?? 20), 60 * 60_000);
   const ip = (req) => (trustProxy ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() : "") || req.socket.remoteAddress || "?";
   const cookie = (token, maxAge) => `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
@@ -191,6 +192,16 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (customers.findByNif(b.nuevo).length) return send(res, 400, { error: "Ese código no está disponible. Elige otro." }), true; // no puede coincidir con el NIF de nadie
       const r = accounts.setCodeKey(acc.id, codeKey(b.nuevo));
       if (r.error) return send(res, 400, { error: r.error }), true;
+      return send(res, 200, { ok: true }), true;
+    }
+
+    // ── Uso de la aplicación (solo contadores por día; sin guardar quién ni qué pide) ──
+    if (p === "/api/uso" && req.method === "POST") {
+      const acc = sessionOf(req);
+      if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
+      if (!usoLimit(ip(req))) return send(res, 429, { error: "Demasiados avisos." }), true;
+      const b = await readJson(req);
+      if (!b || !accounts.anotarUso(String(b.evento ?? ""), b.seg)) return send(res, 400, { error: "Suceso no válido." }), true;
       return send(res, 200, { ok: true }), true;
     }
 

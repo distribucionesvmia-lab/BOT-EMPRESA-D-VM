@@ -228,3 +228,18 @@ test("cliente habitual: teléfono de la lista + contraseña personal (solo si la
   db.deleteAccount(acc.id);
   assert.deepEqual(db.loginCustomerCode("7001", "huella"), { ok: false, reason: "deleted" });
 });
+
+test("uso de la aplicación: contadores por día sin datos personales; resumen con % de abandono y tiempo medio hasta pedir", () => {
+  const db = openAccountsDb(":memory:");
+  const ahora = "2026-11-11T10:00:00Z";
+  assert.equal(db.anotarUso("espiar", null, ahora), false); // solo sucesos conocidos
+  db.anotarUso("repetir", null, ahora); db.anotarUso("repetir", null, ahora);
+  db.anotarUso("pedido", 120, ahora); db.anotarUso("pedido", 60, "2026-11-10T09:00:00Z"); db.anotarUso("pedido", 90000, ahora); // el tiempo se acota a 24 h
+  db.anotarUso("abandono", null, ahora);
+  db.anotarUso("pedido", 600, "2026-09-01T09:00:00Z"); // fuera de los 30 días
+  const r = db.resumenUso(30, ahora);
+  assert.deepEqual([r.repeticiones, r.pedidos, r.abandonos], [2, 3, 1]);
+  assert.equal(r.tasaAbandono, 25); // 1 de cada 4 (3 pedidos + 1 abandono)
+  assert.equal(r.segundosMedioHastaPedir, Math.round((120 + 60 + 86400) / 3));
+  assert.deepEqual(openAccountsDb(":memory:").resumenUso(30), { dias: 30, repeticiones: 0, pedidos: 0, abandonos: 0, catalogoAbierto: 0, tasaAbandono: null, segundosMedioHastaPedir: null });
+});

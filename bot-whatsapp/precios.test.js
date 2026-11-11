@@ -144,7 +144,7 @@ test("CATÁLOGO WEB: «+ Añadir» y el contador miden igual en todas las filas,
   const fs = await import("node:fs");
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
   assert.match(ped, /className = "ud udfijo"/); // los artículos sueltos ocupan el mismo hueco que los de cajas
-  assert.match(ped, /\.slot \.add, \.slot \.step \{ width:100%; height:48px/);
+  assert.match(ped, /\.slot \.add, \.slot \.step \{ width:100%; height:52px; min-height:52px; \} \.slot \.step button, \.slot \.step input \{ height:auto; align-self:stretch; min-height:48px; \}/); // 52 con el borde → los botones del contador miden 48 de verdad
   assert.match(ped, /\.favb \{ width:44px; height:44px/);
   assert.match(ped, /\.tabs button\.tab \{ min-height:48px; \}/);
   assert.match(ped, /@media \(orientation:landscape\) and \(max-height:520px\)/);
@@ -176,4 +176,35 @@ test("CATÁLOGO WEB: controles del carrito a 48 px, sin barra fija con el carrit
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
   assert.doesNotMatch(cli, /data-q="hacer pedido"/); // el atajo de abajo se quitó…
   assert.match(cli, /fila\("Pedido nuevo", "Elige del catálogo", "Hacer pedido"/); // …y queda el de la tarjeta de inicio
+});
+
+test("LETRA: nivel elegido 100/115/130 % con A− / A+ y «Automático» (tope +30 %), el mismo en el chat y el catálogo; controles táctiles de 48 px", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  for (const [n, html] of [["pedido", ped], ["cliente", cli]]) {
+    assert.match(html, /NIVELES = \[1, 1\.15, 1\.3\], TOPE = 1\.3/, n); // nunca más de +30 %
+    assert.match(html, /nivel \|\| Math\.min\(TOPE, ksist\)/, n); // automático: respeta la letra del móvil hasta el tope
+    assert.match(html, /localStorage\.setItem\("vm:letra"/, n);
+    assert.match(html, /\{ vmLetra: v \}/, n); // la página y el catálogo se pasan el nivel sin recargar
+  }
+  assert.match(ped, /window\.vmLetra\.control\(\$\("letraBox"\)\)/);
+  assert.match(cli, /window\.vmLetra\.control\(\$\("menu-letra"\)\)/);
+  assert.match(ped, /\.letra button \{ min-width:48px; min-height:48px;/);
+  assert.match(ped, /\.tl \.hstep \{[^}]*height:52px/); // −, cantidad y + del carrito: 48 reales dentro del borde
+  assert.match(ped, /\.screen \.head button \{ width:48px; height:48px; \}/); // también en apaisado
+  assert.match(ped, /\.cartfoot \.keepbtn \{ flex:1 1 100%; min-height:48px;/);
+});
+
+test("«¿Te falta algo?» antes de enviar, aviso de entrega hoy renovable y medidas de uso sin datos personales", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const srv = fs.readFileSync(new URL("./server.js", import.meta.url), "utf8");
+  assert.match(ped, /function pintarFalta\(box\)/);
+  assert.match(ped, /data\.products\.filter\(p => p\.count > 0 && !qty\.has\(p\.id\)\)[^;]*\.slice\(0, 4\)/); // solo habituales que todavía no lleva, hasta 4
+  assert.match(srv, /\/catalogo\/aviso/); // rutas ligeras para volver a comprobar la hora…
+  assert.match(srv, /\(\\\/datos\|\\\/aviso\)\?\$/); // …en la sesión y en el enlace del pedido
+  assert.match(ped, /refrescarEntrega/);
+  assert.match(ped, /Ya no llegamos a entregarlo hoy: elige otro día\./);
+  assert.match(ped, /\/api\/uso/);
 });

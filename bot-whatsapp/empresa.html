@@ -102,6 +102,9 @@
     <div class="panel" id="p-cuentas" hidden>
       <h2>Cuentas de clientes</h2>
       <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
+      <h2 style="margin-top:22px">Uso de la aplicación (últimos 30 días)</h2>
+      <p class="muted" style="margin:0 0 8px">Solo contadores, sin datos personales: sirven para saber qué cambios funcionan.</p>
+      <div class="scroll"><table><tbody id="uso"></tbody></table></div>
       <h2 style="margin-top:22px">Derechos de protección de datos</h2>
       <p class="muted" style="margin:0 0 8px">Lo que piden los clientes desde la aplicación («Mis datos y privacidad»): corregir sus datos, limitar su uso u oponerse. <b>Hay que contestarles en un plazo máximo de un mes.</b> Cuando un cliente elimina su cuenta, aquí queda anotado (se borran su acceso, contactos y favoritos; los pedidos se conservan por obligación legal).</p>
       <div class="scroll"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Qué pide</th><th>Detalle</th><th>Estado</th><th></th></tr></thead><tbody id="der"></tbody></table></div>
@@ -229,6 +232,11 @@ async function derechos() {
     tr.append(el("td", hora2(d.creada)), el("td", d.cliente), el("td", TIPO_DERECHO[d.tipo] ?? d.tipo), el("td", d.texto || ""), el("td", d.estado === "pendiente" ? "⏳ Pendiente" : "✔ Atendida"), td); tb.appendChild(tr);
   }
 }
+async function usoApp() {
+  const u = await call("/api/admin/uso?dias=30"), tb = $("uso"); tb.innerHTML = "";
+  const t = (s) => (s == null ? "—" : s >= 120 ? Math.round(s / 60) + " min" : s + " s");
+  for (const [a, b] of [["Pedidos enviados", u.pedidos], ["Veces que han usado «Repetir y revisar»", u.repeticiones], ["Carritos abandonados (se fueron sin enviar)", u.abandonos], ["% de carritos abandonados", u.tasaAbandono == null ? "—" : u.tasaAbandono + " %"], ["Tiempo medio desde que abren el catálogo hasta enviar", t(u.segundosMedioHastaPedir)]]) { const tr = document.createElement("tr"); tr.append(el("td", a), el("td", String(b), { className: "num" })); tb.appendChild(tr); }
+}
 async function cuentas() {
   const cue = await call("/api/admin/cuentas"); const tc = $("cue"); tc.innerHTML = "";
   for (const a of cue) {
@@ -355,7 +363,7 @@ async function avisos() {
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), derechos(), clientes(), avisos(), sincronizacion(), correo()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), derechos(), clientes(), avisos(), sincronizacion(), correo()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));

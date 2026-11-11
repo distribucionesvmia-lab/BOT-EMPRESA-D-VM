@@ -160,6 +160,8 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
         return send(res, e.confirmar ? 409 : 400, { error: e.message || "No se pudo leer el Excel.", ...(e.confirmar ? { confirmar: e.confirmar } : {}) }), true;
       }
     }
+    // ---- Uso de la aplicación (contadores, sin datos personales) ----
+    if (p === "/api/admin/uso" && get) return send(res, 200, accounts.resumenUso(Math.max(1, Math.min(365, Number(url.searchParams.get("dias")) || 30)))), true;
     // ---- Derechos de protección de datos que piden los clientes desde la aplicación (corregir, limitar, oponerse… y bajas de cuenta) ----
     if (p === "/api/admin/derechos" && get) return send(res, 200, accounts.listRightsRequests().map((r) => ({ id: r.id, tipo: r.tipo, texto: r.texto, estado: r.estado, creada: r.created_at, atendida: r.resolved_at, clienteId: r.customer_id, cliente: customers.getById(r.customer_id)?.name ?? r.customer_id }))), true;
     if (post && (m = /^\/api\/admin\/derechos\/(\d+)\/atender$/.exec(p))) return send(res, accounts.resolveRightsRequest(Number(m[1])) ? 200 : 404, { ok: true }), true;

@@ -618,3 +618,18 @@ test("DERECHOS Y ACCESO DEL CLIENTE HABITUAL: teléfono de la lista + contraseñ
   assert.deepEqual([cuenta.status, cuenta.phone, cuenta.email], ["deleted", null, null]); // la empresa ve que está eliminada
   assert.ok((await call("GET", "/api/admin/derechos", { admin: true })).json.some((d) => d.tipo === "supresion" && d.clienteId === "7777")); // y queda constancia
 });
+
+test("USO: el catálogo anota contadores (repetir, abandono, pedido) sin datos personales y la empresa los ve en su panel", async () => {
+  assert.equal((await call("POST", "/api/uso", { body: { evento: "repetir" } })).status, 401); // sin sesión no se anota nada
+  const r = await entrarNif("111111");
+  assert.equal(r.status, 200);
+  const cookie = cookieOf(r);
+  assert.equal((await call("POST", "/api/uso", { cookie, body: { evento: "espiar" } })).status, 400);
+  const antes = (await call("GET", "/api/admin/uso", { admin: true })).json;
+  for (const evento of ["repetir", "abandono"]) assert.equal((await call("POST", "/api/uso", { cookie, body: { evento } })).status, 200);
+  assert.equal((await call("POST", "/api/uso", { cookie, body: { evento: "pedido", seg: 95 } })).status, 200);
+  const despues = (await call("GET", "/api/admin/uso?dias=30", { admin: true })).json;
+  assert.deepEqual([despues.repeticiones - antes.repeticiones, despues.abandonos - antes.abandonos, despues.pedidos - antes.pedidos], [1, 1, 1]);
+  assert.equal((await call("GET", "/api/admin/uso")).status, 403); // solo la empresa
+  assert.doesNotMatch(JSON.stringify(despues), /7001|CAFETERIA|111111/); // sin datos de nadie
+});

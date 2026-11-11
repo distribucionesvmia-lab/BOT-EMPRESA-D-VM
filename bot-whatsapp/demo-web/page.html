@@ -3,18 +3,62 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script>
-/* Tamaño de letra del móvil: si el sistema (p. ej. Samsung con «Tamaño de fuente» alto) agranda los textos, se mide aquí (--k) y cada
-   tamaño de letra se divide entre --k (font-size:calc(17px / var(--k))). Así la pantalla se ve igual que en un iPhone, que no agranda. */
+/* Tamaño de letra. Todos los tamaños están escritos como calc(N / var(--k,1)); aquí se decide lo que vale --k para que la letra final sea N × T:
+     · T = el nivel que elige el cliente (100 %, 115 % o 130 %) con los botones A− / A+; o, en «Automático», T = el menor entre 1,3 y la escala de letra del móvil
+       (se respeta la letra grande del sistema hasta un +30 %).
+     · --k = escala del móvil ÷ T  (móvil a 1,0 → --k 1: se ve normal; móvil a 1,5 → --k ≈ 1,15: se ve a 1,3; elegido 130 % en un móvil a 1,0 → --k ≈ 0,77).
+   El nivel elegido se guarda en el navegador (si no se puede guardar, funciona igual) y se lo pasan entre sí la página y el catálogo (otro documento). */
 (function () {
+  var NIVELES = [1, 1.15, 1.3], TOPE = 1.3, ksist = 1, nivel = 0, oyentes = []; // nivel 0 = automático
+  try { var g = localStorage.getItem("vm:letra"); if (g) nivel = Number(g); } catch (e) { /* sin guardar */ }
+  if (typeof window.vmLetraInicial === "number") nivel = window.vmLetraInicial;
+  if (NIVELES.indexOf(nivel) < 0) nivel = 0;
+  function efectivo() { return nivel || Math.min(TOPE, ksist); }
+  function aplicar() {
+    document.documentElement.style.setProperty("--k", String(Math.round((ksist / efectivo()) * 1000) / 1000));
+    for (var i = 0; i < oyentes.length; i++) oyentes[i]();
+  }
   function medir() {
     try {
       var d = document.createElement("div");
       d.style.cssText = "position:absolute;left:-9999px;top:0;visibility:hidden;font-size:100px;line-height:1;white-space:nowrap;margin:0;padding:0;border:0";
       d.textContent = "Ag"; document.documentElement.appendChild(d);
       var k = d.getBoundingClientRect().height / 100; d.remove();
-      document.documentElement.style.setProperty("--k", k > 0.6 && k < 3 ? String(Math.round(k * 100) / 100) : "1");
-    } catch (e) { /* sin medir: tamaño normal */ }
+      ksist = k > 0.6 && k < 3 ? Math.round(k * 100) / 100 : 1;
+    } catch (e) { ksist = 1; }
+    aplicar();
   }
+  function avisar(v, desdeFuera) { // pasa el nivel a la página de arriba y a los catálogos de dentro
+    try { if (!desdeFuera && window.parent !== window) window.parent.postMessage({ vmLetra: v }, "*"); } catch (e) {}
+    try { var fr = document.getElementsByTagName("iframe"); for (var i = 0; i < fr.length; i++) fr[i].contentWindow.postMessage({ vmLetra: v }, "*"); } catch (e) {}
+  }
+  function fijar(v, desdeFuera) {
+    v = Number(v) || 0; if (NIVELES.indexOf(v) < 0) v = 0;
+    nivel = v;
+    try { if (v) localStorage.setItem("vm:letra", String(v)); else localStorage.removeItem("vm:letra"); } catch (e) { /* sin guardar */ }
+    aplicar(); avisar(v, desdeFuera);
+  }
+  function paso(delta) { // A− / A+: sobre el nivel que se está viendo ahora
+    var e = efectivo(), i = 0; for (var j = 0; j < NIVELES.length; j++) if (Math.abs(NIVELES[j] - e) < Math.abs(NIVELES[i] - e)) i = j;
+    var n = NIVELES[Math.max(0, Math.min(NIVELES.length - 1, i + delta))]; fijar(n, false);
+  }
+  function control(caja) { // «Tamaño de letra»: A−  100 %  A+  · Automático
+    if (!caja) return;
+    caja.className = "letra"; caja.setAttribute("role", "group"); caja.setAttribute("aria-label", "Tamaño de letra");
+    function boton(txt, etiqueta, fn) { var b = document.createElement("button"); b.type = "button"; b.textContent = txt; b.setAttribute("aria-label", etiqueta); b.onclick = function (ev) { ev.stopPropagation(); fn(); }; return b; }
+    var menos = boton("A−", "Reducir letra", function () { paso(-1); }), mas = boton("A+", "Aumentar letra", function () { paso(1); });
+    var auto = boton("Automático", "Tamaño de letra automático", function () { fijar(0, false); }); auto.className = "letra-auto";
+    var n = document.createElement("span"); n.className = "letra-n"; n.setAttribute("aria-live", "polite");
+    caja.textContent = ""; caja.appendChild(menos); caja.appendChild(n); caja.appendChild(mas); caja.appendChild(auto);
+    function pintar() {
+      var e = efectivo(), txt = Math.round(e * 100) + " %";
+      n.textContent = nivel ? "Letra " + txt : "Letra " + txt + " (auto)";
+      menos.disabled = e <= NIVELES[0] + 0.001; mas.disabled = e >= NIVELES[NIVELES.length - 1] - 0.001; auto.setAttribute("aria-pressed", String(!nivel));
+    }
+    oyentes.push(pintar); pintar();
+  }
+  window.vmLetra = { niveles: NIVELES, nivel: function () { return nivel; }, efectivo: efectivo, sistema: function () { return ksist; }, fijar: fijar, paso: paso, control: control };
+  addEventListener("message", function (e) { var d = e.data; if (d && typeof d === "object" && "vmLetra" in d && e.source !== window) fijar(d.vmLetra, true); });
   medir(); addEventListener("resize", medir); addEventListener("pageshow", medir);
 })();
 </script>
@@ -277,6 +321,8 @@
   #c-chat .vm-inicio .fila b { font-size:calc(16.5px / var(--k,1)); display:block; }
   #c-chat .vm-inicio .fila button { border:0; background:#d90000; color:#fff; font:inherit; font-weight:800; font-size:calc(16px / var(--k,1)); border-radius:12px; padding:0 18px; min-height:48px; cursor:pointer; box-shadow:0 3px 0 #a80000; flex:none; transition:transform .1s; }
   #c-chat .vm-inicio .fila button:active { transform:translateY(2px); box-shadow:none; }
+  #c-chat .vm-inicio .fila.siempre { align-items:flex-start; } #c-chat .vm-inicio .fila.siempre small { display:block; } #c-chat .vm-inicio .fila.siempre b { display:none; }
+  #c-chat .vm-inicio ul.lineas { margin:6px 0 0; padding-left:18px; font-size:calc(14px / var(--k,1)); color:#3c4043; line-height:1.4; } #c-chat .vm-inicio ul.lineas li { overflow-wrap:anywhere; }
   /* Atajos fijos sobre el cuadro de texto */
   #c-chat .quick { display:flex; gap:6px; overflow-x:auto; padding:10px 12px 2px; background:#fff; border-top:1px solid #e7e8ea; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
   #c-chat .quick::-webkit-scrollbar { display:none; }
@@ -323,6 +369,16 @@
   .datos-wrap { display:grid; gap:16px; }
   .datos-wrap[hidden] { display:none; }
   .pasoDx { background:#e8f4ee; color:#0b6e4f; border-radius:999px; padding:6px 12px; font-size:calc(13px / var(--k,1)); font-weight:700; }
+  /* Control «Tamaño de letra» (A− / A+ de 48 px, nivel visible y «Automático») */
+  .letra { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+  .letra button { min-width:48px; min-height:48px; padding:0 10px; border-radius:12px; border:2px solid #d90000; background:#fff; color:#a80000; font-weight:800; font-size:calc(17px / var(--k,1)); cursor:pointer; touch-action:manipulation; }
+  .letra button:disabled { opacity:.45; cursor:default; }
+  .letra button.letra-auto { font-size:calc(14px / var(--k,1)); } .letra button.letra-auto[aria-pressed="true"] { background:#d90000; color:#fff; }
+  .letra .letra-n { min-width:84px; text-align:center; font-weight:700; font-size:calc(14px / var(--k,1)); line-height:1.2; }
+  header .letra .letra-n { color:#fff; }
+  .bar .mpop .letra { padding:10px 14px; border-top:1px solid #eceef0; } .bar .mpop .letra button { display:inline-flex !important; align-items:center; justify-content:center; width:auto !important; min-height:48px !important; padding:0 12px !important; border:2px solid #d90000 !important; background:#fff !important; color:#a80000 !important; border-radius:12px !important; }
+  .bar .mpop .letra button.letra-auto[aria-pressed="true"] { background:#d90000 !important; color:#fff !important; } .bar .mpop .letra .letra-n { color:#1d1d1f; }
+  .bar .mpop .letra-titulo { padding:10px 14px 0; font-size:calc(13px / var(--k,1)); font-weight:700; color:#5f6368; }
 </style>
 
 <button type="button" class="tecnico-btn" id="tecnico-btn">Técnico</button>
@@ -634,7 +690,7 @@ function avisos() {
   const m = document.createElement("div"); m.className = "bmenu";
   m.innerHTML = '<button type="button" id="mbtn" aria-label="Menú" aria-expanded="false" aria-controls="mpop">⋮</button><div class="mpop" id="mpop" hidden></div>';
   $("cambiar").textContent = "Cambiar contraseña"; $("salir").textContent = "Salir";
-  $("misdatos").textContent = "Mis datos y privacidad"; m.querySelector("#mpop").append($("cambiar"), $("misdatos"), $("salir")); bar.appendChild(m); span.remove();
+  $("misdatos").textContent = "Mis datos y privacidad"; const tl = el("div", "Tamaño de letra", { className: "letra-titulo" }), ml = el("div", "", { id: "menu-letra" }); m.querySelector("#mpop").append($("cambiar"), $("misdatos"), tl, ml, $("salir")); window.vmLetra.control(ml); bar.appendChild(m); span.remove();
   const mbtn = m.querySelector("#mbtn"), mpop = m.querySelector("#mpop");
   const menu = (abrir) => { mpop.hidden = !abrir; mbtn.setAttribute("aria-expanded", String(abrir)); };
   mbtn.onclick = (e) => { e.stopPropagation(); menu(mpop.hidden); };
@@ -767,7 +823,17 @@ function inicio(ui) {
     const bt = document.createElement("button"); bt.type = "button"; bt.textContent = boton; bt.onclick = accion;
     f.append(t, bt); c.appendChild(f);
   };
-  fila("Pedido nuevo", "Elige del catálogo", "Hacer pedido", abrirMini);
+  fila("Pedido nuevo", "Elige del catálogo", "Hacer pedido", () => enviar("h:open", "Hacer pedido")); // lo contesta el asistente (con el aviso de «entrega hoy» si toca) y abre el catálogo
+  if (ui.last?.lineas?.length) { // «Tu pedido de siempre»: las líneas del último pedido y un botón que lo abre en el catálogo para revisarlo
+    const f = document.createElement("div"); f.className = "fila siempre";
+    const t = document.createElement("div"); const s = document.createElement("small"); s.textContent = "Tu pedido de siempre · " + ui.last.date; const b = document.createElement("b"); b.textContent = "Tu pedido de siempre";
+    const ul = document.createElement("ul"); ul.className = "lineas";
+    for (const l of ui.last.lineas) { const li = document.createElement("li"); li.textContent = l; ul.appendChild(li); }
+    if (ui.last.mas) { const li = document.createElement("li"); li.textContent = "… y " + ui.last.mas + " más"; ul.appendChild(li); }
+    t.append(s, b, ul);
+    const bt = document.createElement("button"); bt.type = "button"; bt.textContent = "Repetir y revisar"; bt.onclick = () => abrirMini(ui.url + "#" + ui.last.repetir);
+    f.append(t, bt); c.appendChild(f);
+  }
   chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
 }
 const sinEmoji = (t) => String(t ?? "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim();
@@ -793,7 +859,7 @@ function abrirMini(url) {
   web.innerHTML = "";
   const bar = el("div", "", { className: "web-h" }); const x = el("span", "✕ Cerrar"); x.onclick = () => (web.hidden = true);
   bar.append(x, document.createTextNode("Catálogo de pedido"));
-  const fr = el("iframe", "", { title: "Catálogo de pedido", srcdoc: pre ? MINI_HTML.replace("<head>", `<head><script>window.vmPrecarga=${JSON.stringify(pre)}<\/script>`) : MINI_HTML }); web.append(bar, fr); web.hidden = false;
+  const fr = el("iframe", "", { title: "Catálogo de pedido", srcdoc: MINI_HTML.replace("<head>", `<head><script>window.vmLetraInicial=${window.vmLetra.nivel()};${pre ? `window.vmPrecarga=${JSON.stringify(pre)};` : ""}<\/script>`) }); web.append(bar, fr); web.hidden = false;
   setTimeout(() => { if (miniState && !miniState.ready) { fr.remove(); web.appendChild(el("p", "Este visor no permite abrir el catálogo. Puedes pedir escribiendo en el chat, por ejemplo «2 aguas».", { style: "padding:16px;color:var(--muted)" })); } }, 2500);
 }
 window.addEventListener("message", (e) => {
@@ -802,7 +868,8 @@ window.addEventListener("message", (e) => {
   if (d.tipo === "pedido") { setTimeout(() => { web.hidden = true; burbuja(d.mensaje, "in"); }, 1300); return; }
   if (d.vmApi) {
     let status = 200, json;
-    if (d.method === "POST" && /\/favorito$/.test(d.url || "")) ({ status, json } = VM.miniFav(miniState.link, JSON.parse(d.body || "{}")));
+    if (d.method === "POST" && /\/api\/uso$/.test(d.url || "")) json = { ok: true }; // contadores de uso: en la demo no se guardan (¡y no son un pedido!)
+    else if (d.method === "POST" && /\/favorito$/.test(d.url || "")) ({ status, json } = VM.miniFav(miniState.link, JSON.parse(d.body || "{}")));
     else if (d.method === "POST") ({ status, json } = VM.miniSubmit(miniState.link, JSON.parse(d.body || "{}")));
     else if (/\/aviso$/.test(d.url || "")) { json = VM.miniAviso(miniState.link); if (json.error) status = 410; }
     else { json = VM.miniData(miniState.link); if (json.error) status = 410; }

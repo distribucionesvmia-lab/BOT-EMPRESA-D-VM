@@ -88,6 +88,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   // Favoritos del cliente (privados, por cliente; no los toca la sincronización con a3ERP)
   db.exec("CREATE TABLE IF NOT EXISTS favorites (customer_id TEXT NOT NULL, product_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (customer_id, product_id))");
   // Derechos de protección de datos que el cliente ejerce desde la aplicación (corregir, limitar, oponerse, otra) y bajas de cuenta
+  // Uso de la aplicación: solo contadores por día y tipo de suceso (repetir, abandono, pedido…); no se guarda quién ni qué pide
+  db.exec("CREATE TABLE IF NOT EXISTS uso (dia TEXT NOT NULL, evento TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, suma INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (dia, evento))");
   db.exec("CREATE TABLE IF NOT EXISTS rights (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, tipo TEXT NOT NULL, texto TEXT, estado TEXT NOT NULL DEFAULT 'pendiente', created_at TEXT NOT NULL, resolved_at TEXT)");
   addCol("accounts", "deleted_at", "TEXT");
   addCol("registrations", "pin_hash", "TEXT");
@@ -311,6 +313,22 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       if (!row.code_key || row.code_key !== key) { recordFail(row, now); return { ok: false, reason: "invalid" }; }
       db.prepare("UPDATE accounts SET failed = 0, lock_count = 0, locked_until = NULL, last_login = ? WHERE id = ?").run(now, row.id);
       return { ok: true, token: openSession(row, now), account: accountOut(byId.get(row.id)) };
+    },
+
+    /** Cuenta un suceso de uso (sin datos personales). evento: repetir | abandono | pedido | catalogo; seg = segundos hasta pedir (solo «pedido»). */
+    anotarUso(evento, seg = null, now = new Date().toISOString()) {
+      if (!["repetir", "abandono", "pedido", "catalogo"].includes(evento)) return false;
+      const dia = now.slice(0, 10), s = evento === "pedido" && Number.isFinite(Number(seg)) ? Math.max(0, Math.min(86400, Math.round(Number(seg)))) : 0;
+      db.prepare("INSERT INTO uso (dia, evento, n, suma) VALUES (?, ?, 1, ?) ON CONFLICT(dia, evento) DO UPDATE SET n = n + 1, suma = suma + excluded.suma").run(dia, evento, s);
+      return true;
+    },
+    /** Resumen de los últimos `dias` días: repeticiones, pedidos, carritos abandonados y tiempo medio hasta pedir. */
+    resumenUso(dias = 30, now = new Date().toISOString()) {
+      const desde = new Date(new Date(now).getTime() - (dias - 1) * 86_400_000).toISOString().slice(0, 10);
+      const filas = db.prepare("SELECT evento, SUM(n) AS n, SUM(suma) AS suma FROM uso WHERE dia >= ? GROUP BY evento").all(desde);
+      const n = (e) => Number(filas.find((f) => f.evento === e)?.n ?? 0), suma = (e) => Number(filas.find((f) => f.evento === e)?.suma ?? 0);
+      const pedidos = n("pedido"), abandonos = n("abandono");
+      return { dias, repeticiones: n("repetir"), pedidos, abandonos, catalogoAbierto: n("catalogo"), tasaAbandono: pedidos + abandonos ? Math.round((abandonos / (pedidos + abandonos)) * 100) : null, segundosMedioHastaPedir: pedidos ? Math.round(suma("pedido") / pedidos) : null };
     },
 
     /** Solicitud de un derecho (corregir, limitar, oponerse, otra) que llega a la empresa. { id } o { error }. */
