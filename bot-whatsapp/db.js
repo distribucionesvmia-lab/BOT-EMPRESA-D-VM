@@ -81,6 +81,7 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
   addColumn("orders", "notified_at", "TEXT"); // cuándo se envió el correo de aviso (null = pendiente)
   addColumn("orders", "notify_lock", "TEXT"); // reserva del envío (evita que dos procesos envíen el mismo)
   addColumn("orders", "delivery_date", "TEXT"); // día de entrega que pidió el cliente (AAAA-MM-DD)
+  addColumn("orders", "modified_at", "TEXT"); // cuándo lo modificó el cliente (null = nunca)
   addColumn("orders", "city", "TEXT"); // población del cliente (sale bajo el nombre en el Excel de pedidos)
   for (const [c, ddl] of [["unit", "TEXT NOT NULL DEFAULT 'ud'"], ["boxes", "INTEGER"], ["units", "INTEGER"], ["discount", "REAL NOT NULL DEFAULT 0"], ["vat_rate", "REAL"], ["amount", "REAL"], ["note", "TEXT"]]) {
     addColumn("order_lines", c, ddl);
@@ -157,6 +158,24 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
         referencia: o.ref, fecha: o.created_at, estado: o.status, entrega: o.delivery_date ?? null, nombre: o.name, direccion: o.address, poblacion: o.city ?? null, telefono: o.phone, nota: o.note ?? null, total_base: o.total,
         lineas: o.items.map((i) => ({ codigo: i.id, descripcion: i.name, cantidad: i.qty, unidad: i.unit, cajas: i.boxes, unidades: i.units, precio: i.price, descuento: i.discount, iva: i.vat_rate, importe: i.amount, nota: i.note ?? null })),
       })),
+
+    getOrderByRef: (ref) => withLines(db.prepare("SELECT * FROM orders WHERE ref = ?").get(String(ref))) ?? null,
+    /** Sustituye el contenido de un pedido pendiente (el cliente lo modifica): mismo número de pedido, sin duplicados, marcado como modificado. null si ya no está pendiente. */
+    replaceOrder(ref, o, now = new Date().toISOString()) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const old = db.prepare("SELECT id FROM orders WHERE ref = ? AND export_status = 'pending' AND status != 'cancelled'").get(String(ref));
+        if (!old) { db.exec("COMMIT"); return null; }
+        db.prepare("UPDATE orders SET address = ?, text = ?, note = ?, total = ?, review = ?, reason = ?, re = ?, delivery_date = ?, city = ?, modified_at = ? WHERE id = ?")
+          .run(o.address ?? null, o.text ?? null, o.note || null, o.total ?? null, o.review ? 1 : 0, o.reason ?? null, o.re ? 1 : 0, o.delivery ?? null, o.city ?? null, now, old.id);
+        db.prepare("DELETE FROM order_lines WHERE order_id = ?").run(old.id);
+        for (const i of o.items ?? []) insertLine.run(old.id, String(i.id), i.name ?? null, i.price ?? null, i.qty, i.unit ?? "ud", i.boxes ?? null, i.units ?? i.qty, i.discount ?? 0, i.vat ?? null, i.amount ?? null, i.note ?? null);
+        db.exec("COMMIT");
+        return withLines(db.prepare("SELECT * FROM orders WHERE id = ?").get(old.id));
+      } catch (err) { db.exec("ROLLBACK"); throw err; }
+    },
+    /** Los últimos pedidos de un cliente (para «Mis pedidos»). */
+    recentOrders: (customerId, limit = 6) => db.prepare("SELECT * FROM orders WHERE customer_id = ? AND status != 'cancelled' ORDER BY id DESC LIMIT ?").all(String(customerId), limit).map(withLines),
 
     listOrders({ exportStatus, limit = 200 } = {}) {
       const rows = exportStatus

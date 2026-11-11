@@ -34,6 +34,7 @@ import { scheduleBackups } from "./backup.js";
 import { sourceFromEnv } from "./drive.js";
 import nodePath from "node:path";
 import { BUSINESS, ayudaPublica } from "./config.js";
+import { puedeEditarPedido } from "./delivery.js";
 
 if (process.env.DEMO === "1") {
   // La demo usa su propia base de datos y carpeta, para no mezclarse con pedidos reales
@@ -520,6 +521,22 @@ async function appRoutes(req, res, url) {
     if (!getAccountsDb().setFavorite(account.customerId, id, body?.on !== false)) return void sendJson(res, 400, { error: "Has llegado al máximo de favoritos (300)" });
     return void sendJson(res, 200, { ok: true, favs: getAccountsDb().favorites(account.customerId) });
   }
+  if (p === "/api/mis-pedidos" && req.method === "GET") { // «Mis pedidos»: los últimos y si todavía se pueden modificar (hasta la hora límite y mientras no se exporten)
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const lista = getDb().recentOrders(account.customerId, 6).map((o) => {
+      const pe = puedeEditarPedido(o);
+      return { ref: o.ref, fecha: o.created_at, entrega: o.delivery_date ?? null, total: o.total, lineas: o.items.length, resumen: o.items.slice(0, 3).map((i) => `${i.qty} ${i.name}`).join(" · "), modificado: o.modified_at ?? null, editable: pe.ok, hasta: pe.ok ? pe.texto : "" };
+    });
+    return void sendJson(res, 200, { pedidos: lista, ayuda: ayudaPublica() });
+  }
+  if (p === "/catalogo/pedido" && req.method === "GET") { // contenido de un pedido modificable, para volver a abrirlo en el catálogo
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const o = getDb().getOrderByRef(url.searchParams.get("ref") ?? "");
+    if (!o || o.customer_id !== String(account.customerId) || String(o.phone) !== String(account.phone)) return void sendJson(res, 404, { error: "No encontramos ese pedido." });
+    const pe = puedeEditarPedido(o);
+    if (!pe.ok) return void sendJson(res, 409, { error: "Ya no se puede modificar este pedido. Llámanos y lo cambiamos.", ayuda: ayudaPublica() });
+    return void sendJson(res, 200, { ref: o.ref, hasta: pe.texto, entrega: o.delivery_date ?? null, nota: (o.note ?? "").replace(/^ENTREGA EN [^:]*: [^·]*(?: · )?/, ""), direccion: /^ENTREGA EN /.test(o.note ?? "") ? o.address : "", lineas: o.items.map((i) => ({ id: String(i.id), qty: i.qty, unit: i.unit, note: i.note ?? "" })) });
+  }
   if (p === "/catalogo" && req.method === "POST") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
@@ -527,12 +544,24 @@ async function appRoutes(req, res, url) {
     const key = typeof body?.key === "string" && /^[\w-]{8,64}$/.test(body.key) ? body.key : null;
     if (!key) return void sendJson(res, 400, { error: "Solicitud no válida" });
     const customer = clienteConPedidos(account.customerId);
+    if (typeof body.replaces === "string" && body.replaces) { // primero se comprueba que el pedido es suyo y que todavía se puede modificar
+      const viejo = getDb().getOrderByRef(body.replaces);
+      if (!viejo || viejo.customer_id !== String(account.customerId) || String(viejo.phone) !== String(account.phone)) return void sendJson(res, 404, { error: "No encontramos ese pedido." });
+      if (!puedeEditarPedido(viejo).ok) return void sendJson(res, 409, { error: "Ya no se puede modificar este pedido. Llámanos y lo cambiamos." });
+    }
     const built = webOrderFromBody(body, customer, { key: `web:${account.id}:${key}`, phone: account.phone }, catalogNow());
     if (built.error) return void sendJson(res, 400, { error: built.error });
     const priced = priceOrder(holdIfUnconfirmed(account, built.order), customer, catalogNow());
+    if (typeof body.replaces === "string" && body.replaces) { // el cliente MODIFICA un pedido ya enviado: sustituye al anterior (mismo número), nunca crea otro
+      const nuevo = getDb().replaceOrder(body.replaces, priced);
+      if (!nuevo) return void sendJson(res, 409, { error: "Ya no se puede modificar este pedido. Llámanos y lo cambiamos." }); // se exportó mientras tanto
+      const pe = puedeEditarPedido(nuevo);
+      return void sendJson(res, 200, { ok: true, modificado: true, ref: nuevo.ref, ...(pe.ok ? { modificable: pe.texto || "Puedes seguir modificándolo mientras no lo preparemos" } : {}), message: `✅ Pedido modificado (${nuevo.ref}). ${priced.items.length} ${priced.items.length === 1 ? "artículo" : "artículos"}, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.` });
+    }
     const { duplicate, order: guardado } = await createOrder(priced);
     if (duplicate) return void sendJson(res, 409, { error: "Este pedido ya se envió" }); // doble clic o dos pestañas
-    return void sendJson(res, 200, { ok: true, message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} ${priced.items.length === 1 ? "artículo" : "artículos"}, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.${guardado?.ref ? `\n🧾 Tu referencia: *${guardado.ref}*` : ""}\n\n${BUSINESS.payment}` });
+    const pe = guardado ? puedeEditarPedido(guardado) : { ok: false };
+    return void sendJson(res, 200, { ok: true, ...(guardado?.ref ? { ref: guardado.ref } : {}), ...(pe.ok ? { modificable: pe.texto || "Puedes seguir modificándolo mientras no lo preparemos" } : {}), message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} ${priced.items.length === 1 ? "artículo" : "artículos"}, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.${guardado?.ref ? `\n🧾 Tu referencia: *${guardado.ref}*` : ""}\n\n${BUSINESS.payment}` });
   }
   res.writeHead(404).end();
 }

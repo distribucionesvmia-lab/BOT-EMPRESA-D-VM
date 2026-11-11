@@ -171,6 +171,7 @@ async function pedidos() {
     const cli = el("td"); cli.append(el("b", o.cliente), el("div", o.codigo ? "Cód. " + o.codigo : "Cliente nuevo", { className: "muted" }));
     const est = el("td"); est.appendChild(el("span", o.estado[0].toUpperCase() + o.estado.slice(1), { className: "badge " + o.estado }));
     if (o.motivo) est.appendChild(el("div", o.motivo, { className: "muted" }));
+    if (o.modificado) est.appendChild(el("div", "✏️ Modificado " + hora(o.modificado), { className: "muted" })); // el cliente lo cambió después de enviarlo
     if (o.estado === "retenido" && o.codigo) { const b = el("button", "Revisado: exportar"); b.onclick = async () => { await call(`/api/admin/pedidos/${o.ref}/aprobar`, {}); refrescar(); }; est.appendChild(b); }
     const detTd = el("td"); detTd.appendChild(det);
     const chk = el("td");

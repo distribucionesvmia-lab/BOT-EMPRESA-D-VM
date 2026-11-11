@@ -159,3 +159,24 @@ test("AVISO «entrega hoy»: solo Medina del Campo, día laborable y antes de la
     assert.equal(caso(c, iso), deliveryOptions(iso, { hoy: puedeHoy(c) }).some((o) => o.kind === "hoy"), `${iso} ${c.city}`);
   }
 });
+
+test("modificar un pedido enviado: hasta las 10:00 del último día laborable antes de la entrega (en el día, hasta las 10:00 de hoy); exportado, nunca", async () => {
+  const { puedeEditarPedido, diaLimiteEdicion } = await import("./delivery.js");
+  const ped = (delivery, at, extra = {}) => ({ status: "confirmed", export_status: "pending", delivery_date: delivery, created_at: at, ...extra });
+  // entrega el martes 10/11/2026, pedido el lunes por la tarde → límite: el lunes (último laborable antes) a las 10:00… ya pasada la hora del pedido
+  assert.equal(diaLimiteEdicion("2026-11-10", "2026-11-09T14:00:00Z"), "2026-11-09");
+  // entrega el lunes 16/11 → el último laborable anterior es el viernes 13/11 (se salta el fin de semana)
+  assert.equal(diaLimiteEdicion("2026-11-16", "2026-11-09T14:00:00Z"), "2026-11-13");
+  const p = ped("2026-11-16", "2026-11-09T14:00:00Z");
+  assert.equal(puedeEditarPedido(p, "2026-11-13T08:59:00Z").ok, true); // viernes 09:59 Madrid
+  assert.match(puedeEditarPedido(p, "2026-11-13T08:59:00Z").texto, /hasta las 10:00 de hoy/); assert.match(puedeEditarPedido(p, "2026-11-12T20:00:00Z").texto, /hasta las 10:00 del viernes/);
+  assert.equal(puedeEditarPedido(p, "2026-11-13T09:00:00Z").ok, false); // viernes 10:00 Madrid
+  assert.equal(puedeEditarPedido(p, "2026-11-12T20:00:00Z").ok, true); // el jueves por la tarde todavía
+  // entrega en el día (cliente de Medina): hasta las 10:00 de hoy
+  const hoy = ped("2026-11-09", "2026-11-09T07:00:00Z");
+  assert.equal(puedeEditarPedido(hoy, "2026-11-09T08:30:00Z").ok, true); assert.match(puedeEditarPedido(hoy, "2026-11-09T08:30:00Z").texto, /de hoy/);
+  assert.equal(puedeEditarPedido(hoy, "2026-11-09T09:00:00Z").ok, false);
+  // un pedido ya exportado o cancelado no se puede editar, a cualquier hora
+  assert.equal(puedeEditarPedido(ped("2026-11-16", "2026-11-09T14:00:00Z", { export_status: "exported" }), "2026-11-10T08:00:00Z").ok, false);
+  assert.equal(puedeEditarPedido(ped("2026-11-16", "2026-11-09T14:00:00Z", { status: "cancelled" }), "2026-11-10T08:00:00Z").ok, false);
+});

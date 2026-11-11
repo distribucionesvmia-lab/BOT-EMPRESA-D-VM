@@ -11,6 +11,27 @@ export function madridDay(iso = new Date().toISOString()) {
 }
 // «Hoy» solo se ofrece a los clientes de estos municipios (código INE que viene en la ficha del cliente de a3ERP): Medina del Campo.
 // Para todos los demás el primer día posible es mañana.
+// ── Modificar un pedido ya enviado (F-18) ──
+// SUPUESTO A CONFIRMAR: se puede editar hasta las 10:00 (Madrid) del último día laborable anterior al de entrega; si la entrega es en el día, hasta las 10:00 de ese día.
+export const LIMITE_EDICION_HORA = 10;
+/** Último día en que se puede modificar el pedido (AAAA-MM-DD), o null si no tiene día de entrega. */
+export function diaLimiteEdicion(deliveryDay, orderAtIso) {
+  if (!deliveryDay) return null;
+  if (deliveryDay <= madridDay(orderAtIso)) return deliveryDay;
+  let d = addDays(deliveryDay, -1);
+  while (!isWorkday(d)) d = addDays(d, -1);
+  return d;
+}
+/** ¿Se puede modificar? { ok, texto }: un pedido ya exportado al Excel no se puede editar. */
+export function puedeEditarPedido(order, nowIso = new Date().toISOString()) {
+  if (!order || order.status === "cancelled" || order.export_status !== "pending") return { ok: false, texto: "" };
+  const dia = diaLimiteEdicion(order.delivery_date, order.created_at);
+  if (!dia) return { ok: true, texto: "" };
+  const hoy = madridDay(nowIso), ok = hoy < dia || (hoy === dia && madridHour(nowIso) < LIMITE_EDICION_HORA);
+  const cuando = dia === hoy ? "de hoy" : `del ${DIAS[weekday(dia)]}`;
+  return { ok, texto: `Puedes modificarlo hasta las ${LIMITE_EDICION_HORA}:00 ${cuando}` };
+}
+
 export const MUNICIPIOS_HOY = ["47085"];
 // Si la ficha no trae código de municipio, se deduce de la población: «MEDINA DEL CAMPO» cuenta como 47085. Si trae código, manda el código.
 const sinTildes = (t) => String(t ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();

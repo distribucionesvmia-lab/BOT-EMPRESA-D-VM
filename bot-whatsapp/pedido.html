@@ -530,6 +530,7 @@
 
   <section class="screen" id="cart" hidden>
     <div class="head"><button id="back" type="button" aria-label="Volver a los productos">←</button><div><small>Paso 2 de 3</small><h2>Revisa tu pedido</h2></div></div>
+    <div class="aviso" id="modBanner" role="status" aria-live="polite" hidden></div>
     <div class="aviso" id="avisoHoy2" role="status" aria-live="polite" hidden>🚚 Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
     <div class="body cartbody">
       <div class="cartcount" id="cartCount"></div>
@@ -584,7 +585,7 @@
   </section>
 
   <section class="screen" id="done" hidden>
-    <div class="ok"><div class="tick">✓</div><h2 id="doneT">¡Pedido recibido!</h2><p id="doneP" style="color:var(--gris)"></p><p id="backlink" hidden><a href="/cliente">Volver al chat</a></p></div>
+    <div class="ok"><div class="tick">✓</div><h2 id="doneT">¡Pedido recibido!</h2><p id="doneP" style="color:var(--gris)"></p><p id="modInfo" style="color:var(--gris);margin:6px 0" hidden></p><button type="button" class="big sec" id="modBtn" hidden style="margin:8px 0">✏️ Modificar pedido</button><p id="backlink" hidden><a href="/cliente">Volver al chat</a></p></div>
   </section>
 </div>
 
@@ -1119,7 +1120,25 @@ document.querySelectorAll(".tab").forEach(b => b.onclick = () => {
   renderList();
 });
 // Pedido en marcha que viene del chat (#c=código.unidades,…): lo que ya había pedido se queda en el carrito y se le suma lo nuevo
+// ── Modificar un pedido ya enviado (F-18): se reabre con sus líneas, pasa por los pasos 2 y 3 y, al confirmar, sustituye al anterior ──
+let modificando = null;
+async function modificar(ref) {
+  const r = await fetch("/catalogo/pedido?ref=" + encodeURIComponent(ref)).catch(() => null), j = r && await r.json().catch(() => null);
+  if (!r || !r.ok) {
+    $("done").hidden = false; $("doneT").textContent = "Para cambiar este pedido, llámanos"; $("doneP").textContent = (j && j.error) || "No se puede abrir el pedido.";
+    $("modInfo").hidden = true; $("modBtn").hidden = true; if (j && j.ayuda) { const b = $("modBtn"); b.hidden = false; b.textContent = "❓ ¿Necesitas ayuda?"; b.onclick = () => abrirAyuda(j.ayuda, data.customer.name); } return;
+  }
+  qty.clear(); unitOf.clear(); notes.clear(); let falta = 0;
+  for (const l of j.lineas) { if (!productoPorId.has(l.id)) { falta++; continue; } qty.set(l.id, l.qty); unitOf.set(l.id, l.unit === "caja" ? "caja" : "ud"); if (l.note) notes.set(l.id, l.note); }
+  modificando = { ref: j.ref, hasta: j.hasta };
+  $("note").value = j.nota || ""; if (j.direccion) { document.querySelector('input[name="addrmode"][value="otra"]').checked = true; $("addrOtra").value = j.direccion; } pintarDireccion();
+  $("modBanner").hidden = false; $("modBanner").textContent = `✏️ Estás modificando el pedido ${j.ref}. ${j.hasta}.`;
+  ["done", "when", "resumen"].forEach(id => ($(id).hidden = true)); refresh(); showCart(true);
+  if (falta) aviso(falta === 1 ? "1 artículo ya no está disponible." : falta + " artículos ya no están disponibles.");
+}
 function precargar() {
+  const mod = /[#&]m=([\w-]+)/.exec(String(window.vmPrecarga ?? location.hash)); // «Modificar pedido» desde el chat
+  if (mod) { setTimeout(() => modificar(mod[1]), 0); return; }
   const m = /[#&]c=([^&]*)/.exec(String(window.vmPrecarga ?? location.hash));
   if (!m) return;
   const byId = new Set(data.products.map(p => p.id));
@@ -1247,11 +1266,14 @@ async function enviarPedido(delivery, errBox) {
   const opts = [...document.querySelectorAll("#whenOpts .opt")], btn = $("confirm");
   opts.forEach(o => (o.disabled = true)); btn.disabled = true; $("resOk").disabled = true; errBox.textContent = "";
   try {
-    const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value, deliveryAddress: dirEntrega(), delivery }) });
+    const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, ...(modificando ? { replaces: modificando.ref } : {}), lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value, deliveryAddress: dirEntrega(), delivery }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "No se ha podido enviar el pedido");
     pedidoEnviado = true; uso("pedido", Math.round((Date.now() - tAbierto) / 1000));
     qty.clear(); unitOf.clear(); notes.clear(); try { localStorage.removeItem(clave()); } catch {}
+    $("doneT").textContent = j.modificado ? "¡Pedido modificado!" : "¡Pedido recibido!";
+    $("modInfo").hidden = !j.modificable; $("modInfo").textContent = j.modificable ? j.modificable + "." : ""; $("modBtn").hidden = !(j.modificable && j.ref); if (j.ref) $("modBtn").onclick = () => modificar(j.ref);
+    modificando = null; $("modBanner").hidden = true;
     $("doneP").textContent = j.message; $("when").hidden = true; $("resumen").hidden = true; $("cart").hidden = true; $("done").hidden = false; $("backlink").hidden = parent !== window;
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
   } catch (e) {

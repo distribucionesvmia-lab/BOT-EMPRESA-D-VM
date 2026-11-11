@@ -651,3 +651,39 @@ test("AYUDA y «LO MÁS PEDIDO»: /api/ayuda es público y sin datos rellenados 
   const cat = (await call("GET", "/catalogo/datos", { cookie: await (async () => { const r = await call("POST", "/api/login-nif", { body: { nif: "123456", empresa: "ejemplo" } }); return r.cookie; })() })).json;
   if (cat && cat.products) { assert.ok(Array.isArray(cat.top)); assert.ok(cat.top.every((id) => typeof id === "string")); assert.ok("ayuda" in cat); }
 });
+
+test("MODIFICAR UN PEDIDO ENVIADO: sustituye al anterior (mismo número, sin duplicados), lo ve la empresa como «modificado» y un pedido exportado ya no se puede cambiar", async () => {
+  const A = cookieOf(await entrarNif("111111"));
+  const dia = (() => { let d = new Date(Date.now() + 30 * 86_400_000); while ([0, 6].includes(d.getUTCDay())) d = new Date(d.getTime() + 86_400_000); return d.toISOString().slice(0, 10); })();
+  const r1 = await call("POST", "/catalogo", { cookie: A, body: { key: "modificar-clave-1", lines: [{ id: "1010", qty: 1 }], delivery: dia, note: "primero" } });
+  assert.equal(r1.status, 200, JSON.stringify(r1.json));
+  const ref = r1.json.ref; assert.match(ref, /^VM-\d{4}-\d{6}$/); assert.match(r1.json.modificable, /Puedes modificarlo hasta las 10:00/);
+  const antes = (await call("GET", "/api/admin/pedidos", { admin: true })).json.length;
+  // «Mis pedidos» lo enseña como modificable
+  const mis = (await call("GET", "/api/mis-pedidos", { cookie: A })).json;
+  assert.equal(mis.pedidos[0].ref, ref); assert.equal(mis.pedidos[0].editable, true);
+  assert.equal((await call("GET", "/api/mis-pedidos")).status, 401);
+  // se reabre con sus líneas
+  const abierto = (await call("GET", `/catalogo/pedido?ref=${ref}`, { cookie: A })).json;
+  assert.deepEqual(abierto.lineas.map((l) => [l.id, l.qty]), [["1010", 1]]); assert.equal(abierto.entrega, dia);
+  // otro cliente no puede abrirlo ni cambiarlo
+  const B = cookieOf(await entrarNif("122222", "bar uno"));
+  assert.equal((await call("GET", `/catalogo/pedido?ref=${ref}`, { cookie: B })).status, 404);
+  assert.equal((await call("POST", "/catalogo", { cookie: B, body: { key: "modificar-otro-1", replaces: ref, lines: [{ id: "1010", qty: 9 }] } })).status, 404);
+  // modificar: mismo número de pedido, otras cantidades, una sola vez en la lista y marcado como modificado
+  const m = await call("POST", "/catalogo", { cookie: A, body: { key: "modificar-clave-1", replaces: ref, lines: [{ id: "1010", qty: 3 }], delivery: dia, note: "cambiado" } });
+  assert.equal(m.status, 200, JSON.stringify(m.json)); assert.equal(m.json.ref, ref); assert.equal(m.json.modificado, true);
+  const doble = await call("POST", "/catalogo", { cookie: A, body: { key: "modificar-clave-1", replaces: ref, lines: [{ id: "1010", qty: 3 }], delivery: dia, note: "cambiado" } }); // doble clic
+  assert.equal(doble.status, 200);
+  const lista = (await call("GET", "/api/admin/pedidos", { admin: true })).json;
+  assert.equal(lista.length, antes, "no se crea ningún pedido nuevo");
+  const o = lista.find((x) => x.ref === ref);
+  assert.equal(o.lineas.length, 1); assert.equal(o.lineas[0].cajas ?? o.lineas[0].unidades, o.lineas[0].cajas != null ? 3 : 3 * (o.lineas[0].unidades / 3));
+  assert.equal(o.nota, "cambiado"); assert.ok(o.modificado, "la empresa ve que está modificado");
+  // exportado → ya no se puede modificar
+  assert.equal((await call("POST", "/api/admin/exportar", { admin: true, body: { refs: [ref] } })).status, 200);
+  const tarde = await call("POST", "/catalogo", { cookie: A, body: { key: "modificar-clave-1", replaces: ref, lines: [{ id: "1010", qty: 5 }], delivery: dia } });
+  assert.equal(tarde.status, 409); assert.match(tarde.json.error, /Llámanos/);
+  assert.equal((await call("GET", "/api/mis-pedidos", { cookie: A })).json.pedidos[0].editable, false);
+  assert.equal((await call("GET", `/catalogo/pedido?ref=${ref}`, { cookie: A })).status, 409);
+});
