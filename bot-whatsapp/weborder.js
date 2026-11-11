@@ -98,6 +98,7 @@ export function webOrderFromBody(body, customer, { key, phone, at = new Date().t
       customerId: customer.id,
       name: customer.name,
       address: customer.address,
+      city: customer.city ?? "",
       text: items.map((i) => `${i.qty} ${i.unit === "caja" ? "cajas de " : ""}${i.name}`).join(" + ") + (note ? ` · Nota: ${note}` : ""),
       items,
       total: null, // lo calcula priceOrder (cajas × unidades por caja, precios especiales, descuentos)

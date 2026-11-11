@@ -7,7 +7,7 @@ import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, conH
 import { deliveryOptions, deliveryInfo, deliveryCalendarFrom, madridDay, puedeHoy } from "../delivery.js";
 import { findCustomers } from "../identify.js";
 import { FORMAT, madrid, madridTime } from "../export-format.js";
-import { workbookFiles } from "../xlsx-files.js";
+import { workbookFiles, estiloCss, estiloDecimales } from "../xlsx-files.js";
 import { zipStore } from "./zip-browser.js";
 import { BUSINESS } from "../config.js";
 import { seedDocs, DEMO_ACCOUNTS } from "./seeds.js";
@@ -135,7 +135,7 @@ function newOrderRow(order, customer) {
   const o = priceOrder(order, customer, getCatalog());
   return {
     id: `o${Date.now().toString(36)}${uid()}`,
-    customer_id: o.customerId ?? null, phone: o.phone, name: o.name, address: o.address, text: o.text, note: o.note || null, delivery_date: o.delivery ?? null,
+    customer_id: o.customerId ?? null, phone: o.phone, name: o.name, address: o.address, city: o.city || null, text: o.text, note: o.note || null, delivery_date: o.delivery ?? null,
     total: o.total, review: !!o.review, reason: o.reason ?? null, re: !!o.re, export_status: "pending", export_id: null, created_at: o.at,
     items: o.items.map((i) => ({
       id: String(i.id), name: i.name, price: i.price, qty: i.qty, unit: i.unit ?? "ud", boxes: i.boxes ?? null, units: i.units ?? i.qty,
@@ -208,6 +208,7 @@ const adaptClientes = {
 const actualizador = crearActualizador({ catalogDb: adaptCatalogo, customersDb: adaptClientes, accountsDb: { ensureMany: () => 0 } });
 document.querySelectorAll("[data-privacidad]").forEach((n) => { n.outerHTML = privacidadHtml({ email: "" }); }); // información de privacidad en el acceso y en la solicitud de alta
 window.VM = {
+  estiloCss, estiloDecimales, // para pintar la vista previa del Excel con sus estilos reales
   business: BUSINESS.name,
   phone: PHONE,
   ready: () => ready,

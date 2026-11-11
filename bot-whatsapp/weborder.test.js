@@ -116,3 +116,9 @@ test("historial del cliente: solo sus 10 últimos pedidos; al hacer el 11.º se 
   const cat = [{ id: "1", name: "AGUA" }];
   assert.equal(webHistory(withOwnOrders({ id: "C", orders: muchos }, []), cat).length, 10);
 });
+
+test("el pedido lleva la población del cliente (sale bajo el nombre en el Excel de pedidos)", () => {
+  const { order } = webOrderFromBody({ lines: [{ id: "B", qty: 1 }] }, { ...cliente, city: "MEDINA DEL CAMPO" }, ctx, catalogo);
+  assert.equal(order.city, "MEDINA DEL CAMPO");
+  assert.equal(webOrderFromBody({ lines: [{ id: "B", qty: 1 }] }, cliente, ctx, catalogo).order.city, ""); // sin población: vacía, no «undefined»
+});

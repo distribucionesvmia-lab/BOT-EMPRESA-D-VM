@@ -76,13 +76,14 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
   addColumn("orders", "notified_at", "TEXT"); // cuándo se envió el correo de aviso (null = pendiente)
   addColumn("orders", "notify_lock", "TEXT"); // reserva del envío (evita que dos procesos envíen el mismo)
   addColumn("orders", "delivery_date", "TEXT"); // día de entrega que pidió el cliente (AAAA-MM-DD)
+  addColumn("orders", "city", "TEXT"); // población del cliente (sale bajo el nombre en el Excel de pedidos)
   for (const [c, ddl] of [["unit", "TEXT NOT NULL DEFAULT 'ud'"], ["boxes", "INTEGER"], ["units", "INTEGER"], ["discount", "REAL NOT NULL DEFAULT 0"], ["vat_rate", "REAL"], ["amount", "REAL"], ["note", "TEXT"]]) {
     addColumn("order_lines", c, ddl);
   }
 
   const insertOrder = db.prepare(
-    `INSERT OR IGNORE INTO orders (key, customer_id, phone, name, address, text, note, total, review, reason, re, created_at, delivery_date)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT OR IGNORE INTO orders (key, customer_id, phone, name, address, text, note, total, review, reason, re, created_at, delivery_date, city)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const setRef = db.prepare("UPDATE orders SET ref = ? WHERE id = ?");
   const insertLine = db.prepare(
@@ -107,7 +108,7 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
       const at = o.at ?? new Date().toISOString();
       db.exec("BEGIN IMMEDIATE");
       try {
-        const r = insertOrder.run(o.key, o.customerId ?? null, String(o.phone), o.name ?? null, o.address ?? null, o.text ?? null, o.note || null, o.total ?? null, o.review ? 1 : 0, o.reason ?? null, o.re ? 1 : 0, at, o.delivery ?? null);
+        const r = insertOrder.run(o.key, o.customerId ?? null, String(o.phone), o.name ?? null, o.address ?? null, o.text ?? null, o.note || null, o.total ?? null, o.review ? 1 : 0, o.reason ?? null, o.re ? 1 : 0, at, o.delivery ?? null, o.city || null);
         if (r.changes === 0) {
           db.exec("COMMIT");
           return { order: withLines(byKey.get(o.key)), duplicate: true };

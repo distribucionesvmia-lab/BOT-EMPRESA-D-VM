@@ -126,8 +126,8 @@ test("PRECIOS DE ARTÍCULO: se enseñan siempre con 3 decimales (catálogo web, 
   const bar = { id: "C1", name: "Bar", address: "x", orders: [] };
   const r = handleMessage(newSession(bar), "productos");
   assert.match(r.reply, /— \d+,\d{3} €/);
-  const xlsx = fs.readFileSync(new URL("./xlsx-files.js", import.meta.url), "utf8");
-  assert.match(xlsx, /formatCode="#,##0\.000"/);
+  const { workbookFiles } = await import("./xlsx-files.js");
+  assert.match(workbookFiles([{ name: "H", rows: [[1]] }])["xl/styles.xml"], /formatCode="#,##0\.000"/); // la columna «Precio» del Excel lleva 3 decimales
 });
 
 test("MÓVIL: el tamaño de letra del sistema (Samsung) se compensa: ningún font-size en px sin dividir entre --k", async () => {

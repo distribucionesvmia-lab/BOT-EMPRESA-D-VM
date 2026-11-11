@@ -510,6 +510,7 @@ function handleMessageInner(session, rawText, ctx = {}) {
       customerId: s.customer?.id ?? null,
       name: s.name,
       address: s.address,
+      city: s.customer?.city ?? "",
       text: s.orderText.replace(/\n/g, " + "),
       note: s.note || "",
       delivery: s.delivery ?? null,
