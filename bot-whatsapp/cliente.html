@@ -197,7 +197,8 @@
   .dot { width:8px; height:8px; border-radius:50%; background:#5bff8f; box-shadow:0 0 0 0 rgba(91,255,143,.6); animation:vm-latido 2s infinite; display:inline-block; }
   @keyframes vm-latido { 0% { box-shadow:0 0 0 0 rgba(91,255,143,.55); } 70% { box-shadow:0 0 0 8px rgba(91,255,143,0); } 100% { box-shadow:0 0 0 0 rgba(91,255,143,0); } }
   .bmenu { position:relative; display:block !important; }
-  .bmenu > button { border:0 !important; background:rgba(255,255,255,.18) !important; width:44px; height:44px; border-radius:12px !important; font-size:calc(22px / var(--k,1)) !important; padding:0 !important; }
+  .bmenu > button { border:0 !important; background:#fff !important; color:#d90000 !important; width:52px; height:52px; border-radius:14px !important; font-size:calc(30px / var(--k,1)) !important; font-weight:900; line-height:1; padding:0 !important; box-shadow:0 3px 10px rgba(0,0,0,.3); }
+  .bmenu { margin-left:auto; flex:none; }   .bmenu > button:active { transform:scale(.94); }
   .mpop { position:absolute; right:0; top:52px; background:#fff; border-radius:14px; box-shadow:0 12px 32px rgba(0,0,0,.28); overflow:hidden; min-width:190px; animation:vm-pop .2s cubic-bezier(.34,1.56,.64,1) both; }
   .mpop[hidden] { display:none; }
   .bar .mpop button { display:block; width:100%; text-align:left; border:0 !important; background:#fff !important; color:#1d1d1f !important; padding:0 16px !important; min-height:50px !important; font-size:calc(16px / var(--k,1)) !important; border-radius:0 !important; }
