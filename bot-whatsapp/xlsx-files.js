@@ -48,8 +48,8 @@ export function estiloCss(i) {
   if (s.sz) css.push(`font-size:${Math.round(s.sz * 1.15)}px`);
   if (s.h) css.push(`text-align:${s.h}`);
   if (s.v) css.push("vertical-align:middle");
-  if (s.wrap) css.push("white-space:normal");
-  if (s.border) css.push(`border-${s.border.side === "all" ? "" : "bottom-"}style:solid; border-${s.border.side === "all" ? "" : "bottom-"}width:1px; border-${s.border.side === "all" ? "" : "bottom-"}color:#${s.border.color ?? "BFBFBF"}`.replace(/border--/g, "border-"));
+  if (s.wrap) css.push("white-space:pre-line");
+  if (s.border) { const c = `1px ${s.border.style === "hair" ? "dotted" : "solid"} #${s.border.color ?? "BFBFBF"}`; css.push(s.border.side === "all" ? `border:${c}` : `border-${s.border.side}:${c}`); }
   return css.join(";");
 }
 

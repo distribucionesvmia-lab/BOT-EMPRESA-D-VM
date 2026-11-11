@@ -33,12 +33,12 @@ Versión y modalidad (local/nube): **pendiente de confirmar**.
 ## Pie del pedido (observado)
 Pestañas del pie: Resumen · Detalle impuestos · Otros datos. Todo lo que contiene **lo calcula a3ERP**: descuento/recargo financiero (pronto pago, recargo), portes/embalajes (base e IVA de portes), totales (base de líneas, base imponible, cuota IVA/IGIC, recargo de equivalencia, base de retención, % y retención, no sujeto, total documento) y el botón «Generar anticipo». **El Excel no exporta nada de esto.**
 
-## Excel de pedidos (formato `pedidos-v3`, para imprimirlos y pasarlos a mano a a3ERP)
-**Una hoja por pedido** (se llama «5900 · 000004»), lista para imprimir en **A4 vertical**, ajustada al ancho, con márgenes pequeños, área de impresión automática y las páginas numeradas abajo a la derecha («1/3»).
-- **Cartel azul** «Cliente 5900 · NOMBRE COMERCIAL» y, debajo, la **población**. Después: Nº pedido · Fecha recepción · Hora pedido (el código y el nombre del cliente solo salen en el cartel).
-- **Líneas**: ☐ (casilla de «preparado») · Código artículo · Cajas · Descripción · Unidades · Precio (3 decimales) · Dto. % · Importe. Sin columna de IVA. Filas de 17 pt, alternas gris claro/blanco, con separador fino, todo centrado. Cajas en negrita; unidades, precio, dto. e importe en gris; **si no hay cajas, las unidades van en negrita y negro**.
-- **Pie final del pedido**: día de entrega (rojo hoy, amarillo mañana, verde más de 24 h) → Observaciones del cliente (cuadro; el texto sale en rojo si lo hay) → totales (base, IVA, R.E., total).
-- **Pie de página de cada hoja**: las observaciones de línea, si las hay («Línea 3 · 26700 GAZPACHO: sin hielo»); si no hay ninguna, queda en blanco. Cabe un máximo de unos 240 caracteres (si no, remite a la hoja «Líneas»).
+## Excel de pedidos (formato `pedidos-v4`, para imprimirlos y pasarlos a mano a a3ERP)
+Sigue la hoja modelo de la empresa. **Una hoja por pedido** (se llama «5900 · 000004»), lista para imprimir en **A4 vertical**, ajustada al ancho, con márgenes pequeños, área de impresión automática y las páginas numeradas abajo a la derecha («1/3»). No lleva figuras flotantes (ni casillas ni cuadros de texto sueltos): todo va dentro de las celdas.
+- **Cartel azul oscuro**: «Cliente 5900» (columnas A-C) y el nombre comercial (D-H); debajo del nombre, la **población**. Después: Nº pedido · Fecha recep. · Hora.
+- **Líneas**: Código artículo · ☐ (casilla de «preparado», un carácter de la celda) · Cajas · Descripción · Unidades · Precio (3 decimales) · Dto. % · Importe. Sin IVA. Filas de 17 pt, alternas gris claro/blanco, con bordes finos. Cajas en negrita; unidades, precio, dto. e importe en gris; **si no hay cajas, las unidades van en negrita y negro**.
+- **Totales** justo debajo de las líneas (base, IVA, R.E., total) → **Entrega** (rojo hoy, amarillo mañana, verde más de 24 h) → **Observaciones del cliente** (cuadro; el texto sale en rojo si lo hay).
+- **Observaciones línea**, al pie de la hoja (abajo de la página): código + descripción + «*observación». Si ninguna línea tiene observación, esa parte queda totalmente en blanco.
 - Última hoja «Líneas»: lo mismo en plano (una fila por línea, con IVA y observaciones), para filtrar o importar.
 Los totales se calculan por tipo de IVA y reproducen el pedido real de la captura (base 84,12 · IVA 15,26 · total 99,38).
 
