@@ -2,8 +2,9 @@ import { BUSINESS, PRODUCTS } from "./config.js";
 import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRows, isYes, isNo, isDone, parseRemove, parseChangeQty, lev } from "./nlu.js";
 import { isTooGeneric } from "./identify.js";
 import { categorizar } from "./categorias.js";
-import { deliveryAllowed, longDate, puedeHoy } from "./delivery.js";
+import { deliveryAllowed, longDate, puedeHoy, entregaHoyDisponible, AVISO_HOY } from "./delivery.js";
 import { priceLine, totals } from "./pricing.js";
+import { responder as responderAsistente } from "./asistente.js";
 
 const money = (n) => `${n.toFixed(2).replace(".", ",")} ${BUSINESS.currency}`; // «3,30 €», como en la web
 const moneyP = (n) => `${Number(n).toFixed(3).replace(".", ",")} ${BUSINESS.currency}`; // precio de un artículo: SIEMPRE con 3 decimales («1,665 €»)
@@ -231,7 +232,7 @@ const greeting = (s, justIdentified = false) => {
         `• Elige el día de entrega, confirma y listo.`,
       ui: {
         type: "link", title: "Hacer pedido", url: s.link, home: true,
-        ...(ult ? { last: { date: fmtDateFull(ult.o.date), articulos: ult.items.length, total: Math.round(total(ult.items) * 100) / 100, conIva: true } } : {}),
+        ...(ult ? { last: { date: fmtDateFull(ult.o.date), articulos: ult.items.length, total: Math.round(total(ult.items) * 100) / 100, conIva: true, lineas: ult.items.slice(0, 5).map((i) => `${cantidadH(i)} · ${i.name}`), mas: Math.max(0, ult.items.length - 5), repetir: hashRepetir(ult.items) } } : {}),
       },
     };
   }
@@ -355,12 +356,42 @@ function anadirProductos(s) {
   if (!s.link) return showList(s, 0, "🛒 Elige lo que quieres añadir (tu pedido se mantiene):");
   return { reply: "🛒 *¡Abriendo el catálogo!* Tu pedido se queda como está: añade lo que quieras y finaliza desde allí. Si no se abre solo, pulsa el botón.", session: s, ui: { type: "link", title: "Añadir productos", url: catalogoConPedido(s), open: true } };
 }
-function openCatalog(s) {
+function openCatalog(s, now = new Date()) {
+  // Aviso de «entrega hoy»: la misma regla que la opción «Hoy» del calendario (Medina del Campo, laborable y antes de las 10:00 de Madrid)
+  const aviso = s.customer && entregaHoyDisponible(s.customer, now) ? `🚚 ${AVISO_HOY}\n\n` : "";
   if (s.link) {
-    return { reply: "🛒 *¡Abriendo tu catálogo!* Si no se abre solo, pulsa el botón.", session: s, ui: { type: "link", title: "Hacer pedido", url: s.link, open: true } };
+    return { reply: aviso + "🛒 *¡Abriendo tu catálogo!* Si no se abre solo, pulsa el botón.", session: s, ui: { type: "link", title: "Hacer pedido", url: s.link, open: true } };
   }
-  return showList(s, 0, "🛒 Elige lo que quieres pedir:");
+  return showList(s, 0, aviso + "🛒 Elige lo que quieres pedir:");
 }
+/** Lo que va detrás de la dirección del catálogo para abrirlo con un pedido anterior ya puesto («Repetir y revisar»). */
+const hashRepetir = (items) => "c=" + items.map((i) => `${encodeURIComponent(String(i.id))}.${Math.min(999, i.unit === "caja" ? i.qty * (i.upb || 1) : i.qty)}`).join(",") + "&r=1";
+
+// ── Asistente: preguntas en lenguaje natural y recomendaciones (ver asistente.js) ──
+function asistir(s, rawText, now, ctx) {
+  const habituales = new Set(habitualProducts(s.customer).map((p) => String(p.id)));
+  const ultimo = pedidosDe(s.customer).map((o) => ({ o, items: itemsFromLines(o.lines) })).find((x) => x.items.length);
+  const r = responderAsistente(rawText, {
+    catalogo: CATALOG, cliente: s.customer, habituales, ahora: now, ultimo: !!ultimo, recomendados: s.reco ?? [],
+    precioOf: priceOf, upbOf,
+    fmtPrecio: (p) => `${moneyP(priceOf(p))}${upbOf(p) ? ` · caja de ${upbOf(p)} (${money(priceOf(p) * upbOf(p))})` : ""}`,
+    caja: (p) => money(priceOf(p) * upbOf(p)), unidad: (p) => moneyP(priceOf(p)),
+  });
+  if (!r) return null;
+  if (r.tipo === "pedido") return handleMessageInner(s, r.texto, ctx); // lo anota el intérprete de pedidos de siempre
+  if (r.tipo === "elegir") return handleMessageInner(s, `p:${s.reco[r.indice]}`, ctx);
+  s.reco = r.productos.map((p) => String(p.id));
+  let ui;
+  if (r.productos.length) {
+    ui = { type: "list", button: "Añadir al pedido", section: "Te recomiendo", rows: r.productos.map((p) => ({ id: `p:${p.id}`, title: trunc(p.name, 24), description: trunc(`${p.name} · ${moneyP(priceOf(p))}${upbOf(p) ? ` · caja de ${upbOf(p)}` : ""}${habituales.has(String(p.id)) ? " · ya lo has pedido" : ""}`, 72) })) };
+  } else if (r.accion === "repetir" && ultimo && s.link) {
+    ui = { type: "link", title: "Repetir y revisar", url: `${s.link}#${hashRepetir(ultimo.items)}`, open: false };
+  } else if (r.accion) {
+    ui = s.link ? { type: "link", title: "Hacer pedido", url: s.link } : buttons(["h:open", "Hacer pedido"]);
+  }
+  return { reply: r.reply, session: s, ...(ui ? { ui } : {}) };
+}
+
 // Tabla de un pedido para la web (cantidad · producto · importe); el texto del mensaje sigue siendo el respaldo para WhatsApp
 const tablaPedido = (titulo, items, subtitulo = "") => ({
   titulo, subtitulo,
@@ -538,14 +569,14 @@ function handleMessageInner(session, rawText, ctx = {}) {
     return { reply: HUMAN_REPLY, session: s, handoff: true };
   }
   // Botones de «último pedido» e «histórico»
-  if (s.customer && text === "h:open") return openCatalog(s);
+  if (s.customer && text === "h:open") return openCatalog(s, now);
   if (s.customer && text === "h:hist") return showHistory(s);
   // «hacer pedido», «último pedido», «histórico»… (con el carrito vacío; con artículos en el carrito «hacer el pedido» es finalizar)
   if (s.customer && ["menu", "items"].includes(s.state) || s.customer && s.state === "cart" && !s.cart.length) {
     const t1 = limpia(text);
     if (esUltimo(t1)) return showLast(s);
     if (esHistorico(t1)) return showHistory(s);
-    if (esAbrir(t1)) return openCatalog(s);
+    if (esAbrir(t1)) return openCatalog(s, now);
   }
   // Día de entrega (se pregunta al confirmar el pedido)
   if (s.state === "delivery") {
@@ -775,6 +806,7 @@ function handleMessageInner(session, rawText, ctx = {}) {
         // Un número suelto («1.5», «5»): no es un artículo (antes «1.5» se tomaba por «AGUA MINERAL 1,5 L»)
         if (/^\s*\d+(?:[.,]\d+)?\s*$/.test(rawText) && !/^q:/.test(text)) return { reply: "Me falta el artículo 🙂. Escribe la cantidad y lo que quieres, por ejemplo _\"6 aguas\"_ o _\"2 cajas de cerveza\"_. Las cantidades son números enteros.", session: s };
         if (/(?:^|[\s,;+y])0+\s+[a-zñ]/i.test(norm(rawText))) return { reply: "La cantidad tiene que ser mayor que 0. Escribe, por ejemplo, _\"3 aguas\"_.", session: s };
+        if (!s.unverified) { const asistida = asistir(s, rawText, now, ctx); if (asistida) return asistida; } // dudas y recomendaciones en lenguaje natural
         const dd = takeDate(s, rawText, now);
         const amb = [];
         const found = parseItems(dd.rest, s.customer, { ambiguos: amb });

@@ -135,3 +135,27 @@ test("«hoy» solo para los clientes del municipio 47085; los demás empiezan en
     assert.ok(deliveryMin(now) > now.slice(0, 10));
   }
 });
+
+test("AVISO «entrega hoy»: solo Medina del Campo, día laborable y antes de las 10:00 de Madrid (la misma regla que la opción «Hoy»)", async () => {
+  const { entregaHoyDisponible, deliveryOptions, puedeHoy, AVISO_HOY } = await import("./delivery.js");
+  assert.equal(AVISO_HOY, "Si haces el pedido antes de las 10:00, te lo entregamos hoy.");
+  const medina = { municipio: "47085", city: "MEDINA DEL CAMPO" }, medinaSinCodigo = { city: "Medina del Campo" }, otro = { municipio: "47186", city: "TORDESILLAS" };
+  const caso = (cliente, iso) => entregaHoyDisponible(cliente, iso);
+  // lunes 9 de noviembre de 2026 (Madrid = UTC+1)
+  assert.equal(caso(medina, "2026-11-09T08:30:00Z"), true, "lunes 09:30");
+  assert.equal(caso(medina, "2026-11-09T08:59:50Z"), true, "lunes 09:59:50");
+  assert.equal(caso(medina, "2026-11-09T09:00:00Z"), false, "lunes 10:00 en punto");
+  assert.equal(caso(medina, "2026-11-09T10:00:00Z"), false, "lunes 11:00");
+  assert.equal(caso(medina, "2026-11-14T08:00:00Z"), false, "sábado 09:00");
+  assert.equal(caso(medina, "2026-11-15T08:00:00Z"), false, "domingo 09:00");
+  assert.equal(caso(otro, "2026-11-09T08:30:00Z"), false, "otro municipio 09:30");
+  assert.equal(caso({ municipio: "47186", city: "MEDINA DEL CAMPO" }, "2026-11-09T08:30:00Z"), false, "si la ficha trae código de municipio, manda el código");
+  assert.equal(caso(medinaSinCodigo, "2026-11-09T08:30:00Z"), true, "sin código: vale la población sin tildes ni mayúsculas");
+  // horario de verano (Madrid = UTC+2): lunes 6 de julio de 2026
+  assert.equal(caso(medina, "2026-07-06T07:30:00Z"), true, "verano 09:30");
+  assert.equal(caso(medina, "2026-07-06T08:00:00Z"), false, "verano 10:00");
+  // nunca se contradicen: hay aviso exactamente cuando la opción «Hoy» existe
+  for (const iso of ["2026-11-09T08:30:00Z", "2026-11-09T08:59:59Z", "2026-11-09T09:00:00Z", "2026-11-14T08:00:00Z", "2026-11-12T07:00:00Z"]) for (const c of [medina, otro, medinaSinCodigo]) {
+    assert.equal(caso(c, iso), deliveryOptions(iso, { hoy: puedeHoy(c) }).some((o) => o.kind === "hoy"), `${iso} ${c.city}`);
+  }
+});

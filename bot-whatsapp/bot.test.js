@@ -98,13 +98,14 @@ test("cliente conocido: 0 unidades quita el artículo", () => {
   assert.match(r.reply, /quitado/);
 });
 
-test("cliente conocido: «repetir» ya no existe; el bot ofrece hacer un pedido y no apunta nada", () => {
-  for (const t of ["repetir", "repite el último pedido", "lo de siempre", "h:repeat", "h:repeat1"]) {
+test("cliente conocido: «repetir» no confirma ni apunta nada solo: explica el botón «Repetir y revisar» (el flujo antiguo con listas ya no existe)", () => {
+  for (const t of ["repetir", "repite el último pedido", "lo de siempre"]) {
     const r = say(newSession(bar, "/catalogo"), t);
-    assert.match(r.reply, /No estoy diseñado/, t);
+    assert.match(r.reply, /Repetir y revisar/, t);
     assert.equal(r.session.cart.length, 0, t);
     assert.notEqual(r.session.state, "confirm", t);
   }
+  for (const t of ["h:repeat", "h:repeat1"]) assert.match(say(newSession(bar, "/catalogo"), t).reply, /No estoy diseñado/, t); // los botones antiguos ya no existen
 });
 
 test("«Histórico» enseña los pedidos con sus tablas y solo ofrece hacer un pedido (sin «repetir»)", () => {
@@ -215,8 +216,8 @@ test("el saludo explica en puntos lo fácil que es pedir (sin ofrecer «Repetir�
   assert.doesNotMatch(nuevo.reply, /Repetir/);
 });
 
-test("lo que no es pedir, último pedido, histórico o repetir recibe una respuesta clara con el botón de hacer pedido", () => {
-  for (const t of ["qué tal", "gracias", "buenas tardes", "agua", "quiero hablar", "cuánto vale la cerveza"]) {
+test("lo que no tiene que ver con pedidos ni con productos recibe una respuesta clara con el botón de hacer pedido (las dudas y recomendaciones las contesta el asistente: ver asistente.test.js)", () => {
+  for (const t of ["qué tal", "gracias", "buenas tardes", "quiero hablar", "blablabla"]) {
     const r = say(newSession(bar, "/catalogo"), t);
     assert.equal(r.reply, "No estoy diseñado para responderte a eso. Te puedo ayudar a hacer un pedido rápido.", t);
     assert.equal(r.ui.type, "link");
@@ -251,4 +252,17 @@ test("totales para el cliente: llevan IVA (y recargo de equivalencia si lo tiene
   const r = say(newSession(conRe), "2 aguas");
   assert.match(r.reply, /Total con IVA: 2,52/); // 2,00 + 21 % IVA (0,42) + 5,2 % R.E. (0,10)
   assert.match(r.reply, /R\.E\. 0,10/);
+});
+
+test("CHAT: al empezar un pedido sale UN aviso «entrega hoy» solo si el cliente es de Medina del Campo, es laborable y son antes de las 10:00 (Madrid)", async () => {
+  const { AVISO_HOY } = await import("./delivery.js");
+  const medina = { ...bar, city: "MEDINA DEL CAMPO", municipio: "47085" }, otro = { ...bar, city: "TORDESILLAS", municipio: "47186" };
+  const abrir = (cliente, iso) => say(newSession(cliente, "/catalogo"), "h:open").reply;
+  const antes = handleMessage(newSession(medina, "/catalogo"), "h:open", { now: "2026-11-09T08:30:00Z" }).reply;
+  assert.equal((antes.match(new RegExp(AVISO_HOY.replace(/[.]/g, "\\."), "g")) ?? []).length, 1, "un único aviso");
+  for (const [cliente, iso] of [[medina, "2026-11-09T09:00:00Z"], [medina, "2026-11-09T10:00:00Z"], [medina, "2026-11-14T08:00:00Z"], [otro, "2026-11-09T08:30:00Z"]]) {
+    const r = handleMessage(newSession(cliente, "/catalogo"), "h:open", { now: iso }).reply;
+    assert.equal(r.includes("10:00"), false, `sin aviso: ${cliente.city} ${iso}`);
+  }
+  void abrir;
 });

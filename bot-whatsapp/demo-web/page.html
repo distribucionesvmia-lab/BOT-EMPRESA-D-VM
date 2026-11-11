@@ -804,6 +804,7 @@ window.addEventListener("message", (e) => {
     let status = 200, json;
     if (d.method === "POST" && /\/favorito$/.test(d.url || "")) ({ status, json } = VM.miniFav(miniState.link, JSON.parse(d.body || "{}")));
     else if (d.method === "POST") ({ status, json } = VM.miniSubmit(miniState.link, JSON.parse(d.body || "{}")));
+    else if (/\/aviso$/.test(d.url || "")) { json = VM.miniAviso(miniState.link); if (json.error) status = 410; }
     else { json = VM.miniData(miniState.link); if (json.error) status = 410; }
     e.source?.postMessage({ vmApiRes: d.vmApi, status, json }, "*");
   }

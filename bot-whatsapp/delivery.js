@@ -64,6 +64,15 @@ export function deliveryOptions(nowIso = new Date().toISOString(), opts = {}) {
   return out;
 }
 
+/** Texto del aviso de «entrega hoy» (el catálogo y el chat dicen exactamente esto). */
+export const AVISO_HOY = "Si haces el pedido antes de las 10:00, te lo entregamos hoy.";
+/**
+ * ¿Se puede ofrecer entrega HOY ahora mismo? Sale de las propias opciones de entrega (deliveryOptions): si la opción «Hoy» existe, hay aviso;
+ * si no, no. Así el aviso y la opción «Hoy» del calendario se deciden con el mismo código y no pueden contradecirse
+ * (cliente de Medina del Campo + día laborable + antes de las 10:00 de Madrid).
+ */
+export const entregaHoyDisponible = (customer, nowIso = new Date().toISOString()) => deliveryOptions(nowIso, { hoy: puedeHoy(customer) }).some((o) => o.kind === "hoy");
+
 export const MAX_AHEAD_DAYS = 90; // el calendario deja elegir hasta 90 días por delante
 
 /** Primer día que deja marcar el calendario de «otro día»: el primer día de servicio posterior al último botón (nunca contradice a las opciones). */

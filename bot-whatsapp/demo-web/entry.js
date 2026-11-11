@@ -4,7 +4,7 @@
 import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog, habitualProducts } from "../bot.js";
 import { priceOrder, totals } from "../pricing.js";
 import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, conHistorial } from "../weborder.js";
-import { deliveryOptions, deliveryInfo, deliveryCalendarFrom, madridDay, puedeHoy } from "../delivery.js";
+import { deliveryOptions, deliveryInfo, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "../delivery.js";
 import { findCustomers } from "../identify.js";
 import { FORMAT, madrid, madridTime } from "../export-format.js";
 import { workbookFiles, estiloCss, estiloDecimales } from "../xlsx-files.js";
@@ -379,7 +379,13 @@ window.VM = {
   miniData(link) {
     const customer = links.get(link)?.customer;
     if (!customer) return { error: "Enlace no válido o caducado" };
-    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address, re: !!customer.recargoEquivalencia }, used: links.get(link).used, favs: [...(favsDemo.get(customer.id) ?? [])], products: webProducts(customer, getCatalog(), habitualProducts, (id) => globalThis.__VM_FOTOS__?.[id] ?? null, (id) => !!globalThis.__VM_FOTOS_IA__?.includes(id)), history: webHistory(customer, getCatalog()), tree: webTree(getCatalog()), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) };
+    return { business: BUSINESS.name, priceNote: BUSINESS.priceNote, customer: { name: customer.name, address: customer.address, re: !!customer.recargoEquivalencia }, used: links.get(link).used, favs: [...(favsDemo.get(customer.id) ?? [])], products: webProducts(customer, getCatalog(), habitualProducts, (id) => globalThis.__VM_FOTOS__?.[id] ?? null, (id) => !!globalThis.__VM_FOTOS_IA__?.includes(id)), history: webHistory(customer, getCatalog()), tree: webTree(getCatalog()), ...this.miniAviso(link) };
+  },
+  /** Lo mismo que el servidor: aviso «entrega hoy» y opciones de día, con la hora de Madrid y las mismas funciones. */
+  miniAviso(link) {
+    const customer = links.get(link)?.customer;
+    if (!customer) return { error: "Enlace no válido o caducado" };
+    return { entregaHoy: entregaHoyDisponible(customer), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) };
   },
   miniSubmit(link, body) {
     const customer = links.get(link)?.customer;

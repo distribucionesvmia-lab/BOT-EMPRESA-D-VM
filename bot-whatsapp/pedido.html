@@ -344,12 +344,12 @@
 
   /* ── Móvil apaisado (p. ej. 568×320): cabecera, pestañas y buscador ocupan poco; carrito compacto ── */
   @media (orientation:landscape) and (max-height:520px) {
-    .app { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto auto auto minmax(0, 1fr); }
+    .app { display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto auto auto auto minmax(0, 1fr); }
     header { grid-column:1 / -1; padding:4px 14px; border-radius:0 0 14px 14px; max-height:56px; flex-wrap:nowrap; }
     header img { height:28px; } .ttl b { font-size:calc(15px / var(--k,1)); -webkit-line-clamp:1; } .cartbtn { min-height:44px; padding:0 14px; margin-left:auto; }
     .paso, .guia { display:none; }
-    .tabs { grid-column:1; grid-row:2; margin:4px 6px 4px 14px; } .buscar { grid-column:2; grid-row:2; padding:4px 14px 4px 6px; } .buscar input { min-height:44px; } .buscar::before { top:14px; left:calc(6px + 14px); }
-    .filbar { grid-column:1 / -1; grid-row:3; padding:0 14px 4px; } main { grid-column:1 / -1; grid-row:4; min-height:0; padding-bottom:78px; }
+    .tabs { grid-column:1; grid-row:3; margin:4px 6px 4px 14px; } .buscar { grid-column:2; grid-row:3; padding:4px 14px 4px 6px; } .buscar input { min-height:44px; } .buscar::before { top:14px; left:calc(6px + 14px); }
+    .filbar { grid-column:1 / -1; grid-row:4; padding:0 14px 4px; } main { grid-column:1 / -1; grid-row:5; min-height:0; padding-bottom:78px; }
     .app.compacto header, .app.compacto .tabs, .app.compacto .buscar { max-height:0; opacity:0; overflow:hidden; padding-top:0; padding-bottom:0; margin-top:0; margin-bottom:0; pointer-events:none; } /* al bajar por la lista se pliega todo lo de arriba */
     footer { padding:6px 14px calc(6px + env(safe-area-inset-bottom)); } footer .big, #verCarrito { min-height:48px; }
     .p { margin:6px 12px; padding:8px; grid-template-columns:72px minmax(0, 1fr) 300px; gap:10px; contain-intrinsic-size:auto 112px; }
@@ -414,6 +414,10 @@
   }
   @media (min-width:700px) { .tl-ctl { flex-wrap:nowrap; } .tl-art { width:44%; } }
   footer[hidden] { display:none !important; } .app.sin-carrito main { padding-bottom:24px; }
+  /* Aviso de «entrega hoy» (solo Medina del Campo, laborable y antes de las 10:00): franja discreta bajo la cabecera, sin tapar productos */
+  .aviso { margin:8px 14px 0; padding:9px 12px; border-radius:12px; background:#e8f5ec; color:#14532d; border:1px solid #b9dfc6; font-size:calc(15px / var(--k,1)); font-weight:600; line-height:1.3; overflow-wrap:anywhere; }
+  .aviso[hidden] { display:none; }
+  @media (orientation:landscape) and (max-height:520px) { #avisoHoy { grid-column:1 / -1; grid-row:2; margin:4px 14px 0; padding:6px 10px; } }
 </style>
 </head>
 <body>
@@ -423,6 +427,7 @@
     <div class="ttl"><b id="ttl">Cargando…</b><small id="sub"></small></div>
     <button class="cartbtn" id="cartIcon" type="button" aria-label="Ver carrito">🛒 Carrito <span id="cnt">0</span></button>
   </header>
+  <div class="aviso" id="avisoHoy" role="status" aria-live="polite" hidden>🚚 Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
   <div class="paso">Paso 1 de 3 · Elige tus productos</div>
   <div class="guia" id="guia" aria-live="polite">Toca <b>«+ Añadir»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.</div>
   <nav class="tabs">
@@ -438,6 +443,7 @@
 
   <section class="screen" id="cart" hidden>
     <div class="head"><button id="back" type="button" aria-label="Volver a los productos">←</button><div><small>Paso 2 de 3</small><h2>Revisa tu pedido</h2></div></div>
+    <div class="aviso" id="avisoHoy2" role="status" aria-live="polite" hidden>🚚 Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
     <div class="body cartbody">
       <div class="cartcount" id="cartCount"></div>
       <div id="cartLines"></div>
@@ -1008,6 +1014,7 @@ function resumen(day) {
 $("resOk").onclick = () => enviarPedido(diaElegido, $("errRes"));
 $("resCambiar").onclick = $("backRes").onclick = () => ($("resumen").hidden = true);
 async function enviarPedido(delivery, errBox) {
+  if (delivery) { await refrescarEntrega(); if (delivery === data.today && !(data.delivery || []).some(o => o.kind === "hoy")) { errBox.textContent = "Ya no llegamos a entregarlo hoy: elige otro día."; return; } } // «hoy» solo vale antes de las 10:00
   const opts = [...document.querySelectorAll("#whenOpts .opt")], btn = $("confirm");
   opts.forEach(o => (o.disabled = true)); btn.disabled = true; $("resOk").disabled = true; errBox.textContent = "";
   try {
@@ -1026,6 +1033,32 @@ async function enviarPedido(delivery, errBox) {
     }
   }
 }
+
+
+// Aviso de «entrega hoy»: lo decide el servidor con la hora de Madrid (la misma función que la opción «Hoy») y aquí se revisa cada 30 s
+function pintarAviso() { const v = !!data.entregaHoy; for (const id of ["avisoHoy", "avisoHoy2"]) $(id).hidden = !v; }
+let refrescando = false;
+async function refrescarEntrega() {
+  if (refrescando || document.hidden || !data.products) return;
+  refrescando = true;
+  try {
+    const r = await fetch(location.pathname + "/aviso").catch(() => null);
+    if (!r || !r.ok) return;
+    const d = await r.json(), hoyViejo = data.today, teniaHoy = (data.delivery || []).some(o => o.kind === "hoy");
+    Object.assign(data, { entregaHoy: d.entregaHoy, delivery: d.delivery, today: d.today, minDate: d.minDate });
+    pintarAviso();
+    const quedaHoy = data.delivery.some(o => o.kind === "hoy");
+    if (teniaHoy && !quedaHoy) { // pasaron las 10:00 mientras elegía: «Hoy» desaparece y, si la tenía elegida, se le dice claro
+      if (!$("when").hidden) pintarOpciones();
+      if (diaElegido === hoyViejo) {
+        diaElegido = null; $("resumen").hidden = true; $("when").hidden = false; pintarOpciones();
+        $("errWhen").textContent = "Ya no llegamos a entregarlo hoy: elige otro día.";
+      }
+    }
+  } finally { refrescando = false; }
+}
+setInterval(refrescarEntrega, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refrescarEntrega(); });
 
 // Pantallas superpuestas (carrito, día de entrega, resumen, calendario): foco, tecla Esc y botón «Atrás» del móvil
 const CAPAS = ["cart", "when", "resumen"], FONDO = ["header", ".paso", ".guia", ".tabs", ".buscar", ".filbar", "#list", "footer"];
@@ -1060,6 +1093,7 @@ const obs = new MutationObserver(capasCambian);
   if (!r || !r.ok) { $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 primeros dígitos de tu DNI</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
   data = await r.json();
   data.products.forEach(p => productoPorId.set(p.id, p));
+  pintarAviso();
   document.title = "Pedido a " + data.business;
   $("ttl").textContent = "Hola, " + data.customer.name;
   $("sub").textContent = "Haz tu pedido a " + data.business;

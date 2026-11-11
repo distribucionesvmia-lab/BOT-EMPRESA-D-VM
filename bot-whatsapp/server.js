@@ -15,7 +15,9 @@ import { estadoSistema, crearVigilante } from "./monitor.js";
 import { privacidadHtml } from "./privacidad.js";
 import { sendMail } from "./mailer.js";
 import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders } from "./weborder.js";
-import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy } from "./delivery.js";
+import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "./delivery.js";
+// Lo que el catálogo necesita para el aviso «entrega hoy» y las opciones de día: se calcula SIEMPRE en el servidor con la hora de Madrid
+const avisoEntrega = (customer) => ({ entregaHoy: entregaHoyDisponible(customer), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) });
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { mailConfigFromEnv } from "./mailer.js";
@@ -257,7 +259,7 @@ function readJson(req, max = 100_000) {
 }
 
 function webOrderRoutes(req, res, url) {
-  const m = /^\/pedido\/([\w.-]+)(\/datos)?$/.exec(url.pathname);
+  const m = /^\/pedido\/([\w.-]+)(\/datos|\/aviso)?$/.exec(url.pathname);
   if (!m) return false;
   const token = m[1];
 
@@ -271,6 +273,7 @@ function webOrderRoutes(req, res, url) {
     const customer = customer0 && withOwnOrders(customer0, getDb().ordersOf(customer0.id));
     if (!customer) return json(res, { error: "Enlace no válido o caducado" }, 410);
 
+    if (req.method === "GET" && m[2] === "/aviso") return json(res, avisoEntrega(customer));
     if (req.method === "GET") {
       // Identificado solo por nombre (link.u): no se enseña histórico, precios especiales ni dirección de ese cliente
       const view = link.u ? { ...customer, orders: [], usual: [], frequent: [], specialPrices: {}, discounts: {}, address: "" } : customer;
@@ -283,9 +286,7 @@ function webOrderRoutes(req, res, url) {
         products,
         history: webHistory(view, catalogNow()),
         tree: webTree(catalogNow()),
-        delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }),
-        today: madridDay(),
-        minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }),
+        ...avisoEntrega(customer),
       });
     }
 
@@ -472,6 +473,10 @@ async function appRoutes(req, res, url) {
     if (!account) return void res.writeHead(302, { Location: "/cliente" }).end();
     return void enviar(res, 200, HTML, page("pedido.html"));
   }
+  if (p === "/catalogo/aviso" && req.method === "GET") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    return void sendJson(res, 200, avisoEntrega(clienteConPedidos(account.customerId)));
+  }
   if (p === "/catalogo/datos" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     const customer = clienteConPedidos(account.customerId);
@@ -484,9 +489,7 @@ async function appRoutes(req, res, url) {
       products: webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa),
       history: webHistory(customer, catalogNow()),
       tree: webTree(catalogNow()),
-      delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }),
-      today: madridDay(),
-      minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }),
+      ...avisoEntrega(customer),
     });
   }
   if (p.startsWith("/img/") && req.method === "GET") {
