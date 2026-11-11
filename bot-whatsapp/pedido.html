@@ -364,18 +364,55 @@
     .screen > .box.pie { padding-top:6px !important; flex-direction:row; flex-wrap:wrap; }
   }
 
-  /* ── Ordenador y tablet grande: 2–3 columnas de productos y 4 de categorías (antes, una sola columna con mucho vacío) ── */
-  @media (min-width:900px) {
-    header, .paso, .guia, .filbar, footer { padding-left:max(16px, calc((100% - 1240px) / 2)); padding-right:max(16px, calc((100% - 1240px) / 2)); }
-    .tabs { margin-left:max(16px, calc((100% - 1240px) / 2)); margin-right:max(16px, calc((100% - 1240px) / 2)); max-width:560px; }
-    .buscar { padding-left:max(16px, calc((100% - 1240px) / 2)); padding-right:max(16px, calc((100% - 1240px) / 2)); } .buscar::before { left:calc(max(16px, (100% - 1240px) / 2) + 14px); }
-    main { padding-left:max(0px, calc((100% - 1240px) / 2)); padding-right:max(0px, calc((100% - 1240px) / 2)); }
-    #list { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); align-items:start; }
-    #list > :not(.p) { grid-column:1 / -1; }
-    .cats { grid-template-columns:repeat(4, minmax(0, 1fr)); } .subs { grid-template-columns:repeat(2, minmax(0, 1fr)); }
-    footer { display:flex; justify-content:center; } footer .big { width:min(100%, 640px); }
+  /* ── Tabla de artículos (carrito y «solo lo marcado») ── */
+  .tl-wrap { margin:0 14px 12px; background:#fff; border:1px solid var(--linea); border-radius:18px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  #list > .tl-wrap { margin:10px 12px 14px; }
+  table.tl { width:100%; border-collapse:collapse; table-layout:auto; }
+  .tl thead th { background:#f3f4f6; color:var(--gris); font-size:calc(13px / var(--k,1)); text-transform:uppercase; letter-spacing:.05em; font-weight:700; text-align:left; padding:10px 12px; }
+  .tl thead th:nth-child(2) { text-align:center; } .tl thead th.tl-imp { text-align:right; }
+  .tl td { padding:10px 12px; vertical-align:middle; border-top:1px solid var(--linea); }
+  .tl tbody tr.tl-fila:nth-of-type(4n+1) td, .tl tbody tr.tl-obs:nth-of-type(4n+2) td { background:#fff; }
+  .tl tbody tr.tl-fila:nth-of-type(4n+3) td, .tl tbody tr.tl-obs:nth-of-type(4n+4) td { background:#fafafb; }
+  .tl tr.tl-obs td { border-top:0; padding:0 12px 8px; }
+  .tl-art { width:46%; } .tl-art > * { vertical-align:middle; }
+  .tl-art { display:table-cell; } .tl-art .tl-av { display:inline-grid; margin-right:12px; }
+  .tl-txt { display:inline-block; vertical-align:middle; max-width:calc(100% - 76px); }
+  .tl .tl-av { width:56px; height:56px; border:0; padding:0; border-radius:12px; font-size:calc(18px / var(--k,1)); cursor:zoom-in; position:relative; overflow:hidden; place-items:center; color:#fff; font-weight:800; }
+  .tl .cn { font-weight:700; font-size:calc(16px / var(--k,1)); line-height:1.25; overflow-wrap:anywhere; }
+  .tl .cp { color:var(--gris); font-size:calc(13px / var(--k,1)); margin-top:2px; }
+  .tl-cant { text-align:center; white-space:nowrap; }
+  .tl-ctl { display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:center; }
+  .tl .ud { min-width:112px; height:44px; } .tl .ud button { min-height:40px; }
+  .tl .hstep { display:flex; align-items:center; border:2px solid var(--rojo); border-radius:12px; overflow:hidden; background:#fff; height:44px; }
+  .tl .hstep button { width:44px; height:100%; border:0; background:var(--rojo-s); color:var(--rojo-o); font-size:calc(24px / var(--k,1)); font-weight:700; cursor:pointer; }
+  .tl .hstep input { width:56px; height:100%; border:0; text-align:center; font-size:calc(19px / var(--k,1)); font-weight:800; outline:none; -moz-appearance:textfield; }
+  .tl .hstep input::-webkit-outer-spin-button, .tl .hstep input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  .tl-imp { text-align:right; white-space:nowrap; }
+  td.tl-imp b { display:block; font-size:calc(18px / var(--k,1)); } td.tl-imp small { display:block; color:var(--gris); font-size:calc(12px / var(--k,1)); }
+  .tl .cx { border:0; background:none; color:var(--gris); font-size:calc(13px / var(--k,1)); min-height:44px; padding:0 4px; cursor:pointer; margin-top:2px; }
+  .tl .tl-obs button { border:0; background:none; color:var(--rojo-o); font-weight:700; font-size:calc(14px / var(--k,1)); min-height:40px; padding:0; cursor:pointer; }
+  .tl .tl-obs input { width:100%; border:2px solid var(--linea); border-radius:10px; padding:10px; font:inherit; font-size:calc(16px / var(--k,1)); }
+  @media (max-width:560px) { /* móvil: cada fila de la tabla en dos renglones (artículo arriba; cantidad e importe debajo) para que el nombre no se parta en vertical */
+    .tl, .tl tbody { display:block; } .tl thead { display:none; }
+    .tl tr.tl-fila { display:grid; grid-template-columns:minmax(0, 1fr) auto; align-items:center; border-top:1px solid var(--linea); }
+    .tl tr.tl-fila:first-child { border-top:0; } .tl tr.tl-fila td { border-top:0; padding:8px 10px; }
+    .tl td.tl-art { grid-column:1 / -1; width:auto; padding-bottom:0; } .tl .tl-av { width:56px; height:56px; } .tl-art .tl-av { display:inline-grid; margin:0 10px 0 0; }
+    .tl-txt { max-width:calc(100% - 76px); }
+    .tl td.tl-cant { grid-column:1; text-align:left; } .tl-ctl { justify-content:flex-start; gap:8px; } .tl .ud { min-width:104px; }
+    .tl td.tl-imp { grid-column:2; } td.tl-imp b { font-size:calc(17px / var(--k,1)); }
+    .tl tr.tl-obs { display:block; } .tl tr.tl-obs td { display:block; padding:0 10px 8px; }
   }
-  @media (min-width:1500px) { #list { grid-template-columns:repeat(3, minmax(0, 1fr)); } .cats { grid-template-columns:repeat(5, minmax(0, 1fr)); } }
+  /* ── Ordenador: una fila por producto, ancha, con la descripción en una o dos líneas (antes se partía en columnas estrechas) ── */
+  @media (min-width:900px) {
+    #list { display:block; }
+    .p { grid-template-columns:104px minmax(0, 1fr) 330px; align-items:center; gap:18px; }
+    .p .av { width:104px; height:104px; }
+    .p .ctl { width:330px; grid-template-columns:120px minmax(0, 1fr); grid-template-areas:"ud slot" "cap cap"; } .p .ctl .ud { width:120px; min-width:0; }
+    .info .n { font-size:calc(18px / var(--k,1)); }
+    .cats { grid-template-columns:repeat(4, minmax(0, 1fr)); } .subs { grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    .tl-art { width:44%; }
+  }
+  @media (min-width:700px) { .tl-ctl { flex-wrap:nowrap; } .tl-art { width:44%; } }
 </style>
 </head>
 <body>
@@ -581,18 +618,29 @@ function control(p) {
   return box;
 }
 
-// Foto en grande: toca la foto de un producto; se cierra tocando fuera, con la X o con Esc
+// Foto en grande: toca la foto de un producto (en el catálogo, en «solo lo marcado» o en el carrito); se cierra tocando fuera, con la X o con Esc.
+// Se enseña a su tamaño real (hasta 1,6 veces) para que no salga borrosa: una foto pequeña no se estira hasta hacerla pasta.
 function verFoto(p) {
   let z = document.getElementById("zoomFoto");
   if (!z) {
-    z = document.createElement("div"); z.id = "zoomFoto"; z.setAttribute("role", "dialog"); z.setAttribute("aria-modal", "true");
-    z.style.cssText = "position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.82);display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px";
-    z.innerHTML = '<button type="button" aria-label="Cerrar" style="position:absolute;top:12px;right:14px;width:44px;height:44px;border:0;border-radius:22px;background:#fff;font-size:calc(22px / var(--k,1));cursor:pointer">✕</button><img alt="" style="width:min(92vw,560px);height:min(92vw,560px);max-height:70vh;object-fit:contain;background:#fff;border-radius:14px"><div style="color:#fff;text-align:center;font-weight:600;padding:12px 8px 4px"></div><div class="zia" style="color:#ccc;text-align:center;font-size:calc(12px / var(--k,1));font-style:italic;padding-bottom:8px"></div>';
+    z = document.createElement("div"); z.id = "zoomFoto"; z.setAttribute("role", "dialog"); z.setAttribute("aria-modal", "true"); z.setAttribute("aria-label", "Foto del producto");
+    z.style.cssText = "position:fixed;inset:0;z-index:50;background:rgba(15,15,18,.88);display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px;overflow:auto";
+    z.innerHTML = '<button type="button" aria-label="Cerrar" style="position:absolute;top:12px;right:14px;width:48px;height:48px;border:0;border-radius:24px;background:#fff;font-size:calc(22px / var(--k,1));cursor:pointer">✕</button>'
+      + '<div class="zcaja" style="background:#fff;border-radius:18px;padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;gap:10px;max-width:min(96vw,760px)">'
+      + '<img alt="" style="display:block;max-width:100%;max-height:68vh;width:auto;height:auto;object-fit:contain;border-radius:10px;background:#fff">'
+      + '<div class="znom" style="font-weight:800;font-size:calc(19px / var(--k,1));text-align:center;line-height:1.25;overflow-wrap:anywhere"></div>'
+      + '<div class="zinfo" style="color:#5f6368;font-size:calc(16px / var(--k,1));text-align:center"></div>'
+      + '<div class="zia" style="color:#8a8a8a;text-align:center;font-size:calc(13px / var(--k,1));font-style:italic"></div></div>';
     z.onclick = () => (z.style.display = "none"); // (el atributo hidden no vale: el display del estilo lo anula)
     document.body.appendChild(z);
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && z.style.display !== "none") { z.style.display = "none"; e.stopImmediatePropagation(); } }, true);
   }
-  z.querySelector("img").src = p.img; z.children[2].textContent = p.name; z.querySelector(".zia").textContent = p.ia ? "Foto orientativa creada con IA" : "";
+  const im = z.querySelector("img");
+  im.style.width = "auto"; im.onload = () => { const w = Math.min(im.naturalWidth * 1.6, innerWidth * 0.9, 720); if (w > 0) im.style.width = Math.max(w, Math.min(240, im.naturalWidth)) + "px"; };
+  im.src = p.img;
+  z.querySelector(".znom").textContent = p.name;
+  z.querySelector(".zinfo").textContent = [p.price != null ? eurp(p.price) : "", p.unitsPerBox ? "caja de " + p.unitsPerBox + " uds" : ""].filter(Boolean).join(" · ");
+  z.querySelector(".zia").textContent = p.ia ? "Foto orientativa creada con IA" : "";
   z.style.display = "flex";
 }
 
@@ -612,12 +660,6 @@ function row(p) {
   const pr = document.createElement("div"); pr.className = "pr";
   const price = document.createElement("b"); price.textContent = eurp(p.price); pr.appendChild(price);
   if (p.discount) { const dto = document.createElement("span"); dto.className = "dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} % dto.`; dto.style.cssText = "color:#0a7a3b;font-weight:700;font-size:calc(14px / var(--k,1));margin-left:4px"; pr.appendChild(dto); } // el descuento del cliente se ve ya en la fila
-  if (p.lastQty) {
-    const chip = document.createElement("button"); chip.type = "button"; chip.className = "chip";
-    chip.textContent = "↻ Última vez: " + p.lastQty + (p.lastQty === 1 ? " ud" : " uds"); chip.title = "Pedir las mismas unidades";
-    chip.onclick = () => { unitOf.set(p.id, "ud"); setQty(p.id, p.lastQty); }; // las de la última vez son unidades
-    pr.appendChild(chip);
-  }
   if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " uds"; // (las unidades que lleva pedidas ya salen bajo el contador: así la tarjeta no cambia de alto)
   info.append(n, c);
   if (p.ia) { const ia = document.createElement("div"); ia.className = "ia"; ia.textContent = "Foto orientativa creada con IA"; ia.style.cssText = "font-size:calc(11px / var(--k,1));color:#8a8a8a;font-style:italic;margin:1px 0 2px"; info.appendChild(ia); }
@@ -756,6 +798,10 @@ function renderList() {
     list.appendChild(d); return;
   }
   if (tab === "hab" && !q) items = [...items.filter(p => favs.has(p.id)), ...items.filter(p => !favs.has(p.id))]; // los favoritos van primero
+  if (filtra) { // «Ver solo lo que he marcado»: una tabla con lo marcado (foto, cantidad, importe), no tarjetas
+    tablaLineas.sinObs = true; list.appendChild(tablaLineas(items.map(p => ({ ...p, qty: qty.get(p.id) })))); tablaLineas.sinObs = false;
+    return;
+  }
   items.slice(0, limite).forEach(p => list.appendChild(row(p)));
   entrada(list, ".p");
   if (items.length > limite) {
@@ -774,50 +820,67 @@ function tween(el, hasta) {
   const paso = ahora => { const k = Math.min(1, (ahora - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = eur(desde + (hasta - desde) * e); if (k < 1 && totalMostrado === hasta) requestAnimationFrame(paso); };
   requestAnimationFrame(paso);
 }
-function renderCart() {
-  const box = $("cartLines"); box.innerHTML = "";
-  const ls = lines(), nUds = ls.reduce((t, l) => t + uds(l), 0);
-  $("cartCount").textContent = `${ls.length} artículo${ls.length === 1 ? "" : "s"} · ${nUds} unidad${nUds === 1 ? "" : "es"}`;
+// Tabla de artículos con cantidad: la usan el carrito y «Ver solo lo marcado». Columnas: Artículo (foto con zoom) · Cantidad · Importe.
+function tablaLineas(ls) {
+  const wrap = document.createElement("div"); wrap.className = "tl-wrap";
+  const t = document.createElement("table"); t.className = "tl";
+  const th = t.createTHead().insertRow();
+  for (const x of ["Artículo", "Cantidad", "Importe"]) { const c = document.createElement("th"); c.scope = "col"; c.textContent = x; if (x === "Importe") c.className = "tl-imp"; th.appendChild(c); }
+  const tb = t.createTBody();
   ls.forEach(l => {
-    const card = document.createElement("div"); card.className = "card cl" + (bumpId === l.id ? " nocard" : ""); card.style.setProperty("--i", ls.indexOf(l));
-    const av = document.createElement("div"); av.className = "av"; av.style.background = hue(l.name); av.textContent = initials(l.name);
-    if (l.img) { const im = document.createElement("img"); im.src = l.img; im.alt = ""; im.onerror = () => im.remove(); av.appendChild(im); }
-    const info = document.createElement("div");
+    const tr = tb.insertRow(); tr.className = "tl-fila";
+    const cj = unit(l.id) === "caja";
+    // Artículo: foto (toca para ampliarla) + nombre + precio por unidad
+    const a = tr.insertCell(); a.className = "tl-art";
+    const av = document.createElement("button"); av.type = "button"; av.className = "av tl-av"; av.style.background = hue(l.name); av.textContent = initials(l.name); av.setAttribute("aria-label", l.img ? "Ampliar la foto de " + l.name : l.name);
+    if (l.img) { const im = document.createElement("img"); im.src = l.img; im.alt = ""; im.onerror = () => im.remove(); av.appendChild(im); av.onclick = () => verFoto(l); } else av.style.cursor = "default";
+    const tx = document.createElement("div"); tx.className = "tl-txt";
     const n = document.createElement("div"); n.className = "cn"; n.textContent = l.name;
-    const k = l.unitsPerBox || 1, cj = unit(l.id) === "caja";
     const pr = document.createElement("div"); pr.className = "cp";
     pr.textContent = eurp(l.price) + " / ud" + (l.discount ? ` · −${String(l.discount).replace(".", ",")} %` : "") + (l.unitsPerBox ? ` · caja de ${l.unitsPerBox}` : "");
-    info.append(n, pr);
-    const x = document.createElement("button"); x.type = "button"; x.className = "cx"; x.textContent = "🗑"; x.setAttribute("aria-label", "Quitar " + l.name); x.onclick = () => setQty(l.id, 0);
-    const mid = document.createElement("div"); mid.className = "cmid";
+    tx.append(n, pr); a.append(av, tx);
+    // Cantidad: Cajas|Uds + − 1 +
+    const q = tr.insertCell(); q.className = "tl-cant";
+    const box = document.createElement("div"); box.className = "tl-ctl";
     if (l.unitsPerBox) {
       const sel = document.createElement("div"); sel.className = "ud"; sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Pedir en");
-      for (const [u, t] of [["caja", "Cajas"], ["ud", "Uds"]]) {
-        const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.className = unit(l.id) === u ? "on" : ""; b.setAttribute("aria-pressed", String(unit(l.id) === u));
+      for (const [u, tt] of [["caja", "Cajas"], ["ud", "Uds"]]) {
+        const b = document.createElement("button"); b.type = "button"; b.textContent = tt; b.className = unit(l.id) === u ? "on" : ""; b.setAttribute("aria-pressed", String(unit(l.id) === u));
         b.onclick = () => cambiarUnidad(l, u); sel.appendChild(b);
       }
-      mid.appendChild(sel);
+      box.appendChild(sel);
     }
     const st = document.createElement("div"); st.className = "hstep";
     const minus = document.createElement("button"); minus.type = "button"; minus.textContent = "−"; minus.setAttribute("aria-label", "Quitar uno de " + l.name); minus.onclick = () => setQty(l.id, l.qty - 1);
     const inp = document.createElement("input"); inp.type = "number"; inp.inputMode = "numeric"; inp.min = 0; inp.value = l.qty; inp.setAttribute("aria-label", "Cantidad de " + l.name); inp.onchange = () => setQty(l.id, inp.value);
     const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.setAttribute("aria-label", "Añadir uno de " + l.name); plus.onclick = () => setQty(l.id, l.qty + 1);
-    st.append(minus, inp, plus); mid.appendChild(st);
-    const imp = document.createElement("div"); imp.className = "cimp";
+    st.append(minus, inp, plus); box.appendChild(st); q.appendChild(box);
+    // Importe + unidades + quitar
+    const m = tr.insertCell(); m.className = "tl-imp";
     const ib = document.createElement("b"); ib.textContent = eur(importe(l));
     const is = document.createElement("small"); is.textContent = cj ? `${l.qty} ${l.qty === 1 ? "caja" : "cajas"} = ${uds(l)} uds` : `${uds(l)} ${uds(l) === 1 ? "unidad" : "unidades"}`;
-    imp.append(ib, is); mid.appendChild(imp);
+    const x = document.createElement("button"); x.type = "button"; x.className = "cx"; x.textContent = "🗑 Quitar"; x.setAttribute("aria-label", "Quitar " + l.name); x.onclick = () => setQty(l.id, 0);
+    m.append(ib, is, x);
     // Observación de la línea: plegada hasta que se necesita
-    const ob = document.createElement("div"); ob.className = "cobs";
-    const abrir = () => {
-      ob.innerHTML = ""; const ta = document.createElement("input"); ta.maxLength = 120; ta.placeholder = "Observación para este artículo (opcional)"; ta.value = notes.get(l.id) || "";
-      ta.setAttribute("aria-label", "Observación para " + l.name); ta.oninput = () => { notes.set(l.id, ta.value); guardar(); }; ob.appendChild(ta); return ta;
-    };
-    if ((notes.get(l.id) || "").trim()) abrir();
-    else { const b = document.createElement("button"); b.type = "button"; b.textContent = "＋ Añadir observación a este artículo"; b.onclick = () => abrir().focus(); ob.appendChild(b); }
-    card.append(av, info, x, mid, ob);
-    box.appendChild(card);
+    if (!tablaLineas.sinObs) {
+      const ro = tb.insertRow(); ro.className = "tl-obs"; const co = ro.insertCell(); co.colSpan = 3;
+      const abrir = () => {
+        co.innerHTML = ""; const ta = document.createElement("input"); ta.maxLength = 120; ta.placeholder = "Observación para este artículo (opcional)"; ta.value = notes.get(l.id) || "";
+        ta.setAttribute("aria-label", "Observación para " + l.name); ta.oninput = () => { notes.set(l.id, ta.value); guardar(); }; co.appendChild(ta); return ta;
+      };
+      if ((notes.get(l.id) || "").trim()) abrir();
+      else { const b = document.createElement("button"); b.type = "button"; b.textContent = "＋ Añadir observación a este artículo"; b.onclick = () => abrir().focus(); co.appendChild(b); }
+    }
   });
+  wrap.appendChild(t);
+  return wrap;
+}
+
+function renderCart() {
+  const box = $("cartLines"); box.innerHTML = "";
+  const ls = lines(), nUds = ls.reduce((t, l) => t + uds(l), 0);
+  $("cartCount").textContent = `${ls.length} artículo${ls.length === 1 ? "" : "s"} · ${nUds} unidad${nUds === 1 ? "" : "es"}`;
+  box.appendChild(tablaLineas(ls));
   tween($("total"), total()); $("totSub").textContent = desgloseIva();
   if (!count()) showCart(false);
 }

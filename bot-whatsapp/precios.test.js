@@ -97,13 +97,13 @@ test("PEDIDO WEB: los artículos que se venden en cajas se piden por cajas por d
   assert.match(html, /\.ctl \.bump, \.hstep\.bump, \.step\.bump \{ animation:none !important; \}/);
 });
 
-test("MÓVIL: «Mostrar más» no se sale del ancho y el código/PIN de entrada admite solo 6 cifras", async () => {
+test("MÓVIL: «Mostrar más» no se sale del ancho y el código y la contraseña de entrada admiten solo letras y números, máximo 6", async () => {
   const fs = await import("node:fs");
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
   assert.match(ped, /m\.style\.width = "calc\(100% - 28px\)"/);
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
   for (const id of ["a-nif", "a-pin", "r-pin", "r-pin2", "c-nuevo", "c-nuevo2"]) assert.match(cli, new RegExp(`id="${id}"[^>]*maxlength="6"`), id);
-  assert.match(cli, /replace\(\/\\D\/g, ""\)\.slice\(0, 6\)/);
+  assert.match(cli, /replace\(\/\[\^A-Za-z0-9\]\/g, ""\)\.slice\(0, 6\)/);
 });
 
 test("MÓVIL con letra grande (Samsung): ninguna caja de altura fija corta los textos y las categorías caben en 2 columnas", async () => {
@@ -140,7 +140,7 @@ test("MÓVIL: el tamaño de letra del sistema (Samsung) se compensa: ningún fon
   }
 });
 
-test("CATÁLOGO WEB: «+ Añadir» y el contador miden igual en todas las filas, zonas de toque de 44 px o más, móvil apaisado y ordenador en columnas", async () => {
+test("CATÁLOGO WEB: «+ Añadir» y el contador miden igual en todas las filas, zonas de toque de 44 px o más, móvil apaisado y ordenador en filas anchas", async () => {
   const fs = await import("node:fs");
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
   assert.match(ped, /className = "ud udfijo"/); // los artículos sueltos ocupan el mismo hueco que los de cajas
@@ -148,6 +148,18 @@ test("CATÁLOGO WEB: «+ Añadir» y el contador miden igual en todas las filas,
   assert.match(ped, /\.favb \{ width:44px; height:44px/);
   assert.match(ped, /\.tabs button\.tab \{ min-height:48px; \}/);
   assert.match(ped, /@media \(orientation:landscape\) and \(max-height:520px\)/);
-  assert.match(ped, /@media \(min-width:900px\)[\s\S]*#list \{ display:grid; grid-template-columns:repeat\(2/);
+  assert.match(ped, /@media \(min-width:900px\)[\s\S]*\.p \{ grid-template-columns:104px minmax\(0, 1fr\) 330px/); // ordenador: una fila ancha por producto (la descripción no se parte en vertical)
   assert.doesNotMatch(ped, /" → " \+ qty\.get\(p\.id\) \* p\.unitsPerBox/); // el texto de la tarjeta no cambia al añadir (no se mueve lo de debajo)
+});
+
+test("CATÁLOGO WEB: sin «Última vez», carrito y «solo lo marcado» en tabla, foto ampliable también en el carrito, zoom nítido", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.doesNotMatch(ped, /Última vez/); // se quitó el botón «↻ Última vez: N uds» de cada producto
+  assert.match(ped, /function tablaLineas\(ls\)/);
+  assert.match(ped, /box\.appendChild\(tablaLineas\(ls\)\)/); // el carrito es una tabla…
+  assert.match(ped, /list\.appendChild\(tablaLineas\(items\.map/); // …y «Ver solo lo que he marcado» también
+  assert.match(ped, /av\.onclick = \(\) => verFoto\(l\)/); // tocar la foto en el carrito (o en la tabla) la amplía
+  for (const col of ["Artículo", "Cantidad", "Importe"]) assert.ok(ped.includes(`"${col}"`), col);
+  assert.match(ped, /im\.naturalWidth \* 1\.6/); // la foto ampliada no se estira más de 1,6 veces su tamaño real
 });

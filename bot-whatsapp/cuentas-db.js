@@ -1,7 +1,7 @@
 // Cuentas de clientes: solicitud de alta, aprobación por la empresa, acceso con teléfono + PIN y sesiones.
 // Base de datos aparte (cuentas.sqlite). Garantiza que cada cuenta queda ligada a UN cliente de la base de clientes
 // y que solo la empresa puede darla de alta: el cliente pide acceso con su teléfono, correo y nombre de empresa,
-// la empresa lo aprueba y le da un PIN de 6 cifras (así también se comprueba que el teléfono es suyo).
+// la empresa lo aprueba y le da una contraseña de 6 letras o números (así también se comprueba que el teléfono es suyo).
 //
 // Seguridad:
 //  - El PIN y el token de sesión no se guardan en claro: el PIN con scrypt + sal, el token con SHA-256.
@@ -71,6 +71,9 @@ const checkPin = (pin, stored) => {
 };
 const DUMMY = hashPin("000000"); // para gastar el mismo tiempo con teléfonos desconocidos
 const sha = (t) => crypto.createHash("sha256").update(t).digest("hex");
+// Contraseña: 6 letras o números; mayúsculas y minúsculas son lo mismo (se guarda y se compara en MAYÚSCULAS)
+export const normPin = (p) => String(p ?? "").trim().toUpperCase();
+export const pinValido = (p) => /^[A-Z0-9]{6}$/.test(normPin(p));
 const newPin = () => String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
 const plus = (iso, ms) => new Date(new Date(iso).getTime() + ms).toISOString();
 
@@ -196,9 +199,9 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       if (!p) return { error: "El teléfono no es válido." };
       if (!validEmail(String(email ?? "").trim())) return { error: "El correo no es válido." };
       if (biz.length < 2 || biz.length > 80) return { error: "Escribe el nombre de tu empresa." };
-      if (pin !== undefined && !/^\d{6}$/.test(String(pin))) return { error: "El PIN debe tener 6 cifras." };
+      if (pin !== undefined && !pinValido(pin)) return { error: "La contraseña debe tener 6 letras o números." };
       const mail = String(email).trim();
-      const hash = pin === undefined ? null : hashPin(String(pin));
+      const hash = pin === undefined ? null : hashPin(normPin(pin));
       const open = db.prepare("SELECT id FROM registrations WHERE phone = ? AND status = 'pending'").get(p);
       if (open) {
         db.prepare("UPDATE registrations SET email = ?, business = ?, pin_hash = ?, created_at = ? WHERE id = ?").run(mail, biz, hash, now, open.id);
@@ -244,7 +247,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       const p = normalizePhone(phone);
       if (!p) return { error: "El teléfono no es válido." };
       if (!validEmail(String(email ?? "").trim())) return { error: "El correo no es válido." };
-      if (!/^\d{6}$/.test(String(pin ?? ""))) return { error: "El PIN debe tener 6 cifras." };
+      if (!pinValido(pin)) return { error: "La contraseña debe tener 6 letras o números." };
       if (byPhone.get(p)) return { error: "Este teléfono ya tiene acceso. Entra con tu PIN, o pide uno nuevo a la empresa." };
       db.exec("BEGIN IMMEDIATE");
       try {
@@ -252,9 +255,9 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         const pre = byCustomer.get(String(customerId));
         let accId;
         if (pre && !pre.phone) {
-          db.prepare("UPDATE accounts SET phone = ?, email = ?, pin_hash = ? WHERE id = ?").run(p, String(email).trim(), hashPin(String(pin)), pre.id);
+          db.prepare("UPDATE accounts SET phone = ?, email = ?, pin_hash = ? WHERE id = ?").run(p, String(email).trim(), hashPin(normPin(pin)), pre.id);
           accId = pre.id;
-        } else accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, verified, created_at) VALUES (?, ?, ?, ?, 0, ?)").run(String(customerId), p, String(email).trim(), hashPin(String(pin)), now).lastInsertRowid);
+        } else accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, verified, created_at) VALUES (?, ?, ?, ?, 0, ?)").run(String(customerId), p, String(email).trim(), hashPin(normPin(pin)), now).lastInsertRowid);
         db.exec("COMMIT");
         return { account: accountOut(byId.get(accId)) };
       } catch (e) {
@@ -281,7 +284,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       if (row.status !== "active") return { ok: false, reason: "locked" };
       if (row.locked_until && row.locked_until > now) return { ok: false, reason: "locked" };
       // verify(cuenta): comprobación extra (p. ej. el nombre de empresa escrito coincide con el cliente de la cuenta)
-      if (!row.pin_hash || !/^\d{6}$/.test(String(pin ?? "")) || !checkPin(String(pin), row.pin_hash) || (verify && !verify(accountOut(row)))) {
+      if (!row.pin_hash || !pinValido(pin) || !checkPin(normPin(pin), row.pin_hash) || (verify && !verify(accountOut(row)))) {
         recordFail(row, now);
         return { ok: false, reason: "invalid" };
       }

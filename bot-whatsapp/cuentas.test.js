@@ -110,9 +110,10 @@ test("rechazar una solicitud no crea cuenta", () => {
   assert.equal(db.reject(id), false);
 });
 
-test("el cliente elige su PIN al registrarse: al aprobar se activa ese PIN y no se genera otro", () => {
+test("el cliente elige su contraseña al registrarse: al aprobar se activa esa y no se genera otra", () => {
   const db = openAccountsDb(":memory:");
-  assert.match(db.requestRegistration(solicitud({ pin: "12ab56" })).error, /PIN/);
+  assert.match(db.requestRegistration(solicitud({ pin: "12ab5" })).error, /contraseña/); // 5 caracteres
+  assert.match(db.requestRegistration(solicitud({ pin: "12ab5!" })).error, /contraseña/); // con un símbolo
   const { id } = db.requestRegistration(solicitud({ pin: "123456" }));
   const r = db.approve(id, "9001");
   assert.equal(r.pin, undefined);
@@ -130,7 +131,7 @@ test("alta automática: cuenta creada con el PIN del cliente pero sin confirmar;
   assert.match(db.registerAuto({ ...solicitud(), pin: "111111", customerId: "493" }).error, /ya tiene acceso/);
   assert.equal(db.confirm(1), true);
   assert.equal(db.listAccounts()[0].verified, true);
-  assert.match(db.registerAuto({ ...solicitud({ phone: "699000111" }), pin: "12", customerId: "1" }).error, /PIN/);
+  assert.match(db.registerAuto({ ...solicitud({ phone: "699000111" }), pin: "12", customerId: "1" }).error, /contraseña/);
 });
 
 test("acceso con comprobación extra: si falla (nombre de empresa distinto) cuenta como un intento fallido", () => {
@@ -157,4 +158,12 @@ test("favoritos: privados por cliente, sin duplicados, se quitan y tienen tope",
   for (let i = 0; i < 299; i++) db.setFavorite("3", "P" + i, true);
   assert.equal(db.setFavorite("3", "ULTIMO", true), true);
   assert.equal(db.setFavorite("3", "UNO-MAS", true), false);
+});
+
+test("contraseña con letras: mayúsculas y minúsculas valen igual, y el hash es el mismo", () => {
+  const db = openAccountsDb(":memory:");
+  const r = db.registerAuto({ ...solicitud(), pin: "Ab12Cd", customerId: "493", matched: "nombre + teléfono" });
+  assert.equal(r.error, undefined);
+  for (const escrito of ["Ab12Cd", "ab12cd", "AB12CD", "aB12cD", " ab12cd "]) assert.equal(db.login("600111222", escrito).ok, true, escrito);
+  assert.equal(db.login("600111222", "ab12ce").ok, false);
 });
