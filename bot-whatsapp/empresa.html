@@ -449,7 +449,7 @@ $(p + "-ver").onclick = async () => {
   fichero = $(p + "-file").files[0]; $(p + "-aplicar").hidden = true; $(p + "-res").textContent = "";
   if (!fichero) { $(p + "-msg").textContent = "Elige primero el archivo Excel."; return; }
   $(p + "-ver").disabled = true; $(p + "-msg").textContent = "Comparando con lo que hay…";
-  try { const j = await adLlamar("vista-previa", p, fichero); ultimo = j; adPinta(j, p); $(p + "-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : "No hay cambios que aplicar (o hay un aviso que lo impide)."; $(p + "-aplicar").hidden = !j.aplicable; }
+  try { const j = await adLlamar("vista-previa", p, fichero); ultimo = j; adPinta(j, p); $(p + "-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : !(j.aviso && j.aviso.length) ? "Este Excel es igual que lo que ya tienes: no hay ningún cambio que aplicar." : "No se puede aplicar este Excel: lee los avisos de arriba."; $(p + "-aplicar").hidden = !j.aplicable; }
   catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-ver").disabled = false; }
 };
 $(p + "-aplicar").onclick = async () => {

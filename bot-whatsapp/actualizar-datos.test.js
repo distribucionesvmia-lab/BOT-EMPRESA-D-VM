@@ -177,3 +177,24 @@ test("detecta de qué tipo es cada Excel y avisa si se sube en la tarjeta equivo
   assert.throws(() => act.vistaPrevia("clientes", Buffer.from(prod)), /parece un Excel de productos o artículos, no de clientes\. Súbelo en la tarjeta «Productos y precios»/);
   assert.throws(() => act.vistaPrevia("productos", Buffer.from(cli)), /parece un Excel de clientes/);
 });
+
+test("un Excel nuevo enseña SOLO lo que cambia (precio, modo de venta, nuevo, bloqueado), se aplica solo eso y el mismo Excel otra vez dice que no hay cambios", () => {
+  const cab = ["Cód. artículo", "Artículo", "Precio venta", "Tipo IVA ventas", "Unidades paquete venta", "Obsoleto", "Bloqueado", "MODO DE VENTA"];
+  const base = Array.from({ length: 30 }, (_, i) => [String(100 + i), "ARTICULO " + i, 1 + i / 10, "ORD21", 6, "No", "No", 3]);
+  const xl = (rows) => Buffer.from(buildWorkbook([{ name: "a", rows: [cab, ...rows] }]));
+  const a = crearActualizador({ catalogDb: openCatalogDb(":memory:"), customersDb: {}, accountsDb: {} });
+  assert.equal(a.vistaPrevia("productos", xl(base)).resumen.anadidos, 30); // primera vez: todo es nuevo
+  a.aplicar("productos", xl(base), { confirmo: true });
+  const igual = a.vistaPrevia("productos", xl(base));
+  assert.equal(igual.aplicable, false); assert.equal(igual.resumen.iguales, 30); assert.deepEqual([igual.resumen.anadidos, igual.resumen.modificados, igual.resumen.quitados], [0, 0, 0]); // mismo Excel: sin cambios
+  assert.throws(() => a.aplicar("productos", xl(base), { confirmo: true }), /No hay nada que aplicar/);
+  const n = base.map((r) => [...r]);
+  n[3][2] = 5.55; n[5][5] = "si"; n[5][6] = "si"; n[7][7] = 2; n.push(["999", "ARTICULO NUEVO", 2, "RED10", 12, "No", "No", 2]);
+  const v = a.vistaPrevia("productos", xl(n));
+  assert.deepEqual([v.resumen.anadidos, v.resumen.quitados, v.resumen.modificados, v.resumen.iguales], [1, 1, 2, 27]); // solo lo que cambia
+  assert.deepEqual(v.detalle.modificados.map((m) => [m.id, m.cambios.map((c) => c.campo).join()]), [["103", "Precio"], ["107", "Modo de venta"]]);
+  assert.equal(v.detalle.quitados[0].id, "105"); assert.equal(v.detalle.anadidos[0].id, "999");
+  const r = a.aplicar("productos", xl(n), { confirmo: true });
+  assert.deepEqual([r.anadidos, r.modificados, r.desactivados], [1, 2, 1]);
+  assert.equal(a.vistaPrevia("productos", xl(n)).aplicable, false); // y otra vez igual: nada que aplicar
+});
