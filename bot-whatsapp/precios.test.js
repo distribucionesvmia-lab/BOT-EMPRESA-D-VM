@@ -308,3 +308,10 @@ test("CÓDIGOS CON PUNTO (157.10, 151.21…): «repetir pedido» separa bien el 
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
   assert.match(ped, /par\.lastIndexOf\("\."\)/); assert.doesNotMatch(ped, /par\.split\("\."\)/);
 });
+
+test("TU PEDIDO DE SIEMPRE en el móvil: el texto a todo el ancho y los botones debajo, sin una columna estrecha", async () => {
+  const fs = await import("node:fs");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  assert.match(cli, /\.vm-inicio \.fila\.siempre \{ flex-direction:column; align-items:stretch !important;/);
+  assert.match(cli, /f\.append\(t, bt, sem\); c\.appendChild\(f\);/); assert.match(cli, /sem\.className = "sec"/);
+});
