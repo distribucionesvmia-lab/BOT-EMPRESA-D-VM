@@ -277,3 +277,10 @@ test("CABECERA DEL CATÁLOGO: compacta (logo, nombre, «Aa» y carrito en una fi
   assert.match(ped, /\.app\.compacto header, \.app\.compacto \.tabs, \.app\.compacto \.buscar \{ max-height:0;/); // solo en apaisado se pliega todo
   assert.match(ped, /header img \{ height:34px; \}/); assert.match(ped, /\.letra \.letra-bt small \{ display:none; \}/);
 });
+
+test("BIENVENIDA: el saludo va dentro de la tarjeta de inicio (un solo mensaje alineado, con los 3 pasos) y no se pierde la tarjeta", async () => {
+  const fs = await import("node:fs");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  assert.match(cli, /if \(j\.ui\?\.home\) window\.__saludo = String\(j\.reply\)\.split\("\\n\\n"\)\[0\]; else burbuja\([^;]*"in"\); \(j\.cards \?\? \[\]\)\.forEach\(tarjetaTabla\); if \(j\.ui\) interactivo\(j\.ui\);/); // un comentario en esa línea se comía la tarjeta
+  assert.match(cli, /className = "pasos"/); assert.match(cli, /fila\.className = "mrow in"; const av = document\.createElement\("div"\); av\.className = "av"/);
+});
