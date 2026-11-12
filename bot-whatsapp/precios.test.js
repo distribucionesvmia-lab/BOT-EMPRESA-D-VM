@@ -294,3 +294,12 @@ test("ALTAS A MANO Y CLIENTE NUEVO: formularios en el panel (producto, cliente y
   assert.match(emp, /Modo de venta \(2 = solo caja, 3 = caja o unidad\)/);
   assert.match(cli, /id="r-dir"/); assert.match(cli, /direccion: \$\("r-dir"\)\.value/);
 });
+
+test("TOTALES EN EL CATÁLOGO: el carrito y la barra de abajo van SIN IVA; el total con IVA sale arriba del paso de elegir el día", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.match(ped, /\$\{eur\(calc\(\)\.base\)\} sin IVA/); // barra «Ver carrito»
+  assert.match(ped, /<span>Total sin IVA<small id="totSub">/); assert.match(ped, /tween\(\$\("total"\), calc\(\)\.base\)/); // paso 2
+  assert.match(ped, /id="whenTotal"/); assert.match(ped, /\$\("whenTotal"\)\.textContent = eur\(total\(\)\)/); // paso 3: con IVA
+  assert.match(ped, /\$\("resTotal"\)\.textContent = eur\(total\(\)\)/); // y el resumen final también
+});

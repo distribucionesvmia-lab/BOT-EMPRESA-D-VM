@@ -595,7 +595,7 @@
       <div class="err" id="err" role="alert"></div>
     </div>
     <div class="cartfoot">
-      <div class="tot"><span>Total con IVA<small id="totSub"></small></span><b id="total">0,00 €</b></div>
+      <div class="tot"><span>Total sin IVA<small id="totSub"></small></span><b id="total">0,00 €</b></div>
       <button class="big" id="confirm" type="button">Elegir el día de entrega →</button>
       <button class="keepbtn" id="keep" type="button">+ Seguir añadiendo productos</button>
     </div>
@@ -605,6 +605,7 @@
   <section class="screen" id="when" hidden style="z-index:6">
     <div class="head"><button id="backWhen" type="button" aria-label="Volver al carrito">←</button><div><small>Paso 3 de 3</small><h2>¿Cuándo quieres recibirlo?</h2></div></div>
     <div class="body" style="padding:14px">
+      <div class="box" id="whenTot" style="margin:0 0 14px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;border-radius:16px;border:2px solid var(--rojo)"><span style="font-weight:800;font-size:calc(17px / var(--k,1))">Total con IVA<small id="whenSub" style="display:block;font-weight:400;color:var(--gris);font-size:calc(13px / var(--k,1))"></small></span><b id="whenTotal" style="font-size:calc(26px / var(--k,1));color:var(--rojo-o);white-space:nowrap">0,00 €</b></div>
       <p style="margin:0 0 14px;color:var(--gris);font-size:calc(18px / var(--k,1))">Toca el día de entrega. <b>Después podrás revisar el pedido y confirmarlo.</b></p>
       <div id="whenOpts" style="display:grid;gap:12px"></div>
       <div class="err" id="errWhen" role="alert"></div>
@@ -1134,7 +1135,7 @@ function renderCart() {
   const ls = lines(), nUds = ls.reduce((t, l) => t + uds(l), 0);
   $("cartCount").textContent = `${ls.length} artículo${ls.length === 1 ? "" : "s"} · ${nUds} unidad${nUds === 1 ? "" : "es"}`;
   box.appendChild(tablaLineas(ls)); pintarFalta(box);
-  tween($("total"), total()); $("totSub").textContent = desgloseIva();
+  tween($("total"), calc().base); $("totSub").textContent = "El IVA se suma al elegir el día de entrega"; // en el carrito se ve el importe sin IVA; con IVA, en el paso 3
   if (!count()) showCart(false);
 }
 
@@ -1151,7 +1152,7 @@ function refresh() {
   if (n > nPrev0) { for (const el of [$("cnt"), $("verCarrito")]) { el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse"); } }
   nPrev0 = n;
   $("cnt").textContent = n;
-  $("verCarrito").textContent = n ? `Ver carrito · ${n} artículo${n === 1 ? "" : "s"} · ${eur(total())}` : "Añade productos para empezar";
+  $("verCarrito").textContent = n ? `Ver carrito · ${n} artículo${n === 1 ? "" : "s"} · ${eur(calc().base)} sin IVA` : "Añade productos para empezar";
   $("guia").innerHTML = n ? `Llevas <b>${n} artículo${n === 1 ? "" : "s"}</b>. Cuando termines, pulsa el botón rojo de abajo.` : "Toca <b>«+ Añadir»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.";
   $("verCarrito").disabled = !n; document.querySelector("footer").hidden = !n; document.querySelector(".app").classList.toggle("sin-carrito", !n); // sin nada en el carrito no hay barra fija que tape la lista
   const fila = bumpId && !bumpFav && !(tab === "hab" && soloCantidad) ? $("list").querySelector(`.p[data-id="${CSS.escape(bumpId)}"]`) : null;
@@ -1265,6 +1266,7 @@ $("confirm").onclick = () => {
   $("errWhen").textContent = ""; pintarOpciones(); $("when").hidden = false;
 };
 function pintarOpciones() {
+  $("whenTotal").textContent = eur(total()); $("whenSub").textContent = desgloseIva(); // aquí, el importe FINAL con IVA
   const box = $("whenOpts"); box.innerHTML = "";
   for (const o of data.delivery) {
     const b = document.createElement("button"); b.type = "button"; b.className = "opt";
