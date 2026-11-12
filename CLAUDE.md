@@ -52,6 +52,7 @@ Si algo sale mal tras reiniciar: `git log -3`, vuelve al commit anterior (`git r
 - **Ayuda** («¿Necesitas ayuda?»): teléfono, WhatsApp y horario en `config.js` (`AYUDA`) o variables `AYUDA_TEL`, `AYUDA_WHATSAPP`, `AYUDA_HORARIO`; sin datos no sale el botón.
 - **Direcciones de entrega**: la de siempre u otra distinta (`deliveryAddress`); un cliente nuevo debe escribirla. Si es otra, el pedido lleva «ENTREGA EN OTRA DIRECCIÓN: …» en las observaciones (panel y Excel).
 - **Excel**: se puede volver a exportar cualquier pedido ya exportado, las veces que haga falta (`export_orders`); botón «Imprimir» (hoja A4 directa).
+- **Carga inicial** (`cargar-inicial.js`, `deploy/windows/cargar-inicial.bat`, `docs/CARGA_INICIAL.md`): carpeta `C:\vm\inicial` con los Excel de partida (clientes, artículos, historial de prueba), `descuentos.json`, fotos y `prueba.json`; el instalador la carga la primera vez con las mismas reglas que «Datos y Excel» (repetible, no duplica). La base no va ya hecha porque las huellas del NIF dependen de `NIF_PEPPER`. Esos archivos llevan datos reales: **nunca a GitHub** (`inicial/` en `.gitignore`).
 - **Actualización automática** (`deploy/windows/actualizar-auto.bat`, tarea «VM Actualizar» cada 10 minutos): pasa las pruebas, comprueba que arranca y vuelve atrás si falla; botón «Actualizar ahora» en «Datos y Excel».
 
 ## Vigilancia

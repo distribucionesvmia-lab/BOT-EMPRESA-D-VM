@@ -24,6 +24,15 @@ if ((Test-Path $cli) -or (Test-Path $emp)) {
   $claveNueva = $true
 }
 
+# Carga inicial (solo hace falta la primera vez): si existe C:\vm\inicial con los archivos del paquete de datos iniciales, se cargan
+# los clientes, productos, descuentos, historial y fotos; asi el programa nace con todo y despues solo se suben actualizaciones.
+if (Test-Path "C:\vm\inicial") {
+  Write-Host "Cargando los datos iniciales desde C:\vm\inicial ..."
+  Push-Location (Split-Path -Parent $aqui)
+  & node --env-file=C:\vm\config\empresa.env cargar-inicial.js C:\vm\inicial
+  Pop-Location
+} else { Write-Host "No hay carpeta C:\vm\inicial: se instala sin datos (se pueden cargar despues con cargar-inicial.bat)." }
+
 # Arranque automatico al encender el ordenador
 schtasks /Create /TN "VM Cliente" /TR "$aqui\iniciar-cliente.bat" /SC ONSTART /RU SYSTEM /RL HIGHEST /F | Out-Null
 schtasks /Create /TN "VM Empresa" /TR "$aqui\iniciar-empresa.bat" /SC ONSTART /RU SYSTEM /RL HIGHEST /F | Out-Null

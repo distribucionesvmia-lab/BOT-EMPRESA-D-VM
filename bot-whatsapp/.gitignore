@@ -11,3 +11,7 @@ demo.sqlite*
 exportaciones-demo
 respaldos
 salida-datos
+
+# Carga inicial: lleva datos reales de clientes y de la tarifa: nunca al repositorio
+inicial/
+datos-iniciales*/
