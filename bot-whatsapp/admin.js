@@ -171,6 +171,15 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       if (!sync?.configurado) return send(res, 400, { error: "La sincronización no está configurada (ver docs/GOOGLE_DRIVE.md)." }), true;
       return send(res, 200, await sync.runNow()), true;
     }
+    // ---- Altas a mano: un producto o un cliente sueltos, sin Excel ----
+    if (post && (p === "/api/admin/productos/nuevo" || p === "/api/admin/clientes/nuevo")) {
+      if (!actualizador) return send(res, 404, { error: "No disponible." }), true;
+      const b = (await readJson(req)) ?? {};
+      try {
+        const r = p.includes("productos") ? actualizador.anadirProducto(b, { actualizar: b.actualizar === true }) : actualizador.anadirCliente(b, { actualizar: b.actualizar === true });
+        return send(res, 200, { ok: true, ...r }), true;
+      } catch (e) { return send(res, 400, { error: e.message, ...(e.existe ? { existe: true } : {}) }), true; }
+    }
     // ---- Clientes (la lista que viene de a3ERP) ----
     if (p === "/api/admin/clientes/lista" && get) {
       const pagina = Math.max(0, Number(url.searchParams.get("pagina") ?? 0) || 0);
@@ -215,6 +224,19 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
     if (m && post) {
       const id = Number(m[2]);
       const b = (await readJson(req)) ?? {};
+      if (m[1] === "solicitudes" && m[3] === "aprobar" && b.nuevo && typeof b.nuevo === "object") {
+        // Cliente NUEVO: se crea su ficha con todos los datos que dio al registrarse (teléfono, correo, DNI/CIF, dirección) y los que completa la empresa; después se acepta la solicitud
+        const reg = accounts.listRegistrations("pending").find((r) => r.id === id);
+        if (!reg) return send(res, 404, { error: "La solicitud no existe o ya se resolvió." }), true;
+        if (!actualizador) return send(res, 404, { error: "No disponible." }), true;
+        const n = b.nuevo;
+        let creado;
+        try {
+          creado = actualizador.anadirCliente({ codigo: n.codigo, nombre: n.nombre || reg.business, razonSocial: n.razonSocial, nif: n.nif || reg.nif, telefono: reg.phone, correo: reg.email, direccion: n.direccion ?? reg.address, poblacion: n.poblacion, municipio: n.municipio, recargo: n.recargo === true });
+        } catch (e) { return send(res, 400, { error: e.message, ...(e.existe ? { existe: true } : {}) }), true; }
+        const r = accounts.approve(id, creado.id);
+        return r.error ? send(res, 400, { error: r.error }) : send(res, 200, { ok: true, cliente: creado.nombre, codigo: creado.id, provisional: creado.provisional, telefono: r.account.phone, ...(r.pin ? { pin: r.pin } : {}) }), true;
+      }
       if (m[1] === "solicitudes" && m[3] === "aprobar") {
         const cust = customers.getById(String(b.clienteId ?? ""));
         if (!cust) return send(res, 400, { error: "Elige un cliente de la lista." }), true;

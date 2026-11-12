@@ -106,7 +106,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
              ON CONFLICT(id) DO UPDATE SET name = excluded.name, legal_name = COALESCE(excluded.legal_name, legal_name), city = COALESCE(excluded.city, city), municipio = COALESCE(excluded.municipio, municipio),
                phone = COALESCE(excluded.phone, phone), address = COALESCE(excluded.address, address),
                recargo = excluded.recargo, active = excluded.active, updated_at = excluded.updated_at`,
-          ).run(id, String(c.name).trim(), c.legalName ?? null, c.city ?? null, String(c.municipio ?? "").trim() || null, c.phone ?? phones9(c)[0] ?? null, c.address ?? null, c.recargoEquivalencia ? 1 : 0, c.active === false ? 0 : 1, now);
+          ).run(id, String(c.name).trim(), c.legalName ?? null, c.city ?? null, String(c.municipio ?? "").trim() || null, c.phone ?? phones9(c)[0] ?? null, c.address ?? null, (c.recargoEquivalencia === undefined ? byId.get(id)?.recargo : c.recargoEquivalencia) ? 1 : 0, c.active === false ? 0 : 1, now); // un Excel sin el dato del recargo no lo borra
           // El NIF no se guarda: solo la huella de sus 6 primeros dígitos (nif-key.js). Si el cliente ya trae las huellas, se usan tal cual.
           const keys = Array.isArray(c.nifKeys) ? c.nifKeys : c.nif ? nifKeys(id, c.nif) : [];
           if (keys.length) db.prepare("UPDATE customers SET nif_keys = ? WHERE id = ?").run(JSON.stringify(keys), id);
@@ -224,7 +224,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
              OR EXISTS (SELECT 1 FROM customer_phones p WHERE p.customer_id = c.id AND p.phone LIKE ?) OR EXISTS (SELECT 1 FROM customer_emails e WHERE e.customer_id = c.id AND e.email LIKE ?)`,
         )
         .get(like, like, like, like, like, like, like).n;
-      return { total, rows: rows.map((r) => ({ id: r.id, name: r.name, legalName: r.legal_name ?? "", city: r.city ?? "", phones: r.phones ? r.phones.split(" ") : [], emails: r.emails ? r.emails.split(" ") : [], active: !!r.active })) };
+      return { total, rows: rows.map((r) => ({ id: r.id, name: r.name, legalName: r.legal_name ?? "", city: r.city ?? "", address: r.address ?? "", municipio: r.municipio ?? "", recargoEquivalencia: !!r.recargo, phones: r.phones ? r.phones.split(" ") : [], emails: r.emails ? r.emails.split(" ") : [], active: !!r.active })) };
     },
     /** Los artículos que más clientes distintos compran (solo identificadores y nunca de quién): mínimo 3 clientes, para no delatar a ninguno. */
     topProducts: (limit = 8) => db.prepare("SELECT product_id AS id FROM purchases GROUP BY product_id HAVING COUNT(DISTINCT customer_id) >= 3 ORDER BY COUNT(DISTINCT customer_id) DESC, COUNT(*) DESC LIMIT ?").all(limit).map((r) => r.id),

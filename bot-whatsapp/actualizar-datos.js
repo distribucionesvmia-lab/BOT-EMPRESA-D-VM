@@ -3,7 +3,9 @@
 // se vuelve a leer y comparar el mismo Excel, así lo que se aplica es siempre lo que acaba de verse.
 import fs from "node:fs";
 import path from "node:path";
-import { parseClientesXlsx } from "./clientes-import.js";
+import { parseClientesXlsx, extractPhones, extractEmails } from "./clientes-import.js";
+import { parseNumber, PRECIO_MAXIMO } from "./productos-import.js";
+import { nifKeys } from "./nif-key.js";
 import { parseHistorialXlsx } from "./historial-import.js";
 import { unzip, readXlsx } from "./xlsx-read.js";
 import { leerExcel, saltosDePrecio } from "./actualizar-productos.js";
@@ -13,6 +15,27 @@ import { compararProductos, aplicarProductos, CAMPOS, vendible } from "./product
 const MUESTRA = 40; // filas de detalle que se enseñan por apartado
 const MIN_RATIO = 0.5; // un Excel con menos de la mitad de lo que hay se rechaza: casi seguro está incompleto
 export const TIPOS = ["productos", "clientes", "historial", "fotos"];
+const ETIQUETA_TIPO = { productos: "de productos o artículos", clientes: "de clientes", historial: "del historial de compras", fotos: "de fotos (ZIP)" };
+const TARJETA_TIPO = { productos: "Productos y precios", clientes: "Clientes", historial: "Historial de compras", fotos: "Fotos de productos (ZIP)" };
+const nrm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+
+/**
+ * Mira el archivo y dice qué tipo de datos es: «productos» (artículos o tarifa de a3ERP), «clientes», «historial» (listado de compras) o «fotos» (un ZIP de imágenes);
+ * null si no se reconoce. Se usa para avisar antes de aplicar nada si se ha subido en la tarjeta equivocada.
+ */
+export function detectarTipo(buf) {
+  try {
+    if (buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b && !buf.includes("xl/workbook.xml")) return "fotos"; // un zip que no es un Excel
+    for (const fila of readXlsx(buf).slice(0, 40)) {
+      const h = fila.map(nrm);
+      const tiene = (re) => h.some((c) => re.test(c));
+      if (tiene(/^cod/) && tiene(/^organizacion/)) return "clientes";
+      if (tiene(/^fecha/) && tiene(/documento/) && tiene(/^(unidades|cantidad)/)) return "historial";
+      if (tiene(/(precio|tarifa|pvp)/) && tiene(/^(descrip|nombre|denomin|articulo)/) && !tiene(/^fecha/)) return "productos";
+    }
+  } catch { /* archivo que no se puede leer: lo dirá el proceso normal */ }
+  return null;
+}
 
 /** Ancho y alto de un PNG o JPEG (null si no se reconoce). Sirve para avisar de fotos de baja resolución. */
 export function dimensiones(b) {
@@ -231,12 +254,72 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     };
   }
 
+  // ---------- altas a mano: un producto o un cliente sueltos, sin Excel ----------
+  const limpia = (s) => String(s ?? "").replace(/\s+/g, " ").trim();
+  function falla(msg, extra = {}) { return Object.assign(new Error(msg), extra); }
+  function anadirProducto(d, { actualizar = false } = {}) {
+    const id = limpia(d.codigo);
+    if (!/^[\w.-]{1,40}$/.test(id)) throw falla("Escribe el código del artículo (letras, números, punto o guion, sin espacios).");
+    const name = limpia(d.nombre);
+    if (name.length < 2 || name.length > 120) throw falla("Escribe el nombre del artículo.");
+    const price = parseNumber(d.precio);
+    if (price === null || !(price > 0) || price > PRECIO_MAXIMO) throw falla("Escribe el precio por unidad, sin IVA (mayor que 0).");
+    const vat = Number(d.iva);
+    if (![4, 10, 21].includes(vat)) throw falla("Elige el IVA: 4 %, 10 % o 21 %.");
+    const upbTxt = limpia(d.unidadesCaja), upb = upbTxt === "" ? null : Number(upbTxt);
+    if (upb !== null && (!Number.isInteger(upb) || upb < 1 || upb > 5000)) throw falla("Las unidades por caja deben ser un número entero (1 o más).");
+    const saleMode = d.modo === "caja" || d.modo === "ambos" ? d.modo : undefined;
+    if (saleMode === "ambos" && !(upb > 1)) throw falla("«Caja o unidad» necesita las unidades por caja (más de 1).");
+    const dto = limpia(d.descuento) === "" ? null : parseNumber(d.descuento);
+    if (dto !== null && (dto < 0 || dto > 100)) throw falla("El descuento debe estar entre 0 y 100.");
+    const antes = catalogDb.get(id);
+    if (antes && !actualizar) throw falla(`Ya existe el artículo ${id} (${antes.name}). Si quieres cambiarlo, confirma que se actualice.`, { existe: true });
+    const cat = limpia(d.categoria) ? { category: limpia(d.categoria), ...(limpia(d.subcategoria) ? { subcategory: limpia(d.subcategoria) } : {}) } : antes?.category ? {} : clasificar({ id, name }, familias);
+    const prod = { id, name, price: Math.round(price * 1e4) / 1e4, vat, unitsPerBox: upb && upb > 1 ? upb : null, ...(saleMode ? { saleMode } : {}), ...(dto !== null ? { discount: dto } : {}), active: true, ...cat };
+    catalogDb.upsertProducts([prod], { partial: true });
+    registro({ at: new Date().toISOString(), tipo: "producto a mano", fichero: "", resumen: { id, name }, resultado: { creado: !antes } });
+    onChange("productos");
+    return { id, nombre: name, creado: !antes, categoria: prod.category ?? null };
+  }
+  /** Siguiente código provisional para un cliente nuevo que aún no tiene el de a3ERP: P00001, P00002… */
+  const codigoProvisional = () => { const n = customersDb.list().map((c) => /^P(\d{5})$/.exec(c.id)).filter(Boolean).map((m) => Number(m[1])); return "P" + String((n.length ? Math.max(...n) : 0) + 1).padStart(5, "0"); };
+  function anadirCliente(d, { actualizar = false } = {}) {
+    const name = limpia(d.nombre);
+    if (name.length < 2 || name.length > 80) throw falla("Escribe el nombre comercial del cliente.");
+    let id = limpia(d.codigo), provisional = false;
+    if (id && !/^[\w-]{1,20}$/.test(id)) throw falla("El código del cliente solo puede llevar letras, números y guion (máximo 20).");
+    if (!id) { id = codigoProvisional(); provisional = true; }
+    const antes = customersDb.getById(id);
+    if (antes && !actualizar) throw falla(`Ya existe el cliente ${id} (${antes.name}). Si quieres cambiarlo, confirma que se actualice.`, { existe: true });
+    const nifTxt = limpia(d.nif).toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (nifTxt && (!/^[A-Z0-9]{8,10}$/.test(nifTxt) || nifTxt.replace(/\D/g, "").length < 6)) throw falla("El DNI, NIE o CIF no parece válido (por ejemplo 12345678Z o B12345678).");
+    const phones = extractPhones(d.telefono), emails = extractEmails(d.correo);
+    if (limpia(d.telefono) && !phones.length) throw falla("El teléfono no es válido (9 cifras).");
+    if (limpia(d.correo) && !emails.length) throw falla("El correo no es válido.");
+    const municipio = limpia(d.municipio).replace(/\D/g, "");
+    if (municipio && municipio.length !== 5) throw falla("El código de municipio tiene 5 cifras (Medina del Campo: 47085).");
+    const poblacion = limpia(d.poblacion), calle = limpia(d.direccion);
+    const cliente = {
+      id, name, legalName: limpia(d.razonSocial) && limpia(d.razonSocial).toLowerCase() !== name.toLowerCase() ? limpia(d.razonSocial) : "",
+      ...(nifTxt ? { nifKeys: nifKeys(id, nifTxt) } : {}), city: poblacion, municipio, address: calle && poblacion && !nrm(calle).includes(nrm(poblacion)) ? `${calle}, ${poblacion}` : calle || poblacion, // si la dirección ya trae la población, no se repite
+      ...(phones.length ? { phones, phone: phones[0] } : {}), ...(emails.length ? { emails } : {}), active: true, ...(d.recargo !== undefined ? { recargoEquivalencia: !!d.recargo } : {}),
+    };
+    customersDb.upsertCustomers([cliente]);
+    accountsDb.ensureMany([id]); // ya tiene su cuenta lista para entrar con el DNI/CIF o con teléfono y contraseña
+    registro({ at: new Date().toISOString(), tipo: "cliente a mano", fichero: "", resumen: { id, name }, resultado: { creado: !antes, provisional } });
+    onChange("clientes");
+    return { id, nombre: name, creado: !antes, provisional, sinNif: !nifTxt, sinTelefono: !phones.length };
+  }
+
   const por = { productos, clientes, historial, fotos };
   const preparar = (tipo, buf) => {
     if (!por[tipo]) throw new Error("Tipo de datos desconocido.");
+    const real = detectarTipo(buf);
+    if (real && real !== tipo) throw new Error(`Este archivo parece un Excel ${ETIQUETA_TIPO[real]}, no ${ETIQUETA_TIPO[tipo]}. Súbelo en la tarjeta «${TARJETA_TIPO[real]}».`);
     return por[tipo](buf);
   };
   return {
+    anadirProducto, anadirCliente,
     vistaPrevia(tipo, buf) {
       const { aplicar: _a, ...r } = preparar(tipo, buf);
       return r;

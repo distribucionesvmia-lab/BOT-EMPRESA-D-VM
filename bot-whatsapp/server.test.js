@@ -727,3 +727,51 @@ test("RECORDATORIOS DE HOY: solo la empresa los ve; «Ya avisado» y «No avisar
   const despues = (await call("GET", "/api/admin/recordatorios", { admin: true })).json;
   assert.ok(!despues.filas.some((f) => f.id === "7001"));
 });
+
+test("ALTAS A MANO: un producto y un cliente sueltos desde el panel, con sus avisos y sin duplicados", async () => {
+  assert.equal((await call("POST", "/api/admin/productos/nuevo", { body: {} })).status, 403);
+  const malo = (b) => call("POST", "/api/admin/productos/nuevo", { admin: true, body: b });
+  assert.match((await malo({ codigo: "ZZ 1", nombre: "X", precio: 1, iva: 21 })).json.error, /código/);
+  assert.match((await malo({ codigo: "M100", nombre: "Mermelada manual", precio: 0, iva: 21 })).json.error, /precio/);
+  assert.match((await malo({ codigo: "M100", nombre: "Mermelada manual", precio: 2, iva: 7 })).json.error, /IVA/);
+  assert.match((await malo({ codigo: "M100", nombre: "Mermelada manual", precio: 2, iva: 10, modo: "ambos" })).json.error, /unidades por caja/);
+  const ok = await malo({ codigo: "M100", nombre: "Mermelada manual 340", precio: "2,5", iva: 10, unidadesCaja: 8, modo: "ambos" });
+  assert.equal(ok.status, 200, JSON.stringify(ok.json)); assert.equal(ok.json.creado, true);
+  const dup = await malo({ codigo: "M100", nombre: "Mermelada manual 340", precio: 3, iva: 10, unidadesCaja: 8, modo: "ambos" });
+  assert.equal(dup.status, 400); assert.equal(dup.json.existe, true); // no pisa uno que ya existe sin confirmarlo
+  const act = await malo({ codigo: "M100", nombre: "Mermelada manual 340", precio: 3, iva: 10, unidadesCaja: 8, modo: "caja", actualizar: true });
+  assert.equal(act.status, 200); assert.equal(act.json.creado, false);
+
+  const cli = (b) => call("POST", "/api/admin/clientes/nuevo", { admin: true, body: b });
+  assert.equal((await call("POST", "/api/admin/clientes/nuevo", { body: {} })).status, 403);
+  assert.match((await cli({ nombre: "X" })).json.error, /nombre comercial/);
+  assert.match((await cli({ nombre: "Bar Manual", nif: "123" })).json.error, /DNI/);
+  assert.match((await cli({ nombre: "Bar Manual", telefono: "12" })).json.error, /teléfono/);
+  const a = await cli({ codigo: "M777", nombre: "Bar Manual", razonSocial: "Bar Manual SL", nif: "54321098K", telefono: "983 11 22 33", correo: "manual@ejemplo.es", direccion: "Calle Real 4", poblacion: "Medina del Campo", municipio: "47085", recargo: true });
+  assert.equal(a.status, 200, JSON.stringify(a.json)); assert.equal(a.json.provisional, false);
+  assert.equal((await cli({ codigo: "M777", nombre: "Otro" })).json.existe, true);
+  const prov = await cli({ nombre: "Cliente sin código" }); // aún sin el código de a3ERP: se le da uno provisional
+  assert.equal(prov.status, 200); assert.match(prov.json.id, /^P\d{5}$/); assert.equal(prov.json.provisional, true); assert.equal(prov.json.sinNif, true);
+  // la ficha completa está en la base de clientes y entra con su DNI/CIF
+  const lista = (await call("GET", "/api/admin/clientes/lista?q=manual", { admin: true })).json.clientes.find((c) => c.id === "M777");
+  assert.equal(lista.address, "Calle Real 4, Medina del Campo"); assert.equal(lista.recargoEquivalencia, true); assert.ok(lista.cuenta);
+  const nif = await entrarNif("543210");
+  assert.equal(nif.status, 200, JSON.stringify(nif.json));
+});
+
+test("ALTA DE UN CLIENTE NUEVO POR EL BOT: la empresa lo acepta y se crea su ficha con todos sus datos (y el DNI/CIF se borra de la solicitud)", async () => {
+  const reg = await call("POST", "/api/registro", { body: { telefono: "655 12 12 12", correo: "nuevo.alta@ejemplo.es", empresa: "Taberna Nueva Alta", pin: "Ab12Cd", nif: "87654321X", direccion: "Plaza Mayor 3, Medina del Campo" } });
+  assert.equal(reg.status, 200, JSON.stringify(reg.json)); assert.equal(reg.json.estado, "pendiente");
+  const sol = (await call("GET", "/api/admin/solicitudes", { admin: true })).json.find((s) => s.business === "Taberna Nueva Alta");
+  assert.ok(sol); assert.equal(sol.address, "Plaza Mayor 3, Medina del Campo"); assert.equal(sol.nif, "87654321X");
+  const r = await call("POST", `/api/admin/solicitudes/${sol.id}/aprobar`, { admin: true, body: { nuevo: { codigo: "N4242", poblacion: "Medina del Campo", municipio: "47085" } } });
+  assert.equal(r.status, 200, JSON.stringify(r.json)); assert.equal(r.json.codigo, "N4242"); assert.equal(r.json.telefono, "655121212");
+  // su ficha tiene todos los datos
+  const c = (await call("GET", "/api/admin/clientes/lista?q=taberna nueva", { admin: true })).json.clientes.find((x) => x.id === "N4242");
+  assert.equal(c.name, "Taberna Nueva Alta"); assert.equal(c.address, "Plaza Mayor 3, Medina del Campo"); assert.deepEqual(c.phones, ["655121212"]);
+  assert.equal((await call("GET", "/api/admin/solicitudes", { admin: true })).json.some((s) => s.id === sol.id), false); // ya no está pendiente
+  // y el DNI/CIF ya no se conserva en la solicitud, pero sí entra con él y con teléfono + contraseña
+  assert.equal((await entrarNif("876543", "Taberna Nueva Alta")).status, 200);
+  assert.equal((await call("POST", "/api/acceso", { body: { telefono: "655121212", empresa: "Taberna Nueva Alta", pin: "ab12cd" } })).status, 200);
+  assert.equal((await call("POST", `/api/admin/solicitudes/${sol.id}/aprobar`, { admin: true, body: { nuevo: {} } })).status, 404); // ya resuelta
+});

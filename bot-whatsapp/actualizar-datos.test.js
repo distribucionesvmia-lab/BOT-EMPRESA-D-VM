@@ -82,7 +82,7 @@ test("historial: solo se reescribe el de los clientes cuyo histórico cambia", (
 test("tipo desconocido o Excel que no es del tipo: error claro", () => {
   const { a } = montar();
   assert.throws(() => a.vistaPrevia("pedidos", prod()), /desconocido/);
-  assert.throws(() => a.vistaPrevia("clientes", prod(["1", "X", "1", "RED10", "1", "No", "No"])), /cabecera/);
+  assert.throws(() => a.vistaPrevia("clientes", prod(["1", "X", "1", "RED10", "1", "No", "No"])), /parece un Excel de productos o artículos, no de clientes/);
 });
 
 import { zip } from "./zip.js";
@@ -161,4 +161,19 @@ test("productos: un Excel sin código de familia no cambia la categoría de los 
   const p = a.vistaPrevia("productos", prod(["1", "AGUA BEZOYA 1 L", "1,20", "RED10", "6", "No", "No"], ["2", "CERVEZA MAHOU LATA", "0,60", "ORD21", "24", "No", "No"]));
   assert.equal(p.resumen.modificados, 1); // solo cambia el precio
   assert.deepEqual(p.detalle.modificados[0].cambios.map((c) => c.campo).includes("Categoría"), false);
+});
+
+test("detecta de qué tipo es cada Excel y avisa si se sube en la tarjeta equivocada", async () => {
+  const { detectarTipo } = await import("./actualizar-datos.js");
+  const prod = buildWorkbook([{ name: "a", rows: [["Cód. artículo", "Artículo", "Precio venta", "Tipo IVA ventas", "Unidades paquete venta", "MODO DE VENTA"], ["1", "AGUA", 1, "RED10", 6, 3]] }]);
+  const cli = buildWorkbook([{ name: "a", rows: [["Cód. cliente", "Organización", "Razón social", "Población", "Dirección fiscal", "Teléfono", "E-Mail", "NIF"], ["1", "BAR UNO", "BAR UNO SL", "MEDINA", "CL UNO", "983000000", "", "12345678Z"]] }]);
+  const his = buildWorkbook([{ name: "a", rows: [["Artículo", "Descripción", "Unidades", "Fecha", "Precio", "Nº Documento", "Cliente"], ["1", "AGUA", 2, 46309, 1, "202608793", "0429"]] }]);
+  const art = buildWorkbook([{ name: "a", rows: [["", "   2-SOLO CAJA  3-CAJA ó UNID"], ["Cód. artículo", "Artículo", "Precio venta", "Tipo IVA ventas", "Unidades paquete venta", "Obsoleto", "Bloqueado", "MODO DE VENTA"], ["1", "AGUA", 1, "RED10", 6, "No", "No", 2]] }]); // como el de a3ERP: una fila de notas arriba
+  assert.equal(detectarTipo(Buffer.from(prod)), "productos"); assert.equal(detectarTipo(Buffer.from(art)), "productos");
+  assert.equal(detectarTipo(Buffer.from(cli)), "clientes"); assert.equal(detectarTipo(Buffer.from(his)), "historial");
+  assert.equal(detectarTipo(Buffer.from("PK\u0003\u0004 fotos/a.jpg")), "fotos"); assert.equal(detectarTipo(Buffer.from("no es un excel")), null);
+  // el actualizador rechaza el archivo equivocado antes de tocar nada
+  const act = crearActualizador({ catalogDb: openCatalogDb(":memory:"), customersDb: { count: () => 0, list: () => [], getById: () => null, upsertCustomers: () => ({ added: 0, updated: 0 }) }, accountsDb: { ensureMany: () => 0 } });
+  assert.throws(() => act.vistaPrevia("clientes", Buffer.from(prod)), /parece un Excel de productos o artículos, no de clientes\. Súbelo en la tarjeta «Productos y precios»/);
+  assert.throws(() => act.vistaPrevia("productos", Buffer.from(cli)), /parece un Excel de clientes/);
 });

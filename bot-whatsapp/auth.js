@@ -116,7 +116,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         if (r.error) return send(res, 400, { error: r.error }), true;
         return send(res, 200, { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono, el nombre de tu empresa y tu contraseña." }), true;
       }
-      const r = accounts.requestRegistration({ phone: b.telefono, email: correo, business: empresa, pin, nif }); // el DNI/CIF solo se guarda aquí (cliente nuevo) y se borra al resolver la solicitud
+      const r = accounts.requestRegistration({ phone: b.telefono, email: correo, business: empresa, pin, nif, address: b.direccion }); // el DNI/CIF solo se guarda aquí (cliente nuevo) y se borra al resolver la solicitud
       if (r.error) return send(res, 400, { error: r.error }), true;
       const motivo = { ambiguo: "Hay varios clientes que encajan", contacto: "El nombre coincide pero no el teléfono ni el correo", nombre: "No hay ningún cliente con ese nombre" }[m.reason];
       accounts.setMatched(r.id, motivo);

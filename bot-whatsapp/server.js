@@ -443,7 +443,7 @@ async function accountChat(account, text, msgId) {
 }
 
 // Cuenta de alta automática aún sin confirmar por la empresa: puede pedir, pero sus pedidos se retienen hasta que alguien los revise
-const holdIfUnconfirmed = (account, order) => (account.verified ? order : { ...order, review: true, reason: "Cuenta de alta automática sin confirmar: comprueba que es el cliente antes de exportar" });
+const holdIfUnconfirmed = (account, order) => (/^P\d{5}$/.test(String(account.customerId)) ? { ...order, review: true, reason: "Cliente nuevo con código provisional: ponle su código de a3ERP antes de exportar" } : account.verified ? order : { ...order, review: true, reason: "Cuenta de alta automática sin confirmar: comprueba que es el cliente antes de exportar" });
 const isJson = (req) => /^application\/json/i.test(req.headers["content-type"] ?? "");
 
 async function appRoutes(req, res, url) {

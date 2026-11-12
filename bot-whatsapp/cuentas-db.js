@@ -96,6 +96,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   db.exec("CREATE TABLE IF NOT EXISTS rights (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, tipo TEXT NOT NULL, texto TEXT, estado TEXT NOT NULL DEFAULT 'pendiente', created_at TEXT NOT NULL, resolved_at TEXT)");
   addCol("accounts", "deleted_at", "TEXT");
   addCol("registrations", "pin_hash", "TEXT");
+  addCol("registrations", "address", "TEXT"); // dirección (calle y localidad) que escribe un cliente nuevo: pasa a su ficha al aceptarlo
   addCol("registrations", "nif", "TEXT"); // DNI/NIE/CIF que escribe un cliente nuevo: la empresa lo necesita para darlo de alta; se borra al resolver la solicitud
   addCol("registrations", "matched", "TEXT");
   addCol("accounts", "verified", "INTEGER NOT NULL DEFAULT 1");
@@ -220,7 +221,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     },
 
     /** El cliente pide acceso. Devuelve { id } o { error }. Una solicitud pendiente del mismo teléfono se actualiza. */
-    requestRegistration({ phone, email, business, pin, nif }, now = new Date().toISOString()) {
+    requestRegistration({ phone, email, business, pin, nif, address }, now = new Date().toISOString()) {
       const p = normalizePhone(phone);
       const biz = String(business ?? "").trim().replace(/\s+/g, " ");
       if (!p) return { error: "El teléfono no es válido." };
@@ -230,19 +231,20 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       const mail = String(email).trim();
       const dni = nif === undefined ? null : String(nif).toUpperCase().replace(/[^A-Z0-9]/g, "");
       if (dni !== null && !/^[A-Z0-9]{8,10}$/.test(dni)) return { error: "Escribe tu DNI, NIE o CIF." };
+      const dir = String(address ?? "").trim().replace(/\s+/g, " ").slice(0, 160) || null;
       const hash = pin === undefined ? null : hashPin(normPin(pin));
       const open = db.prepare("SELECT id FROM registrations WHERE phone = ? AND status = 'pending'").get(p);
       if (open) {
-        db.prepare("UPDATE registrations SET email = ?, business = ?, pin_hash = ?, nif = ?, created_at = ? WHERE id = ?").run(mail, biz, hash, dni, now, open.id);
+        db.prepare("UPDATE registrations SET email = ?, business = ?, pin_hash = ?, nif = ?, address = ?, created_at = ? WHERE id = ?").run(mail, biz, hash, dni, dir, now, open.id);
         return { id: Number(open.id) };
       }
       if (db.prepare("SELECT COUNT(*) AS n FROM registrations WHERE status = 'pending'").get().n >= 300) return { error: "Hay demasiadas solicitudes pendientes. Inténtalo más tarde." };
-      return { id: Number(db.prepare("INSERT INTO registrations (phone, email, business, pin_hash, nif, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(p, mail, biz, hash, dni, now).lastInsertRowid) };
+      return { id: Number(db.prepare("INSERT INTO registrations (phone, email, business, pin_hash, nif, address, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(p, mail, biz, hash, dni, dir, now).lastInsertRowid) };
     },
     /** Anota qué datos coincidieron con la base de clientes (se muestra a la empresa). */
     setMatched: (id, text) => void db.prepare("UPDATE registrations SET matched = ? WHERE id = ?").run(text, id),
     listRegistrations: (status = "pending") =>
-      db.prepare("SELECT id, phone, email, business, nif, status, customer_id AS customerId, matched, created_at AS createdAt FROM registrations WHERE status = ? ORDER BY id").all(status).map((r) => ({ ...r })),
+      db.prepare("SELECT id, phone, email, business, nif, address, status, customer_id AS customerId, matched, created_at AS createdAt FROM registrations WHERE status = ? ORDER BY id").all(status).map((r) => ({ ...r })),
 
     /** La empresa aprueba: liga el teléfono al cliente elegido y genera el PIN (se devuelve UNA vez). */
     approve(id, customerId, now = new Date().toISOString()) {
@@ -260,7 +262,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
           db.prepare("UPDATE accounts SET phone = ?, email = ?, pin_hash = ?, status = CASE WHEN status = 'deleted' THEN 'active' ELSE status END WHERE id = ?").run(r.phone, r.email, r.pin_hash ?? hashPin(pin), pre.id);
           accId = pre.id;
         } else accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, created_at) VALUES (?, ?, ?, ?, ?)").run(String(customerId), r.phone, r.email, r.pin_hash ?? hashPin(pin), now).lastInsertRowid);
-        db.prepare("UPDATE registrations SET status = 'approved', nif = NULL, customer_id = ?, decided_at = ? WHERE id = ?").run(String(customerId), now, id);
+        db.prepare("UPDATE registrations SET status = 'approved', nif = NULL, address = NULL, customer_id = ?, decided_at = ? WHERE id = ?").run(String(customerId), now, id);
         db.exec("COMMIT");
         return { account: accountOut(byId.get(accId)), ...(pin ? { pin } : {}) };
       } catch (e) {
@@ -297,7 +299,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     /** La empresa confirma una cuenta automática: sus pedidos ya no se retienen. */
     confirm: (accountId) => db.prepare("UPDATE accounts SET verified = 1 WHERE id = ?").run(accountId).changes === 1,
     reject(id, now = new Date().toISOString()) {
-      return db.prepare("UPDATE registrations SET status = 'rejected', nif = NULL, decided_at = ? WHERE id = ? AND status = 'pending'").run(now, id).changes === 1;
+      return db.prepare("UPDATE registrations SET status = 'rejected', nif = NULL, address = NULL, decided_at = ? WHERE id = ? AND status = 'pending'").run(now, id).changes === 1;
     },
 
     listAccounts: () => db.prepare("SELECT * FROM accounts ORDER BY id").all().map(accountOut),
