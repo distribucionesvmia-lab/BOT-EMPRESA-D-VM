@@ -284,3 +284,13 @@ test("BIENVENIDA: el saludo va dentro de la tarjeta de inicio (un solo mensaje a
   assert.match(cli, /if \(j\.ui\?\.home\) window\.__saludo = String\(j\.reply\)\.split\("\\n\\n"\)\[0\]; else burbuja\([^;]*"in"\); \(j\.cards \?\? \[\]\)\.forEach\(tarjetaTabla\); if \(j\.ui\) interactivo\(j\.ui\);/); // un comentario en esa línea se comía la tarjeta
   assert.match(cli, /className = "pasos"/); assert.match(cli, /fila\.className = "mrow in"; const av = document\.createElement\("div"\); av\.className = "av"/);
 });
+
+test("ALTAS A MANO Y CLIENTE NUEVO: formularios en el panel (producto, cliente y «crear su ficha» al aceptar una solicitud) y dirección en el alta del cliente", async () => {
+  const fs = await import("node:fs");
+  const emp = fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8"), cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  assert.match(emp, /id="alta-prod"/); assert.match(emp, /id="alta-cli"/);
+  assert.match(emp, /\/api\/admin\/productos\/nuevo/); assert.match(emp, /\/api\/admin\/clientes\/nuevo/);
+  assert.match(emp, /Es cliente nuevo: crear su ficha/); assert.match(emp, /\{ nuevo: form\.valores\(\) \}/);
+  assert.match(emp, /Modo de venta \(2 = solo caja, 3 = caja o unidad\)/);
+  assert.match(cli, /id="r-dir"/); assert.match(cli, /direccion: \$\("r-dir"\)\.value/);
+});

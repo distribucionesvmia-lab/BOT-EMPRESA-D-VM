@@ -82,3 +82,9 @@ El Excel de la tarifa de a3ERP trae las fotos como **miniaturas de 64 píxeles**
 
 ## Modo de venta
 Si el Excel trae la columna **MODO DE VENTA** (2 = solo caja, 3 = caja o unidad), se importa y se enseña en la vista previa como «Modo de venta». Los artículos de solo caja (con más de 1 unidad por caja) se piden únicamente por cajas enteras; los de «caja o unidad» dejan elegir. Los artículos con «Bloqueado» u «Obsoleto» = si se quitan del catálogo.
+
+## Altas a mano y clientes nuevos
+- **El sistema reconoce solo qué es cada Excel** (productos o artículos de a3ERP, tarifa, clientes, historial de compras, ZIP de fotos). Si subes uno en la tarjeta equivocada, avisa «este archivo parece un Excel de clientes…, súbelo en la tarjeta…» y no toca nada.
+- **Añadir un producto a mano:** pestaña «Datos y Excel» → «Añadir un producto a mano» (código, nombre, precio sin IVA, IVA 4/10/21, unidades por caja, modo de venta, descuento y categoría opcionales). Si el código ya existe, pregunta antes de actualizarlo.
+- **Añadir un cliente a mano:** pestaña «Clientes» → «Añadir un cliente a mano». Sin código de a3ERP se le da uno provisional (P00001…); sus pedidos quedan retenidos hasta que tenga el definitivo. Con DNI/CIF entra con sus 6 primeros dígitos (no se guarda el número, solo una huella).
+- **Un cliente nuevo se registra por el bot:** en «Solicitudes de alta» pulsa «Es cliente nuevo: crear su ficha». Se rellena con lo que escribió (nombre, DNI/CIF, dirección) y lo completas (código, razón social, población, municipio, recargo). Al aceptar se crea su ficha en la base de clientes con teléfono y correo, su cuenta queda activa y el DNI/CIF se borra de la solicitud.

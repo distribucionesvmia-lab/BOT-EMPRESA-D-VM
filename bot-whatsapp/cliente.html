@@ -392,6 +392,7 @@
         <label>Nombre de tu empresa o negocio<input id="r-emp" maxlength="80" required></label>
         <label>Teléfono<input id="r-tel" type="tel" inputmode="tel" required></label>
         <label>DNI, NIE o CIF<input id="r-nif" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 12345678Z o B12345678" required></label>
+        <label>Dirección de entrega (opcional)<input id="r-dir" maxlength="160" autocomplete="street-address" placeholder="Calle, número y localidad"></label>
         <label>Correo electrónico<input id="r-mail" type="email" autocomplete="email" required></label>
         <label>Elige una contraseña de 6 letras o números<input id="r-pin" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
         <label>Repite la contraseña<input id="r-pin2" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
@@ -486,7 +487,7 @@ $("ir-acceso").onclick = () => ver("acceso");
 $("f-registro").onsubmit = async (e) => {
   e.preventDefault(); $("r-err").textContent = ""; $("r-ok").textContent = "";
   if ($("r-pin").value.toUpperCase() !== $("r-pin2").value.toUpperCase()) { $("r-err").textContent = "Las dos contraseñas no coinciden."; return; }
-  const r = await post("/api/registro", { empresa: $("r-emp").value, telefono: $("r-tel").value, correo: $("r-mail").value, nif: $("r-nif").value, pin: $("r-pin").value });
+  const r = await post("/api/registro", { empresa: $("r-emp").value, telefono: $("r-tel").value, correo: $("r-mail").value, nif: $("r-nif").value, pin: $("r-pin").value, direccion: $("r-dir").value });
   const j = await r.json().catch(() => ({}));
   if (r.ok) {
     $("r-ok").textContent = j.mensaje; $("f-registro").reset();

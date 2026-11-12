@@ -171,6 +171,7 @@ const pendientes = [];
 const escribe = (p) => { pendientes.push(p); return p; };
 const adaptCatalogo = {
   list: () => cache.products.map((p) => ({ ...p, active: p.active !== false })),
+  get: (id) => { const p = cache.products.find((x) => String(x.id) === String(id)); return p ? { ...p, active: p.active !== false } : null; },
   upsertProducts(lista, { deactivateMissing = false } = {}) {
     const hoy = new Map(cache.products.map((p) => [String(p.id), p])), vistos = new Set(), r = { added: 0, updated: 0, unchanged: 0, deactivated: 0 };
     const salida = new Map(); // id → documento que debe quedar
@@ -232,7 +233,7 @@ window.VM = {
    * si coinciden el nombre y el teléfono (o el correo) de UN cliente, la cuenta queda activa al momento (sin confirmar); si no,
    * pasa a «Solicitudes de alta» para que la revise la empresa.
    */
-  async requestAccess({ phone, email, business, pin, nif }) {
+  async requestAccess({ phone, email, business, pin, nif, direccion }) {
     const p = phone9(phone), biz = String(business ?? "").trim().replace(/\s+/g, " "), mail = String(email ?? "").trim();
     if (biz.length < 2 || biz.length > 80) return { error: "Escribe el nombre de tu empresa." };
     if (!p) return { error: "El teléfono no es válido." };
@@ -253,7 +254,7 @@ window.VM = {
     }
     const open = cache.registrations.find((r) => r.phone === p && r.status === "pending");
     const id = open?.id ?? `r${Date.now().toString(36)}${uid()}`;
-    const doc = { id, phone: p, email: mail, business: biz, status: "pending", pinHash: pinHash(p, pin), nif: dni, matched: MOTIVOS[m.reason], createdAt: now };
+    const doc = { id, phone: p, email: mail, business: biz, status: "pending", pinHash: pinHash(p, pin), nif: dni, address: String(direccion ?? "").trim().replace(/\s+/g, " ").slice(0, 160) || null, matched: MOTIVOS[m.reason], createdAt: now };
     await (open ? backend.update("registrations", id, doc) : backend.set("registrations", id, doc));
     return { ok: true, estado: "pendiente", mensaje: "Hemos recibido tu solicitud. En un plazo de 24 a 48 horas nos pondremos en contacto contigo y se aceptará tu cuenta para que puedas hacer pedidos." };
   },
@@ -458,6 +459,28 @@ window.VM = {
   registrations: () => cache.registrations.filter((r) => r.status === "pending").sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)).map((r) => ({ ...r, sugerencias: matchRegistration({ phone: r.phone, email: r.email, business: r.business }).suggestions })),
   searchCustomers: (q) => cache.customers.filter((c) => !q || c.name.toLowerCase().includes(String(q).toLowerCase()) || c.id === q).slice(0, 15).map((c) => ({ id: c.id, name: c.name })),
   /** La empresa aprueba una solicitud: liga el teléfono al cliente elegido. Vale el PIN que eligió el cliente. */
+  /** Altas a mano (mismo código que el programa real): un producto o un cliente sueltos. */
+  async addProduct(d, { actualizar = false } = {}) {
+    if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para añadir productos.");
+    const r = actualizador.anadirProducto(d, { actualizar }); await Promise.all(pendientes.splice(0)); return r;
+  },
+  async addCustomer(d, { actualizar = false } = {}) {
+    if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para añadir clientes.");
+    const r = actualizador.anadirCliente(d, { actualizar }); await Promise.all(pendientes.splice(0)); return r;
+  },
+  /** Aceptar una solicitud como cliente NUEVO: se crea su ficha con los datos que dio y los que completa la empresa, y se acepta. */
+  async approveNew(regId, nuevo = {}) {
+    if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para aprobar solicitudes.");
+    const r = cache.registrations.find((x) => x.id === regId && x.status === "pending");
+    if (!r) throw new Error("La solicitud ya se resolvió.");
+    if (cache.accounts.some((a) => a.phone === r.phone)) throw new Error("Ese teléfono ya tiene una cuenta.");
+    const c = actualizador.anadirCliente({ codigo: nuevo.codigo, nombre: nuevo.nombre || r.business, razonSocial: nuevo.razonSocial, nif: nuevo.nif || r.nif, telefono: r.phone, correo: r.email, direccion: nuevo.direccion ?? r.address, poblacion: nuevo.poblacion, municipio: nuevo.municipio, recargo: nuevo.recargo === true });
+    await Promise.all(pendientes.splice(0));
+    const now = new Date().toISOString(), id = `a${Date.now().toString(36)}${uid()}`;
+    await backend.set("accounts", id, { id, customerId: c.id, phone: r.phone, email: r.email, pinHash: r.pinHash, status: "active", verified: true, createdAt: now });
+    await backend.update("registrations", r.id, { status: "approved", customerId: c.id, nif: null, address: null, decidedAt: now });
+    return { cliente: c.nombre, codigo: c.id, provisional: c.provisional, telefono: r.phone };
+  },
   async approve(regId, customerId) {
     if (!perms.isAdmin) throw new Error("Necesitas acceso de Editor para aprobar solicitudes.");
     const r = cache.registrations.find((x) => x.id === regId && x.status === "pending");

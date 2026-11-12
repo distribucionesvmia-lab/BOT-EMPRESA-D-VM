@@ -424,6 +424,10 @@
   @media (max-width:360px) { .vm-inicio .pasos { grid-template-columns:1fr; } .vm-inicio .pasos .paso { flex-direction:row; text-align:left; gap:10px; } }
   .mrow:has(.vm-inicio) { align-items:flex-start; } .mrow:has(.vm-inicio) .av { margin-top:2px; }
   .vm-inicio .fila button.vm-link { background:none !important; color:#a80000 !important; box-shadow:none !important; padding:10px 0 !important; min-height:48px; justify-content:flex-start; text-align:left; text-decoration:underline; font-size:calc(15px / var(--k,1)); }
+  .alta-sum { font-weight:600; min-height:44px; display:flex; align-items:center; cursor:pointer; } .form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap:10px 14px; margin:10px 0; }
+  .form-grid label { display:flex; flex-direction:column; gap:4px; font-size:calc(13px / var(--k,1)); color:var(--muted); } .form-grid label .lab { font-weight:600; color:var(--fg); } .form-grid input[type=text], .form-grid input[type=email], .form-grid input[type=tel], .form-grid select { min-height:44px; padding:0 10px; border:1px solid var(--line); border-radius:8px; font:inherit; background:var(--bg); color:var(--fg); }
+  .form-grid label.chk { flex-direction:row; align-items:center; gap:10px; min-height:44px; } .form-grid label.chk input { width:22px; height:22px; }
+  .alta-msg { min-height:1.2em; margin:6px 0 0; font-size:calc(13px / var(--k,1)); } .alta-msg.err { color:var(--hold); } .alta-msg.ok { color:var(--accent); }
 </style>
 
 <button type="button" class="tecnico-btn" id="tecnico-btn">Técnico</button>
@@ -500,6 +504,7 @@
         <label>Nombre de tu empresa o negocio<input id="r-emp" maxlength="80" required></label>
         <label>Teléfono<input id="r-tel" type="tel" inputmode="tel" required></label>
         <label>DNI, NIE o CIF<input id="r-nif" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 12345678Z o B12345678" required></label>
+        <label>Dirección de entrega (opcional)<input id="r-dir" maxlength="160" autocomplete="street-address" placeholder="Calle, número y localidad"></label>
         <label>Correo electrónico<input id="r-mail" type="email" autocomplete="email" required></label>
         <label>Elige una contraseña de 6 letras o números<input id="r-pin" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
         <label>Repite la contraseña<input id="r-pin2" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
@@ -625,6 +630,7 @@
       </div>
 
       <div id="p-clientes" hidden>
+      <details class="panel" id="alta-cli"><summary class="alta-sum">Añadir un cliente a mano</summary><div id="alta-cli-cuerpo"></div></details>
       <div class="panel">
         <h2>Clientes</h2>
         <p class="msg">La lista de clientes con la que el sistema comprueba las altas (nombre comercial o razón social, teléfono y correo).</p>
@@ -635,6 +641,7 @@
       </div>
 
       <div id="p-datos" class="datos-wrap" hidden>
+        <details class="panel" id="alta-prod"><summary class="alta-sum">Añadir un producto a mano</summary><div id="alta-prod-cuerpo"></div></details>
         <div class="panel">
           <h2>Datos y Excel</h2>
           <p class="msg">Sube aquí los Excel de a3ERP (y las fotos). Siempre pasa lo mismo: <b>1</b> eliges el archivo, <b>2</b> «Ver cambios» te enseña qué se añade, qué cambia y qué se quita <b>sin tocar nada</b>, y <b>3</b> «Aplicar cambios» escribe solo las diferencias. Orden recomendado la primera vez: <b>clientes → productos → historial → fotos</b>. En esta demo se aplica sobre los datos de ejemplo.</p>
@@ -759,7 +766,7 @@ $("ir-acceso").onclick = () => { pantallaCliente.reg = false; pantallaCliente();
 $("f-registro").onsubmit = async (e) => {
   e.preventDefault(); $("r-err").textContent = ""; $("r-ok").textContent = "";
   if ($("r-pin").value.toUpperCase() !== $("r-pin2").value.toUpperCase()) { $("r-err").textContent = "Las dos contraseñas no coinciden."; return; }
-  const r = await VM.requestAccess({ business: $("r-emp").value, phone: $("r-tel").value, email: $("r-mail").value, nif: $("r-nif").value, pin: $("r-pin").value });
+  const r = await VM.requestAccess({ business: $("r-emp").value, phone: $("r-tel").value, email: $("r-mail").value, nif: $("r-nif").value, pin: $("r-pin").value, direccion: $("r-dir").value });
   if (r.error) { $("r-err").textContent = r.error; return; }
   $("r-ok").textContent = r.mensaje; $("f-registro").reset();
   if (r.estado === "activa") setTimeout(() => { pantallaCliente.reg = false; pantallaCliente(); }, 1800);
@@ -1154,7 +1161,7 @@ $(p + "-aplicar").onclick = async () => {
 };
 }
 const TIPOS_DX = [
-  { p: "px", tipo: "productos", icono: "", titulo: "Productos y precios", acepta: ".xlsx", desc: "Añade los productos nuevos, actualiza precios, IVA, unidades por caja y categorías, y retira los que ya no vienen (pasan a inactivos, no se borran).", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Cód. familia" },
+  { p: "px", tipo: "productos", icono: "", titulo: "Productos y precios", acepta: ".xlsx", desc: "Añade los productos nuevos, actualiza precios, IVA, unidades por caja y categorías, y retira los que ya no vienen (pasan a inactivos, no se borran).", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Modo de venta (2 = solo caja, 3 = caja o unidad) · Bloqueado · Obsoleto · Cód. familia" },
   { p: "cl", tipo: "clientes", icono: "", titulo: "Clientes", acepta: ".xlsx", desc: "Crea los clientes nuevos (con su cuenta) y actualiza nombre, dirección, teléfonos y correos. Los que no vienen en el Excel no se dan de baja solos.", cols: "Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto" },
   { p: "hi", tipo: "historial", icono: "", titulo: "Historial de compras", acepta: ".xlsx", desc: "Relaciona cada compra con su cliente por el código. Cada cliente conserva sus 10 últimos pedidos. Sube antes el Excel de clientes.", cols: "Cliente · Fecha · Nº Documento · Artículo · Unidades" },
   { p: "fo", tipo: "fotos", icono: "", titulo: "Fotos de productos (ZIP)", acepta: ".zip", desc: "Un ZIP con una foto por producto, con el código como nombre (11098.jpg), en cualquier carpeta. Si trae un Excel de control con la columna «tipo» (IA), avisa en el catálogo de las fotos creadas con IA.", cols: "Archivos .jpg, .png o .webp (mejor de 800 px o más)" },
@@ -1189,7 +1196,64 @@ $("reiniciar").onclick = async () => {
 
 // Lo que la empresa lleva elegido en cada solicitud se conserva cuando llegan datos nuevos y se vuelve a pintar la tabla
 const eleccion = new Map(), busqueda = new Map();
+/** Formulario sencillo: defs = [{ k, etiqueta, valor, tipo, opciones, ayuda, obligatorio }] → { caja, valores() } */
+function campos(defs) {
+  const caja = el("div", "", { className: "form-grid" }), inputs = {};
+  for (const d of defs) {
+    const lab = el("label"); let inp;
+    if (d.tipo !== "check") lab.appendChild(el("span", d.etiqueta + (d.obligatorio ? " *" : ""), { className: "lab" }));
+    if (d.opciones) { inp = el("select"); for (const [v, t] of d.opciones) inp.appendChild(el("option", t, { value: v })); inp.value = d.valor ?? d.opciones[0][0]; }
+    else if (d.tipo === "check") { inp = el("input", "", { type: "checkbox" }); inp.checked = !!d.valor; lab.className = "chk"; lab.append(inp, el("span", d.etiqueta, { className: "lab" })); }
+    else inp = el("input", "", { type: d.tipo || "text", placeholder: d.placeholder || "", value: d.valor || "", maxLength: d.max || 120, autocomplete: "off" });
+    inputs[d.k] = inp; if (d.tipo !== "check") lab.appendChild(inp);
+    if (d.ayuda) lab.appendChild(el("small", d.ayuda, { className: "muted" }));
+    caja.appendChild(lab);
+  }
+  return { caja, inputs, valores: () => Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.type === "checkbox" ? i.checked : i.value])), limpiar: () => { for (const i of Object.values(inputs)) { if (i.type === "checkbox") i.checked = false; else if (i.tagName === "INPUT") i.value = ""; } } };
+}
+const DEF_CLIENTE = (v = {}) => [
+  { k: "codigo", etiqueta: "Código de cliente (a3ERP)", placeholder: "Ej.: 5901", valor: v.codigo, ayuda: "Si aún no lo tienes, déjalo vacío: se pone uno provisional (P00001…) y sus pedidos quedan retenidos hasta que tenga el de a3ERP.", max: 20 },
+  { k: "nombre", etiqueta: "Nombre comercial", obligatorio: true, valor: v.nombre, max: 80 },
+  { k: "razonSocial", etiqueta: "Razón social", valor: v.razonSocial, max: 120 },
+  { k: "nif", etiqueta: "DNI, NIE o CIF", valor: v.nif, ayuda: "Con sus 6 primeros dígitos entra en la aplicación. No se guarda el número, solo una huella.", max: 12 },
+  { k: "telefono", etiqueta: "Teléfono", tipo: "tel", valor: v.telefono, max: 40 },
+  { k: "correo", etiqueta: "Correo", tipo: "email", valor: v.correo, max: 120 },
+  { k: "direccion", etiqueta: "Dirección (calle y número)", valor: v.direccion, max: 160 },
+  { k: "poblacion", etiqueta: "Población", valor: v.poblacion, max: 60 },
+  { k: "municipio", etiqueta: "Código de municipio (5 cifras)", placeholder: "Medina del Campo: 47085", valor: v.municipio, max: 5, ayuda: "Sirve para la entrega en el día." },
+  { k: "recargo", etiqueta: "Tiene recargo de equivalencia", tipo: "check" },
+];
+const DEF_PRODUCTO = [
+  { k: "codigo", etiqueta: "Código del artículo", obligatorio: true, max: 40 },
+  { k: "nombre", etiqueta: "Nombre del artículo", obligatorio: true, max: 120 },
+  { k: "precio", etiqueta: "Precio por unidad, sin IVA (€)", obligatorio: true, placeholder: "Ej.: 1,250", max: 12 },
+  { k: "iva", etiqueta: "IVA", obligatorio: true, opciones: [["21", "21 %"], ["10", "10 %"], ["4", "4 % (superreducido)"]] },
+  { k: "unidadesCaja", etiqueta: "Unidades por caja", placeholder: "Vacío = se vende suelto", max: 5 },
+  { k: "modo", etiqueta: "Modo de venta", opciones: [["", "Sin indicar (se elige cajas o unidades si hay caja)"], ["caja", "Solo cajas enteras (2-SOLO CAJA)"], ["ambos", "Caja o unidad (3-CAJA ó UNID)"]] },
+  { k: "descuento", etiqueta: "Descuento % (opcional)", max: 5 },
+  { k: "categoria", etiqueta: "Categoría (opcional)", ayuda: "Si la dejas vacía, se deduce del nombre.", max: 60 },
+  { k: "subcategoria", etiqueta: "Subcategoría (opcional)", max: 60 },
+];
+function montarAltas() {
+  const alta = (cuerpoId, defs, ruta, boton, quedo) => {
+    const f = campos(defs), msg = el("p", "", { className: "alta-msg", role: "status" }), b = el("button", boton, { className: "btn main", type: "button" });
+    const enviar = async (extra = {}) => {
+      msg.className = "alta-msg"; msg.textContent = ""; b.disabled = true;
+      try { const r = await (ruta.includes("productos") ? VM.addProduct : VM.addCustomer)({ ...f.valores(), ...extra }, { actualizar: !!extra.actualizar }); msg.className = "alta-msg ok"; msg.textContent = quedo(r); f.limpiar(); pintarTodo(); }
+      catch (e) {
+        if (/Ya existe/.test(e.message) && confirm(e.message)) { b.disabled = false; return enviar({ actualizar: true }); }
+        msg.className = "alta-msg err"; msg.textContent = e.message;
+      } finally { b.disabled = false; }
+    };
+    b.onclick = () => enviar();
+    $(cuerpoId).append(f.caja, b, msg);
+  };
+  alta("alta-cli-cuerpo", DEF_CLIENTE(), "clientes", "Añadir cliente", (r) => `${r.creado ? "Cliente añadido" : "Cliente actualizado"}: ${r.nombre} (código ${r.id})${r.provisional ? ". Código provisional: cuando tenga el de a3ERP, avísame." : ""}${r.sinNif ? " Sin DNI/CIF: solo podrá entrar con teléfono y contraseña." : ""}`);
+  alta("alta-prod-cuerpo", DEF_PRODUCTO, "productos", "Añadir producto", (r) => `${r.creado ? "Producto añadido" : "Producto actualizado"}: ${r.nombre} (${r.id})${r.categoria ? " · " + r.categoria : ""}. Ya sale en el catálogo de los clientes.`);
+}
+let altasMontadas = false;
 function pintarSolicitudes() {
+  if (!altasMontadas) { altasMontadas = true; montarAltas(); }
   const list = VM.registrations(); const tb = $("sol"); tb.innerHTML = ""; $("sol-vacio").hidden = list.length > 0;
   for (const s of list) {
     const tr = document.createElement("tr"); const sel = el("select"); sel.setAttribute("aria-label", "Cliente");
@@ -1203,8 +1267,15 @@ function pintarSolicitudes() {
     const ok = el("button", "Aprobar", { type: "button", className: "btn main" });
     ok.onclick = async () => { try { const r = await VM.approve(s.id, sel.value); toast(`Cuenta activada para ${r.cliente}. Entra con la contraseña que eligió.`); } catch (e) { toast(e.message); } };
     const no = el("button", "Rechazar", { type: "button", className: "btn" }); no.onclick = () => VM.reject(s.id).catch((e) => toast(e.message));
-    const td = el("td"); const box = el("div", "", { className: "row2" }); box.append(sel, buscar); td.appendChild(box); const acc = el("td"); acc.append(ok, " ", no);
+    const nuevo = el("button", "Es cliente nuevo: crear su ficha", { type: "button", className: "btn" });
+    const td = el("td"); const box = el("div", "", { className: "row2" }); box.append(sel, buscar); td.appendChild(box); const acc = el("td"); acc.append(ok, " ", nuevo, " ", no);
     tr.append(el("td", s.business), el("td", s.phone), el("td", s.email), el("td", s.matched || "—", { className: "msg" }), td, acc); tb.appendChild(tr);
+    const fila = el("tr"); fila.hidden = true; const celda = el("td", "", { colSpan: 6 });
+    const form = campos(DEF_CLIENTE({ nombre: s.business, nif: s.nif || "", direccion: s.address || "" }).filter((d) => !["telefono", "correo"].includes(d.k)));
+    const msg = el("p", "", { className: "alta-msg err", role: "status" }), crear = el("button", "Crear cliente y aceptar la solicitud", { className: "btn main", type: "button" });
+    celda.append(el("p", `Teléfono y correo (${s.phone} · ${s.email}) pasan solos a su ficha.`, { className: "msg" }), form.caja, crear, msg); fila.appendChild(celda); tb.appendChild(fila);
+    nuevo.onclick = () => { fila.hidden = !fila.hidden; };
+    crear.onclick = async () => { crear.disabled = true; msg.textContent = ""; try { const r = await VM.approveNew(s.id, form.valores()); toast(`Cliente creado (${r.codigo}${r.provisional ? ", código provisional" : ""}) y cuenta de ${r.cliente} activada.`); } catch (e) { msg.textContent = e.message; } finally { crear.disabled = false; } };
   }
 }
 let pagCli = 0, qCli = "";
