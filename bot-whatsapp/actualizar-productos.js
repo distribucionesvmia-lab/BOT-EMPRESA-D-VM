@@ -18,7 +18,7 @@ import { compararProductos, aplicarProductos, CAMPOS, vendible } from "./product
 import { clasificar } from "./categorias.js";
 
 const eur = (n) => (n == null ? "—" : Number(n).toFixed(3).replace(".", ",") + " €"); // precios de artículo: 3 decimales
-const fmt = (campo, v) => (v == null ? "—" : campo === "price" ? eur(v) : campo === "active" ? (v ? "sí" : "no") : String(v));
+const fmt = (campo, v) => (v == null ? "—" : campo === "price" ? eur(v) : campo === "active" ? (v ? "sí" : "no") : campo === "saleMode" ? (v === "caja" ? "solo caja" : "caja o unidad") : String(v));
 
 /** Excel → { productos, sinPrecioIds, filasPorHoja } (todas las hojas con cabecera de productos). */
 export function leerExcel(buf, { iva = {} } = {}) {

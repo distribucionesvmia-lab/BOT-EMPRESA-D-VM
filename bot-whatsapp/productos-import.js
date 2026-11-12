@@ -30,6 +30,7 @@ const FIELDS = [
   ["category", [/^(categoria|familia)$/], []],
   ["subcategory", [/^(subcategoria|subfamilia)$/], []],
   ["family", [/familia/], []], // código de familia de a3ERP («56.0»): sirve para asignar categoría a los artículos nuevos
+  ["saleMode", [/^modo( de)? venta/], []], // 2 = solo caja · 3 = caja o unidad
   ["blocked", [/^bloqueado/], []],
   ["obsolete", [/^obsoleto|^baja$/], []],
 ];
@@ -41,6 +42,14 @@ export function tipoIva(v) {
   if (n !== null) return n;
   const m = /^[A-Za-z]+(\d{1,2})$/.exec(String(v ?? "").trim());
   return m ? Number(m[1]) : null;
+}
+
+/** «MODO DE VENTA» de a3ERP: 2 (solo caja) → «caja»; 3 (caja o unidad) → «ambos»; también «SOLO CAJA» / «CAJA Ó UNID». Cualquier otra cosa: sin dato. */
+export function modoDeVenta(v) {
+  const t = norm(v);
+  if (/^2\b/.test(t) || /solo caja/.test(t)) return "caja";
+  if (/^3\b/.test(t) || /caja o unid|ambos/.test(t)) return "ambos";
+  return null;
 }
 
 export const PRECIO_MAXIMO = 5000; // € por unidad: por encima, casi seguro es una celda mal leída
@@ -87,6 +96,8 @@ export function parseProductos(rows) {
     const p = { id, name, price: Math.round(price * 1e4) / 1e4, active: !(yes(get(r, "blocked")) || yes(get(r, "obsolete"))) };
     const fam = String(get(r, "family") ?? "").trim();
     if (fam) p.family = fam;
+    const modo = modoDeVenta(get(r, "saleMode"));
+    if (modo) p.saleMode = modo;
     const upb = parseNumber(get(r, "unitsPerBox")), vat = tipoIva(get(r, "vat")), dto = parseNumber(get(r, "discount"));
     if (upb !== null && Number.isInteger(upb) && upb >= 1 && upb <= 5000) p.unitsPerBox = upb;
     else if (upb !== null && upb !== 0 && upb !== 1) stats.avisos.push(`${id} ${name}: unidades por caja raras (${upb}), se ignoran`);

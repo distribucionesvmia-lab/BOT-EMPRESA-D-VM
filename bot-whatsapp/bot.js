@@ -3,7 +3,7 @@ import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRo
 import { isTooGeneric } from "./identify.js";
 import { categorizar } from "./categorias.js";
 import { deliveryAllowed, longDate, puedeHoy, entregaHoyDisponible, AVISO_HOY } from "./delivery.js";
-import { priceLine, totals } from "./pricing.js";
+import { priceLine, totals, soloCaja } from "./pricing.js";
 import { responder as responderAsistente } from "./asistente.js";
 
 const money = (n) => `${n.toFixed(2).replace(".", ",")} ${BUSINESS.currency}`; // «3,30 €», como en la web
@@ -21,7 +21,13 @@ const upbOf = (p) => (Number.isInteger(p?.unitsPerBox) && p.unitsPerBox > 1 ? p.
 let PRICES = null;
 let CLIENTE = null; // cliente de la conversación en curso (handleMessage es síncrono): sus precios, descuentos y recargo
 const priceOf = (p) => PRICES?.[String(p.id)] ?? p.price;
-const mkItem = (p, qty, unit = "ud", extra = {}) => ({ id: p.id, name: p.name, price: priceOf(p), qty, unit, upb: upbOf(p), ...extra });
+const mkItem = (p, qty, unit = "ud", extra = {}) => {
+  if (soloCaja(p)) { // solo se vende por cajas enteras: «2 leches» son 2 cajas; solo si dice «unidades» a las claras se pasan a cajas (hacia arriba)
+    const k = upbOf(p), cajas = unit === "caja" || !extra.unitStated ? qty : Math.max(1, Math.ceil(qty / k));
+    return { id: p.id, name: p.name, price: priceOf(p), qty: cajas, unit: "caja", upb: k, ...extra, soloCaja: true, unitStated: true };
+  }
+  return { id: p.id, name: p.name, price: priceOf(p), qty, unit, upb: upbOf(p), ...extra };
+};
 const unitsOf = (i) => (i.unit === "caja" ? i.qty * (i.upb ?? 1) : i.qty);
 const qtyLabel = (i) =>
   i.unit === "caja" ? `${i.qty} ${i.qty === 1 ? "caja" : "cajas"}${i.upb ? ` (${i.qty * i.upb} uds)` : ""}` : `${i.qty}`;
@@ -545,7 +551,7 @@ function handleMessageInner(session, rawText, ctx = {}) {
       text: s.orderText.replace(/\n/g, " + "),
       note: s.note || "",
       delivery: s.delivery ?? null,
-      items: items.map(({ unsure, upb, unitStated, ...i }) => i),
+      items: items.map(({ unsure, upb, unitStated, soloCaja: _sc, ...i }) => i),
       total: items.length ? importes(items).base : null, // base del pedido (la empresa calcula luego el IVA); al cliente se le enseña con IVA
       // Quien se identificó solo por su nombre (el teléfono no es el del cliente) queda retenido hasta que lo revise una persona
       review: items.some((i) => i.unsure) || !items.length || !!(s.opts?.holdUnverified && s.byName && last9(s.opts?.phone) !== last9(s.customer?.phone)),
@@ -726,16 +732,17 @@ function handleMessageInner(session, rawText, ctx = {}) {
       if (p && op && op.qty && op.ids.some((id) => id.toLowerCase() === pick[1])) {
         s.opciones = null;
         const upb = upbOf(p);
-        if (upb && !op.unitStated) { s.askUnit = [{ ...mkItem(p, op.qty, "ud"), upb }]; return askUnitReply(s); }
-        addToCart(s, mkItem(p, op.qty, op.unit));
+        if (upb && !soloCaja(p) && !op.unitStated) { s.askUnit = [{ ...mkItem(p, op.qty, "ud"), upb }]; return askUnitReply(s); }
+        addToCart(s, mkItem(p, op.qty, op.unit, { unitStated: op.unitStated }));
         return showCart(s, "Anotado ✅\n\n");
       }
       if (p) {
         s.opciones = null;
         const last = p.lastQty ?? 1;
         const upb = upbOf(p);
-        s.pick = { id: p.id, name: p.name, price: priceOf(p), unitsPerBox: p.unitsPerBox, lastQty: last, unit: upb ? null : "ud" };
+        s.pick = { id: p.id, name: p.name, price: priceOf(p), unitsPerBox: p.unitsPerBox, lastQty: last, unit: soloCaja(p) ? "caja" : upb ? null : "ud" };
         s.state = "qty";
+        if (soloCaja(p)) return { ...askQty(s), reply: `*${p.name}*\nSe vende solo por cajas enteras: caja de ${upb} uds (${moneyP(priceOf(p) * upb)}).\n¿Cuántas *cajas* quieres? Pulsa un botón o escribe el número.`, session: s };
         if (upb) {
           // El artículo se vende en cajas: se pregunta cómo lo quiere
           return {

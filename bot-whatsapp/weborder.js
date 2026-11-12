@@ -1,5 +1,6 @@
 import { deliveryAllowed, madridDay, puedeHoy } from "./delivery.js";
 import { categorizar, arbolCategorias } from "./categorias.js";
+import { soloCaja } from "./pricing.js";
 
 // Lógica de la mini-aplicación de pedido, sin red ni disco (la comparten el servidor y la demo del navegador).
 
@@ -15,6 +16,7 @@ export function webProducts(customer, catalog, habitualProducts, imgOf = () => n
       discount: customer?.discounts?.[String(p.id)] ?? p.discount ?? 0,
       vat: p.vat ?? 21, // tipo de IVA (para enseñar el total con IVA)
       unitsPerBox: Number.isInteger(p.unitsPerBox) && p.unitsPerBox > 1 ? p.unitsPerBox : null,
+      ...(soloCaja(p) ? { soloCaja: true } : {}), // solo se vende por cajas enteras: en pantalla no hay «Uds»
       ...(({ cat, sub }) => ({ cat, sub }))(categorizar(p)), // categoría y subcategoría (ids) para navegar el catálogo
       ...((img) => (img ? { img } : {}))(imgOf(String(p.id))), // foto del producto (si hay)
       ...(imgOf(String(p.id)) && iaOf(String(p.id)) ? { ia: true } : {}), // la foto está generada con IA (se avisa en pequeño)
@@ -68,9 +70,12 @@ export function webOrderFromBody(body, customer, { key, phone, at = new Date().t
   const merged = new Map();
   for (const l of Array.isArray(body?.lines) ? body.lines : []) {
     const p = catalog.get(String(l?.id));
-    const qty = Math.floor(Number(l?.qty));
+    const qty0 = Math.floor(Number(l?.qty));
     // Unidades o cajas; las cajas solo valen para artículos que se venden en cajas
-    const unit = l?.unit === "caja" && Number.isInteger(p?.unitsPerBox) && p.unitsPerBox > 1 ? "caja" : "ud";
+    const hayCajas = Number.isInteger(p?.unitsPerBox) && p.unitsPerBox > 1;
+    const unit = (l?.unit === "caja" || soloCaja(p)) && hayCajas ? "caja" : "ud";
+    // Un artículo de solo caja nunca se vende suelto: si llega en unidades, se pasan a cajas enteras (hacia arriba)
+    const qty = soloCaja(p) && l?.unit !== "caja" ? Math.ceil(qty0 / p.unitsPerBox) : qty0;
     const lineNote = typeof l?.note === "string" ? l.note.trim().slice(0, 120) : "";
     if (p && qty >= 1 && qty <= 999) {
       const k = `${p.id}|${unit}`;

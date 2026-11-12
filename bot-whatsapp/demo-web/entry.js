@@ -37,7 +37,7 @@ const favsDemo = new Map(); // favoritos de la demo (solo en memoria)
 const links = new Map();
 
 const activeCatalog = () =>
-  [...cache.products].filter((p) => p.active !== false).sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({ id: p.id, name: p.name, price: p.price, ...(p.unitsPerBox ? { unitsPerBox: p.unitsPerBox } : {}), vat: p.vat, discount: p.discount, ...(p.category ? { category: p.category } : {}), ...(p.subcategory ? { subcategory: p.subcategory } : {}) }));
+  [...cache.products].filter((p) => p.active !== false).sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({ id: p.id, name: p.name, price: p.price, ...(p.unitsPerBox ? { unitsPerBox: p.unitsPerBox } : {}), vat: p.vat, discount: p.discount, ...(p.category ? { category: p.category } : {}), ...(p.subcategory ? { subcategory: p.subcategory } : {}), ...(p.saleMode ? { saleMode: p.saleMode } : {}) }));
 
 function onData(coll, rows) {
   if (coll === "customers") {

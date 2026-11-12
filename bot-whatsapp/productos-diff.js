@@ -17,6 +17,7 @@ export const CAMPOS = {
   discount: "Descuento %",
   category: "Categoría",
   subcategory: "Subcategoría",
+  saleMode: "Modo de venta",
   active: "Activo",
 };
 
@@ -26,6 +27,7 @@ const valor = (p, k) => {
   if (k === "unitsPerBox") return p.unitsPerBox === undefined ? undefined : upb(p.unitsPerBox); // sin dato: no se toca
   if (k === "vat" || k === "discount") return p[k] == null ? undefined : round(p[k], 2);
   if (k === "category" || k === "subcategory") return limpia(p[k]) || undefined;
+  if (k === "saleMode") return p.saleMode === "caja" || p.saleMode === "ambos" ? p.saleMode : undefined; // sin dato: no se toca
   if (k === "active") return p.active !== false;
 };
 
@@ -89,6 +91,7 @@ export function aplicarProductos(actual, nuevo, { categoriaNueva = () => ({}) } 
     if (!p.unitsPerBox) delete p.unitsPerBox;
     for (const k of ["vat", "discount"]) if (n[k] != null) p[k] = round(n[k], 2);
     for (const k of ["category", "subcategory"]) if (limpia(n[k])) p[k] = limpia(n[k]);
+    if (n.saleMode === "caja" || n.saleMode === "ambos") p.saleMode = n.saleMode;
     out.push(p);
   }
   return out;

@@ -74,3 +74,6 @@ export function totals(items, re = false) {
   const e = (c) => c / 100;
   return { groups: groups.map((g) => ({ vat: g.vat, base: e(g.base), iva: e(g.iva), re: e(g.re) })), base: e(base), iva: e(iva), re: e(reTotal), total: e(base + iva + reTotal) };
 }
+
+/** Artículo que solo se vende por cajas enteras (modo de venta «2-SOLO CAJA» de a3ERP con más de 1 unidad por caja, p. ej. la leche): no hay «Uds». Con 1 unidad por caja (p. ej. un cubo de basura) la caja y la unidad son lo mismo y se pide en unidades. */
+export const soloCaja = (p) => p?.saleMode === "caja" && Number.isInteger(p?.unitsPerBox) && p.unitsPerBox > 1;

@@ -12,7 +12,7 @@ import { parseHistorialXlsx } from "./historial-import.js";
 export function prepararDatos({ clientesXlsx, productosXlsx, historialXlsx }) {
   const prods = parseProductosXlsx(productosXlsx).products.filter((p) => p.active !== false);
   const hist = parseHistorialXlsx(historialXlsx).byCustomer;
-  const productos = prods.map((p) => ({ id: String(p.id), name: p.name, price: p.price, unitsPerBox: p.unitsPerBox ?? null, vat: p.vat ?? 21, discount: p.discount ?? 0, updatedAt: null, changes: [] }));
+  const productos = prods.map((p) => ({ id: String(p.id), name: p.name, price: p.price, unitsPerBox: p.unitsPerBox ?? null, ...(p.saleMode ? { saleMode: p.saleMode } : {}), vat: p.vat ?? 21, discount: p.discount ?? 0, updatedAt: null, changes: [] }));
   const clientes = parseClientesXlsx(clientesXlsx).customers.filter((c) => c.active !== false).map((c) => ({
     id: String(c.id), name: c.name, legalName: c.legalName ?? "", city: c.city ?? "", municipio: c.municipio ?? "", phone: c.phone ?? "",
     phones: c.phones ?? [], emails: c.emails ?? [], address: c.address ?? "", active: true, recargoEquivalencia: false, specialPrices: {}, discounts: {},

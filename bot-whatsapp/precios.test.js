@@ -92,7 +92,7 @@ test("la página del cliente (pedido.html) calcula EXACTAMENTE lo mismo que el s
 test("PEDIDO WEB: los artículos que se venden en cajas se piden por cajas por defecto y sin animar el −/+", async () => {
   const fs = await import("node:fs");
   const html = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
-  assert.match(html, /const unit = id => unitOf\.get\(id\) \|\| \(productoPorId\.get\(id\)\?\.unitsPerBox \? "caja" : "ud"\)/);
+  assert.match(html, /const unit = id => productoPorId\.get\(id\)\?\.soloCaja \? "caja" : unitOf\.get\(id\) \|\| \(productoPorId\.get\(id\)\?\.unitsPerBox \? "caja" : "ud"\)/);
   assert.match(html, /\[\["caja", "Cajas"\], \["ud", "Uds"\]\]/); // Cajas primero
   assert.match(html, /\.ctl \.bump, \.hstep\.bump, \.step\.bump \{ animation:none !important; \}/);
 });

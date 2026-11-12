@@ -34,6 +34,7 @@ export function tarifaAProductos(buf, conFotos = false) {
       const q = { id: p.id, name: p.name.replace(/\s+/g, " ").trim(), price: p.price, category: destino[0] };
       if (destino[1]) q.subcategory = destino[1];
       if (p.unitsPerBox > 1) q.unitsPerBox = p.unitsPerBox;
+      if (p.saleMode) q.saleMode = p.saleMode; // «MODO DE VENTA»: caja (solo cajas) o ambos (caja o unidad)
       if (p.vat !== undefined) q.vat = p.vat;
       if (p.discount) q.discount = Math.round((p.discount <= 1 ? p.discount * 100 : p.discount) * 100) / 100;
       out.push(q);

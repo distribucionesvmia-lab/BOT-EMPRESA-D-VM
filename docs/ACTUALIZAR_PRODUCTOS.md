@@ -78,3 +78,7 @@ Tipos: 4 %, 10 % y 21 %. El código «SRE» de a3ERP es el superreducido (4 %); 
 
 ### Calidad de las fotos
 El Excel de la tarifa de a3ERP trae las fotos como **miniaturas de 64 píxeles**: ampliadas se ven borrosas. Por eso las fotos del Excel solo se guardan si el producto aún no tiene foto (nunca sustituyen a una foto buena ya subida) y «Ver cambios» avisa de cuántas son de baja resolución (< 200 px). Para que se vea bien lo que se compra, hay que subir fotos grandes en un ZIP («Fotos de productos (ZIP)»): las de ~1000 px se ven nítidas. En la demo del artefacto las miniaturas se recortan, se amplían con filtro Lanczos y se enfocan (build: ver docs/CONTINUAR_CON_OTRA_CUENTA.md).
+
+
+## Modo de venta
+Si el Excel trae la columna **MODO DE VENTA** (2 = solo caja, 3 = caja o unidad), se importa y se enseña en la vista previa como «Modo de venta». Los artículos de solo caja (con más de 1 unidad por caja) se piden únicamente por cajas enteras; los de «caja o unidad» dejan elegir. Los artículos con «Bloqueado» u «Obsoleto» = si se quitan del catálogo.

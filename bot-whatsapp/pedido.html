@@ -649,7 +649,7 @@ const orderKey = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : Stri
 const qty = new Map(); // id -> cantidad (en cajas o en unidades, según unitOf)
 const unitOf = new Map(); // id -> "ud" | "caja"
 const notes = new Map(); // id -> observación de la línea
-const unit = id => unitOf.get(id) || (productoPorId.get(id)?.unitsPerBox ? "caja" : "ud"); // por defecto: en cajas si el artículo se vende por cajas
+const unit = id => productoPorId.get(id)?.soloCaja ? "caja" : unitOf.get(id) || (productoPorId.get(id)?.unitsPerBox ? "caja" : "ud"); // solo caja: siempre cajas enteras; // por defecto: en cajas si el artículo se vende por cajas
 const uds = l => l.qty * (unit(l.id) === "caja" ? (l.unitsPerBox || 1) : 1);
 
 const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -717,6 +717,7 @@ function setQty(id, n) {
 }
 // Cambiar entre unidades y cajas conservando lo que se está pidiendo (nunca 24 uds → 24 cajas sin avisar)
 function cambiarUnidad(p, nueva) {
+  if (p.soloCaja) return; // solo se vende por cajas enteras
   const q = qty.get(p.id) || 0, ant = unit(p.id);
   if (!q || ant === nueva) { unitOf.set(p.id, nueva); bumpId = p.id; return refresh(); }
   const k = p.unitsPerBox || 1;
@@ -755,7 +756,9 @@ function control(p) {
   const q = qty.get(p.id) || 0, box = document.createElement("div");
   box.className = "ctl";
   // Siempre la misma estructura (selector · hueco de compra · leyenda): «+ Añadir» y el contador miden igual y la tarjeta no cambia de alto
-  if (p.unitsPerBox) {
+  if (p.soloCaja) { // solo por cajas enteras: mismo hueco, sin botón «Uds»
+    const fijo = document.createElement("div"); fijo.className = "ud udfijo"; fijo.textContent = "Solo cajas"; fijo.title = "Este artículo se vende solo por cajas enteras"; box.appendChild(fijo);
+  } else if (p.unitsPerBox) {
     const sel = document.createElement("div"); sel.className = "ud"; sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Pedir en");
     for (const [u, t] of [["caja", "Cajas"], ["ud", "Uds"]]) {
       const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.className = unit(p.id) === u ? "on" : ""; b.setAttribute("aria-pressed", String(unit(p.id) === u));
@@ -1069,7 +1072,7 @@ function tablaLineas(ls) {
     // Cantidad: Cajas|Uds + − 1 +
     const q = tr.insertCell(); q.className = "tl-cant";
     const box = document.createElement("div"); box.className = "tl-ctl";
-    if (l.unitsPerBox) {
+    if (l.unitsPerBox && !l.soloCaja) {
       const sel = document.createElement("div"); sel.className = "ud"; sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Pedir en");
       for (const [u, tt] of [["caja", "Cajas"], ["ud", "Uds"]]) {
         const b = document.createElement("button"); b.type = "button"; b.textContent = tt; b.className = unit(l.id) === u ? "on" : ""; b.setAttribute("aria-pressed", String(unit(l.id) === u));
@@ -1176,7 +1179,7 @@ async function modificar(ref) {
     $("modInfo").hidden = true; $("modBtn").hidden = true; if (j && j.ayuda) { const b = $("modBtn"); b.hidden = false; b.textContent = "¿Necesitas ayuda?"; b.onclick = () => abrirAyuda(j.ayuda, data.customer.name); } return;
   }
   qty.clear(); unitOf.clear(); notes.clear(); let falta = 0;
-  for (const l of j.lineas) { if (!productoPorId.has(l.id)) { falta++; continue; } qty.set(l.id, l.qty); unitOf.set(l.id, l.unit === "caja" ? "caja" : "ud"); if (l.note) notes.set(l.id, l.note); }
+  for (const l of j.lineas) { if (!productoPorId.has(l.id)) { falta++; continue; } { const pr = productoPorId.get(l.id); const enCajas = l.unit === "caja" || (pr && pr.soloCaja); qty.set(l.id, enCajas && l.unit !== "caja" && pr ? Math.ceil(l.qty / pr.unitsPerBox) : l.qty); unitOf.set(l.id, enCajas ? "caja" : "ud"); } if (l.note) notes.set(l.id, l.note); }
   modificando = { ref: j.ref, hasta: j.hasta };
   $("note").value = j.nota || ""; if (j.direccion) { document.querySelector('input[name="addrmode"][value="otra"]').checked = true; $("addrOtra").value = j.direccion; } pintarDireccion();
   $("modBanner").hidden = false; $("modBanner").textContent = `Estás modificando el pedido ${j.ref}. ${j.hasta}.`;
@@ -1213,7 +1216,10 @@ function precargar() {
     const [rawId, rawN] = par.split("."), id = decodeURIComponent(rawId ?? ""), u = Math.min(999, Math.floor(Number(rawN)));
     if (!(u > 0)) continue;
     if (!byId.has(id)) { faltan++; continue; } // ya no está en el catálogo
-    unitOf.set(id, "ud"); qty.set(id, u); n++;
+    const pr = productoPorId.get(id);
+    if (pr && pr.soloCaja) { unitOf.set(id, "caja"); qty.set(id, Math.min(999, Math.ceil(u / pr.unitsPerBox))); } // solo caja: las unidades se pasan a cajas enteras
+    else { unitOf.set(id, "ud"); qty.set(id, u); }
+    n++;
   }
   if (faltan) setTimeout(() => aviso(faltan === 1 ? "1 artículo ya no está disponible." : faltan + " artículos ya no están disponibles."), 600);
   if (n && /[#&]f=1(?:&|$)/.test(String(window.vmPrecarga ?? location.hash))) setTimeout(() => { const c = $("fijoCard"); if (!c.hidden) c.scrollIntoView({ block: "center" }); }, 700); // «Repetir cada semana»: se lleva a la opción del pedido fijo
