@@ -86,6 +86,8 @@ export function parseProductos(rows) {
     stats.filas++;
     const id = String(get(r, "code") ?? "").trim(), name = String(get(r, "name") ?? "").trim();
     if (!id || !name) { stats.descartadas++; continue; }
+    // Un código roto del Excel («#VALUE!», «#REF!»…) no es un código: dos artículos con ese «código» se tomarían por el mismo. Se enseña como rechazado para arreglarlo en a3ERP.
+    if (/^#/.test(id)) { stats.rechazados.push({ id, name, motivo: `el código del artículo está roto en el Excel (${id}): corrígelo en a3ERP o en el Excel` }); continue; }
     if (seen.has(id)) { stats.duplicados++; continue; }
     const price = parseNumber(get(r, "price"));
     if (price === null || price < 0) { stats.sinPrecio++; (stats.sinPrecioIds ??= []).push(id); continue; }

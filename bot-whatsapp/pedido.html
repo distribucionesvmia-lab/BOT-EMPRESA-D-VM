@@ -502,8 +502,6 @@
   .bar .mpop .letra { padding:10px 14px; border-top:1px solid #eceef0; } .bar .mpop .letra button { display:inline-flex !important; align-items:center; justify-content:center; width:auto !important; min-height:48px !important; padding:0 12px !important; border:2px solid #d90000 !important; background:#fff !important; color:#a80000 !important; border-radius:12px !important; }
   .bar .mpop .letra button.letra-auto[aria-pressed="true"] { background:#d90000 !important; color:#fff !important; } .bar .mpop .letra .letra-n { color:#1d1d1f; }
   .bar .mpop .letra-titulo { padding:10px 14px 0; font-size:calc(13px / var(--k,1)); font-weight:700; color:#5f6368; }
-  .atajos { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; } .atajos button { min-height:48px; min-width:56px; padding:0 12px; border:2px solid var(--rojo); border-radius:12px; background:#fff; color:var(--rojo-o); font-weight:800; font-size:calc(15px / var(--k,1)); cursor:pointer; touch-action:manipulation; }
-  .atajos button:active { background:var(--rojo-s); }
   .vaciar { display:block; width:calc(100% - 28px); margin:0 14px 12px; min-height:48px; border:2px solid var(--linea); border-radius:14px; background:#fff; color:var(--gris); font-weight:700; font-size:calc(16px / var(--k,1)); cursor:pointer; }
   .diasfijo { display:flex; flex-wrap:wrap; gap:6px; } .diasfijo button { min-width:56px; min-height:48px; padding:0 12px; border:2px solid var(--linea); border-radius:12px; background:#fff; color:var(--gris); font-weight:800; font-size:calc(16px / var(--k,1)); cursor:pointer; touch-action:manipulation; }
   .diasfijo button[aria-pressed="true"] { background:var(--rojo); border-color:var(--rojo); color:#fff; }
@@ -547,6 +545,27 @@
   .cartbtn { min-height:46px; padding:0 14px; font-size:calc(16px / var(--k,1)); gap:6px; }
   .ayudabtn { min-height:46px; }
   .ctl > .cap { min-height:1.1em; } @media (max-width:560px) { .p .ctl { padding:8px 8px 6px; } }
+  /* Carrito: filas más cuidadas (tarjetas limpias, selector y contador en forma de píldora, importe destacado) */
+  .tl-wrap { border-radius:22px; border:1px solid #ececef; box-shadow:0 8px 26px rgba(16,24,40,.08); }
+  .tl thead th { background:#fff; border-bottom:2px solid #f0f0f2; color:#8a8f98; font-size:calc(12px / var(--k,1)); letter-spacing:.09em; padding:12px 16px; }
+  .tl td { padding:16px 14px; }
+  .tl tbody tr.tl-fila td, .tl tbody tr.tl-obs td { background:#fff !important; }
+  .tl tr.tl-obs td { border-top:0; padding:0 16px 16px; }
+  .tl .tl-av { width:64px; height:64px; border-radius:16px; box-shadow:0 2px 10px rgba(16,24,40,.14); background-color:#fff; }
+  .tl .cn { font-size:calc(17px / var(--k,1)); line-height:1.25; }
+  .tl .cp { font-size:calc(13px / var(--k,1)); color:#6b7280; margin-top:4px; }
+  .tl .ud { border:0; background:#f1f2f4; border-radius:999px; padding:3px; gap:2px; min-width:118px; height:50px; }
+  .tl .ud button { border-radius:999px; background:transparent; color:#6b7280; min-height:44px; font-size:calc(15px / var(--k,1)); }
+  .tl .ud button.on { background:var(--rojo); color:#fff; box-shadow:0 2px 6px rgba(217,0,0,.35); }
+  .tl .hstep { border:0; background:#f1f2f4; border-radius:999px; height:50px; padding:3px; gap:2px; overflow:visible; }
+  .tl .hstep button { width:44px; height:44px; border-radius:50%; background:#fff; color:var(--rojo-o); box-shadow:0 1px 4px rgba(16,24,40,.18); font-size:calc(22px / var(--k,1)); }
+  .tl .hstep button:active { background:var(--rojo-s); }
+  .tl .hstep input { width:54px; height:44px; background:transparent; font-size:calc(19px / var(--k,1)); }
+  td.tl-imp b { font-size:calc(19px / var(--k,1)); color:#1d1d1f; } td.tl-imp small { color:#6b7280; margin-top:2px; }
+  .tl .cx { border:1px solid #e3e5e8; background:#fff; border-radius:999px; color:#6b7280; padding:0 16px; min-height:44px; margin-top:8px; font-weight:600; }
+  .tl .cx:active { background:#f6f6f7; }
+  .tl .tl-obs button { width:100%; border:2px dashed #f0c4c4; border-radius:12px; background:#fff8f8; color:var(--rojo-o); padding:0 14px; min-height:48px; text-align:left; }
+  .tl .tl-obs button:active { background:#fff0f0; }
 </style>
 </head>
 <body>
@@ -1086,12 +1105,6 @@ function tablaLineas(ls) {
     const inp = document.createElement("input"); inp.type = "number"; inp.inputMode = "numeric"; inp.pattern = "[0-9]*"; inp.min = 0; inp.max = 999; inp.onfocus = () => inp.select(); inp.value = l.qty; inp.setAttribute("aria-label", "Cantidad de " + l.name); inp.onchange = () => setQty(l.id, inp.value);
     const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.setAttribute("aria-label", "Añadir uno de " + l.name); plus.onclick = () => setQty(l.id, l.qty + 1);
     st.append(minus, inp, plus); box.appendChild(st); q.appendChild(box);
-    // Atajos de cantidad (48 px): «+6», «+12» y «+1 caja» en unidades; en cajas, «+1 caja» y «+6 cajas»
-    const atajos = document.createElement("div"); atajos.className = "atajos"; atajos.setAttribute("role", "group"); atajos.setAttribute("aria-label", "Sumar de golpe a " + l.name);
-    const k = l.unitsPerBox || 0;
-    const lista = cj ? [["+1 caja", 1], ["+6 cajas", 6]] : [["+6", 6], ["+12", 12], ...(k ? [["+1 caja", k]] : [])];
-    for (const [t, n] of lista) { const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.setAttribute("aria-label", `Sumar ${t.slice(1)} a ${l.name}`); b.onclick = () => setQty(l.id, Math.min(999, l.qty + n)); atajos.appendChild(b); }
-    box.appendChild(atajos);
     // Importe + unidades + quitar
     const m = tr.insertCell(); m.className = "tl-imp";
     const ib = document.createElement("b"); ib.textContent = eur(importe(l));
@@ -1214,7 +1227,8 @@ function precargar() {
   const byId = new Set(data.products.map(p => p.id));
   let n = 0, faltan = 0;
   for (const par of m[1].split(",")) {
-    const [rawId, rawN] = par.split("."), id = decodeURIComponent(rawId ?? ""), u = Math.min(999, Math.floor(Number(rawN)));
+    const k = par.lastIndexOf("."), rawId = k < 0 ? par : par.slice(0, k), rawN = k < 0 ? "" : par.slice(k + 1), id = decodeURIComponent(rawId ?? ""), // el código puede llevar punto (157.10): el número va tras el ÚLTIMO punto
+       u = Math.min(999, Math.floor(Number(rawN)));
     if (!(u > 0)) continue;
     if (!byId.has(id)) { faltan++; continue; } // ya no está en el catálogo
     const pr = productoPorId.get(id);

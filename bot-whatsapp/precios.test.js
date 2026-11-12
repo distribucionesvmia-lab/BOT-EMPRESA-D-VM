@@ -239,8 +239,7 @@ test("PAQUETE «COMPRAR MÁS FÁCIL» A+B: lo que ya compra arriba, «Lo más pe
   assert.match(ped, /className = "lo-compras"/); assert.match(ped, /else if \(arbol\) items = \[\.\.\.items\.filter\(p => p\.count > 0\)/);
   assert.match(ped, /Lo más pedido/); assert.match(ped, /data\.top/);
   // F-22
-  assert.match(ped, /className = "atajos"/); assert.match(ped, /\["\+6", 6\], \["\+12", 12\]/); assert.match(ped, /inp\.pattern = "\[0-9\]\*"/);
-  assert.match(ped, /\.atajos button \{ min-height:48px/);
+  assert.doesNotMatch(ped, /atajos/); assert.match(ped, /inp\.pattern = "\[0-9\]\*"/); // sin botones «+1 caja / +6 cajas»
   // F-23
   assert.match(ped, /"Quitado: " \+/); assert.match(ped, /deshacer \? 8000 : 4000/); assert.match(ped, /t\.onpointerenter = t\.onfocusin/); assert.match(ped, /#toast\.arriba \{ bottom:auto/);
   assert.match(ped, /id="vaciar"/); assert.match(ped, /aria-label", "Quitar " \+ l\.name/);
@@ -302,4 +301,10 @@ test("TOTALES EN EL CATÁLOGO: el carrito y la barra de abajo van SIN IVA; el to
   assert.match(ped, /<span>Total sin IVA<small id="totSub">/); assert.match(ped, /tween\(\$\("total"\), calc\(\)\.base\)/); // paso 2
   assert.match(ped, /id="whenTotal"/); assert.match(ped, /\$\("whenTotal"\)\.textContent = eur\(total\(\)\)/); // paso 3: con IVA
   assert.match(ped, /\$\("resTotal"\)\.textContent = eur\(total\(\)\)/); // y el resumen final también
+});
+
+test("CÓDIGOS CON PUNTO (157.10, 151.21…): «repetir pedido» separa bien el código de la cantidad", async () => {
+  const fs = await import("node:fs");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.match(ped, /par\.lastIndexOf\("\."\)/); assert.doesNotMatch(ped, /par\.split\("\."\)/);
 });

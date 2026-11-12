@@ -83,7 +83,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const tieneFoto = (id) => ["jpg", "png", "webp"].some((e) => fs.existsSync(path.join(imgDir, `${id}.${e}`)));
     const fotosAGuardar = [];
     if (imgDir) for (const f of fotos) {
-      if (!/^[\w-]{1,40}$/.test(f.id) || tieneFoto(f.id)) continue;
+      if (!/^[\w.-]{1,40}$/.test(f.id) || tieneFoto(f.id)) continue;
       fotosAGuardar.push(f); fotosNuevas++;
       const d = dimensiones(f.data); if (d && Math.max(d.w, d.h) < POCA_RESOLUCION) fotosBajaCalidad++;
     }
@@ -213,7 +213,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     let iguales = 0;
     const porId = new Map();
     for (const [ruta, data] of Object.entries(entradas)) {
-      const m = /^([\w-]{1,40})\.(jpe?g|png|webp)$/i.exec(path.basename(ruta));
+      const m = /^([\w.-]{1,40})\.(jpe?g|png|webp)$/i.exec(path.basename(ruta)); // el código puede llevar punto (157.10)
       if (!m) { ignoradas.push({ id: path.basename(ruta), nombre: "el nombre del archivo no es un código de producto" }); continue; }
       if (data.length < 200 || data.length > 8_000_000) { ignoradas.push({ id: m[1], nombre: "tamaño de imagen no válido" }); continue; }
       if (!catalogo.has(m[1])) { ignoradas.push({ id: m[1], nombre: "ese código no está en el catálogo" }); continue; }

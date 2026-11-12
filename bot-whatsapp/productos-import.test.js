@@ -66,3 +66,10 @@ test("parseProductos: no importa lo que parece una celda mal leída (precio disp
   assert.match(r.stats.rechazados[1].motivo, /IVA que no existe/);
   assert.equal(r.stats.avisos.length, 2); // descuento imposible y unidades por caja raras
 });
+
+test("un código roto del Excel («#VALUE!») no se importa ni hace que se pierdan otros artículos: se enseña como rechazado", () => {
+  const rows = [["Cód. artículo", "Artículo", "Precio venta"], ["#VALUE!", "LOTE A", 10], ["#VALUE!", "LOTE B", 12], ["100", "AGUA", 1]];
+  const { products, stats } = parseProductos(rows);
+  assert.deepEqual(products.map((p) => p.id), ["100"]); assert.equal(stats.duplicados, 0);
+  assert.deepEqual(stats.rechazados.map((r) => r.name), ["LOTE A", "LOTE B"]); assert.match(stats.rechazados[0].motivo, /código del artículo está roto/);
+});

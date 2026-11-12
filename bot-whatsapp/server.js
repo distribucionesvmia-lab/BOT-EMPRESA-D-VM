@@ -414,7 +414,7 @@ let imgIndex = new Map(), imgAt = 0, imgIa = new Set(); // imgIa: códigos cuya 
 function imgs() {
   if (Date.now() - imgAt > 300_000) {
     imgAt = Date.now();
-    try { imgIndex = new Map(fs.readdirSync(IMG_DIR).map((f) => /^([\w-]{1,40})\.(png|jpe?g|webp)$/i.exec(f)).filter(Boolean).map((m) => [m[1], m[0]])); } catch { imgIndex = new Map(); }
+    try { imgIndex = new Map(fs.readdirSync(IMG_DIR).map((f) => /^([\w.-]{1,40})\.(png|jpe?g|webp)$/i.exec(f)).filter(Boolean).map((m) => [m[1], m[0]])); } catch { imgIndex = new Map(); }
     try { imgIa = new Set(JSON.parse(fs.readFileSync(IMG_DIR + "fotos-ia.json", "utf8")).map(String)); } catch { imgIa = new Set(); }
   }
   return imgIndex;

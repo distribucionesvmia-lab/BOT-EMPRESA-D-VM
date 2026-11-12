@@ -72,10 +72,11 @@ function descuentos(dbs) {
 function fotosIA() {
   const f = path.join(dir, "fotos-ia.json");
   if (!fs.existsSync(f)) return;
-  const imgDir = IMG_DIR;
-  fs.mkdirSync(imgDir, { recursive: true });
-  fs.copyFileSync(f, path.join(imgDir, "fotos-ia.json"));
-  dicho(`  fotos-ia.json copiado (${JSON.parse(fs.readFileSync(f, "utf8")).length} fotos marcadas como hechas con IA).`);
+  fs.mkdirSync(IMG_DIR, { recursive: true });
+  const destino = path.join(IMG_DIR, "fotos-ia.json"), nuevas = JSON.parse(fs.readFileSync(f, "utf8")).map(String);
+  let ya = []; try { ya = JSON.parse(fs.readFileSync(destino, "utf8")).map(String); } catch { /* aún no existe */ }
+  fs.writeFileSync(destino, JSON.stringify([...new Set([...ya, ...nuevas])].sort())); // se SUMA a las que ya había (por ejemplo las marcadas por el Excel de control de un ZIP)
+  dicho(`  fotos-ia.json: ${nuevas.length} fotos marcadas como hechas con IA (en total ${new Set([...ya, ...nuevas]).size}).`);
 }
 
 // prueba.json: [{ id, name, nif, historial: "archivo.xlsx", codigoEnHistorial: "0818" }] → clientes FALSOS de prueba, con su historial
