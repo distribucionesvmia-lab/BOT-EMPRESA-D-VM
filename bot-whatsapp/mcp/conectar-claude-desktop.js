@@ -37,10 +37,17 @@ export function configurar(archivo, { node, script, envFile, url = "http://local
   const leer = (t) => (t.trim() ? JSON.parse(t) : {});
   try { json = leer(texto); }
   catch (e) {
-    // quizá lo pegado a mano está mal puesto: se retira el bloque y cualquier resto de texto suelto (comillas invertidas, la palabra «json»…) entre la primera «{» y la primera clave
-    const limpio = texto.replace(BLOQUE_A_MANO, "").replace(/^(\s*\{)([^"}]*)/, (m, llave, resto) => (resto.trim() ? llave + "\n  " : m));
-    try { json = leer(limpio); arreglado = limpio !== texto; } catch { json = null; }
-    if (!arreglado) { const err = new Error(`El archivo de configuración tiene un error y no he querido tocarlo (${e.message}).`); err.codigo = "json"; throw err; }
+    // Reparaciones, de la más suave a la más amplia; cada una se da por buena solo si el resultado es JSON válido:
+    const intentos = [
+      // 1) se retira el bloque pegado a mano y cualquier resto suelto (comillas invertidas, la palabra «json»…) entre la primera «{» y la primera clave
+      () => texto.replace(BLOQUE_A_MANO, "").replace(/^(\s*\{)([^"}]*)/, (m, llave, resto) => (resto.trim() ? llave + "\n  " : m)),
+      // 2) se descarta TODO lo que hay entre la primera «{» y la primera clave de primer nivel que no es la nuestra (el archivo de Claude va con 2 espacios de sangría)
+      () => { const k = /^ {2}"(?!mcpServers")[^"\n]+"\s*:/m.exec(texto); return k && texto.trimStart().startsWith("{") ? "{\n" + texto.slice(k.index) : null; },
+    ];
+    for (const intento of intentos) { try { const t = intento(); if (t) { json = leer(t); arreglado = true; break; } } catch { /* siguiente */ } }
+    if (!arreglado) {
+      const err = new Error(`El archivo de configuración tiene un error y no he querido tocarlo (${e.message}).\n  Así empieza el archivo (para poder verlo): ${JSON.stringify(texto.slice(0, 160))}`); err.codigo = "json"; throw err;
+    }
   }
   if (typeof json !== "object" || json === null || Array.isArray(json)) throw new Error("El archivo de configuración no tiene el formato esperado.");
   const copia = archivo.replace(/\.json$/, ".antes-de-vm-pedidos.json");

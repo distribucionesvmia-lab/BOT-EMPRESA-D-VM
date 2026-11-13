@@ -72,3 +72,23 @@ test("CONECTAR CLAUDE: también arregla restos sueltos pegados al principio (com
   // un archivo bueno nunca se «arregla»: lo que hay entre la llave y la primera clave solo se toca si es texto suelto
   const bueno = escribir(JSON.stringify({ preferences: { a: 1 } }, null, 2)); assert.equal(configurar(bueno, datos).arreglado, false);
 });
+
+test("CONECTAR CLAUDE: repara el archivo aunque lo pegado a mano esté estropeado de cualquier manera (comillas rizadas, sin comilla inicial, bloque a medias…), conservando lo de Claude", () => {
+  const prefs = `  "preferences": {\n    "a": true,\n    "b": { "c": [1, 2] }\n  },\n  "otra": "x"\n}\n`;
+  const casos = {
+    "comillas rizadas": `{\n  “mcpServers”: {\n    “vm-pedidos”: { “command”: “node” }\n  },\n${prefs}`,
+    "sin la comilla inicial": `{\nmcpServers": {\n    "vm-pedidos": { "command": "node" }\n  },\n${prefs}`,
+    "bloque a medias": `{\n  "mcpServers": {\n    "vm-pedidos": {\n      "command": "node",\n${prefs}`,
+    "texto de una explicación": `{\nPaso 1: pega esto\n  "mcpServers": { "vm-pedidos": { "command": "node" } },\n${prefs}`,
+    "bloque duplicado": `{\n  "mcpServers": { "vm-pedidos": { "command": "node" } }\n  "mcpServers": { "vm-pedidos": { "command": "node" } },\n${prefs}`,
+  };
+  for (const [nombre, texto] of Object.entries(casos)) {
+    assert.throws(() => JSON.parse(texto), nombre);
+    const f = escribir(texto), r = configurar(f, datos);
+    assert.equal(r.arreglado, true, nombre); assert.deepEqual(leer(f).preferences, { a: true, b: { c: [1, 2] } }, nombre); assert.equal(leer(f).otra, "x", nombre);
+    assert.equal(leer(f).mcpServers["vm-pedidos"].command, datos.node, nombre);
+    assert.equal(fs.readFileSync(f.replace(".json", ".antes-de-vm-pedidos.json"), "utf8"), texto, nombre); // la copia es el archivo roto, tal cual
+  }
+  // lo que no se puede arreglar: no se toca y se enseña cómo empieza el archivo
+  const f = escribir('{ esto no tiene arreglo'); assert.throws(() => configurar(f, datos), (e) => e.codigo === "json" && /Así empieza el archivo.*esto no tiene arreglo/.test(e.message));
+});
