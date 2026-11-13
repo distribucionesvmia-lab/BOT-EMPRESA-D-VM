@@ -124,6 +124,7 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 | Fecha | Qué se hizo |
 |---|---|
 | 11-nov-2026 | Aprobadas e incluidas en el prompt del constructor `PROMPT_CONSTRUCTOR_paquete_compra_facil.md`: F-02, F-16, F-17 (versión sin API: lista en el panel + botón wa.me), F-18, F-20, F-21, F-22, F-23, F-24. Excluidas por decisión: F-19 y F-25. |
+| 13-nov-2026 | Ronda 3: estilo minimalista premium tipo Apple decidido por el dueño. Investigación de principios de diseño de Apple (simplicidad, un acento, tipografía del sistema, material translúcido, muelles, barra de pestañas de 3–5, hojas), maqueta `maqueta_minimalista_apple.png` y 6 prompts para el constructor en `PROMPTS_CONSTRUCTOR_diseno_minimalista_premium.md`. |
 | 13-nov-2026 | Ronda 2: puesta al día con la versión instalada, verificación de lo hecho, diagnóstico visual (D-1 a D-8), maqueta de tres pantallas y propuestas P-01 a P-12. PDF `Diseno_premium_app_cliente.pdf`. |
 | 11-nov-2026 | Segunda búsqueda de ideas para facilitar la compra: añadidas F-16 a F-25 (pedido fijo, recordatorio por WhatsApp, editar pedido enviado, estado del pedido, búsqueda, abrir en «lo mío», cantidades rápidas, deshacer, ayuda, notas recordadas). |
 | 11-nov-2026 | Decisiones: letra = respetarla (aprobada); aviso de entrega hoy antes de las 10:00 en Medina del Campo (nueva F-15, aprobada). Prompt para el constructor en `PROMPT_CONSTRUCTOR_letra_y_aviso_entrega.md`. |
@@ -190,17 +191,26 @@ Informe en PDF: `Diseno_premium_app_cliente.pdf` (9 páginas, con maqueta de tre
 
 | Código | Propuesta | Impacto | Esfuerzo | Estado |
 |---|---|---|---|---|
-| P-01 | Sistema de diseño sobrio (fondo cálido, rojo solo de acento, una tipografía, espaciado de 8) y fuera la barra verde / cabecera roja a pantalla completa | Alto | Medio | Propuesta · decisión 1 |
-| P-02 | Navegación inferior de 5 pestañas + mini-carrito fijo | Alto | Medio | Propuesta · decisión 2 |
-| P-03 | Pantalla Inicio personalizada | Alto | Medio | Propuesta |
-| P-04 | Tarjeta de producto de una fila (~100 px en vez de 216) con «+» que pasa a contador | Alto | Medio | Propuesta |
-| P-05 | Fotos ≥ 400×400, fondo uniforme, WebP, por categoría bajo demanda; «imagen orientativa» en las 81 de IA | Alto | Alto | Propuesta · decisión 3 |
-| P-06 | Nombres de producto limpios (con tabla de excepciones) | Medio-Alto | Medio | Propuesta · decisión 4 |
-| P-07 | Micro-interacciones útiles (200–400 ms) | Medio | Bajo | Propuesta |
-| P-08 | Pedido y entrega en una sola pantalla | Alto | Medio | Propuesta |
-| P-09 | Estados vacíos y de error cuidados | Medio | Bajo | Propuesta |
-| P-10 | Escritorio: rejilla y carrito lateral | Medio | Medio | Propuesta · decisión 6 |
-| P-11 | Tarjeta del comercial | Medio | Bajo | Propuesta · decisión 5 |
-| P-12 | Rendimiento (< 3 s con buena cobertura) | Alto | Medio | Propuesta |
+| P-01 | Sistema de diseño sobrio (fondo cálido, rojo solo de acento, una tipografía, espaciado de 8) y fuera la barra verde / cabecera roja a pantalla completa | Alto | Medio | **Aprobada** (13-nov) · Prompt 1 |
+| P-02 | Navegación inferior de 5 pestañas + mini-carrito fijo | Alto | Medio | **Aprobada** (13-nov) · Prompt 3 |
+| P-03 | Pantalla Inicio personalizada | Alto | Medio | **Aprobada** (13-nov) · Prompt 4 |
+| P-04 | Tarjeta de producto de una fila (~100 px en vez de 216) con «+» que pasa a contador | Alto | Medio | **Aprobada** (13-nov) · Prompt 2 |
+| P-05 | Fotos ≥ 400×400, fondo uniforme, WebP, por categoría bajo demanda; «imagen orientativa» en las 81 de IA | Alto | Alto | **Aprobada** (13-nov) · Prompt 5 |
+| P-06 | Nombres de producto limpios (con tabla de excepciones) | Medio-Alto | Medio | **Aprobada** (13-nov) · Prompt 2 |
+| P-07 | Micro-interacciones útiles (200–400 ms) | Medio | Bajo | **Aprobada** (13-nov) · Prompt 5 |
+| P-08 | Pedido y entrega en una sola pantalla | Alto | Medio | **Aprobada** (13-nov) · Prompt 4 |
+| P-09 | Estados vacíos y de error cuidados | Medio | Bajo | **Aprobada** (13-nov) · Prompt 5 |
+| P-10 | Escritorio: rejilla y carrito lateral | Medio | Medio | **Aprobada** (13-nov) · Prompt 6 |
+| P-11 | Tarjeta del comercial | Medio | Bajo | **Aprobada** (13-nov) · Prompt 4 |
+| P-12 | Rendimiento (< 3 s con buena cobertura) | Alto | Medio | **Aprobada** (13-nov) · Prompt 6 |
 
 Fases propuestas: A (P-01, P-04, P-06) · B (P-02, P-03, P-08) · C (P-05, P-07, P-09) · D (P-10, P-11, P-12). Pendiente de decisión también: portes gratis / pedido mínimo (decisión 7).
+
+## 11. Ronda 3 (13-nov-2026): estilo minimalista premium (principios de Apple)
+
+- **Decisión del dueño:** diseño minimalista y premium, como Apple y empresas parecidas. Eso resuelve la decisión 1 de la ronda 2 (estilo sobrio).
+- **Entregables:** `maqueta_minimalista_apple.png` (concepto de 3 pantallas) y `PROMPTS_CONSTRUCTOR_diseno_minimalista_premium.md` (cabecera común + 6 prompts por fases).
+- **Qué se toma de Apple:** simplicidad (no minimalismo vacío), jerarquía por tamaño/peso/espacio, un solo color de acento, fondo gris muy claro con tarjetas blancas, fuente del sistema con interletrado según tamaño, barra de pestañas inferior de 3–5 elementos con título grande, materiales translúcidos, movimiento corto y con propósito (muelles/curvas suaves, interrumpible), respeto a «reducir movimiento / transparencia / contraste» y a la letra del usuario.
+- **Fiabilidad de las fuentes:** salvo las páginas de Apple (HIG de barras de navegación y WWDC), son resúmenes de terceros; los valores exactos de interletrado y de pestañas varían entre fuentes y por eso en los prompts son decisiones de diseño explícitas, no «medidas oficiales de Apple». Las sombras y el radio de las esquinas no tienen consenso: se han elegido (sin sombra por defecto, radio 20).
+- **Orden:** Prompt 1 sistema de diseño → 2 tarjeta de producto y nombres → 3 navegación, buscador y carrito flotante → 4 Inicio y pedido en una pantalla → 5 fotos, micro-interacciones, estados vacíos → 6 escritorio, modo oscuro, accesibilidad.
+- **Próxima investigación:** medir cada versión publicada, comparar con la maqueta, y estudiar (a) cómo presentan el precio y el «añadir» las apps de reparto, (b) pruebas de usabilidad reales con 3–5 clientes de edad (hasta ahora no hay datos de usuarios reales), (c) coste y límites de WhatsApp para recordatorios.
