@@ -333,7 +333,7 @@ test("AVISOS AL MÓVIL (app del cliente): botón «Activar avisos» en Mi cuenta
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
   const sw = fs.readFileSync(new URL("./pwa/sw.js", import.meta.url), "utf8");
   for (const t of ["Activar avisos", "Desactivar avisos", "Añadir a pantalla de inicio", "/api/push/clave", "/api/push/suscribir", "/api/push/baja", "userVisibleOnly: true", "Notification.requestPermission"]) assert.ok(cli.includes(t), t);
-  assert.match(cli, /Notification\.requestPermission\(\)\) !== "granted"/); // pide permiso al pulsar el botón (los móviles lo exigen), no al abrir
+  assert.match(cli, /\(await permiso\) !== "granted"/); // pide permiso al pulsar el botón (los móviles lo exigen), no al abrir
   assert.match(sw, /addEventListener\("push"/); assert.match(sw, /showNotification/); assert.match(sw, /addEventListener\("notificationclick"/);
   assert.doesNotMatch(sw, /caches\.(open|put)/); // sigue sin guardar nada en caché
   assert.match(sw, /startsWith\("\/"\)/); // el aviso solo puede abrir páginas de la propia aplicación
