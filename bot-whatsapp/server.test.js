@@ -775,3 +775,12 @@ test("ALTA DE UN CLIENTE NUEVO POR EL BOT: la empresa lo acepta y se crea su fic
   assert.equal((await call("POST", "/api/acceso", { body: { telefono: "655121212", empresa: "Taberna Nueva Alta", pin: "ab12cd" } })).status, 200);
   assert.equal((await call("POST", `/api/admin/solicitudes/${sol.id}/aprobar`, { admin: true, body: { nuevo: {} } })).status, 404); // ya resuelta
 });
+
+test("Cuentas: «Confirmar todas» confirma de una vez las cuentas sin confirmar (solo la empresa)", async () => {
+  const sin = await call("POST", "/api/admin/cuentas/confirmar-todas", { body: {} });
+  assert.ok(sin.status === 401 || sin.status === 403 || sin.status === 404, "sin clave de la empresa no se puede");
+  const r = await call("POST", "/api/admin/cuentas/confirmar-todas", { admin: true, body: {} });
+  assert.equal(r.status, 200); assert.equal(typeof r.json.confirmadas, "number");
+  const otra = await call("POST", "/api/admin/cuentas/confirmar-todas", { admin: true, body: {} });
+  assert.equal(otra.json.confirmadas, 0);
+});

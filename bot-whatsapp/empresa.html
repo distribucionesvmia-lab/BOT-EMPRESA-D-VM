@@ -122,6 +122,7 @@
     </div>
     <div class="panel" id="p-cuentas" hidden>
       <h2>Cuentas de clientes</h2>
+      <p class="muted" id="cue-todas" hidden style="margin:0 0 10px"><button class="main" id="cue-todas-b" type="button"></button> <span>Confirma de golpe todas las cuentas que aún están sin confirmar.</span></p>
       <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
       <h2 style="margin-top:22px">Uso de la aplicación (últimos 30 días)</h2>
       <p class="muted" style="margin:0 0 8px">Solo contadores, sin datos personales: sirven para saber qué cambios funcionan.</p>
@@ -342,6 +343,12 @@ async function usoApp() {
 }
 async function cuentas() {
   const cue = await call("/api/admin/cuentas"); const tc = $("cue"); tc.innerHTML = "";
+  const sin = cue.filter((a) => !a.verified && a.status !== "deleted").length;
+  $("cue-todas").hidden = !sin; $("cue-todas-b").textContent = `Confirmar todas (${sin})`;
+  $("cue-todas-b").onclick = async () => {
+    if (!confirm(`¿Confirmar las ${sin} cuentas que están sin confirmar?\n\nLas que se registraron solas con teléfono dejarán de tener sus pedidos retenidos para revisión. Si quieres mirarlas una a una, pulsa Cancelar.`)) return;
+    const r = await call("/api/admin/cuentas/confirmar-todas", {}); refrescar(); if (r && typeof r.confirmadas === "number") alert(`Confirmadas: ${r.confirmadas}`);
+  };
   for (const a of cue) {
     const tr = document.createElement("tr");
     const estado = a.status === "deleted" ? "Eliminada por el cliente" : a.status === "blocked" ? "Bloqueada" : a.locked ? "Bloqueo temporal" : a.verified ? "Activa" : a.phone ? "Automática: sin confirmar" : "Creada: aún no ha entrado";

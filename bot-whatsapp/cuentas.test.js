@@ -243,3 +243,12 @@ test("uso de la aplicación: contadores por día sin datos personales; resumen c
   assert.equal(r.segundosMedioHastaPedir, Math.round((120 + 60 + 86400) / 3));
   assert.deepEqual(openAccountsDb(":memory:").resumenUso(30), { dias: 30, repeticiones: 0, pedidos: 0, abandonos: 0, catalogoAbierto: 0, tasaAbandono: null, segundosMedioHastaPedir: null });
 });
+
+test("confirmAll confirma de golpe todas las cuentas sin confirmar, salvo las eliminadas", () => {
+  const db = openAccountsDb(":memory:");
+  db.ensureMany(["1", "2", "3"]);
+  assert.equal(db.listAccounts().filter((a) => !a.verified).length, 3);
+  assert.equal(db.confirmAll(), 3);
+  assert.equal(db.listAccounts().filter((a) => !a.verified).length, 0);
+  assert.equal(db.confirmAll(), 0); // repetirlo no cambia nada
+});

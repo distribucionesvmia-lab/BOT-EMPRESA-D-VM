@@ -298,6 +298,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     },
     /** La empresa confirma una cuenta automática: sus pedidos ya no se retienen. */
     confirm: (accountId) => db.prepare("UPDATE accounts SET verified = 1 WHERE id = ?").run(accountId).changes === 1,
+    /** Confirma de una vez todas las cuentas sin confirmar (menos las eliminadas por el cliente). Devuelve cuántas. */
+    confirmAll: () => Number(db.prepare("UPDATE accounts SET verified = 1 WHERE verified = 0 AND status != 'deleted'").run().changes),
     reject(id, now = new Date().toISOString()) {
       return db.prepare("UPDATE registrations SET status = 'rejected', nif = NULL, address = NULL, decided_at = ? WHERE id = ? AND status = 'pending'").run(now, id).changes === 1;
     },
