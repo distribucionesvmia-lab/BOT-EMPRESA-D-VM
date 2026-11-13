@@ -791,3 +791,29 @@ test("Cuentas: «Confirmar todas» confirma de una vez las cuentas sin confirmar
   const otra = await call("POST", "/api/admin/cuentas/confirmar-todas", { admin: true, body: {} });
   assert.equal(otra.json.confirmadas, 0);
 });
+
+test("VER EL EXCEL: enseña las hojas antes de exportar sin marcar ningún pedido, y también las de una exportación ya hecha", async () => {
+  const { cookie } = await entrarNif("111111").then((r) => ({ cookie: cookieOf(r) }));
+  const rr = await call("POST", "/catalogo", { cookie, body: { key: "clave-vista-excel", lines: [{ id: "1010", qty: 2 }] } });
+  assert.equal(rr.status, 200, JSON.stringify(rr.json));
+  const lista = async () => (await call("GET", "/api/admin/pedidos", { admin: true })).json;
+  const ref = (await lista()).filter((o) => o.estado === "pendiente").pop().ref;
+  assert.equal((await call("POST", "/api/admin/exportar/vista", { body: {} })).status, 403); // sin la clave de la empresa
+  assert.equal((await call("POST", "/api/admin/exportar/vista", { admin: true, body: { refs: ["x; DROP"] } })).status, 400);
+  const v = (await call("POST", "/api/admin/exportar/vista", { admin: true, body: { refs: [ref] } })).json;
+  assert.equal(v.orderCount, 1); assert.ok(v.lineCount >= 1);
+  assert.ok(v.sheets.length >= 2 && v.sheets.every((h) => h.name && Array.isArray(h.rows)) && v.sheets.some((h) => h.name === "Líneas"));
+  assert.equal(typeof v.estilos, "object");
+  // ver no exporta: el pedido sigue pendiente y no hay exportación nueva
+  const antes = (await call("GET", "/api/admin/exportaciones", { admin: true })).json.length;
+  assert.equal((await lista()).find((o) => o.ref === ref).estado, "pendiente");
+  assert.equal((await call("GET", "/api/admin/exportaciones", { admin: true })).json.length, antes);
+  // sin pedidos listos: avisa en vez de fallar
+  assert.equal((await call("POST", "/api/admin/exportar/vista", { admin: true, body: { refs: ["VM-2000-000001"] } })).json.vacio, true);
+  // y una exportación ya hecha se puede ver
+  const ex = (await call("POST", "/api/admin/exportar", { admin: true, body: { refs: [ref] } })).json.exportacion;
+  assert.equal((await call("GET", `/api/admin/exportaciones/${ex.id}/vista`)).status, 403);
+  const hecha = (await call("GET", `/api/admin/exportaciones/${ex.id}/vista`, { admin: true })).json;
+  assert.equal(hecha.orderCount, 1); assert.equal(hecha.archivo, ex.archivo);
+  assert.equal((await call("GET", "/api/admin/exportaciones/99999/vista", { admin: true })).status, 404);
+});

@@ -20,6 +20,10 @@
   button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; } th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
   td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; } .num { text-align: right; white-space: nowrap; } .scroll { overflow-x: auto; } .muted { color: var(--muted); } .ref { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  #xl-panel, #app > * { min-width:0; max-width:100%; } /* la hoja ancha no ensancha la página: se desplaza dentro de su caja */
+  .xl { width:auto; font-size:12.5px; border:1px solid var(--line); } .xl td { border:1px solid var(--line); padding:3px 7px; white-space:nowrap; overflow:hidden; vertical-align:middle; } .xl .nx { text-align:right; }
+  .xl .s1, .xl .s3 { font-weight:600; } .xl .s4, .xl .s6 { background:var(--soft); font-weight:600; }
+  .xl .s7 { background:#1f3864; color:#fff; font-size:22px; font-weight:700; padding:12px 16px; } .xl .s8 { background:#f00; color:#fff; font-weight:700; } .xl .s9 { background:#ff0; color:#000; font-weight:700; } .xl .s10 { background:#92d050; color:#000; font-weight:700; }
   .tabs { display: flex; flex-wrap: wrap; gap: 6px; } .tab[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
   .n { display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: var(--warn); color: var(--warn-fg); font-size: 12px; text-align: center; }
   .badge { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; } .pendiente { background: var(--warn); color: var(--warn-fg); } .exportado { background: var(--ok); color: var(--ok-fg); } .retenido { background: var(--hold); color: var(--hold-fg); }
@@ -70,10 +74,17 @@
       <div class="panel">
         <h2>Pedidos recibidos</h2>
         <p class="muted" id="correo-estado" style="margin:0 0 8px"></p>
-        <div class="row" style="margin-bottom:10px"><button class="main" id="exportar-sel" disabled>Exportar seleccionados (0)</button><button id="exportar">Exportar todos los pendientes</button><span class="muted" id="expmsg" role="status"></span></div>
+        <div class="row" style="margin-bottom:10px"><button class="main" id="exportar-sel" disabled>Exportar seleccionados (0)</button><button id="exportar">Exportar todos los pendientes</button><button id="ver-excel" type="button" title="Enseña cómo quedará el Excel sin exportar nada">Ver cómo queda el Excel</button><span class="muted" id="expmsg" role="status"></span></div>
         <p class="muted" style="margin:0 0 8px">Marca los pedidos pendientes que quieras llevar al Excel; los que no marques siguen pendientes.</p>
         <div class="scroll"><table><thead><tr><th><input type="checkbox" id="sel-todos" aria-label="Seleccionar todos los pendientes"></th><th>Pedido</th><th>Recibido</th><th>Cliente</th><th>Artículos</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody id="ped"></tbody></table></div>
         <p class="muted" id="ped-vacio" hidden>Todavía no hay pedidos.</p>
+      </div>
+      <div class="panel" id="xl-panel" hidden style="margin-top:14px">
+        <h2 id="xl-titulo">Vista del Excel</h2>
+        <p class="muted" id="xl-sub" style="margin:0 0 8px"></p>
+        <div class="row" style="margin-bottom:8px"><button type="button" id="xl-cerrar">Cerrar vista</button></div>
+        <div class="tabs" role="tablist" id="xl-tabs"></div>
+        <div class="scroll" style="margin-top:8px"><table class="xl" id="xl"></table></div>
       </div>
       <div class="panel" id="hist-panel" hidden style="margin-top:14px"><h2>Excel exportados</h2><div class="scroll"><table><tbody id="hist"></tbody></table></div></div>
     </div>
@@ -203,8 +214,9 @@ async function pedidos() {
   const th = $("hist"); th.innerHTML = "";
   for (const e of h.slice(0, 30)) {
     const b = el("button", "Descargar"); b.onclick = () => descargar(e);
+    const ver = el("button", "Ver", { type: "button" }); ver.style.marginRight = "8px"; ver.onclick = () => verExportado(e);
     const im = el("button", "Imprimir", { type: "button" }); im.style.marginLeft = "8px"; im.onclick = () => imprimir(e);
-    const tr = document.createElement("tr"); const td = el("td"); td.append(b, im);
+    const tr = document.createElement("tr"); const td = el("td"); td.append(ver, b, im);
     tr.append(el("td", e.archivo, { className: "ref" }), el("td", hora(e.fecha)), el("td", `${e.pedidos} pedido${e.pedidos === 1 ? "" : "s"} · ${e.lineas} línea${e.lineas === 1 ? "" : "s"}`), td); th.appendChild(tr);
   }
 }
@@ -235,6 +247,54 @@ async function exportar(refs) {
 }
 $("exportar").onclick = () => exportar(null);
 $("exportar-sel").onclick = () => sel.size && exportar([...sel]);
+
+// ---- Ver el Excel en pantalla (sin exportar nada, o el de una exportación ya hecha) ----
+let vistaExcel = null;
+const numX = (n) => Number(n).toFixed(2).replace(".", ","), numXp = (n) => Number(n).toFixed(3).replace(".", ",");
+function pintarHoja(i) {
+  const sh = vistaExcel.sheets[i]; const tbl = $("xl"); tbl.innerHTML = "";
+  // celdas combinadas («A1:H1»): la primera se estira y las demás no se pintan
+  const colN = (l) => [...l].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1, ancla = new Map(), tapadas = new Set();
+  for (const m of sh.merges ?? []) { const [a, b] = m.split(":"), [, ca, ra] = /([A-Z]+)(\d+)/.exec(a), [, cb, rb] = /([A-Z]+)(\d+)/.exec(b); ancla.set(`${ra - 1},${colN(ca)}`, { cs: colN(cb) - colN(ca) + 1, rs: rb - ra + 1 }); for (let r = ra - 1; r < rb; r++) for (let c = colN(ca); c <= colN(cb); c++) if (r !== ra - 1 || c !== colN(ca)) tapadas.add(`${r},${c}`); }
+  const px = (w) => Math.round(w * 7.2);
+  if (sh.widths?.length) { const cg = document.createElement("colgroup"); for (const w of sh.widths) { const c = document.createElement("col"); c.style.width = px(w) + "px"; cg.appendChild(c); } tbl.appendChild(cg); tbl.style.tableLayout = "fixed"; tbl.style.width = px(sh.widths.reduce((a, b) => a + b, 0)) + "px"; } else { tbl.style.tableLayout = ""; tbl.style.width = ""; }
+  sh.rows.forEach((row, r) => {
+    const tr = document.createElement("tr"); if (sh.heights?.[r]) tr.style.height = Math.round(sh.heights[r] * 1.33) + "px";
+    for (let c = 0; c < Math.max(row.length, 1); c++) {
+      if (tapadas.has(`${r},${c}`)) continue;
+      let v = row[c], s = 0; if (v && typeof v === "object") { s = v.s ?? 0; v = v.v; }
+      const td = document.createElement("td"); if (s) { td.className = "s" + s; if (s >= 12) td.style.cssText = (vistaExcel.estilos[s]?.css ?? ""); }
+      const m = ancla.get(`${r},${c}`); if (m) { td.colSpan = m.cs; if (m.rs > 1) td.rowSpan = m.rs; }
+      if (s === 7) { td.colSpan = sh.widths?.length || 9; td.textContent = row.map((x) => (x && typeof x === "object" ? x.v : x)).filter((x) => x != null && x !== "").join("   ·   "); tr.appendChild(td); break; } // cartel antiguo: una sola celda grande
+      if (typeof v === "number") { const dec = (vistaExcel.estilos[s]?.dec ?? null); td.className += " nx"; td.textContent = s === 5 ? numXp(v) : dec != null ? v.toFixed(dec).replace(".", ",") : Number.isInteger(v) ? String(v) : numX(v); if (!(s >= 12)) td.style.textAlign = ""; } else td.textContent = v ?? "";
+      tr.appendChild(td);
+    }
+    tbl.appendChild(tr);
+  });
+  document.querySelectorAll("#xl-tabs .tab").forEach((b, k) => b.setAttribute("aria-selected", String(k === i)));
+}
+function mostrarExcel(v, titulo, sub) {
+  vistaExcel = v; $("xl-panel").hidden = false; $("xl-titulo").textContent = titulo;
+  $("xl-sub").textContent = sub;
+  const tabs = $("xl-tabs"); tabs.innerHTML = "";
+  v.sheets.forEach((sh, i) => { const b = el("button", `Hoja «${sh.name}»`, { type: "button", className: "tab" }); b.setAttribute("role", "tab"); b.onclick = () => { pintarHoja(i); document.querySelectorAll("#xl-tabs .tab").forEach((x, k) => x.setAttribute("aria-selected", String(k === i))); }; tabs.appendChild(b); });
+  pintarHoja(0); document.querySelectorAll("#xl-tabs .tab").forEach((x, k) => x.setAttribute("aria-selected", String(k === 0)));
+  $("xl-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+$("xl-cerrar").onclick = () => { $("xl-panel").hidden = true; vistaExcel = null; };
+$("ver-excel").onclick = async () => {
+  const b = $("ver-excel"); b.disabled = true;
+  try {
+    const v = await call("/api/admin/exportar/vista", sel.size ? { refs: [...sel] } : {});
+    if (v.vacio) { $("expmsg").textContent = "No hay pedidos listos para exportar." + (v.retenidos ? ` (${v.retenidos} retenidos para revisar)` : ""); return; }
+    const n = v.orderCount, l = v.lineCount;
+    mostrarExcel(v, "Así quedará el Excel (aún sin exportar)", `${n} pedido${n === 1 ? "" : "s"} · ${l} línea${l === 1 ? "" : "s"}. Esto es solo una vista: no se ha exportado nada ni se ha marcado ningún pedido.`);
+  } catch (e) { $("expmsg").textContent = e.message; } finally { b.disabled = false; }
+};
+async function verExportado(e) {
+  const v = await call(`/api/admin/exportaciones/${e.id}/vista`, null, false);
+  mostrarExcel(v, "Excel exportado", `${v.archivo} · ${v.orderCount} pedido${v.orderCount === 1 ? "" : "s"} · ${v.lineCount} línea${v.lineCount === 1 ? "" : "s"}`);
+}
 
 // ---- Solicitudes de alta y cuentas ----
 /** Formulario sencillo: defs = [{ k, etiqueta, valor, tipo, opciones, ayuda, obligatorio }] → { caja, valores() } */

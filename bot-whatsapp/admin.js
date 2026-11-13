@@ -10,7 +10,8 @@ import { totals, round2 } from "./pricing.js";
 import { runExport } from "./exporter.js";
 import { execFile } from "node:child_process";
 import { recordatoriosDeHoy } from "./recordatorios.js";
-import { imprimirHtml } from "./export-format.js";
+import { imprimirHtml, FORMAT } from "./export-format.js";
+import { estiloCss, estiloDecimales } from "./xlsx-files.js";
 
 const amountOf = (l) => l.amount ?? round2((l.units ?? l.qty) * (l.price ?? 0) * (1 - (l.discount ?? 0) / 100));
 
@@ -45,6 +46,13 @@ function orderView(o) {
  * accounts: base de cuentas · customers: { list, getById, suggest } · orders: base de pedidos (db.js)
  * Devuelve route(req, res, url) → true si atendió la petición.
  */
+// Vista previa del Excel (las mismas hojas que se escribirían en el .xlsx), con el CSS de cada estilo, para enseñarla en el panel
+function vistaExcel(lista) {
+  const { sheets, lineCount } = FORMAT.build(lista);
+  const estilos = {};
+  for (const sh of sheets) for (const row of sh.rows) for (const c of row) { const st = c && typeof c === "object" ? c.s ?? 0 : 0; if (st && !estilos[st]) estilos[st] = { css: estiloCss(st), dec: estiloDecimales(st) }; }
+  return { orderCount: lista.length, lineCount, sheets, estilos };
+}
 export function createAdmin({ sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones" }) {
   const isAdmin = makeAdminCheck(adminToken);
   // Máximo 10 claves erróneas cada 10 minutos por IP; superado el límite se bloquea esa IP aunque acierte la clave
@@ -115,6 +123,13 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
     }
     // ---- Pedidos ----
     if (p === "/api/admin/pedidos" && get) return send(res, 200, orders.listOrders({ limit: 150 }).map(orderView)), true;
+    if (p === "/api/admin/exportar/vista" && post) { // ver cómo quedará el Excel SIN exportar nada (no marca pedidos)
+      const body = (await readJson(req)) ?? {};
+      if (body.refs !== undefined && (!Array.isArray(body.refs) || !body.refs.length || body.refs.length > 500 || !body.refs.every((r) => /^VM-\d{4}-\d{6}$/.test(String(r))))) return send(res, 400, { error: "Elige al menos un pedido válido." }), true;
+      const { ready, held } = orders.previewPending({ refs: body.refs ?? null });
+      if (!ready.length) return send(res, 200, { vacio: true, retenidos: held }), true;
+      return send(res, 200, { ...vistaExcel(ready), retenidos: held }), true;
+    }
     if (p === "/api/admin/exportar" && post) {
       // Sin cuerpo o sin «refs»: se exportan todos los pendientes; con «refs»: solo los pedidos elegidos
       const body = (await readJson(req)) ?? {};
@@ -139,6 +154,12 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       if (!file || !fs.existsSync(file)) return send(res, 404, { error: "No existe el archivo." }), true;
       res.writeHead(200, { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${e.file_name}"`, "Cache-Control": "no-store" }).end(fs.readFileSync(file));
       return true;
+    }
+    m = /^\/api\/admin\/exportaciones\/(\d+)\/vista$/.exec(p);
+    if (m && get) { // el Excel de una exportación ya hecha, para verlo en pantalla
+      const e = orders.getExport(Number(m[1]));
+      if (!e) return send(res, 404, { error: "No existe la exportación." }), true;
+      return send(res, 200, { archivo: e.file_name, ...vistaExcel(orders.exportedOrders(e.id)) }), true;
     }
     m = /^\/api\/admin\/exportaciones\/(\d+)\/imprimir$/.exec(p);
     if (m && get) { // hoja para imprimir directamente (A4, un pedido por página), sin pasar por Excel

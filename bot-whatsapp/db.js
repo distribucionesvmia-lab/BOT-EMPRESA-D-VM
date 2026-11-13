@@ -104,6 +104,19 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
 
   const withLines = (row) => row && { ...row, review: !!row.review, re: !!row.re, items: linesOf.all(row.id) };
 
+// Qué pedidos entrarían en una exportación (todos los listos, o los elegidos con `refs`, repetidos incluidos). No escribe nada.
+const seleccionExportacion = (refs) => {
+  const pending = db.prepare("SELECT * FROM orders WHERE export_status = 'pending' AND status = 'confirmed' ORDER BY id").all().map(withLines);
+  const allReady = pending.filter((o) => !o.review && o.customer_id && o.items.length);
+  const held = pending.length - allReady.length;
+  // refs: la empresa elige qué pedidos exportar; los demás siguen pendientes para otra exportación
+  const nuevos = refs ? allReady.filter((o) => refs.has(o.ref)) : allReady;
+  // volver a exportar: los pedidos ya exportados que la empresa elige se incluyen otra vez, tantas veces como quiera
+  const repetidos = refs ? db.prepare("SELECT * FROM orders WHERE export_status = 'exported' AND status = 'confirmed' ORDER BY id").all().map(withLines).filter((o) => refs.has(o.ref) && o.customer_id && o.items.length) : [];
+  const ready = [...nuevos, ...repetidos].sort((a, b) => a.id - b.id);
+  return { nuevos, repetidos, ready, held };
+};
+
   return {
     /**
      * Guarda un pedido confirmado. Atómico: o se guardan cabecera y líneas, o nada.
@@ -205,14 +218,7 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
       db.exec("BEGIN IMMEDIATE");
       let built;
       try {
-        const pending = db.prepare("SELECT * FROM orders WHERE export_status = 'pending' AND status = 'confirmed' ORDER BY id").all().map(withLines);
-        const allReady = pending.filter((o) => !o.review && o.customer_id && o.items.length);
-        const held = pending.length - allReady.length;
-        // refs: la empresa elige qué pedidos exportar; los demás siguen pendientes para otra exportación
-        const nuevos = refs ? allReady.filter((o) => refs.has(o.ref)) : allReady;
-        // volver a exportar: los pedidos ya exportados que la empresa elige se incluyen otra vez, tantas veces como quiera
-        const repetidos = refs ? db.prepare("SELECT * FROM orders WHERE export_status = 'exported' AND status = 'confirmed' ORDER BY id").all().map(withLines).filter((o) => refs.has(o.ref) && o.customer_id && o.items.length) : [];
-        const ready = [...nuevos, ...repetidos].sort((a, b) => a.id - b.id);
+        const { nuevos, repetidos, ready, held } = seleccionExportacion(refs);
         if (!ready.length) {
           db.exec("COMMIT");
           return { export: null, held };
@@ -234,6 +240,9 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
         throw err;
       }
     },
+
+    /** Lo que se exportaría ahora (sin exportar nada ni marcar nada): para ver el Excel antes de generarlo. */
+    previewPending: ({ refs = null } = {}) => seleccionExportacion(refs ? new Set(refs) : null),
 
     listExports: (limit = 100) => db.prepare("SELECT * FROM exports ORDER BY id DESC LIMIT ?").all(limit),
     getExport: (id) => db.prepare("SELECT * FROM exports WHERE id = ?").get(id) ?? null,
