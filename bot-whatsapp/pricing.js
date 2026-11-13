@@ -28,14 +28,33 @@ export function importeCentimos(units, price, discount = 0) {
   return Number(c);
 }
 
+/** Fecha de hoy en Madrid (AAAA-MM-DD). */
+export const hoyMadrid = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+/** Oferta del artículo si está vigente hoy (la empresa la pone en el panel): { tipo: "pct" | "eur", valor, hasta? } o null. */
+export function promoVigente(product, hoy = hoyMadrid()) {
+  const o = product?.promo;
+  if (!o || !(Number(o.valor) > 0) || (o.tipo !== "pct" && o.tipo !== "eur")) return null;
+  return o.hasta && hoy > o.hasta ? null : o;
+}
+/**
+ * Precio y descuento que paga un cliente por un artículo: los suyos si los tiene (precio y descuento especiales) o los de la ficha, y encima la
+ * oferta de la empresa: en % sustituye al descuento si es mayor (no se suma); en € se resta al precio de cada unidad.
+ */
+export function precioEfectivo(product, customer, id, precioDelPedido, hoy) {
+  let price = customer?.specialPrices?.[id] ?? product?.price ?? precioDelPedido ?? 0;
+  let discount = customer?.discounts?.[id] ?? product?.discount ?? 0;
+  const o = promoVigente(product, hoy);
+  if (o) { if (o.tipo === "pct") discount = Math.max(discount, Number(o.valor)); else price = Math.max(0, Math.round((price - Number(o.valor)) * 10000) / 10000); }
+  return { price, discount };
+}
+
 /** Calcula los campos de una línea: { unit, boxes, units, price, discount, vat, amount, unsureBox } */
-export function priceLine(item, product, customer) {
+export function priceLine(item, product, customer, hoy) {
   const id = String(item.id);
   const qty = item.qty;
   const upb = Number.isInteger(product?.unitsPerBox) && product.unitsPerBox >= 1 ? product.unitsPerBox : null;
   const byBox = item.unit === "caja";
-  const price = customer?.specialPrices?.[id] ?? product?.price ?? item.price ?? 0;
-  const discount = customer?.discounts?.[id] ?? product?.discount ?? 0;
+  const { price, discount } = precioEfectivo(product, customer, id, item.price, hoy);
   const units = byBox ? qty * (upb ?? 1) : qty;
   return {
     unit: byBox ? "caja" : "ud",

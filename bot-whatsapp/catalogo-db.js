@@ -46,13 +46,15 @@ function normalize(p) {
 }
 
 /** Producto tal como lo usa el bot: { id, name, price, unitsPerBox?, vat, discount } */
-const toCatalog = (r) => ({ id: r.id, name: r.name, price: r.price, ...(r.units_per_box ? { unitsPerBox: r.units_per_box } : {}), vat: r.vat, discount: r.discount, ...(r.category ? { category: r.category } : {}), ...(r.subcategory ? { subcategory: r.subcategory } : {}), ...(r.sale_mode ? { saleMode: r.sale_mode } : {}) });
+const toCatalog = (r) => ({ id: r.id, name: r.name, price: r.price, ...(r.units_per_box ? { unitsPerBox: r.units_per_box } : {}), vat: r.vat, discount: r.discount, ...(r.category ? { category: r.category } : {}), ...(r.subcategory ? { subcategory: r.subcategory } : {}), ...(r.sale_mode ? { saleMode: r.sale_mode } : {}), ...(r.promo_tipo ? { promo: { tipo: r.promo_tipo, valor: r.promo_valor, ...(r.promo_hasta ? { hasta: r.promo_hasta } : {}) } } : {}) });
 
 export function openCatalogDb(path = process.env.CATALOG_DB ?? "catalogo.sqlite") {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
   db.exec(SCHEMA);
-  for (const col of ["category", "subcategory", "sale_mode"]) if (!db.prepare("PRAGMA table_info(products)").all().some((x) => x.name === col)) db.exec(`ALTER TABLE products ADD COLUMN ${col} TEXT`);
+  for (const col of ["category", "subcategory", "sale_mode", "promo_tipo", "promo_hasta"]) if (!db.prepare("PRAGMA table_info(products)").all().some((x) => x.name === col)) db.exec(`ALTER TABLE products ADD COLUMN ${col} TEXT`);
+  if (!db.prepare("PRAGMA table_info(products)").all().some((x) => x.name === "promo_valor")) db.exec("ALTER TABLE products ADD COLUMN promo_valor REAL"); // oferta de la empresa (no la toca la actualización desde a3ERP)
+  db.exec("CREATE TABLE IF NOT EXISTS product_avisos (product_id TEXT PRIMARY KEY, clave TEXT NOT NULL, at TEXT NOT NULL)"); // el último aviso (campana) enviado de cada artículo
   const get = db.prepare("SELECT * FROM products WHERE id = ?");
   const insert = db.prepare("INSERT INTO products (id, name, price, units_per_box, vat, discount, active, category, subcategory, sale_mode, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
   const logChange = db.prepare("INSERT INTO product_changes (product_id, field, old_value, new_value, changed_at) VALUES (?, ?, ?, ?, ?)");
@@ -118,6 +120,38 @@ export function openCatalogDb(path = process.env.CATALOG_DB ?? "catalogo.sqlite"
       if (!r) throw new Error(`No existe el producto ${id}`);
       return atomic(() => apply(normalize({ ...toCatalog(r), active: !!r.active, ...fields, id: r.id }), now));
     },
+
+    /**
+     * Pone o quita la oferta de un artículo: setPromo("1001", { tipo: "pct" | "eur", valor, hasta?: "AAAA-MM-DD" }) o setPromo("1001", null).
+     * Queda anotada en el historial del artículo. No la pisa la actualización desde a3ERP.
+     */
+    setPromo(id, promo, now = new Date().toISOString()) {
+      const r = get.get(String(id));
+      if (!r) throw new Error(`No existe el producto ${id}`);
+      let tipo = null, valor = null, hasta = null;
+      if (promo) {
+        tipo = promo.tipo; valor = Number(promo.valor); hasta = promo.hasta || null;
+        if (tipo !== "pct" && tipo !== "eur") throw new Error("La oferta es en % o en €.");
+        if (!Number.isFinite(valor) || valor <= 0) throw new Error("Escribe un valor mayor que 0.");
+        if (tipo === "pct" && valor > 90) throw new Error("Un descuento no puede pasar del 90 %.");
+        if (tipo === "eur" && valor >= r.price) throw new Error("El descuento en € tiene que ser menor que el precio.");
+        if (hasta && !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) throw new Error("La fecha de fin no es válida.");
+        valor = Math.round(valor * 10000) / 10000;
+      }
+      const texto = (t, v, h) => (t ? `${t === "pct" ? v + " %" : v + " €"}${h ? " hasta " + h : ""}` : null);
+      return atomic(() => {
+        const antes = texto(r.promo_tipo, r.promo_valor, r.promo_hasta), despues = texto(tipo, valor, hasta);
+        if (antes === despues) return "unchanged";
+        logChange.run(r.id, "oferta", antes, despues, now);
+        db.prepare("UPDATE products SET promo_tipo = ?, promo_valor = ?, promo_hasta = ?, updated_at = ? WHERE id = ?").run(tipo, valor, hasta, now, r.id);
+        return "updated";
+      });
+    },
+    /** Último cambio de PRECIO de cada artículo: Map(id → { antes, despues, at }). */
+    ultimosCambiosDePrecio: () => new Map(db.prepare("SELECT product_id AS id, old_value AS antes, new_value AS despues, changed_at AS at FROM product_changes WHERE field = 'price' AND id IN (SELECT MAX(id) FROM product_changes WHERE field = 'price' GROUP BY product_id)").all().map((x) => [x.id, { antes: Number(x.antes), despues: Number(x.despues), at: x.at }])),
+    /** Último aviso (campana) mandado de cada artículo: Map(id → { clave, at }). */
+    avisosHechos: () => new Map(db.prepare("SELECT product_id AS id, clave, at FROM product_avisos").all().map((x) => [x.id, { clave: x.clave, at: x.at }])),
+    avisoHecho: (id, clave, now = new Date().toISOString()) => db.prepare("INSERT INTO product_avisos (product_id, clave, at) VALUES (?, ?, ?) ON CONFLICT(product_id) DO UPDATE SET clave = excluded.clave, at = excluded.at").run(String(id), clave, now),
 
     get: (id) => (get.get(String(id)) ? toCatalog(get.get(String(id))) : null),
     /** Catálogo para el bot (solo activos). */

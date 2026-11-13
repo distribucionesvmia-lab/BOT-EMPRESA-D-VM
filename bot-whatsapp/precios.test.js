@@ -349,3 +349,14 @@ test("AVISOS AL MÓVIL: la primera vez que se abre la app instalada se pregunta 
   // el permiso se pide al pulsar «Sí», sin esperar nada antes
   assert.match(cli, /async function activarAvisos\(\) \{\s*\n\s*const permiso = Notification\.requestPermission\(\);/);
 });
+
+test("PANEL DE LA EMPRESA: sin pestaña «Clientes», con «Artículos» (precio, ofertas, filtros, campana) y la oferta se ve en el catálogo del cliente", () => {
+  const emp = fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8");
+  const cat = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.doesNotMatch(emp, /data-t="clientes"/); assert.doesNotMatch(emp, /id="p-clientes"/);
+  assert.match(emp, /data-t="cuentas"[^>]*>Cuentas de clientes/); assert.match(emp, /data-t="articulos"[^>]*>Artículos/);
+  for (const t of ["ar-q", "ar-cat", "ar-filtro", "Cambiar precio", "Guardar oferta", "Quitar oferta", "% de descuento", "€ de descuento por unidad", "Hasta el día (opcional)", "className: \"campana\"", "/avisar"]) assert.ok(emp.includes(t), t);
+  assert.match(emp, /<svg viewBox="0 0 24 24"[^>]*>.*Z.*<\/svg>/); // la campana es un icono, sin emojis
+  assert.match(emp, /id="alta-cli"[\s\S]*id="p-datos"|id="p-datos"[\s\S]*id="alta-cli"/); // «Añadir un cliente a mano» sigue disponible (ahora en «Datos y Excel»)
+  assert.match(cat, /p\.oferta[\s\S]*"OFERTA"/); // el cliente ve la etiqueta OFERTA en el artículo
+});

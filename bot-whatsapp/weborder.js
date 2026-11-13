@@ -1,10 +1,16 @@
 import { deliveryAllowed, madridDay, puedeHoy } from "./delivery.js";
 import { categorizar, arbolCategorias } from "./categorias.js";
-import { soloCaja } from "./pricing.js";
+import { soloCaja, precioEfectivo, promoVigente } from "./pricing.js";
 
 // Lógica de la mini-aplicación de pedido, sin red ni disco (la comparten el servidor y la demo del navegador).
 
 /** Catálogo que ve el cliente: sus habituales primero, con las unidades de la última vez y las unidades por caja. */
+/** La oferta de la empresa que de verdad le cambia el precio a este cliente: { tipo, valor, hasta? } o null (si ya tiene un descuento mayor, no se enseña). */
+function oferta(p, customer) {
+  const o = promoVigente(p); if (!o) return null;
+  const sin = precioEfectivo({ ...p, promo: null }, customer, String(p.id)), con = precioEfectivo(p, customer, String(p.id));
+  return sin.price !== con.price || sin.discount !== con.discount ? { tipo: o.tipo, valor: Number(o.valor), ...(o.hasta ? { hasta: o.hasta } : {}) } : null;
+}
 export function webProducts(customer, catalog, habitualProducts, imgOf = () => null, iaOf = () => false) {
   const habit = new Map(habitualProducts(customer).map((p) => [p.id, p]));
   return catalog
@@ -12,8 +18,9 @@ export function webProducts(customer, catalog, habitualProducts, imgOf = () => n
       id: String(p.id),
       name: p.name,
       // Mismo criterio que pricing.js (priceLine): precio y descuento especiales del cliente si los hay, si no los de la ficha
-      price: customer?.specialPrices?.[String(p.id)] ?? p.price,
-      discount: customer?.discounts?.[String(p.id)] ?? p.discount ?? 0,
+      price: precioEfectivo(p, customer, String(p.id)).price,
+      discount: precioEfectivo(p, customer, String(p.id)).discount,
+      ...(oferta(p, customer) ? { oferta: oferta(p, customer) } : {}), // la oferta de la empresa, solo si a este cliente le cambia el precio
       vat: p.vat ?? 21, // tipo de IVA (para enseñar el total con IVA)
       unitsPerBox: Number.isInteger(p.unitsPerBox) && p.unitsPerBox > 1 ? p.unitsPerBox : null,
       ...(soloCaja(p) ? { soloCaja: true } : {}), // solo se vende por cajas enteras: en pantalla no hay «Uds»

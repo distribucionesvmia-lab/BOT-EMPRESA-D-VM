@@ -856,6 +856,7 @@ function row(p) {
   const pr = document.createElement("div"); pr.className = "pr";
   const price = document.createElement("b"); price.textContent = eurp(p.price); pr.appendChild(price);
   if (p.discount) { const dto = document.createElement("span"); dto.className = "dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} % dto.`; dto.style.cssText = "color:#0a7a3b;font-weight:700;font-size:calc(14px / var(--k,1));margin-left:4px"; pr.appendChild(dto); } // el descuento del cliente se ve ya en la fila
+  if (p.oferta) { const of = document.createElement("span"); of.className = "oferta"; of.textContent = "OFERTA" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().slice(0, 2).join("/") : ""); of.style.cssText = "background:#d90000;color:#fff;font-weight:800;border-radius:6px;padding:1px 7px;margin-left:6px;font-size:calc(12px / var(--k,1));white-space:nowrap"; pr.appendChild(of); } // oferta de la empresa (el precio y el descuento de arriba ya la incluyen)
   if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " uds · " + eur(precioCaja(p)); // (las unidades que lleva pedidas ya salen bajo el contador: así la tarjeta no cambia de alto)
   info.append(n, c);
   if (p.ia) { const ia = document.createElement("div"); ia.className = "ia"; ia.textContent = "Foto orientativa creada con IA"; ia.style.cssText = "font-size:calc(11px / var(--k,1));color:#8a8a8a;font-style:italic;margin:1px 0 2px"; info.appendChild(ia); }

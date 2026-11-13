@@ -6,7 +6,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { send, readJson, makeAdminCheck } from "./auth.js";
 import { parseClientesXlsx } from "./clientes-import.js";
-import { totals, round2 } from "./pricing.js";
+import { totals, round2, promoVigente, precioEfectivo, hoyMadrid } from "./pricing.js";
+import { categorizar } from "./categorias.js";
 import { runExport } from "./exporter.js";
 import { backupDb } from "./backup.js";
 import { detectarTipo } from "./actualizar-datos.js";
@@ -75,9 +76,23 @@ function vistaExcel(lista) {
   for (const sh of sheets) for (const row of sh.rows) for (const c of row) { const st = c && typeof c === "object" ? c.s ?? 0 : 0; if (st && !estilos[st]) estilos[st] = { css: estiloCss(st), dec: estiloDecimales(st) }; }
   return { orderCount: lista.length, lineCount, sheets, estilos };
 }
-export function createAdmin({ sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "" }) {
+export function createAdmin({ sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "", catalogDb = null }) {
   const isAdmin = makeAdminCheck(adminToken);
   const avisos = crearAvisos({ accountsDb: accounts });
+  // ---- Artículos: precio, ofertas y la campana que avisa a los clientes ----
+  const eurTxt = (n) => { let t = Number(n).toFixed(3).replace(/0$/, ""); return t.replace(".", ",") + " €"; };
+  const fechaTxt = (f) => f.split("-").reverse().slice(0, 2).join("/");
+  /** Qué se puede avisar de un artículo ahora: una oferta vigente o una bajada de precio de los últimos 7 días. { tipo, clave, titulo, texto } o null. */
+  function campanaDe(p, cambio, hoy = hoyMadrid()) {
+    const o = promoVigente(p, hoy);
+    if (o) {
+      const antes = precioEfectivo({ ...p, promo: null }, null, String(p.id)), ahora = precioEfectivo(p, null, String(p.id));
+      const neto = (x) => x.price * (1 - x.discount / 100);
+      return { tipo: "oferta", clave: `promo:${o.tipo}:${o.valor}:${o.hasta ?? ""}`, titulo: `Oferta ${o.tipo === "pct" ? "−" + String(o.valor).replace(".", ",") + " %" : "−" + eurTxt(o.valor)}: ${p.name}`.slice(0, 80), texto: `Ahora a ${eurTxt(neto(ahora))} la unidad (antes ${eurTxt(neto(antes))}).${o.hasta ? ` Hasta el ${fechaTxt(o.hasta)}.` : ""}`.slice(0, 180) };
+    }
+    if (cambio && cambio.despues < cambio.antes && Date.now() - Date.parse(cambio.at) <= 7 * 86_400_000) return { tipo: "bajada", clave: `precio:${cambio.despues}`, titulo: `Bajada de precio: ${p.name}`.slice(0, 80), texto: `Ahora a ${eurTxt(cambio.despues)} (antes ${eurTxt(cambio.antes)}).` };
+    return null;
+  }
   // ---- Bandeja de entrada: carpeta del ordenador donde se dejan los Excel (clientes, artículos, historial) y fotos (ZIP).
   // Nada se aplica solo: el panel enseña lo que hay, «Ver cambios» hace la vista previa de siempre y, al aplicar, el archivo pasa a la subcarpeta «aplicados».
   const ENTRADA_MAX = 80_000_000, tiposCache = new Map();
@@ -281,6 +296,51 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       } catch (e) {
         return send(res, 400, { error: e.message || "No se pudo leer el Excel." }), true;
       }
+    }
+    // ---- Artículos ----
+    if (p === "/api/admin/articulos" && get) {
+      if (!catalogDb) return send(res, 404, { error: "No disponible." }), true;
+      const q = sinTildes(url.searchParams.get("q") ?? "").slice(0, 60), cat = url.searchParams.get("categoria") ?? "", filtro = url.searchParams.get("filtro") ?? "";
+      const pagina = Math.max(0, Number(url.searchParams.get("pagina")) || 0), por = 50, hoy = hoyMadrid();
+      const cambios = catalogDb.ultimosCambiosDePrecio(), hechos = catalogDb.avisosHechos();
+      const todas = catalogDb.list({ activeOnly: filtro !== "retirados" }).filter((x) => filtro !== "retirados" || !x.active).map((x) => {
+        const k = categorizar(x), vig = promoVigente(x, hoy), ch = cambios.get(x.id) ?? null, cp = campanaDe(x, ch, hoy), hecho = cp && hechos.get(x.id)?.clave === cp.clave ? hechos.get(x.id).at : null;
+        return { id: x.id, nombre: x.name, categoria: k.catNombre, categoriaId: k.cat, precio: x.price, descuento: x.discount ?? 0, unidadesPorCaja: x.unitsPerBox ?? null, iva: x.vat, activo: x.active,
+          oferta: vig ? { tipo: vig.tipo, valor: Number(vig.valor), hasta: vig.hasta ?? null } : null, ofertaCaducada: x.promo && !vig ? { tipo: x.promo.tipo, valor: Number(x.promo.valor), hasta: x.promo.hasta ?? null } : null,
+          cambioPrecio: ch ? { antes: ch.antes, despues: ch.despues, at: ch.at } : null, campana: cp?.tipo ?? null, aviso: cp ? { titulo: cp.titulo, texto: cp.texto } : null, avisado: hecho };
+      });
+      const filas = todas.filter((x) => (!q || sinTildes(`${x.id} ${x.nombre}`).includes(q)) && (!cat || x.categoriaId === cat) && (filtro !== "oferta" || x.oferta) && (filtro !== "bajada" || x.campana === "bajada") && (filtro !== "campana" || x.campana));
+      const categorias = [...new Map(todas.map((x) => [x.categoriaId, x.categoria])).entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+      return send(res, 200, { total: filas.length, pagina, porPagina: por, categorias, conOferta: todas.filter((x) => x.oferta).length, filas: filas.slice(pagina * por, pagina * por + por) }), true;
+    }
+    m = /^\/api\/admin\/articulos\/([\w.-]{1,40})\/(precio|oferta|avisar)$/.exec(p);
+    if (m && post && catalogDb) {
+      const prod = catalogDb.get(m[1]);
+      if (!prod) return send(res, 404, { error: "No existe ese artículo." }), true;
+      const b = (await readJson(req)) ?? {};
+      try {
+        if (m[2] === "precio") {
+          const precio = Math.round(Number(String(b.precio ?? "").replace(",", ".")) * 10000) / 10000;
+          if (!Number.isFinite(precio) || precio <= 0 || precio > 100000) return send(res, 400, { error: "Escribe un precio mayor que 0." }), true;
+          if (prod.promo?.tipo === "eur" && Number(prod.promo.valor) >= precio) return send(res, 400, { error: "El descuento en € que tiene ahora es mayor que ese precio: quita antes la oferta." }), true;
+          return send(res, 200, { ok: true, cambio: catalogDb.update(prod.id, { price: precio }) }), true;
+        }
+        if (m[2] === "oferta") {
+          if (b.tipo === "ninguna") return send(res, 200, { ok: true, cambio: catalogDb.setPromo(prod.id, null) }), true;
+          const hasta = b.hasta ? String(b.hasta) : null;
+          if (hasta && hasta < hoyMadrid()) return send(res, 400, { error: "La fecha de fin ya ha pasado." }), true;
+          return send(res, 200, { ok: true, cambio: catalogDb.setPromo(prod.id, { tipo: b.tipo, valor: Number(String(b.valor ?? "").replace(",", ".")), hasta }) }), true;
+        }
+        // avisar: la campana. El texto lo arma el servidor con el estado real del artículo (no se fía de lo que mande la pantalla)
+        if (b.confirmo !== true) return send(res, 400, { error: "Falta la confirmación para avisar." }), true;
+        const cp = campanaDe(prod, catalogDb.ultimosCambiosDePrecio().get(prod.id) ?? null);
+        if (!cp) return send(res, 400, { error: "Este artículo no tiene una oferta ni una bajada de precio reciente que avisar." }), true;
+        if (accounts.pushLogCount(new Date(Date.now() - 3600_000).toISOString()) >= 10) return send(res, 429, { error: "Ya has enviado varios avisos en la última hora. Espera un poco para no molestar a los clientes." }), true;
+        const r = await avisos.aTodos({ title: cp.titulo, body: cp.texto, url: "/cliente", tag: "oferta-" + prod.id });
+        accounts.pushLogAdd({ titulo: cp.titulo, texto: cp.texto, destino: "todos", enviados: r.enviados, fallidos: r.fallidos, detalle: r.errores?.join(" · ") || null });
+        if (r.enviados > 0) catalogDb.avisoHecho(prod.id, cp.clave);
+        return send(res, 200, { ok: true, ...r, titulo: cp.titulo }), true;
+      } catch (e) { return send(res, 400, { error: e.message || "No se pudo guardar." }), true; }
     }
     // ---- Avisos al móvil de los clientes (Web Push) ----
     if (p === "/api/admin/avisos" && get) return send(res, 200, { ...accounts.pushResumen(), contacto: avisos.contacto(), ultimos: accounts.pushLogList(15) }), true;

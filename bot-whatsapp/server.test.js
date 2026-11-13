@@ -1003,3 +1003,51 @@ test("AVISOS A CLIENTES (empresa): a todos o a uno, con confirmación; los móvi
     const despues = (await call("GET", "/api/admin/avisos", { admin: true })).json; assert.equal(despues.moviles, n0.moviles - 1, "el móvil caducado se ha quitado");
   } finally { movA.cerrar(); movB.cerrar(); }
 });
+
+test("ARTÍCULOS (empresa): cambiar precio, poner ofertas, filtrar, y la campana que avisa a los clientes", async () => {
+  const lista = async (q = "") => (await call("GET", "/api/admin/articulos" + q, { admin: true })).json;
+  const POST = (id, ruta, body, extra = {}) => call("POST", `/api/admin/articulos/${id}/${ruta}`, { admin: true, body, ...extra });
+  assert.equal((await call("GET", "/api/admin/articulos")).status, 403); // solo la empresa
+  assert.equal((await call("POST", "/api/admin/articulos/1010/precio", { body: { precio: 1 } })).status, 403);
+  const todo = await lista(); assert.ok(todo.total > 5); assert.ok(todo.categorias.length >= 1);
+  const a0 = todo.filas.find((x) => x.id === "1010"); assert.ok(a0 && a0.precio > 0 && a0.campana === null && a0.oferta === null);
+  // filtros: por nombre (sin tildes ni mayúsculas) y por código
+  assert.ok((await lista("?q=" + encodeURIComponent(a0.nombre.slice(0, 5).toUpperCase()))).filas.some((x) => x.id === "1010"));
+  assert.deepEqual((await lista("?q=1010")).filas.map((x) => x.id), ["1010"]);
+  assert.equal((await lista("?q=zzzz-no-existe")).total, 0);
+  assert.equal((await lista("?filtro=oferta")).total, 0);
+  // precio: se valida, y solo una BAJADA reciente trae la campana (una subida no se avisa)
+  for (const mal of [{ precio: 0 }, { precio: "abc" }, { precio: -2 }, {}]) assert.equal((await POST("1010", "precio", mal)).status, 400);
+  assert.equal((await POST("9999999", "precio", { precio: 1 })).status, 404);
+  const nuevo = Math.round(a0.precio * 0.8 * 1000) / 1000;
+  assert.equal((await POST("1010", "precio", { precio: String(nuevo).replace(".", ",") })).json.cambio, "updated"); // admite coma
+  let a1 = (await lista("?q=1010")).filas[0]; assert.equal(a1.precio, nuevo); assert.equal(a1.campana, "bajada"); assert.equal(a1.cambioPrecio.antes, a0.precio);
+  assert.equal((await lista("?filtro=bajada")).filas.some((x) => x.id === "1010"), true);
+  const b0 = todo.filas.find((x) => x.id !== "1010"); await POST(b0.id, "precio", { precio: b0.precio * 1.5 });
+  assert.equal((await lista("?q=" + b0.id)).filas.find((x) => x.id === b0.id).campana, null); // subida: sin campana
+  // ofertas: validaciones
+  for (const mal of [{ tipo: "raro", valor: 5 }, { tipo: "pct", valor: 0 }, { tipo: "pct", valor: 95 }, { tipo: "eur", valor: nuevo }, { tipo: "pct", valor: 5, hasta: "2000-01-01" }]) assert.equal((await POST("1010", "oferta", mal)).status, 400, JSON.stringify(mal));
+  // oferta en %: sale en la lista y en el pedido del cliente (precio y descuento), con la campana
+  const A = cookieOf(await entrarNif("111111")), mov = await movilDePrueba();
+  try {
+    assert.equal((await POST("1010", "oferta", { tipo: "pct", valor: "15", hasta: "2099-12-31" })).json.cambio, "updated");
+    a1 = (await lista("?q=1010")).filas[0]; assert.deepEqual(a1.oferta, { tipo: "pct", valor: 15, hasta: "2099-12-31" }); assert.equal(a1.campana, "oferta");
+    assert.equal((await lista("?filtro=oferta")).total, 1); assert.equal((await lista("?filtro=campana")).filas.some((x) => x.id === "1010"), true);
+    const rr = await call("POST", "/catalogo", { cookie: A, body: { key: "clave-oferta-pedido-1", lines: [{ id: "1010", qty: 1 }] } }); assert.equal(rr.status, 200, JSON.stringify(rr.json));
+    const lin = (await call("GET", "/api/admin/pedidos", { admin: true })).json.find((o) => o.ref === rr.json.ref).lineas[0];
+    assert.equal(lin.precio, nuevo); assert.ok(lin.descuento >= 15, "el pedido lleva el descuento de la oferta");
+    // la campana: pide confirmación, el texto lo pone el servidor y llega a los móviles
+    await call("POST", "/api/push/suscribir", { cookie: A, body: { subscription: mov.sub } }); await esperar(() => mov.avisos().length >= 1);
+    assert.equal((await POST("1010", "avisar", {})).status, 400); // sin confirmar
+    assert.equal((await POST("1010", "avisar", { confirmo: true, titulo: "ESTO NO SE USA" }, {})).status, 200);
+    assert.ok(await esperar(() => mov.avisos().some((x) => /^Oferta −15 %: /.test(x.title))), "el móvil recibe el aviso de la oferta");
+    const av = mov.avisos().find((x) => /^Oferta/.test(x.title)); assert.ok(av.title.includes(a0.nombre.slice(0, 10))); assert.match(av.body, /Ahora a .+ € la unidad \(antes .+ €\)\. Hasta el 31\/12\./); assert.equal(av.tag, "oferta-1010");
+    a1 = (await lista("?q=1010")).filas[0]; assert.ok(a1.avisado, "queda anotado que ya se avisó");
+    // si la oferta cambia, la campana vuelve a estar «sin avisar»; si se quita, queda la bajada de precio
+    await POST("1010", "oferta", { tipo: "eur", valor: 0.05 }); a1 = (await lista("?q=1010")).filas[0]; assert.equal(a1.avisado, null); assert.equal(a1.oferta.tipo, "eur");
+    await POST("1010", "oferta", { tipo: "ninguna" }); a1 = (await lista("?q=1010")).filas[0]; assert.equal(a1.oferta, null); assert.equal(a1.campana, "bajada");
+    // un artículo sin oferta ni bajada no tiene nada que avisar
+    assert.equal((await POST(b0.id, "avisar", { confirmo: true })).status, 400);
+    assert.equal((await POST("9999999", "avisar", { confirmo: true })).status, 404);
+  } finally { mov.cerrar(); }
+});

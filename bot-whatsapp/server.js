@@ -408,7 +408,7 @@ const estadoDelSistema = adminEnabled ? () => {
 } : null;
 const ficheroActualizaciones = nodePath.join(nodePath.dirname(process.env.CUSTOMERS_DB ?? "clientes.sqlite"), "actualizaciones.log");
 const leerActualizaciones = () => { try { return fs.readFileSync(ficheroActualizaciones, "utf8").trim().split("\n").slice(-60).map((l) => JSON.parse(l)).reverse(); } catch { return []; } };
-const admin = createAdmin({ sync, mail: notificador, actualizador, estado: estadoDelSistema, actualizaciones: leerActualizaciones, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
+const admin = createAdmin({ sync, mail: notificador, actualizador, estado: estadoDelSistema, actualizaciones: leerActualizaciones, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), catalogDb: dbsAdmin?.catalogDb ?? null, adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
 const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));
@@ -513,6 +513,7 @@ async function appRoutes(req, res, url) {
   }
   if (p === "/catalogo/datos" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    await refreshCatalog(); // el cliente ve ya los precios y las ofertas que la empresa acaba de cambiar
     const customer = clienteConPedidos(account.customerId);
     return void sendJson(res, 200, {
       business: BUSINESS.name,
@@ -625,6 +626,7 @@ async function appRoutes(req, res, url) {
     return void sendJson(res, 200, { ref: o.ref, hasta: pe.texto, entrega: o.delivery_date ?? null, nota: (o.note ?? "").replace(/^ENTREGA EN [^:]*: [^·]*(?: · )?/, ""), direccion: /^ENTREGA EN /.test(o.note ?? "") ? o.address : "", lineas: o.items.map((i) => ({ id: String(i.id), qty: i.qty, unit: i.unit, note: i.note ?? "" })) });
   }
   if (p === "/catalogo" && req.method === "POST") {
+    await refreshCatalog(); // el pedido se calcula con los precios y ofertas de ahora mismo
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
     const body = await readJson(req);
