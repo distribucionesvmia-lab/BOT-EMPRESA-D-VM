@@ -338,3 +338,14 @@ test("AVISOS AL MÓVIL (app del cliente): botón «Activar avisos» en Mi cuenta
   assert.doesNotMatch(sw, /caches\.(open|put)/); // sigue sin guardar nada en caché
   assert.match(sw, /startsWith\("\/"\)/); // el aviso solo puede abrir páginas de la propia aplicación
 });
+
+test("AVISOS AL MÓVIL: la primera vez que se abre la app instalada se pregunta una sola vez si quiere los avisos", () => {
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  assert.match(cli, /id="m-avisos"[\s\S]*¿Quieres recibir avisos\?[\s\S]*ofertas[\s\S]*precios[\s\S]*Sí, activar avisos[\s\S]*Ahora no/);
+  assert.match(cli, /display-mode: standalone/); // solo en el acceso directo (app instalada)
+  assert.match(cli, /localStorage\.getItem\("vm:avisos-preguntado"\)/); assert.match(cli, /localStorage\.setItem\("vm:avisos-preguntado", "1"\)/); // una sola vez
+  assert.match(cli, /Notification\.permission !== "default"/); // si ya decidió, no se pregunta
+  assert.match(cli, /setTimeout\(preguntarAvisos, 2000\)/); // sale tras entrar, no tapa la bienvenida de golpe
+  // el permiso se pide al pulsar «Sí», sin esperar nada antes
+  assert.match(cli, /async function activarAvisos\(\) \{\s*\n\s*const permiso = Notification\.requestPermission\(\);/);
+});

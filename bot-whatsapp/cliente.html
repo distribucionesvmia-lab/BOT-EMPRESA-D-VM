@@ -461,6 +461,16 @@
       <button class="vm-link" type="button" id="f-cerrar">Cerrar</button>
     </div>
   </div>
+  <div class="vm-modal" id="m-avisos" hidden>
+    <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-avisos">
+      <h2 id="t-avisos">¿Quieres recibir avisos?</h2>
+      <p>Te avisaremos en este móvil cuando recibamos tus pedidos y cuando haya <b>ofertas</b> y cambios de <b>precios</b>.</p>
+      <p style="font-size:calc(13px / var(--k,1))">Puedes cambiarlo cuando quieras en «Mi cuenta».</p>
+      <div class="err" id="av-err" role="alert"></div>
+      <button class="vm-btn primary" type="button" id="av-si">Sí, activar avisos</button>
+      <button class="vm-btn ghost" type="button" id="av-no">Ahora no</button>
+    </div>
+  </div>
   <div class="vm-modal" id="m-cuenta" hidden>
     <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-cuenta">
       <div class="cu-cab"><h2 id="t-cuenta">Mi cuenta</h2><button class="vm-link" type="button" id="cu-cerrar">Cerrar</button></div>
@@ -568,6 +578,31 @@ const catUrl = () => window.__catUrl || "/catalogo";
 const nodo = (tag, txt, cls) => { const e = document.createElement(tag); if (txt != null) e.textContent = txt; if (cls) e.className = cls; return e; };
 // ── Avisos en el móvil: «Pedido recibido» y avisos de la empresa (notificaciones push) ──
 const clavePush = (b64) => { const raw = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); };
+// Activa los avisos en este móvil. Hay que llamarla directamente desde un clic (los móviles exigen que el permiso se pida al pulsar un botón).
+async function activarAvisos() {
+  const permiso = Notification.requestPermission(); // primero, sin esperar nada antes: así cuenta como respuesta al clic
+  if ((await permiso) !== "granted") throw new Error("No has permitido las notificaciones.");
+  const reg = await navigator.serviceWorker.ready;
+  const j = await fetch("/api/push/clave").then((r) => (r.ok ? r.json() : null)); if (!j) throw new Error("No se ha podido preparar el aviso. Inténtalo de nuevo.");
+  const viejo = await reg.pushManager.getSubscription(); if (viejo) await viejo.unsubscribe();
+  const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: clavePush(j.publica) });
+  const r = await fetch("/api/push/suscribir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subscription: s.toJSON() }) });
+  if (!r.ok) { await s.unsubscribe(); throw new Error((await r.json().catch(() => ({}))).error || "No se pudieron activar los avisos."); }
+}
+// La primera vez que el cliente abre la aplicación instalada (acceso directo) se le pregunta, una sola vez, si quiere recibir avisos
+async function preguntarAvisos() {
+  try {
+    if (localStorage.getItem("vm:avisos-preguntado")) return;
+    const instalada = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+    if (!instalada || !("serviceWorker" in navigator && "PushManager" in window && "Notification" in window) || Notification.permission !== "default") return;
+    const reg = await navigator.serviceWorker.ready; if (await reg.pushManager.getSubscription()) return;
+    if ([...document.querySelectorAll(".vm-modal")].some((m) => !m.hidden)) return; // no tapar otra ventana abierta
+    localStorage.setItem("vm:avisos-preguntado", "1"); // se pregunta solo una vez; después, desde Mi cuenta
+    $("av-err").textContent = ""; $("m-avisos").hidden = false; $("av-si").focus();
+  } catch (e) { /* sin guardado local o sin avisos: no se pregunta */ }
+}
+$("av-si").onclick = async () => { $("av-si").disabled = true; $("av-err").textContent = ""; try { await activarAvisos(); $("m-avisos").hidden = true; } catch (e) { $("av-err").textContent = e.message || "No se han podido activar. Puedes probar más tarde desde Mi cuenta."; $("av-si").disabled = false; } };
+$("av-no").onclick = () => ($("m-avisos").hidden = true);
 async function pintarAvisos(box) {
   box.textContent = ""; box.appendChild(nodo("h3", "Avisos en este móvil", "cu-tit"));
   const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -585,15 +620,7 @@ async function pintarAvisos(box) {
     boton("Desactivar avisos", "ghost", async () => { await fetch("/api/push/baja", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }); await sub.unsubscribe(); await pintarAvisos(box); });
   } else {
     p("Activa los avisos y recibirás una notificación en este móvil cuando recibamos tu pedido.");
-    boton("Activar avisos", "primary", async () => {
-      if ((await Notification.requestPermission()) !== "granted") throw new Error("No has permitido las notificaciones.");
-      const j = await fetch("/api/push/clave").then((r) => (r.ok ? r.json() : null)); if (!j) throw new Error("No se ha podido preparar el aviso. Inténtalo de nuevo.");
-      const viejo = await reg.pushManager.getSubscription(); if (viejo) await viejo.unsubscribe();
-      const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: clavePush(j.publica) });
-      const r = await fetch("/api/push/suscribir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subscription: s.toJSON() }) });
-      if (!r.ok) { await s.unsubscribe(); throw new Error((await r.json().catch(() => ({}))).error || "No se pudieron activar los avisos."); }
-      await pintarAvisos(box);
-    });
+    boton("Activar avisos", "primary", async () => { await activarAvisos(); await pintarAvisos(box); });
   }
   box.appendChild(msg);
 }
@@ -823,7 +850,7 @@ mbtn.onclick = (e) => { e.stopPropagation(); menu(mpop.hidden); };
 document.addEventListener("click", () => menu(false)); document.addEventListener("keydown", (e) => { if (e.key === "Escape") menu(false); });
 document.querySelectorAll("#quick button").forEach((b) => (b.onclick = () => enviar(b.dataset.q, b.textContent)));
 $("f").onsubmit = (e) => { e.preventDefault(); const v = $("t").value.trim(); if (v) { $("t").value = ""; enviar(v); } };
-function entrar(nombre) { $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); }
+function entrar(nombre) { $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); setTimeout(preguntarAvisos, 2000); }
 
 (async () => {
   const r = await fetch("/api/yo");
