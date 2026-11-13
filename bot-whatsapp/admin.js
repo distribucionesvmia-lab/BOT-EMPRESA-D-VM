@@ -335,7 +335,7 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
         if (b.confirmo !== true) return send(res, 400, { error: "Falta la confirmación para avisar." }), true;
         const cp = campanaDe(prod, catalogDb.ultimosCambiosDePrecio().get(prod.id) ?? null);
         if (!cp) return send(res, 400, { error: "Este artículo no tiene una oferta ni una bajada de precio reciente que avisar." }), true;
-        if (accounts.pushLogCount(new Date(Date.now() - 3600_000).toISOString()) >= 10) return send(res, 429, { error: "Ya has enviado varios avisos en la última hora. Espera un poco para no molestar a los clientes." }), true;
+        if (accounts.pushLogCount(new Date(Date.now() - 3600_000).toISOString()) >= 10) return send(res, 400, { error: "Ya has enviado 10 avisos en la última hora. Espera un poco para no molestar a los clientes." }), true; // (no 429: el panel lo confundiría con el bloqueo de la clave)
         const r = await avisos.aTodos({ title: cp.titulo, body: cp.texto, url: "/cliente", tag: "oferta-" + prod.id });
         accounts.pushLogAdd({ titulo: cp.titulo, texto: cp.texto, destino: "todos", enviados: r.enviados, fallidos: r.fallidos, detalle: r.errores?.join(" · ") || null });
         if (r.enviados > 0) catalogDb.avisoHecho(prod.id, cp.clave);
@@ -352,7 +352,7 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       if (b.destino !== "todos" && b.destino !== "cliente") return send(res, 400, { error: "Elige a quién enviarlo." }), true;
       const cli = b.destino === "cliente" ? customers.getById(String(b.clienteId ?? "")) : null;
       if (b.destino === "cliente" && !cli) return send(res, 400, { error: "Elige un cliente de la lista." }), true;
-      if (accounts.pushLogCount(new Date(Date.now() - 3600_000).toISOString()) >= 10) return send(res, 429, { error: "Ya has enviado varios avisos en la última hora. Espera un poco para no molestar a los clientes." }), true;
+      if (accounts.pushLogCount(new Date(Date.now() - 3600_000).toISOString()) >= 10) return send(res, 400, { error: "Ya has enviado 10 avisos en la última hora. Espera un poco para no molestar a los clientes." }), true; // (no 429: el panel lo confundiría con el bloqueo de la clave)
       const mensaje = { title: titulo, body: texto, url: "/cliente", tag: "aviso-" + Date.now() };
       const r = cli ? await avisos.aCliente(cli.id, mensaje) : await avisos.aTodos(mensaje);
       accounts.pushLogAdd({ titulo, texto, destino: cli ? `${cli.id} ${cli.name}` : "todos", enviados: r.enviados, fallidos: r.fallidos, detalle: r.errores?.join(" · ") || null });

@@ -397,7 +397,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     ajusteSiFalta(clave, crearValor) { db.prepare("INSERT OR IGNORE INTO ajustes (clave, valor) VALUES (?, ?)").run(clave, crearValor()); return db.prepare("SELECT valor FROM ajustes WHERE clave = ?").get(clave).valor; },
     pushLogAdd: (x, now = new Date().toISOString()) => db.prepare("INSERT INTO push_log (at, titulo, texto, destino, enviados, fallidos, detalle) VALUES (?, ?, ?, ?, ?, ?, ?)").run(now, x.titulo, x.texto, x.destino, x.enviados, x.fallidos, x.detalle ?? null),
     pushLogList: (limit = 15) => db.prepare("SELECT at, titulo, texto, destino, enviados, fallidos, detalle FROM push_log ORDER BY id DESC LIMIT ?").all(limit),
-    pushLogCount: (desde) => db.prepare("SELECT COUNT(*) AS n FROM push_log WHERE at >= ?").get(desde).n,
+    pushLogCount: (desde) => db.prepare("SELECT COUNT(*) AS n FROM push_log WHERE at >= ? AND enviados > 0").get(desde).n, // solo cuentan los avisos que han llegado a algún móvil: los intentos fallidos no gastan el límite
 
     deleteAccount(accountId, now = new Date().toISOString()) {
       const row = byId.get(Number(accountId));

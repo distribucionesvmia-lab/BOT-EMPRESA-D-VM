@@ -1051,3 +1051,18 @@ test("ARTÍCULOS (empresa): cambiar precio, poner ofertas, filtrar, y la campana
     assert.equal((await POST("9999999", "avisar", { confirmo: true })).status, 404);
   } finally { mov.cerrar(); }
 });
+
+test("AVISOS A CLIENTES: el límite de 10 por hora solo cuenta los que llegan, y se dice con un error normal (no 429: el panel lo tomaría por un bloqueo de la clave)", async () => {
+  const A = cookieOf(await entrarNif("111111")), mov = await movilDePrueba();
+  try {
+    await call("POST", "/api/push/suscribir", { cookie: A, body: { subscription: mov.sub } }); await esperar(() => mov.avisos().length >= 1);
+    const enviar = (n) => call("POST", "/api/admin/avisos/enviar", { admin: true, body: { titulo: "Prueba " + n, texto: "texto", destino: "todos", confirmo: true } });
+    mov.poner(403); // 12 intentos que NO llegan: no gastan el límite
+    for (let i = 0; i < 12; i++) { const r = await enviar("fallo" + i); assert.equal(r.status, 200); assert.equal(r.json.enviados, 0); }
+    mov.poner(201);
+    let corte = null;
+    for (let i = 0; i < 15 && !corte; i++) { const r = await enviar("ok" + i); if (r.status !== 200) corte = { i, r }; }
+    assert.ok(corte, "al llegar a 10 avisos en una hora se detiene");
+    assert.equal(corte.r.status, 400); assert.notEqual(corte.r.status, 429); assert.match(corte.r.json.error, /10 avisos en la última hora/); assert.ok(corte.i <= 10);
+  } finally { mov.cerrar(); }
+});
