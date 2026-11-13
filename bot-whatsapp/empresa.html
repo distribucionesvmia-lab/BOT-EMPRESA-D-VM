@@ -66,7 +66,7 @@
       <button class="tab" role="tab" data-t="solicitudes" aria-selected="false">Solicitudes de alta <span class="n" id="n-sol" hidden></span></button>
       <button class="tab" role="tab" data-t="clientes" aria-selected="false">Clientes <span class="n" id="n-cli" hidden></span></button>
       <button class="tab" role="tab" data-t="cuentas" aria-selected="false">Cuentas de clientes <span class="n" id="n-cue" hidden></span></button>
-      <button class="tab" role="tab" data-t="datos" aria-selected="false">Datos y Excel</button>
+      <button class="tab" role="tab" data-t="datos" aria-selected="false">Datos y Excel <span class="n" id="n-dat" hidden></span></button>
     </div>
 
     <!-- Pedidos -->
@@ -142,6 +142,12 @@
         <h2>Datos y Excel</h2>
         <p class="muted" style="margin:0 0 10px">Sube aquí los Excel de a3ERP (y las fotos). Siempre pasa lo mismo: <b>1</b> eliges el archivo, <b>2</b> «Ver cambios» te enseña qué se añade, qué cambia y qué se quita <b>sin tocar nada</b>, y <b>3</b> «Aplicar cambios» escribe solo las diferencias. Orden recomendado la primera vez: <b>clientes → productos → historial → fotos</b>.</p>
         <div id="dx-pasos" class="row" style="gap:8px;flex-wrap:wrap"><span class="pasoDx">1 · Elige el archivo</span><span class="pasoDx">2 · Revisa los cambios</span><span class="pasoDx">3 · Aplica</span></div>
+      </div>
+      <div class="panel" id="entrada-panel" hidden>
+        <h2>Bandeja de entrada</h2>
+        <p class="muted" id="entrada-info" style="margin:0 0 8px"></p>
+        <div class="scroll"><table><tbody id="entrada-lista"></tbody></table></div>
+        <p class="muted" id="entrada-msg" role="status" style="margin:8px 0 0"></p>
       </div>
       <div id="dx-tarjetas" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px;align-items:start"></div>
     </div>
@@ -584,7 +590,8 @@ for (const t of TIPOS_DX) {
   const c = document.createElement("div"); c.className = "panel dx-card"; c.dataset.tipo = t.tipo;
   c.innerHTML = `<h2>${t.titulo}</h2><p class="muted" style="margin:0 0 8px">${t.desc}</p><p class="muted" style="margin:0 0 10px;font-size:13px"><b>Columnas:</b> ${t.cols}</p><p class="ult muted" id="${t.p}-ult" style="margin:0 0 10px;font-size:13px"></p><input type="hidden" id="${t.p}-tipo" value="${t.tipo}"><div class="row"><input type="file" id="${t.p}-file" accept="${t.acepta}" aria-label="Archivo de ${t.titulo}"><button class="main" id="${t.p}-ver" type="button">Ver cambios</button><button id="${t.p}-aplicar" type="button" hidden>Aplicar cambios</button></div><p class="muted" id="${t.p}-msg" role="status"></p><div id="${t.p}-res"></div>`;
   $("dx-tarjetas").appendChild(c);
-  montarExcel(t.p, () => { ultimasSubidas(); });
+  montarExcel(t.p, () => { ultimasSubidas(); entradaTrasAplicar(t.p); });
+  $(t.p + "-file").addEventListener("change", () => { if (enRevision?.p === t.p) enRevision = null; }); // si elige otro archivo a mano, ya no es el de la bandeja
   $(t.p + "-ver").addEventListener("click", () => { c.style.gridColumn = "1 / -1"; }); // la tarjeta que se está revisando ocupa todo el ancho
 }
 const nombreTipo = { productos: "px", clientes: "cl", historial: "hi", fotos: "fo" };
@@ -597,6 +604,42 @@ async function ultimasSubidas() {
     }
   } catch { /* sin registro */ }
 }
+// ---- Bandeja de entrada: los Excel que se dejan en la carpeta del ordenador. Nada se aplica solo ----
+let enRevision = null; // { p, nombre }: el archivo de la bandeja que se está revisando en una de las tarjetas
+const TIPO_TXT = { productos: "Artículos y precios", clientes: "Clientes", historial: "Historial de compras", fotos: "Fotos (ZIP)" };
+async function entrada() {
+  const r = await call("/api/admin/entrada");
+  $("entrada-panel").hidden = !r.configurada;
+  const n = r.configurada ? (r.archivos ?? []).length : 0; $("n-dat").hidden = !n; $("n-dat").textContent = n || "";
+  if (!r.configurada) return;
+  $("entrada-info").textContent = r.error || `Deja los Excel de a3ERP (y el ZIP de fotos) en la carpeta ${r.carpeta}. Aquí aparecen solos; no se cambia nada hasta que tú pulses «Ver cambios» y luego «Aplicar cambios».`;
+  const tb = $("entrada-lista"); tb.innerHTML = "";
+  if (!r.archivos?.length) { const tr = document.createElement("tr"); tr.appendChild(el("td", "No hay archivos nuevos en la carpeta.", { className: "muted" })); tb.appendChild(tr); return; }
+  for (const a of r.archivos) {
+    const tr = document.createElement("tr"), acc = el("td");
+    const ver = el("button", "Ver cambios", { type: "button", className: "main" }); ver.disabled = !a.tipo; ver.onclick = () => entradaVer(a);
+    const arch = el("button", "Archivar", { type: "button", title: "Lo mueve a la subcarpeta «aplicados» sin cambiar nada: úsalo si ya está aplicado o no hace falta" }); arch.style.marginLeft = "8px"; arch.onclick = () => entradaArchivar(a.nombre, "Archivado.");
+    acc.append(ver, arch);
+    const nom = el("td"); nom.append(el("b", a.nombre), el("div", `${a.tipo ? TIPO_TXT[a.tipo] : "No sé de qué tipo es: súbelo a mano en su tarjeta"} · ${hora2(a.modificado)} · ${(a.tamano / 1048576).toFixed(1).replace(".", ",")} MB`, { className: "muted" }));
+    tr.append(nom, acc); tb.appendChild(tr);
+  }
+}
+async function entradaVer(a) {
+  $("entrada-msg").textContent = "Abriendo el archivo…";
+  try {
+    const r = await call(`/api/admin/entrada/archivo?nombre=${encodeURIComponent(a.nombre)}`, null, true);
+    if (!r.ok) throw new Error("No se pudo leer el archivo de la carpeta.");
+    const p = nombreTipo[a.tipo], dt = new DataTransfer(); dt.items.add(new File([await r.blob()], a.nombre));
+    $(p + "-file").files = dt.files; enRevision = { p, nombre: a.nombre };
+    $(p + "-ver").click(); document.querySelector(`.dx-card[data-tipo="${a.tipo}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    $("entrada-msg").textContent = `Revisa los cambios de «${a.nombre}» más abajo y pulsa «Aplicar cambios» si son correctos. Al aplicarlos, el archivo pasa a la subcarpeta «aplicados».`;
+  } catch (e) { $("entrada-msg").textContent = e.message; }
+}
+async function entradaArchivar(nombre, msg) {
+  try { await call("/api/admin/entrada/archivar", { nombre }); if (msg) $("entrada-msg").textContent = msg; } catch (e) { $("entrada-msg").textContent = e.message; }
+  entrada().catch(() => {});
+}
+function entradaTrasAplicar(p) { if (enRevision && enRevision.p === p) { const n = enRevision.nombre; enRevision = null; entradaArchivar(n, `Aplicado: «${n}» ha pasado a la subcarpeta «aplicados».`); } }
 async function avisos() {
   const r = await call("/api/admin/resumen");
   const n = (id, v) => { $(id).hidden = !v; $(id).textContent = v; };
@@ -604,7 +647,7 @@ async function avisos() {
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), derechos(), clientes(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), derechos(), clientes(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));

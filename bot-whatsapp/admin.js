@@ -9,6 +9,7 @@ import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2 } from "./pricing.js";
 import { runExport } from "./exporter.js";
 import { backupDb } from "./backup.js";
+import { detectarTipo } from "./actualizar-datos.js";
 import { execFile } from "node:child_process";
 import { recordatoriosDeHoy } from "./recordatorios.js";
 import { imprimirHtml, FORMAT, madrid } from "./export-format.js";
@@ -73,8 +74,28 @@ function vistaExcel(lista) {
   for (const sh of sheets) for (const row of sh.rows) for (const c of row) { const st = c && typeof c === "object" ? c.s ?? 0 : 0; if (st && !estilos[st]) estilos[st] = { css: estiloCss(st), dec: estiloDecimales(st) }; }
   return { orderCount: lista.length, lineCount, sheets, estilos };
 }
-export function createAdmin({ sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones" }) {
+export function createAdmin({ sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "" }) {
   const isAdmin = makeAdminCheck(adminToken);
+  // ---- Bandeja de entrada: carpeta del ordenador donde se dejan los Excel (clientes, artículos, historial) y fotos (ZIP).
+  // Nada se aplica solo: el panel enseña lo que hay, «Ver cambios» hace la vista previa de siempre y, al aplicar, el archivo pasa a la subcarpeta «aplicados».
+  const ENTRADA_MAX = 80_000_000, tiposCache = new Map();
+  const nombreValido = (n) => typeof n === "string" && n.length > 0 && n.length <= 200 && path.basename(n) === n && /\.(xlsx|zip)$/i.test(n) && !/^[.~]/.test(n);
+  function listarEntrada() {
+    const dir = entradaDir();
+    if (!dir) return { configurada: false };
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { return { configurada: true, carpeta: dir, archivos: [], error: "No se puede abrir la carpeta de entrada." }; }
+    const archivos = [];
+    for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!f.isFile() || !nombreValido(f.name)) continue;
+      const st = fs.statSync(path.join(dir, f.name));
+      if (!st.size || st.size > ENTRADA_MAX) continue;
+      const k = `${f.name}|${st.size}|${st.mtimeMs}`;
+      if (!tiposCache.has(k)) { try { tiposCache.set(k, detectarTipo(fs.readFileSync(path.join(dir, f.name)))); } catch { tiposCache.set(k, null); } if (tiposCache.size > 200) tiposCache.delete(tiposCache.keys().next().value); }
+      archivos.push({ nombre: f.name, tipo: tiposCache.get(k), tamano: st.size, modificado: st.mtime.toISOString() });
+    }
+    archivos.sort((a, b) => (a.modificado < b.modificado ? 1 : -1));
+    return { configurada: true, carpeta: dir, archivos: archivos.slice(0, 50) };
+  }
   // Máximo 10 claves erróneas cada 10 minutos por IP; superado el límite se bloquea esa IP aunque acierte la clave
   // Cada CLAVE distinta que falla cuenta una vez: el panel lanza varias peticiones a la vez con la misma clave y un solo
   // error al teclear no debe bloquear al administrador. Las peticiones sin clave no cuentan (no adivinan nada).
@@ -258,6 +279,24 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       } catch (e) {
         return send(res, 400, { error: e.message || "No se pudo leer el Excel." }), true;
       }
+    }
+    // ---- Bandeja de entrada (carpeta del ordenador) ----
+    if (p === "/api/admin/entrada" && get) return send(res, 200, listarEntrada()), true;
+    if (p === "/api/admin/entrada/archivo" && get) {
+      const n = url.searchParams.get("nombre") ?? "", dir = entradaDir();
+      if (!dir || !nombreValido(n) || !fs.existsSync(path.join(dir, n))) return send(res, 404, { error: "No existe ese archivo en la carpeta." }), true;
+      res.writeHead(200, { "Content-Type": "application/octet-stream", "Cache-Control": "no-store" }).end(fs.readFileSync(path.join(dir, n)));
+      return true;
+    }
+    if (p === "/api/admin/entrada/archivar" && post) { // el archivo ya se aplicó (o no hace falta): pasa a «aplicados», con la fecha delante
+      const b = (await readJson(req)) ?? {}, dir = entradaDir();
+      if (!dir || !nombreValido(b.nombre) || !fs.existsSync(path.join(dir, b.nombre))) return send(res, 404, { error: "No existe ese archivo en la carpeta." }), true;
+      try {
+        const destino = path.join(dir, "aplicados"); fs.mkdirSync(destino, { recursive: true });
+        const sello = madrid(new Date().toISOString()).replace(/[-: ]/g, "").replace(/^(\d{8})/, "$1-").slice(0, 13);
+        fs.renameSync(path.join(dir, b.nombre), path.join(destino, `${sello}-${b.nombre}`));
+        return send(res, 200, { ok: true }), true;
+      } catch (e) { return send(res, 409, { error: "No se pudo mover el archivo. Si lo tienes abierto en Excel, ciérralo y vuelve a intentarlo." }), true; }
     }
     // ---- Actualizar datos desde un Excel: vista previa de los cambios y aplicar solo las diferencias ----
     m = /^\/api\/admin\/(vista-previa|aplicar)\/(productos|clientes|historial|fotos)$/.exec(p);

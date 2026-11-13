@@ -2,7 +2,7 @@
 # Se puede ejecutar varias veces: NUNCA cambia unas claves que ya existen (si se cambia NIF_PEPPER nadie podria entrar).
 $ErrorActionPreference = "Stop"
 $aqui = Split-Path -Parent $MyInvocation.MyCommand.Path
-foreach ($d in "C:\vm\config", "C:\vm\datos", "C:\vm\logs") { New-Item -ItemType Directory -Force -Path $d | Out-Null }
+foreach ($d in "C:\vm\config", "C:\vm\datos", "C:\vm\logs", "C:\vm\entrada") { New-Item -ItemType Directory -Force -Path $d | Out-Null }
 
 function ClaveAleatoria($n) {
   $b = New-Object byte[] $n; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)

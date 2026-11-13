@@ -22,7 +22,7 @@ before(async () => {
     cwd: path.dirname(fileURLToPath(import.meta.url)),
     env: {
       ...process.env, DEMO: "1", PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
-      DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: syncDir, BACKUP_DIR: path.join(dir, "respaldos"),
+      DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: syncDir, BACKUP_DIR: path.join(dir, "respaldos"), ENTRADA_DIR: path.join(dir, "entrada"),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -301,7 +301,7 @@ test("APP_MODE=cliente: la aplicación del cliente no tiene NADA de administraci
   const { p, url } = await arrancar("cliente");
   try {
     assert.equal(await status(url + "/cliente"), 200);
-    for (const ruta of ["/empresa", "/distribuidor", "/api/admin/pedidos", "/api/admin/solicitudes", "/api/admin/cuentas", "/api/admin/exportar", "/api/admin/resumen", "/api/admin/vista-previa/productos", "/api/admin/aplicar/clientes", "/api/admin/clientes/lista", "/api/admin/estado", "/api/admin/actualizaciones"]) {
+    for (const ruta of ["/empresa", "/distribuidor", "/api/admin/pedidos", "/api/admin/solicitudes", "/api/admin/cuentas", "/api/admin/exportar", "/api/admin/entrada", "/api/admin/resumen", "/api/admin/vista-previa/productos", "/api/admin/aplicar/clientes", "/api/admin/clientes/lista", "/api/admin/estado", "/api/admin/actualizaciones"]) {
       assert.equal(await status(url + ruta, { headers: { Authorization: `Bearer ${ADMIN}` } }), 404, ruta);
     }
   } finally {
@@ -874,4 +874,37 @@ test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repet
   assert.equal(JSON.stringify(a).includes("B11111111") || JSON.stringify(b).includes("12222222A"), false);
   // lo de la empresa no está en esta respuesta
   assert.equal(/export|ADMIN|token|sha256/i.test(JSON.stringify(a)), false);
+});
+
+test("BANDEJA DE ENTRADA: enseña los Excel de la carpeta (con su tipo), no aplica nada solo y al archivar los mueve a «aplicados»", async () => {
+  const carpeta = path.join(dir, "entrada");
+  assert.equal((await call("GET", "/api/admin/entrada")).status, 403); // solo la empresa
+  const vacia = (await call("GET", "/api/admin/entrada", { admin: true })).json;
+  assert.equal(vacia.configurada, true); assert.deepEqual(vacia.archivos, []);
+  fs.writeFileSync(path.join(carpeta, "articulos-nuevos.xlsx"), Buffer.from(buildWorkbook([{ name: "A", rows: [["Cód. artículo", "Artículo", "Precio venta"], ["9999", "PRUEBA ENTRADA", 1.5]] }])));
+  fs.writeFileSync(path.join(carpeta, "lista.xlsx"), Buffer.from(buildWorkbook([{ name: "C", rows: [cabecera, ["7901", "BAR PRUEBA", "BAR PRUEBA", "MEDINA", "CL. UNO 1", "611000111", "", "B22222222", "No", "No", "1"]] }])));
+  fs.writeFileSync(path.join(carpeta, "cualquier.xlsx"), Buffer.from(buildWorkbook([{ name: "X", rows: [["hola", "adios"], [1, 2]] }])));
+  fs.writeFileSync(path.join(carpeta, "notas.txt"), "no es un Excel"); fs.writeFileSync(path.join(carpeta, "~$temporal.xlsx"), "temporal de Excel");
+  const l = (await call("GET", "/api/admin/entrada", { admin: true })).json;
+  assert.deepEqual(l.archivos.map((a) => a.nombre).sort(), ["articulos-nuevos.xlsx", "cualquier.xlsx", "lista.xlsx"]); // ni el .txt ni el temporal de Excel
+  const tipo = (n) => l.archivos.find((a) => a.nombre === n).tipo;
+  assert.equal(tipo("articulos-nuevos.xlsx"), "productos"); assert.equal(tipo("lista.xlsx"), "clientes"); assert.equal(tipo("cualquier.xlsx"), null);
+  assert.equal(JSON.stringify(l).includes("B22222222"), false); // nada de NIF en la lista
+  // no se aplica nada solo: el catálogo no tiene el artículo de prueba
+  assert.equal((await call("GET", "/api/admin/pedidos", { admin: true })).status, 200);
+  const buscar = (await fetch(`${BASE}/api/admin/vista-previa/productos`, { method: "POST", headers: { Authorization: `Bearer ${ADMIN}`, "Content-Type": "application/octet-stream" }, body: fs.readFileSync(path.join(carpeta, "articulos-nuevos.xlsx")) })).status;
+  assert.equal(buscar, 200); // la vista previa de siempre funciona con ese archivo
+  // descargar el archivo para la vista previa: solo nombres válidos de la carpeta
+  const bytes = await fetch(`${BASE}/api/admin/entrada/archivo?nombre=lista.xlsx`, { headers: { Authorization: `Bearer ${ADMIN}` } });
+  assert.equal(bytes.status, 200); assert.equal(Buffer.from(await bytes.arrayBuffer()).length, fs.statSync(path.join(carpeta, "lista.xlsx")).size);
+  for (const mal of ["../server.js", "..%2Fserver.js", "notas.txt", "no-existe.xlsx"]) assert.equal((await fetch(`${BASE}/api/admin/entrada/archivo?nombre=${mal}`, { headers: { Authorization: `Bearer ${ADMIN}` } })).status, 404, mal);
+  assert.equal((await fetch(`${BASE}/api/admin/entrada/archivo?nombre=lista.xlsx`)).status, 403);
+  // archivar: pasa a «aplicados» con la fecha delante y deja de salir en la lista
+  assert.equal((await call("POST", "/api/admin/entrada/archivar", { body: { nombre: "lista.xlsx" } })).status, 403);
+  assert.equal((await call("POST", "/api/admin/entrada/archivar", { admin: true, body: { nombre: "../server.js" } })).status, 404);
+  assert.equal((await call("POST", "/api/admin/entrada/archivar", { admin: true, body: { nombre: "lista.xlsx" } })).status, 200);
+  assert.equal(fs.existsSync(path.join(carpeta, "lista.xlsx")), false);
+  assert.ok(fs.readdirSync(path.join(carpeta, "aplicados")).some((f) => /^\d{8}-\d{4}-lista\.xlsx$/.test(f)));
+  assert.equal((await call("POST", "/api/admin/entrada/archivar", { admin: true, body: { nombre: "lista.xlsx" } })).status, 404);
+  assert.equal((await call("GET", "/api/admin/entrada", { admin: true })).json.archivos.some((a) => a.nombre === "lista.xlsx"), false);
 });

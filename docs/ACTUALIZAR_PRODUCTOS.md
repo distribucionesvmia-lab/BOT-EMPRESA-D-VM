@@ -88,3 +88,12 @@ Si el Excel trae la columna **MODO DE VENTA** (2 = solo caja, 3 = caja o unidad)
 - **Añadir un producto a mano:** pestaña «Datos y Excel» → «Añadir un producto a mano» (código, nombre, precio sin IVA, IVA 4/10/21, unidades por caja, modo de venta, descuento y categoría opcionales). Si el código ya existe, pregunta antes de actualizarlo.
 - **Añadir un cliente a mano:** pestaña «Clientes» → «Añadir un cliente a mano». Sin código de a3ERP se le da uno provisional (P00001…); sus pedidos quedan retenidos hasta que tenga el definitivo. Con DNI/CIF entra con sus 6 primeros dígitos (no se guarda el número, solo una huella).
 - **Un cliente nuevo se registra por el bot:** en «Solicitudes de alta» pulsa «Es cliente nuevo: crear su ficha». Se rellena con lo que escribió (nombre, DNI/CIF, dirección) y lo completas (código, razón social, población, municipio, recargo). Al aceptar se crea su ficha en la base de clientes con teléfono y correo, su cuenta queda activa y el DNI/CIF se borra de la solicitud.
+
+
+## Bandeja de entrada (carpeta del ordenador de la oficina)
+Para no tener que subir el archivo a mano cada vez, el programa puede vigilar **una carpeta** del ordenador:
+1. Crea la carpeta (por defecto `C:\vm\entrada`; mejor sin tildes) y escribe en `C:\vm\config\empresa.env` la línea `ENTRADA_DIR=C:\vm\entrada`. Reinicia «VM Empresa».
+2. Copia ahí los Excel de a3ERP (clientes, artículos, historial) o el ZIP de fotos. El nombre da igual: el programa reconoce el tipo por su contenido.
+3. En el panel, pestaña «Datos y Excel», aparece la **Bandeja de entrada** (y un número en la pestaña). **Nada se aplica solo**: pulsa «Ver cambios» (la vista previa de siempre, con las confirmaciones de saltos de precio) y después «Aplicar cambios».
+4. Al aplicar, el archivo se mueve a la subcarpeta `aplicados` (con la fecha delante). «Archivar» lo mueve sin aplicar nada.
+No confundir con `SYNC_DIR`, que es el sistema antiguo que **sí aplica solo**, sin vista previa: no usar con esta carpeta.
