@@ -100,6 +100,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   db.exec("CREATE TABLE IF NOT EXISTS uso (dia TEXT NOT NULL, evento TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, suma INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (dia, evento))");
   db.exec("CREATE TABLE IF NOT EXISTS rights (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, tipo TEXT NOT NULL, texto TEXT, estado TEXT NOT NULL DEFAULT 'pendiente', created_at TEXT NOT NULL, resolved_at TEXT)");
   addCol("accounts", "deleted_at", "TEXT");
+  addCol("push_log", "detalle", "TEXT");
   addCol("registrations", "pin_hash", "TEXT");
   addCol("registrations", "address", "TEXT"); // dirección (calle y localidad) que escribe un cliente nuevo: pasa a su ficha al aceptarlo
   addCol("registrations", "nif", "TEXT"); // DNI/NIE/CIF que escribe un cliente nuevo: la empresa lo necesita para darlo de alta; se borra al resolver la solicitud
@@ -392,9 +393,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     pushResumen: () => ({ moviles: db.prepare("SELECT COUNT(*) AS n FROM push_subs").get().n, clientes: db.prepare("SELECT COUNT(DISTINCT customer_id) AS n FROM push_subs").get().n }),
     /** Un ajuste interno (p. ej. las claves VAPID): se guarda una vez y todas las aplicaciones leen el mismo. */
     ajuste: (clave) => db.prepare("SELECT valor FROM ajustes WHERE clave = ?").get(clave)?.valor ?? null,
+    ajusteGuardar: (clave, valor) => db.prepare("INSERT INTO ajustes (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor").run(clave, String(valor)),
     ajusteSiFalta(clave, crearValor) { db.prepare("INSERT OR IGNORE INTO ajustes (clave, valor) VALUES (?, ?)").run(clave, crearValor()); return db.prepare("SELECT valor FROM ajustes WHERE clave = ?").get(clave).valor; },
-    pushLogAdd: (x, now = new Date().toISOString()) => db.prepare("INSERT INTO push_log (at, titulo, texto, destino, enviados, fallidos) VALUES (?, ?, ?, ?, ?, ?)").run(now, x.titulo, x.texto, x.destino, x.enviados, x.fallidos),
-    pushLogList: (limit = 15) => db.prepare("SELECT at, titulo, texto, destino, enviados, fallidos FROM push_log ORDER BY id DESC LIMIT ?").all(limit),
+    pushLogAdd: (x, now = new Date().toISOString()) => db.prepare("INSERT INTO push_log (at, titulo, texto, destino, enviados, fallidos, detalle) VALUES (?, ?, ?, ?, ?, ?, ?)").run(now, x.titulo, x.texto, x.destino, x.enviados, x.fallidos, x.detalle ?? null),
+    pushLogList: (limit = 15) => db.prepare("SELECT at, titulo, texto, destino, enviados, fallidos, detalle FROM push_log ORDER BY id DESC LIMIT ?").all(limit),
     pushLogCount: (desde) => db.prepare("SELECT COUNT(*) AS n FROM push_log WHERE at >= ?").get(desde).n,
 
     deleteAccount(accountId, now = new Date().toISOString()) {

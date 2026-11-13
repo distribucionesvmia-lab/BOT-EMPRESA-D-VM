@@ -622,11 +622,22 @@ async function ultimasSubidas() {
   } catch { /* sin registro */ }
 }
 // ---- Avisos a los clientes (notificaciones en el móvil) ----
+// Lo que dijo el servicio de notificaciones del móvil, en claro
+function explicarPush(errores) {
+  const t = (errores ?? []).join(" · "); if (!t) return "";
+  const cod = Number((/^(\d{3})/.exec(t) || [])[1] || 0);
+  const que = !cod ? "No se ha podido conectar con el servicio de notificaciones (revisa la conexión a internet del ordenador de la oficina y que el antivirus o el cortafuegos no lo bloqueen)."
+    : cod === 429 ? "El servicio de notificaciones pide esperar un poco antes de enviar más."
+    : cod === 413 ? "El mensaje es demasiado largo."
+    : cod >= 500 ? "El servicio de notificaciones del móvil está fallando; vuelve a intentarlo dentro de un rato."
+    : "El servicio de notificaciones ha rechazado el aviso (suele ser un problema de configuración del servidor).";
+  return `${que} (Detalle técnico: ${t})`;
+}
 async function avisosClientes() {
   const r = await call("/api/admin/avisos");
   $("av-estado").textContent = r.moviles ? `Ahora mismo hay ${r.clientes} cliente${r.clientes === 1 ? "" : "s"} con los avisos activados (${r.moviles} móvil${r.moviles === 1 ? "" : "es"}).` : "Todavía ningún cliente ha activado los avisos en su móvil.";
   const tb = $("av-hist"); tb.innerHTML = ""; $("av-vacio").hidden = r.ultimos.length > 0;
-  for (const x of r.ultimos) { const tr = document.createElement("tr"), t = el("td"); t.append(el("b", x.titulo), el("div", x.texto, { className: "muted" })); tr.append(el("td", hora(x.at)), t, el("td", x.destino === "todos" ? "A todos" : "A " + x.destino), el("td", `${x.enviados} enviado${x.enviados === 1 ? "" : "s"}${x.fallidos ? ` · ${x.fallidos} sin entregar` : ""}`)); tb.appendChild(tr); }
+  for (const x of r.ultimos) { const tr = document.createElement("tr"), t = el("td"); t.append(el("b", x.titulo), el("div", x.texto, { className: "muted" })); tr.append(el("td", hora(x.at)), t, el("td", x.destino === "todos" ? "A todos" : "A " + x.destino), el("td", `${x.enviados} enviado${x.enviados === 1 ? "" : "s"}${x.fallidos ? ` · ${x.fallidos} sin entregar${x.detalle ? " (" + x.detalle + ")" : ""}` : ""}`)); tb.appendChild(tr); }
 }
 $("av-destino").onchange = () => { $("av-uno").hidden = $("av-destino").value !== "cliente"; };
 let tAv = 0; $("av-q").oninput = () => { clearTimeout(tAv); tAv = setTimeout(async () => { const q = $("av-q").value.trim(); const sel = $("av-sel"); sel.innerHTML = ""; if (q.length < 2) return; const r = await call("/api/admin/clientes?q=" + encodeURIComponent(q)).catch(() => []); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); if (!r.length) sel.appendChild(el("option", "Ningún cliente con ese nombre", { value: "" })); }, 300); };
@@ -638,7 +649,7 @@ $("f-avisos").onsubmit = async (e) => {
   $("av-enviar").disabled = true; msg.textContent = "Enviando…";
   try {
     const r = await call("/api/admin/avisos/enviar", { destino: uno ? "cliente" : "todos", clienteId: uno ? $("av-sel").value : undefined, titulo: $("av-titulo").value, texto: $("av-texto").value, confirmo: true });
-    msg.textContent = r.enviados ? `Enviado a ${r.enviados} móvil${r.enviados === 1 ? "" : "es"}.${r.fallidos ? ` ${r.fallidos} no se han podido entregar.` : ""}` : "No había ningún móvil con los avisos activados" + (uno ? " para ese cliente." : ".");
+    msg.textContent = r.enviados ? `Enviado a ${r.enviados} móvil${r.enviados === 1 ? "" : "es"}.${r.fallidos ? ` ${r.fallidos} no se han podido entregar. ${explicarPush(r.errores)}` : ""}` : r.fallidos ? `El cliente tiene los avisos activados, pero el aviso NO ha llegado. ${explicarPush(r.errores)}` : "No había ningún móvil con los avisos activados" + (uno ? " para ese cliente." : ".");
     if (r.enviados) { $("av-titulo").value = ""; $("av-texto").value = ""; } avisosClientes().catch(() => {});
   } catch (x) { msg.textContent = x.message; } finally { $("av-enviar").disabled = false; }
 };

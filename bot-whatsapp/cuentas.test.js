@@ -252,3 +252,12 @@ test("confirmAll confirma de golpe todas las cuentas sin confirmar, salvo las el
   assert.equal(db.listAccounts().filter((a) => !a.verified).length, 0);
   assert.equal(db.confirmAll(), 0); // repetirlo no cambia nada
 });
+
+test("AVISOS: la base guarda ajustes compartidos (claves y contacto) y los lee cualquier aplicación", () => {
+  const db = openAccountsDb(":memory:");
+  assert.equal(db.ajuste("contacto"), null);
+  db.ajusteGuardar("contacto", "https://ejemplo.invalid"); db.ajusteGuardar("contacto", "https://otra.invalid");
+  assert.equal(db.ajuste("contacto"), "https://otra.invalid");
+  const a = db.ajusteSiFalta("vapid", () => "uno"), b = db.ajusteSiFalta("vapid", () => "dos");
+  assert.deepEqual([a, b], ["uno", "uno"]); // se crea una vez y no cambia
+});

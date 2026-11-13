@@ -295,7 +295,7 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       if (accounts.pushLogCount(new Date(Date.now() - 3600_000).toISOString()) >= 10) return send(res, 429, { error: "Ya has enviado varios avisos en la última hora. Espera un poco para no molestar a los clientes." }), true;
       const mensaje = { title: titulo, body: texto, url: "/cliente", tag: "aviso-" + Date.now() };
       const r = cli ? await avisos.aCliente(cli.id, mensaje) : await avisos.aTodos(mensaje);
-      accounts.pushLogAdd({ titulo, texto, destino: cli ? `${cli.id} ${cli.name}` : "todos", enviados: r.enviados, fallidos: r.fallidos });
+      accounts.pushLogAdd({ titulo, texto, destino: cli ? `${cli.id} ${cli.name}` : "todos", enviados: r.enviados, fallidos: r.fallidos, detalle: r.errores?.join(" · ") || null });
       return send(res, 200, { ok: true, ...r }), true;
     }
     // ---- Bandeja de entrada (carpeta del ordenador) ----

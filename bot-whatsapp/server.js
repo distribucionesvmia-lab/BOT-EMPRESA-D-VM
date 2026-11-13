@@ -415,6 +415,7 @@ const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), g
 // Avisos al móvil (Web Push) de los clientes que los han activado. Nunca bloquean ni hacen fallar un pedido.
 let _avisos = null;
 const avisosPush = () => (_avisos ??= crearAvisos({ accountsDb: getAccountsDb() }));
+if (clientEnabled) avisosPush(); // crea ya los avisos: así deja guardado el contacto (PUBLIC_URL) para que también lo use la aplicación de la empresa
 function avisoPedido(account, guardado, modificado = false) {
   if (!guardado?.ref) return;
   const pe = puedeEditarPedido(guardado);

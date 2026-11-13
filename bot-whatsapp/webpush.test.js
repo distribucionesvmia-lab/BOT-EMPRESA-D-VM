@@ -70,9 +70,12 @@ test("WEB PUSH: enviarPush manda la petición correcta, descifrable, y avisa de 
     assert.deepEqual([r.ok, r.estado, r.caducada], [true, 201, false]);
     assert.equal(vistos[0].cab["content-encoding"], "aes128gcm"); assert.equal(vistos[0].cab.ttl, "86400"); assert.match(vistos[0].cab.authorization, /^vapid t=.+, k=.+$/);
     assert.deepEqual(JSON.parse(nav.descifrar(vistos[0].cuerpo)), { title: "Hola", body: "Prueba" });
-    estado = 410; assert.deepEqual(await enviarPush(sub, { title: "x" }, { vapid }), { ok: false, estado: 410, caducada: true });
-    estado = 500; assert.deepEqual(await enviarPush(sub, { title: "x" }, { vapid }), { ok: false, estado: 500, caducada: false });
+    estado = 410; const caducada = await enviarPush(sub, { title: "x" }, { vapid }); assert.deepEqual([caducada.ok, caducada.estado, caducada.caducada], [false, 410, true]);
+    estado = 500; const falla = await enviarPush(sub, { title: "x" }, { vapid }); assert.deepEqual([falla.ok, falla.estado, falla.caducada], [false, 500, false]);
     srv.close();
-    assert.deepEqual(await enviarPush({ endpoint: "https://evil.example.com/x", keys: nav.keys }, { title: "x" }, { vapid }), { ok: false, estado: 0, caducada: false }); // no sale a direcciones raras
+    // sin conexión con el servicio: estado 0 y el motivo (para poder explicárselo a la empresa)
+    const sinRed = await enviarPush({ endpoint: "http://127.0.0.1:1/push/x", keys: nav.keys }, { title: "x" }, { vapid });
+    assert.equal(sinRed.ok, false); assert.equal(sinRed.estado, 0); assert.ok(sinRed.motivo && sinRed.motivo.length > 0, "dice por qué no ha salido");
+    const rara = await enviarPush({ endpoint: "https://evil.example.com/x", keys: nav.keys }, { title: "x" }, { vapid }); assert.deepEqual([rara.ok, rara.estado], [false, 0]); // no sale a direcciones raras
   } finally { delete process.env.PUSH_ALLOW_HTTP; }
 });

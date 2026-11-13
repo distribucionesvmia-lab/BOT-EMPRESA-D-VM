@@ -53,7 +53,7 @@ export function cifrar(texto, { p256dh, auth }) {
 }
 
 /**
- * Manda un aviso a una suscripción. Devuelve { ok, estado, caducada }: «caducada» = el navegador ya no la quiere (404/410) y hay que borrarla.
+ * Manda un aviso a una suscripción. Devuelve { ok, estado, caducada, motivo? }: «motivo» es lo que dijo el servicio (o el fallo de red) cuando no sale bien; «caducada» = el navegador ya no la quiere (404/410) y hay que borrarla.
  * Nunca lanza: un fallo de red es { ok:false, estado:0 }.
  */
 export async function enviarPush(sub, mensaje, { vapid, contacto, ttl = 86400, fetchFn = fetch } = {}) {
@@ -66,6 +66,7 @@ export async function enviarPush(sub, mensaje, { vapid, contacto, ttl = 86400, f
       body: cuerpo,
       signal: AbortSignal.timeout(10_000),
     });
-    return { ok: r.status >= 200 && r.status < 300, estado: r.status, caducada: r.status === 404 || r.status === 410 };
-  } catch { return { ok: false, estado: 0, caducada: false }; }
+    const ok = r.status >= 200 && r.status < 300;
+    return { ok, estado: r.status, caducada: r.status === 404 || r.status === 410, ...(ok ? {} : { motivo: (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 120) }) };
+  } catch (e) { return { ok: false, estado: 0, caducada: false, motivo: String(e?.cause?.code || e?.name || e?.message || "error").slice(0, 60) }; }
 }

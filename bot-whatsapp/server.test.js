@@ -986,6 +986,12 @@ test("AVISOS A CLIENTES (empresa): a todos o a uno, con confirmación; los móvi
     assert.ok(await esperar(() => movA.avisos().some((x) => x.title === "Solo para ti"))); assert.equal(movB.avisos().length, antesB, "el otro cliente no recibe el aviso individual");
     // registro de lo enviado
     const log = (await call("GET", "/api/admin/avisos", { admin: true })).json.ultimos; assert.equal(log[0].titulo, "Solo para ti"); assert.equal(log[1].destino, "todos");
+    // si el servicio de notificaciones falla, la empresa lo sabe y se le dice por qué (y queda en el registro)
+    movA.poner(403);
+    const rechazo = (await call("POST", "/api/admin/avisos/enviar", { admin: true, body: { ...base, titulo: "Prueba rechazo", destino: "cliente", clienteId: idA } })).json;
+    assert.deepEqual([rechazo.enviados, rechazo.fallidos], [0, 1]); assert.ok(rechazo.errores[0].startsWith("403"), JSON.stringify(rechazo));
+    assert.match((await call("GET", "/api/admin/avisos", { admin: true })).json.ultimos[0].detalle, /^403/);
+    movA.poner(201);
     // un móvil que ya no existe (410) se borra solo
     movB.poner(410);
     await call("POST", "/api/admin/avisos/enviar", { admin: true, body: { ...base, titulo: "Prueba caducado" } });
