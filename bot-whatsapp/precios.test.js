@@ -315,3 +315,16 @@ test("TU PEDIDO DE SIEMPRE en el móvil: el texto a todo el ancho y los botones 
   assert.match(cli, /\.vm-inicio \.fila\.siempre \{ flex-direction:column; align-items:stretch !important;/);
   assert.match(cli, /f\.append\(t, bt, sem\); c\.appendChild\(f\);/); assert.match(cli, /sem\.className = "sec"/);
 });
+
+test("MI CUENTA (app del cliente): botón arriba, datos del cliente y pedidos por meses con «Repetir» y «Añadir al carrito»", () => {
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const cat = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.match(cli, /<button type="button" id="micuenta" class="cuenta"[^>]*>[\s\S]*?<span>Mi cuenta<\/span><\/button>/); // botón visible en la cabecera, sin emojis
+  assert.match(cli, /\/api\/mi-cuenta/);
+  for (const t of ["Mis datos", "Dirección", "Repetir pedido", "Añadir al carrito", "Modificar pedido", "Algo no es correcto"]) assert.ok(cli.includes(t), t);
+  assert.match(cli, /"&r=1&x=1"/); // repetir: empieza un carrito nuevo con ese pedido
+  assert.match(cli, /"&a=1"/); // añadir: suma a lo que ya hay
+  assert.match(cli, /toLocaleDateString\("es-ES", \{ month: "long", year: "numeric" \}\)/); // agrupados por meses
+  assert.match(cat, /sumar = \/\[#&\]a=1/); assert.match(cat, /deCero = \/\[#&\]x=1/);
+  assert.doesNotMatch(cli, /id="m-pedidos"/); // la ventana antigua se sustituyó por «Mi cuenta»
+});

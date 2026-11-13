@@ -557,6 +557,26 @@ async function appRoutes(req, res, url) {
     });
     return void sendJson(res, 200, { pedidos: lista, ayuda: ayudaPublica() });
   }
+  if (p === "/api/mi-cuenta" && req.method === "GET") { // «Mi cuenta»: SUS datos y SUS últimos pedidos (los de a3ERP y los hechos aquí), con las líneas para repetirlos o añadirlos al carrito
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const c = customerDirectory.getById(account.customerId);
+    if (!c) return void sendJson(res, 404, { error: "No encontramos tu ficha." });
+    const hist = webHistory(clienteConPedidos(account.customerId), catalogNow());
+    const pedidos = hist.map((o) => {
+      const propio = /^VM-\d{4}-\d{6}$/.test(o.doc) ? getDb().getOrderByRef(o.doc) : null; // un pedido hecho en la aplicación: se puede saber si aún se modifica
+      const pe = propio && propio.customer_id === String(account.customerId) ? puedeEditarPedido(propio) : null;
+      return {
+        doc: o.doc, fecha: o.date, entrega: propio?.delivery_date ?? null, origen: propio ? "app" : "a3erp",
+        estado: !propio ? "Entregado" : propio.export_status === "exported" ? "En preparación" : pe?.ok ? "Recibido · puedes modificarlo" : "Recibido",
+        editable: !!pe?.ok, hasta: pe?.ok ? pe.texto : "", modificado: propio?.modified_at ?? null,
+        lineas: o.lines.map((l) => ({ id: l.id, nombre: l.name, uds: l.qty })),
+      };
+    });
+    return void sendJson(res, 200, {
+      cliente: { nombre: c.name, razonSocial: c.legalName && c.legalName !== c.name ? c.legalName : "", codigo: c.id, direccion: c.address, poblacion: c.city, telefono: account.phone ?? "", correo: account.email ?? "" },
+      pedidos, ayuda: ayudaPublica(),
+    });
+  }
   if (p === "/catalogo/pedido" && req.method === "GET") { // contenido de un pedido modificable, para volver a abrirlo en el catálogo
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     const o = getDb().getOrderByRef(url.searchParams.get("ref") ?? "");

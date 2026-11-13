@@ -1225,21 +1225,24 @@ function precargar() {
   const m = /[#&]c=([^&]*)/.exec(String(window.vmPrecarga ?? location.hash));
   if (!m) return;
   const byId = new Set(data.products.map(p => p.id));
+  const hashTxt = String(window.vmPrecarga ?? location.hash), sumar = /[#&]a=1(?:&|$)/.test(hashTxt), deCero = /[#&]x=1(?:&|$)/.test(hashTxt); // a=1: «Añadir al carrito» (suma a lo que ya hay) · x=1: «Repetir» (empieza un carrito nuevo con este pedido)
+  if (deCero && qty.size) { if (!confirm("Tienes un pedido sin terminar en el carrito. ¿Cambiarlo por este pedido?")) return; qty.clear(); unitOf.clear(); notes.clear(); }
   let n = 0, faltan = 0;
   for (const par of m[1].split(",")) {
     const k = par.lastIndexOf("."), rawId = k < 0 ? par : par.slice(0, k), rawN = k < 0 ? "" : par.slice(k + 1), id = decodeURIComponent(rawId ?? ""), // el código puede llevar punto (157.10): el número va tras el ÚLTIMO punto
        u = Math.min(999, Math.floor(Number(rawN)));
     if (!(u > 0)) continue;
     if (!byId.has(id)) { faltan++; continue; } // ya no está en el catálogo
-    const pr = productoPorId.get(id);
-    if (pr && pr.soloCaja) { unitOf.set(id, "caja"); qty.set(id, Math.min(999, Math.ceil(u / pr.unitsPerBox))); } // solo caja: las unidades se pasan a cajas enteras
-    else { unitOf.set(id, "ud"); qty.set(id, u); }
+    const pr = productoPorId.get(id), ya = sumar ? (qty.get(id) || 0) : 0;
+    if (sumar && ya && pr && pr.unitsPerBox > 1 && unit(id) === "caja") { qty.set(id, Math.min(999, ya + Math.ceil(u / pr.unitsPerBox))); } // ya estaba en cajas: se suman cajas
+    else if (pr && pr.soloCaja) { unitOf.set(id, "caja"); qty.set(id, Math.min(999, ya + Math.ceil(u / pr.unitsPerBox))); } // solo caja: las unidades se pasan a cajas enteras
+    else { unitOf.set(id, "ud"); qty.set(id, Math.min(999, ya + u)); }
     n++;
   }
   if (faltan) setTimeout(() => aviso(faltan === 1 ? "1 artículo ya no está disponible." : faltan + " artículos ya no están disponibles."), 600);
   if (n && /[#&]f=1(?:&|$)/.test(String(window.vmPrecarga ?? location.hash))) setTimeout(() => { const c = $("fijoCard"); if (!c.hidden) c.scrollIntoView({ block: "center" }); }, 700); // «Repetir cada semana»: se lleva a la opción del pedido fijo
   if (n && /[#&]r=1(?:&|$)/.test(String(window.vmPrecarga ?? location.hash))) { uso("repetir"); setTimeout(() => showCart(true), 0); } // «Repetir y revisar»: se cuenta y se abre el carrito para revisarlo
-  if (n) { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); aviso(`Tu pedido anterior ya está en el carrito (${n} artículo${n === 1 ? "" : "s"}). Añade lo que quieras del catálogo y finaliza.`); }
+  if (n) { tab = "all"; document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.t === "all")); aviso(sumar ? `Hemos añadido ${n} artículo${n === 1 ? "" : "s"} de tu pedido al carrito. Sigue comprando o finaliza.` : `Tu pedido anterior ya está en el carrito (${n} artículo${n === 1 ? "" : "s"}). Añade lo que quieras del catálogo y finaliza.`); }
 }
 $("fil").onclick = () => { soloCantidad = !soloCantidad; renderList(); }; // ida y vuelta
 let tBusca = 0;

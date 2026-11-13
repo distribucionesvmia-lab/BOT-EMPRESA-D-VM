@@ -852,3 +852,26 @@ test("PEDIDOS: se filtran por día, horas y cliente, y se borran los elegidos (c
   assert.ok(tras.find((o) => o.ref === b)); // el no elegido sigue
   assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: [a], confirmo: true } })).json.borrados, 0); // repetirlo no rompe nada
 });
+
+test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repetir o añadir), nunca los de otro ni su NIF", async () => {
+  assert.equal((await call("GET", "/api/mi-cuenta")).status, 401);
+  const A = cookieOf(await entrarNif("111111"));
+  const B = cookieOf(await entrarNif("122222", "bar dos"));
+  const rr = await call("POST", "/catalogo", { cookie: A, body: { key: "clave-mi-cuenta-A", lines: [{ id: "1010", qty: 2 }, { id: "1020", qty: 1 }] } });
+  assert.equal(rr.status, 200, JSON.stringify(rr.json));
+  const a = (await call("GET", "/api/mi-cuenta", { cookie: A })).json;
+  assert.equal(a.cliente.nombre, "CAFETERIA IMPORTADA");
+  assert.equal(typeof a.cliente.codigo, "string");
+  const suyo = a.pedidos.find((p) => p.doc === rr.json.ref);
+  assert.ok(suyo, "su pedido recién hecho aparece");
+  assert.equal(suyo.origen, "app"); assert.match(suyo.fecha, /^\d{4}-\d{2}-\d{2}$/);
+  assert.ok(suyo.lineas.length >= 1 && suyo.lineas.every((l) => l.id && l.nombre && l.uds > 0), "las líneas traen código, nombre y unidades (para repetir o añadir)");
+  assert.ok(a.pedidos.length <= 10); // sus 10 últimos
+  // otro cliente: ni sus datos ni su pedido; y en ninguna respuesta aparece el NIF
+  const b = (await call("GET", "/api/mi-cuenta", { cookie: B })).json;
+  assert.equal(b.cliente.nombre, "BAR DOS");
+  assert.equal(b.pedidos.some((p) => p.doc === rr.json.ref), false);
+  assert.equal(JSON.stringify(a).includes("B11111111") || JSON.stringify(b).includes("12222222A"), false);
+  // lo de la empresa no está en esta respuesta
+  assert.equal(/export|ADMIN|token|sha256/i.test(JSON.stringify(a)), false);
+});
