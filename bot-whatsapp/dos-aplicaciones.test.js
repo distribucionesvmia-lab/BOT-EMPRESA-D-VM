@@ -2,6 +2,7 @@
 // «VM Cliente» y «VM Empresa») con las MISMAS bases de datos. Un cliente que pide desde otro móvil (otra sesión, otro programa) tiene que hacer
 // que su pedido llegue a la aplicación de la empresa: no puede quedarse solo en el navegador de quien lo hace.
 import test, { before, after } from "node:test";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -13,7 +14,7 @@ const ADMIN = "clave-de-prueba-dos";
 const P1 = 4100 + Math.floor(Math.random() * 400), P2 = P1 + 500;
 const CLI = `http://127.0.0.1:${P1}`, EMP = `http://127.0.0.1:${P2}`;
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-dos-"));
-const aqui = path.dirname(new URL(import.meta.url).pathname);
+const aqui = path.dirname(fileURLToPath(import.meta.url));
 const procs = [];
 const comunes = { ...process.env, DEMO: "1", LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", NIF_PEPPER: "pimienta-de-prueba",
   DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: path.join(dir, "sync"), EXPORT_DIR: path.join(dir, "exp"), BACKUP_DIR: path.join(dir, "resp") };
@@ -22,7 +23,7 @@ function arrancar(env) {
   const p = spawn(process.execPath, ["server.js"], { cwd: aqui, env: { ...comunes, ...env }, stdio: ["ignore", "pipe", "pipe"] });
   procs.push(p);
   return new Promise((res, rej) => {
-    const t = setTimeout(() => rej(new Error("el servidor no arrancó")), 10000);
+    const t = setTimeout(() => rej(new Error("el servidor no arrancó en 40 s")), 40000);
     p.stdout.on("data", (d) => String(d).includes("Bot escuchando") && (clearTimeout(t), res()));
     p.on("exit", (c) => rej(new Error("el servidor salió con código " + c)));
   });

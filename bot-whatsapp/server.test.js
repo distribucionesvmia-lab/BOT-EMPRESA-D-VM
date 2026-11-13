@@ -1,6 +1,7 @@
 // Prueba de extremo a extremo del servidor: alta, aprobación, acceso con PIN y, sobre todo,
 // que un cliente NO puede ver los datos (historial, catálogo habitual, pedidos) de otro.
 import test, { before, after } from "node:test";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -18,7 +19,7 @@ const syncDir = path.join(dir, "sync");
 before(async () => {
   fs.mkdirSync(syncDir, { recursive: true });
   proc = spawn(process.execPath, ["server.js"], {
-    cwd: path.dirname(new URL(import.meta.url).pathname),
+    cwd: path.dirname(fileURLToPath(import.meta.url)),
     env: {
       ...process.env, DEMO: "1", PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
       DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: syncDir,
@@ -26,9 +27,12 @@ before(async () => {
     stdio: ["ignore", "pipe", "pipe"],
   });
   await new Promise((res, rej) => {
-    const t = setTimeout(() => rej(new Error("el servidor no arrancó")), 8000);
-    proc.stdout.on("data", (d) => String(d).includes("Bot escuchando") && (clearTimeout(t), res()));
-    proc.on("exit", (c) => rej(new Error("el servidor salió con código " + c)));
+    let dicho = ""; // lo que haya dicho el servidor, para que el error explique qué pasó (en Windows con antivirus el primer arranque tarda más)
+    const t = setTimeout(() => rej(new Error("el servidor no arrancó en 40 s. Dijo: " + dicho.slice(-600))), 40000);
+    proc.stderr.on("data", (d) => { dicho += String(d); });
+    proc.stdout.on("data", (d) => { dicho += String(d); if (String(d).includes("Bot escuchando")) (clearTimeout(t), res()); });
+    proc.on("error", (e) => rej(new Error("no se pudo lanzar el servidor: " + e.message)));
+    proc.on("exit", (c) => rej(new Error("el servidor salió con código " + c + ". Dijo: " + dicho.slice(-600))));
   });
 });
 after(() => proc?.kill());
@@ -278,13 +282,16 @@ async function arrancar(mode) {
   const port = 3990 + Math.floor(Math.random() * 9) + (mode === "empresa" ? 10 : 0);
   const d = fs.mkdtempSync(path.join(os.tmpdir(), "vm-mode-"));
   const p = spawn(process.execPath, ["server.js"], {
-    cwd: path.dirname(new URL(import.meta.url).pathname),
+    cwd: path.dirname(fileURLToPath(import.meta.url)),
     env: { ...process.env, DEMO: "1", APP_MODE: mode, PORT: String(port), PUBLIC_URL: `http://127.0.0.1:${port}`, LINK_SECRET: "x", ADMIN_TOKEN: ADMIN, DB_PATH: path.join(d, "p.sqlite"), CATALOG_DB: path.join(d, "c.sqlite"), CUSTOMERS_DB: path.join(d, "cl.sqlite"), ACCOUNTS_DB: path.join(d, "a.sqlite") },
     stdio: ["ignore", "pipe", "pipe"],
   });
   await new Promise((res, rej) => {
-    const t = setTimeout(() => rej(new Error("no arrancó")), 8000);
-    p.stdout.on("data", (x) => String(x).includes("Bot escuchando") && (clearTimeout(t), res()));
+    let dicho = "";
+    const t = setTimeout(() => rej(new Error("no arrancó en 40 s. Dijo: " + dicho.slice(-600))), 40000);
+    p.stderr.on("data", (x) => { dicho += String(x); });
+    p.stdout.on("data", (x) => { dicho += String(x); if (String(x).includes("Bot escuchando")) (clearTimeout(t), res()); });
+    p.on("error", (e) => rej(new Error("no se pudo lanzar: " + e.message)));
   });
   return { p, url: `http://127.0.0.1:${port}` };
 }

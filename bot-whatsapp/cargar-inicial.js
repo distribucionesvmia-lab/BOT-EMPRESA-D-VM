@@ -9,6 +9,7 @@
 //   Uso:   node --env-file=C:\vm\config\empresa.env cargar-inicial.js [carpeta]
 // Los archivos de esa carpeta llevan datos REALES de clientes: nunca se suben a GitHub (la carpeta «inicial» está en .gitignore).
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { crearActualizador, detectarTipo } from "./actualizar-datos.js";
 import { getDatabases, getAccountsDb } from "./erp.js";
@@ -17,7 +18,7 @@ import { nifKeys } from "./nif-key.js";
 
 const ORDEN = ["clientes", "productos", "historial", "fotos"];
 const dir = path.resolve(process.argv[2] ?? "C:\\vm\\inicial");
-const IMG_DIR = process.env.IMG_DIR ?? new URL("./imagenes/", import.meta.url).pathname; // la misma carpeta de fotos que usa el servidor
+const IMG_DIR = process.env.IMG_DIR ?? fileURLToPath(new URL("./imagenes/", import.meta.url)); // la misma carpeta de fotos que usa el servidor
 const t0 = Date.now();
 const dicho = (m) => console.log(m);
 

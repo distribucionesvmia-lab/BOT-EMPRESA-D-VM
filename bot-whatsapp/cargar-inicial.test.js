@@ -1,4 +1,5 @@
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -21,7 +22,7 @@ test("carga inicial: deja clientes, productos, descuentos e historial listos, re
   fs.writeFileSync(path.join(dir, "descuentos.json"), JSON.stringify({ 1001: 20, 1002: 10, 7777: 5 }));
   fs.writeFileSync(path.join(dir, "prueba.json"), JSON.stringify([{ id: "T999", name: "CLIENTE FALSO", nif: "81818181A", historial: "prueba/historial-falso.xlsx", codigoEnHistorial: "0999" }]));
   const env = { ...process.env, NIF_PEPPER: "pepper-test", LINK_SECRET: "x", DB_PATH: path.join(datos, "p.sqlite"), CATALOG_DB: path.join(datos, "c.sqlite"), CUSTOMERS_DB: path.join(datos, "cl.sqlite"), ACCOUNTS_DB: path.join(datos, "a.sqlite"), IMG_DIR: path.join(datos, "img") + path.sep };
-  const correr = () => execFileSync(process.execPath, ["--no-warnings", "cargar-inicial.js", dir], { env, cwd: path.dirname(new URL(import.meta.url).pathname), encoding: "utf8" });
+  const correr = () => execFileSync(process.execPath, ["--no-warnings", "cargar-inicial.js", dir], { env, cwd: path.dirname(fileURLToPath(import.meta.url)), encoding: "utf8" });
   const a = correr();
   assert.match(a, /clientes: clientes\.xlsx → cargado \{"nuevos":22/);
   assert.match(a, /productos: articulos\.xlsx → cargado \{[^}]*"anadidos":24[^}]*\}/); // el bloqueado no entra

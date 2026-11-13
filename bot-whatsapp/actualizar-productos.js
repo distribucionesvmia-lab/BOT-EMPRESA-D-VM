@@ -11,6 +11,7 @@
 //
 // Lo que el Excel no trae no se toca (descuentos, categorías…). Los productos que ya no están pasan a «inactivos» (no se borran, queda el historial).
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { readXlsxSheets, fotosPorFila } from "./xlsx-read.js";
 import { parseProductos } from "./productos-import.js";
@@ -87,7 +88,7 @@ async function main() {
   const fichero = args.find((a, i) => !a.startsWith("--") && !["--catalogo", "--actual", "--salida-json", "--informe", "--fotos", "--familias", "--iva", "--artefacto", "--descuentos-de"].includes(args[i - 1]));
   if (!fichero) { console.error("Uso: node actualizar-productos.js ARTICULOS.xlsx [--aplicar] [--catalogo catalogo.sqlite | --actual lista.json --salida-json nueva.json] [--informe informe.md] [--fotos carpeta] [--iva SRE=4]"); process.exit(1); }
   const iva = Object.fromEntries(args.flatMap((a, i) => (args[i - 1] === "--iva" ? [a.split("=")] : [])).map(([k, v]) => [k, Number(v)]));
-  const familiasRuta = opt("--familias") ?? new URL("./familias-categorias.json", import.meta.url).pathname;
+  const familiasRuta = opt("--familias") ?? fileURLToPath(new URL("./familias-categorias.json", import.meta.url));
   const familias = fs.existsSync(familiasRuta) ? JSON.parse(fs.readFileSync(familiasRuta, "utf8")) : {};
 
   const { productos, sinPrecioIds, fotos } = leerExcel(fs.readFileSync(fichero), { iva });

@@ -1,4 +1,5 @@
 import http from "node:http";
+import { fileURLToPath } from "node:url";
 import crypto from "node:crypto";
 import zlib from "node:zlib";
 import fs from "node:fs";
@@ -387,7 +388,7 @@ if (adminEnabled) {
 }
 const dbsAdmin = adminEnabled ? getDatabases() : null;
 const actualizador = adminEnabled ? crearActualizador({
-  catalogDb: dbsAdmin.catalogDb, customersDb: dbsAdmin.customersDb, accountsDb: getAccountsDb(), imgDir: process.env.IMG_DIR ?? new URL("./imagenes/", import.meta.url).pathname, copiaCatalogo: process.env.CATALOG_DB ?? "catalogo.sqlite",
+  catalogDb: dbsAdmin.catalogDb, customersDb: dbsAdmin.customersDb, accountsDb: getAccountsDb(), imgDir: process.env.IMG_DIR ?? fileURLToPath(new URL("./imagenes/", import.meta.url)), copiaCatalogo: process.env.CATALOG_DB ?? "catalogo.sqlite",
   familias: (() => { try { return JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8")); } catch { return {}; } })(),
   registro: (e) => { try { fs.appendFileSync(nodePath.join(nodePath.dirname(process.env.CUSTOMERS_DB ?? "clientes.sqlite"), "actualizaciones.log"), JSON.stringify(e) + "\n"); } catch { /* el registro nunca bloquea */ } },
   onChange: () => { imgAt = 0; refreshCatalog().catch(console.error); },
@@ -408,7 +409,7 @@ const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
 const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));
 // Fotos de producto: ficheros «<código>.png|jpg|webp» en la carpeta IMG_DIR (por defecto «imagenes»). Se listan al arrancar y cada 5 minutos.
-const IMG_DIR = process.env.IMG_DIR ?? new URL("./imagenes/", import.meta.url).pathname;
+const IMG_DIR = process.env.IMG_DIR ?? fileURLToPath(new URL("./imagenes/", import.meta.url));
 const IMG_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
 let imgIndex = new Map(), imgAt = 0, imgIa = new Set(); // imgIa: códigos cuya foto está generada con IA (fotos-ia.json en la carpeta de fotos)
 function imgs() {
