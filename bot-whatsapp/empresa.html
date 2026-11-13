@@ -66,6 +66,7 @@
       <button class="tab" role="tab" data-t="solicitudes" aria-selected="false">Solicitudes de alta <span class="n" id="n-sol" hidden></span></button>
       <button class="tab" role="tab" data-t="clientes" aria-selected="false">Clientes <span class="n" id="n-cli" hidden></span></button>
       <button class="tab" role="tab" data-t="cuentas" aria-selected="false">Cuentas de clientes <span class="n" id="n-cue" hidden></span></button>
+      <button class="tab" role="tab" data-t="avisos" aria-selected="false">Avisos a clientes</button>
       <button class="tab" role="tab" data-t="datos" aria-selected="false">Datos y Excel <span class="n" id="n-dat" hidden></span></button>
     </div>
 
@@ -150,6 +151,22 @@
         <p class="muted" id="entrada-msg" role="status" style="margin:8px 0 0"></p>
       </div>
       <div id="dx-tarjetas" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px;align-items:start"></div>
+    </div>
+    <div id="p-avisos" hidden style="display:grid;gap:14px">
+      <div class="panel">
+        <h2>Avisos a clientes</h2>
+        <p class="muted" id="av-estado" style="margin:0 0 10px"></p>
+        <p class="muted" style="margin:0 0 10px">Los avisos llegan como una notificación al móvil de los clientes que han abierto la aplicación, han pulsado «Activar avisos» en «Mi cuenta» y la tienen instalada en su pantalla de inicio. El aviso de «Pedido recibido» sale solo cada vez que un cliente hace un pedido.</p>
+        <form id="f-avisos" autocomplete="off" style="display:grid;gap:10px;max-width:560px">
+          <label style="display:flex;flex-direction:column;gap:4px"><span class="lab"><b>Para quién</b></span>
+            <select id="av-destino"><option value="todos">Todos los clientes que tienen los avisos activados</option><option value="cliente">Un solo cliente</option></select></label>
+          <div id="av-uno" hidden style="display:grid;gap:6px"><input id="av-q" type="search" placeholder="Busca el cliente por nombre o código" aria-label="Buscar cliente"><select id="av-sel" aria-label="Cliente"></select></div>
+          <label style="display:flex;flex-direction:column;gap:4px"><span class="lab"><b>Título</b> <span class="muted">(máximo 50 letras)</span></span><input id="av-titulo" maxlength="50" placeholder="Por ejemplo: Oferta de la semana" required></label>
+          <label style="display:flex;flex-direction:column;gap:4px"><span class="lab"><b>Mensaje</b> <span class="muted">(máximo 180 letras)</span></span><textarea id="av-texto" maxlength="180" rows="3" placeholder="Por ejemplo: Esta semana, cerveza al mejor precio. ¡Haz tu pedido antes de las 10:00 y te lo llevamos hoy!" required style="font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px"></textarea></label>
+          <div class="row"><button class="main" id="av-enviar">Enviar aviso</button><span class="muted" id="av-msg" role="status"></span></div>
+        </form>
+      </div>
+      <div class="panel"><h2>Últimos avisos enviados</h2><div class="scroll"><table><tbody id="av-hist"></tbody></table></div><p class="muted" id="av-vacio" hidden>Todavía no has enviado ningún aviso.</p></div>
     </div>
     <div class="panel" id="p-cuentas" hidden>
       <h2>Cuentas de clientes</h2>
@@ -604,6 +621,27 @@ async function ultimasSubidas() {
     }
   } catch { /* sin registro */ }
 }
+// ---- Avisos a los clientes (notificaciones en el móvil) ----
+async function avisosClientes() {
+  const r = await call("/api/admin/avisos");
+  $("av-estado").textContent = r.moviles ? `Ahora mismo hay ${r.clientes} cliente${r.clientes === 1 ? "" : "s"} con los avisos activados (${r.moviles} móvil${r.moviles === 1 ? "" : "es"}).` : "Todavía ningún cliente ha activado los avisos en su móvil.";
+  const tb = $("av-hist"); tb.innerHTML = ""; $("av-vacio").hidden = r.ultimos.length > 0;
+  for (const x of r.ultimos) { const tr = document.createElement("tr"), t = el("td"); t.append(el("b", x.titulo), el("div", x.texto, { className: "muted" })); tr.append(el("td", hora(x.at)), t, el("td", x.destino === "todos" ? "A todos" : "A " + x.destino), el("td", `${x.enviados} enviado${x.enviados === 1 ? "" : "s"}${x.fallidos ? ` · ${x.fallidos} sin entregar` : ""}`)); tb.appendChild(tr); }
+}
+$("av-destino").onchange = () => { $("av-uno").hidden = $("av-destino").value !== "cliente"; };
+let tAv = 0; $("av-q").oninput = () => { clearTimeout(tAv); tAv = setTimeout(async () => { const q = $("av-q").value.trim(); const sel = $("av-sel"); sel.innerHTML = ""; if (q.length < 2) return; const r = await call("/api/admin/clientes?q=" + encodeURIComponent(q)).catch(() => []); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); if (!r.length) sel.appendChild(el("option", "Ningún cliente con ese nombre", { value: "" })); }, 300); };
+$("f-avisos").onsubmit = async (e) => {
+  e.preventDefault(); const msg = $("av-msg"), uno = $("av-destino").value === "cliente";
+  if (uno && !$("av-sel").value) { msg.textContent = "Busca y elige un cliente."; return; }
+  const quien = uno ? $("av-sel").selectedOptions[0].textContent : "todos los clientes que tienen los avisos activados";
+  if (!confirm(`¿Enviar este aviso a ${quien}?\n\n«${$("av-titulo").value}»\n${$("av-texto").value}\n\nNo se puede deshacer.`)) return;
+  $("av-enviar").disabled = true; msg.textContent = "Enviando…";
+  try {
+    const r = await call("/api/admin/avisos/enviar", { destino: uno ? "cliente" : "todos", clienteId: uno ? $("av-sel").value : undefined, titulo: $("av-titulo").value, texto: $("av-texto").value, confirmo: true });
+    msg.textContent = r.enviados ? `Enviado a ${r.enviados} móvil${r.enviados === 1 ? "" : "es"}.${r.fallidos ? ` ${r.fallidos} no se han podido entregar.` : ""}` : "No había ningún móvil con los avisos activados" + (uno ? " para ese cliente." : ".");
+    if (r.enviados) { $("av-titulo").value = ""; $("av-texto").value = ""; } avisosClientes().catch(() => {});
+  } catch (x) { msg.textContent = x.message; } finally { $("av-enviar").disabled = false; }
+};
 // ---- Bandeja de entrada: los Excel que se dejan en la carpeta del ordenador. Nada se aplica solo ----
 let enRevision = null; // { p, nombre }: el archivo de la bandeja que se está revisando en una de las tarjetas
 const TIPO_TXT = { productos: "Artículos y precios", clientes: "Clientes", historial: "Historial de compras", fotos: "Fotos (ZIP)" };
@@ -650,8 +688,8 @@ async function avisos() {
 async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), derechos(), clientes(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
-  document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
-  $("p-pedidos").hidden = b.dataset.t !== "pedidos"; $("p-solicitudes").hidden = b.dataset.t !== "solicitudes"; $("p-clientes").hidden = b.dataset.t !== "clientes"; $("p-cuentas").hidden = b.dataset.t !== "cuentas"; $("p-datos").hidden = b.dataset.t !== "datos"; if (b.dataset.t === "datos") ultimasSubidas();
+  document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b))); if (b.dataset.t === "avisos") avisosClientes().catch(() => {});
+  $("p-pedidos").hidden = b.dataset.t !== "pedidos"; $("p-solicitudes").hidden = b.dataset.t !== "solicitudes"; $("p-clientes").hidden = b.dataset.t !== "clientes"; $("p-cuentas").hidden = b.dataset.t !== "cuentas"; $("p-avisos").hidden = b.dataset.t !== "avisos"; $("p-datos").hidden = b.dataset.t !== "datos"; if (b.dataset.t === "datos") ultimasSubidas();
 }));
 async function entrar() { try { await refrescar(); if ($("app").hidden && clave) { await call("/api/admin/resumen"); $("login").hidden = true; $("app").hidden = false; clearInterval(timer); timer = setInterval(refrescar, 15000); } } catch (e) { $("l-err").textContent = e.message; } }
 $("f-login").onsubmit = (e) => { e.preventDefault(); clave = $("clave").value; try { sessionStorage.setItem("vm_admin", clave); } catch {} $("l-err").textContent = ""; entrar(); };

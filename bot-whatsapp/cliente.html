@@ -566,6 +566,37 @@ $("f-codigo").onsubmit = async (e) => {
 const hashLineas = (o) => "c=" + o.lineas.map((l) => encodeURIComponent(l.id) + "." + Math.min(999, l.uds)).join(",");
 const catUrl = () => window.__catUrl || "/catalogo";
 const nodo = (tag, txt, cls) => { const e = document.createElement(tag); if (txt != null) e.textContent = txt; if (cls) e.className = cls; return e; };
+// ── Avisos en el móvil: «Pedido recibido» y avisos de la empresa (notificaciones push) ──
+const clavePush = (b64) => { const raw = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(raw, (c) => c.charCodeAt(0)); };
+async function pintarAvisos(box) {
+  box.textContent = ""; box.appendChild(nodo("h3", "Avisos en este móvil", "cu-tit"));
+  const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const instalada = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const p = (t) => box.appendChild(nodo("p", t, "res"));
+  if (!("serviceWorker" in navigator && "PushManager" in window && "Notification" in window)) {
+    p(esIOS && !instalada ? "Para recibir avisos en el iPhone, abre esta página en Safari, pulsa «Compartir», elige «Añadir a pantalla de inicio» y abre la aplicación desde su icono. Después vuelve aquí para activarlos." : "Este navegador no permite recibir avisos.");
+    return;
+  }
+  const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+  if (Notification.permission === "denied") { p("Has bloqueado los avisos de esta aplicación. Para activarlos, permite las notificaciones en los ajustes de tu móvil o de tu navegador."); return; }
+  const msg = nodo("p", "", "res"), boton = (txt, cls, fn) => { const b = nodo("button", txt, "vm-btn " + cls); b.type = "button"; b.onclick = async () => { b.disabled = true; msg.textContent = ""; try { await fn(); } catch (e) { msg.textContent = e.message || "No se ha podido."; b.disabled = false; } }; box.appendChild(b); return b; };
+  if (sub && Notification.permission === "granted") {
+    p("Avisos activados en este móvil: te avisamos cuando recibimos tus pedidos y cuando tengamos novedades."); 
+    boton("Desactivar avisos", "ghost", async () => { await fetch("/api/push/baja", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }); await sub.unsubscribe(); await pintarAvisos(box); });
+  } else {
+    p("Activa los avisos y recibirás una notificación en este móvil cuando recibamos tu pedido.");
+    boton("Activar avisos", "primary", async () => {
+      if ((await Notification.requestPermission()) !== "granted") throw new Error("No has permitido las notificaciones.");
+      const j = await fetch("/api/push/clave").then((r) => (r.ok ? r.json() : null)); if (!j) throw new Error("No se ha podido preparar el aviso. Inténtalo de nuevo.");
+      const viejo = await reg.pushManager.getSubscription(); if (viejo) await viejo.unsubscribe();
+      const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: clavePush(j.publica) });
+      const r = await fetch("/api/push/suscribir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subscription: s.toJSON() }) });
+      if (!r.ok) { await s.unsubscribe(); throw new Error((await r.json().catch(() => ({}))).error || "No se pudieron activar los avisos."); }
+      await pintarAvisos(box);
+    });
+  }
+  box.appendChild(msg);
+}
 async function abrirCuenta(irAPedidos) {
   menu(false); const B = $("cu-cuerpo"); B.textContent = "Un momento…"; $("m-cuenta").hidden = false;
   const j = await fetch("/api/mi-cuenta").then((r) => (r.ok ? r.json() : null)).catch(() => null); B.innerHTML = "";
@@ -579,6 +610,8 @@ async function abrirCuenta(irAPedidos) {
   const corr = nodo("button", "Algo no es correcto: avisar a la empresa", "vm-btn ghost"); corr.type = "button";
   corr.onclick = () => { $("m-cuenta").hidden = true; $("misdatos").onclick(); $("d-tipo").value = "corregir"; $("d-texto").focus(); };
   B.appendChild(corr);
+  // Avisos en este móvil (notificaciones)
+  const avisosCaja = nodo("div"); B.appendChild(avisosCaja); pintarAvisos(avisosCaja).catch(() => { avisosCaja.textContent = ""; });
   // Mis pedidos, por meses
   const tp = nodo("h3", "Mis pedidos", "cu-tit"); tp.id = "cu-pedidos"; B.appendChild(tp);
   if (!j.pedidos.length) B.appendChild(nodo("p", "Todavía no tienes pedidos. Cuando hagas uno, aparecerá aquí para repetirlo cuando quieras.")); 

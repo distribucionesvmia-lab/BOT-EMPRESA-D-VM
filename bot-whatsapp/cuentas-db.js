@@ -90,6 +90,11 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   db.exec("CREATE TABLE IF NOT EXISTS standing_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, days TEXT NOT NULL, paused INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)");
   db.exec("CREATE TABLE IF NOT EXISTS reminders (customer_id TEXT NOT NULL, day TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY (customer_id, day))"); // day = '' para «no avisar más»
   db.exec("CREATE TABLE IF NOT EXISTS favorites (customer_id TEXT NOT NULL, product_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (customer_id, product_id))");
+  // Avisos al móvil (Web Push): un registro por navegador/móvil del cliente que los ha activado; claves VAPID y registro de avisos de la empresa
+  db.exec("CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, customer_id TEXT NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT NOT NULL)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_push_cliente ON push_subs(customer_id)");
+  db.exec("CREATE TABLE IF NOT EXISTS ajustes (clave TEXT PRIMARY KEY, valor TEXT NOT NULL)");
+  db.exec("CREATE TABLE IF NOT EXISTS push_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, titulo TEXT NOT NULL, texto TEXT NOT NULL, destino TEXT NOT NULL, enviados INTEGER NOT NULL, fallidos INTEGER NOT NULL)");
   // Derechos de protección de datos que el cliente ejerce desde la aplicación (corregir, limitar, oponerse, otra) y bajas de cuenta
   // Uso de la aplicación: solo contadores por día y tipo de suceso (repetir, abandono, pedido…); no se guarda quién ni qué pide
   db.exec("CREATE TABLE IF NOT EXISTS uso (dia TEXT NOT NULL, evento TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, suma INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (dia, evento))");
@@ -370,6 +375,28 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
      * solicitudes de alta. La cuenta queda marcada como eliminada (así la sincronización con a3ERP no la vuelve a crear). Los pedidos y las facturas
      * se conservan, bloqueados, durante los plazos que exige la ley, y no los ve nadie del lado del cliente. Queda anotado para la empresa.
      */
+    // ---- Avisos al móvil (Web Push) ----
+    /** Guarda (o actualiza) la suscripción de un móvil de este cliente. Máximo 5 por cliente: al llegar la 6.ª se borra la más antigua. */
+    pushSave(customerId, { endpoint, keys }, now = new Date().toISOString()) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("INSERT INTO push_subs (endpoint, customer_id, p256dh, auth, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(endpoint) DO UPDATE SET customer_id = excluded.customer_id, p256dh = excluded.p256dh, auth = excluded.auth").run(endpoint, String(customerId), keys.p256dh, keys.auth, now);
+        const mias = db.prepare("SELECT endpoint FROM push_subs WHERE customer_id = ? ORDER BY created_at DESC, rowid DESC").all(String(customerId));
+        for (const x of mias.slice(5)) db.prepare("DELETE FROM push_subs WHERE endpoint = ?").run(x.endpoint);
+        db.exec("COMMIT");
+      } catch (e) { db.exec("ROLLBACK"); throw e; }
+    },
+    pushRemove: (endpoint) => db.prepare("DELETE FROM push_subs WHERE endpoint = ?").run(String(endpoint)).changes > 0,
+    /** Suscripciones de un cliente (o de todos si no se indica): [{ endpoint, keys:{p256dh, auth}, customerId }] */
+    pushOf: (customerId = null) => db.prepare(customerId == null ? "SELECT * FROM push_subs ORDER BY customer_id" : "SELECT * FROM push_subs WHERE customer_id = ?").all(...(customerId == null ? [] : [String(customerId)])).map((r) => ({ endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth }, customerId: r.customer_id })),
+    pushResumen: () => ({ moviles: db.prepare("SELECT COUNT(*) AS n FROM push_subs").get().n, clientes: db.prepare("SELECT COUNT(DISTINCT customer_id) AS n FROM push_subs").get().n }),
+    /** Un ajuste interno (p. ej. las claves VAPID): se guarda una vez y todas las aplicaciones leen el mismo. */
+    ajuste: (clave) => db.prepare("SELECT valor FROM ajustes WHERE clave = ?").get(clave)?.valor ?? null,
+    ajusteSiFalta(clave, crearValor) { db.prepare("INSERT OR IGNORE INTO ajustes (clave, valor) VALUES (?, ?)").run(clave, crearValor()); return db.prepare("SELECT valor FROM ajustes WHERE clave = ?").get(clave).valor; },
+    pushLogAdd: (x, now = new Date().toISOString()) => db.prepare("INSERT INTO push_log (at, titulo, texto, destino, enviados, fallidos) VALUES (?, ?, ?, ?, ?, ?)").run(now, x.titulo, x.texto, x.destino, x.enviados, x.fallidos),
+    pushLogList: (limit = 15) => db.prepare("SELECT at, titulo, texto, destino, enviados, fallidos FROM push_log ORDER BY id DESC LIMIT ?").all(limit),
+    pushLogCount: (desde) => db.prepare("SELECT COUNT(*) AS n FROM push_log WHERE at >= ?").get(desde).n,
+
     deleteAccount(accountId, now = new Date().toISOString()) {
       const row = byId.get(Number(accountId));
       if (!row) return { ok: false };
@@ -378,6 +405,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         dropSessions.run(row.id);
         db.prepare("DELETE FROM favorites WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM standing_orders WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM push_subs WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM registrations WHERE customer_id = ? OR (phone = ? AND ? IS NOT NULL)").run(row.customer_id, row.phone, row.phone);
         db.prepare("UPDATE accounts SET phone = NULL, email = NULL, pin_hash = NULL, code_key = NULL, status = 'deleted', verified = 0, failed = 0, lock_count = 0, locked_until = NULL, deleted_at = ? WHERE id = ?").run(now, row.id);
         db.prepare("INSERT INTO rights (customer_id, tipo, texto, estado, created_at, resolved_at) VALUES (?, 'supresion', ?, 'atendida', ?, ?)").run(row.customer_id, "El cliente eliminó su cuenta desde la aplicación (acceso, contactos y favoritos borrados; pedidos conservados por obligación legal).", now, now);

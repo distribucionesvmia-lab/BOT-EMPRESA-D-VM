@@ -10,6 +10,7 @@ import { totals, round2 } from "./pricing.js";
 import { runExport } from "./exporter.js";
 import { backupDb } from "./backup.js";
 import { detectarTipo } from "./actualizar-datos.js";
+import { crearAvisos } from "./avisos.js";
 import { execFile } from "node:child_process";
 import { recordatoriosDeHoy } from "./recordatorios.js";
 import { imprimirHtml, FORMAT, madrid } from "./export-format.js";
@@ -76,6 +77,7 @@ function vistaExcel(lista) {
 }
 export function createAdmin({ sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "" }) {
   const isAdmin = makeAdminCheck(adminToken);
+  const avisos = crearAvisos({ accountsDb: accounts });
   // ---- Bandeja de entrada: carpeta del ordenador donde se dejan los Excel (clientes, artículos, historial) y fotos (ZIP).
   // Nada se aplica solo: el panel enseña lo que hay, «Ver cambios» hace la vista previa de siempre y, al aplicar, el archivo pasa a la subcarpeta «aplicados».
   const ENTRADA_MAX = 80_000_000, tiposCache = new Map();
@@ -279,6 +281,22 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       } catch (e) {
         return send(res, 400, { error: e.message || "No se pudo leer el Excel." }), true;
       }
+    }
+    // ---- Avisos al móvil de los clientes (Web Push) ----
+    if (p === "/api/admin/avisos" && get) return send(res, 200, { ...accounts.pushResumen(), ultimos: accounts.pushLogList(15) }), true;
+    if (p === "/api/admin/avisos/enviar" && post) {
+      const b = (await readJson(req)) ?? {};
+      const titulo = String(b.titulo ?? "").trim(), texto = String(b.texto ?? "").trim();
+      if (b.confirmo !== true) return send(res, 400, { error: "Falta la confirmación para enviar." }), true;
+      if (!titulo || titulo.length > 50 || !texto || texto.length > 180) return send(res, 400, { error: "Escribe un título (máximo 50 letras) y un mensaje (máximo 180)." }), true;
+      if (b.destino !== "todos" && b.destino !== "cliente") return send(res, 400, { error: "Elige a quién enviarlo." }), true;
+      const cli = b.destino === "cliente" ? customers.getById(String(b.clienteId ?? "")) : null;
+      if (b.destino === "cliente" && !cli) return send(res, 400, { error: "Elige un cliente de la lista." }), true;
+      if (accounts.pushLogCount(new Date(Date.now() - 3600_000).toISOString()) >= 10) return send(res, 429, { error: "Ya has enviado varios avisos en la última hora. Espera un poco para no molestar a los clientes." }), true;
+      const mensaje = { title: titulo, body: texto, url: "/cliente", tag: "aviso-" + Date.now() };
+      const r = cli ? await avisos.aCliente(cli.id, mensaje) : await avisos.aTodos(mensaje);
+      accounts.pushLogAdd({ titulo, texto, destino: cli ? `${cli.id} ${cli.name}` : "todos", enviados: r.enviados, fallidos: r.fallidos });
+      return send(res, 200, { ok: true, ...r }), true;
     }
     // ---- Bandeja de entrada (carpeta del ordenador) ----
     if (p === "/api/admin/entrada" && get) return send(res, 200, listarEntrada()), true;

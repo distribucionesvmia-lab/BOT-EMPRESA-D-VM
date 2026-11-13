@@ -29,6 +29,8 @@ const topIds = () => {
 const avisoEntrega = (customer) => ({ entregaHoy: entregaHoyDisponible(customer), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) });
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
+import { crearAvisos } from "./avisos.js";
+import { endpointValido, clavesValidas } from "./webpush.js";
 import { mailConfigFromEnv } from "./mailer.js";
 import { crearNotificador } from "./notificaciones.js";
 import { scheduleBackups } from "./backup.js";
@@ -152,6 +154,7 @@ async function handleIncoming(from, text, msgId = null) {
     out.order = priceOrder(out.order, current.customer ?? null, catalogNow());
     const { order: guardado } = await createOrder(out.order);
     out.reply = conReferencia(out.reply, guardado?.ref);
+    avisoPedido(account, guardado);
   }
   return out;
 }
@@ -357,6 +360,7 @@ const datosDelCliente = (acc) => {
     pedidos_hechos_en_la_aplicacion: getDb().ordersFull(acc.customerId),
     favoritos: getAccountsDb().favorites(acc.customerId),
     pedido_fijo_semanal: getAccountsDb().getStanding(acc.customerId),
+    avisos_en_el_movil: getAccountsDb().pushOf(acc.customerId).length, // móviles donde tiene activados los avisos (las claves de cada móvil no se incluyen)
   };
 };
 const auth = createAuth({
@@ -408,6 +412,18 @@ const admin = createAdmin({ sync, mail: notificador, actualizador, estado: estad
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
 const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));
+// Avisos al móvil (Web Push) de los clientes que los han activado. Nunca bloquean ni hacen fallar un pedido.
+let _avisos = null;
+const avisosPush = () => (_avisos ??= crearAvisos({ accountsDb: getAccountsDb() }));
+function avisoPedido(account, guardado, modificado = false) {
+  if (!guardado?.ref) return;
+  const pe = puedeEditarPedido(guardado);
+  void avisosPush().aCliente(account.customerId, {
+    title: modificado ? "Pedido modificado" : "Pedido recibido",
+    body: `${modificado ? "Hemos cambiado" : "Hemos recibido"} tu pedido ${guardado.ref}.${pe.ok ? " Puedes modificarlo desde «Mi cuenta» hasta la hora límite." : ""}`,
+    url: "/cliente", tag: "pedido-" + guardado.ref,
+  });
+}
 // Fotos de producto: ficheros «<código>.png|jpg|webp» en la carpeta IMG_DIR (por defecto «imagenes»). Se listan al arrancar y cada 5 minutos.
 const IMG_DIR = process.env.IMG_DIR ?? fileURLToPath(new URL("./imagenes/", import.meta.url));
 const IMG_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
@@ -577,6 +593,27 @@ async function appRoutes(req, res, url) {
       pedidos, ayuda: ayudaPublica(),
     });
   }
+  if (p === "/api/push/clave" && req.method === "GET") { // clave pública para que el móvil pueda activar los avisos
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    return void sendJson(res, 200, { publica: avisosPush().publica() });
+  }
+  if (p === "/api/push/suscribir" && req.method === "POST") { // el cliente activa los avisos en ESTE móvil
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const sub = (await readJson(req))?.subscription;
+    if (!sub || !endpointValido(sub.endpoint) || !clavesValidas(sub.keys)) return void sendJson(res, 400, { error: "Este móvil no permite recibir avisos." });
+    getAccountsDb().pushSave(account.customerId, { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } });
+    void avisosPush().aCliente(account.customerId, { title: "Avisos activados", body: "Te avisaremos aquí cuando recibamos tus pedidos.", url: "/cliente", tag: "avisos-activados" });
+    return void sendJson(res, 200, { ok: true });
+  }
+  if (p === "/api/push/baja" && req.method === "POST") { // desactiva los avisos de este móvil (solo si son de este cliente)
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const endpoint = String((await readJson(req))?.endpoint ?? "");
+    const mio = getAccountsDb().pushOf(account.customerId).some((x) => x.endpoint === endpoint);
+    if (mio) getAccountsDb().pushRemove(endpoint);
+    return void sendJson(res, 200, { ok: true });
+  }
   if (p === "/catalogo/pedido" && req.method === "GET") { // contenido de un pedido modificable, para volver a abrirlo en el catálogo
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     const o = getDb().getOrderByRef(url.searchParams.get("ref") ?? "");
@@ -603,11 +640,13 @@ async function appRoutes(req, res, url) {
     if (typeof body.replaces === "string" && body.replaces) { // el cliente MODIFICA un pedido ya enviado: sustituye al anterior (mismo número), nunca crea otro
       const nuevo = getDb().replaceOrder(body.replaces, priced);
       if (!nuevo) return void sendJson(res, 409, { error: "Ya no se puede modificar este pedido. Llámanos y lo cambiamos." }); // se exportó mientras tanto
+      avisoPedido(account, nuevo, true);
       const pe = puedeEditarPedido(nuevo);
       return void sendJson(res, 200, { ok: true, modificado: true, ref: nuevo.ref, ...(pe.ok ? { modificable: pe.texto || "Puedes seguir modificándolo mientras no lo preparemos" } : {}), message: `✅ Pedido modificado (${nuevo.ref}). ${priced.items.length} ${priced.items.length === 1 ? "artículo" : "artículos"}, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.` });
     }
     const { duplicate, order: guardado } = await createOrder(priced);
     if (duplicate) return void sendJson(res, 409, { error: "Este pedido ya se envió" }); // doble clic o dos pestañas
+    avisoPedido(account, guardado);
     const pe = guardado ? puedeEditarPedido(guardado) : { ok: false };
     return void sendJson(res, 200, { ok: true, ...(guardado?.ref ? { ref: guardado.ref } : {}), ...(pe.ok ? { modificable: pe.texto || "Puedes seguir modificándolo mientras no lo preparemos" } : {}), message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} ${priced.items.length === 1 ? "artículo" : "artículos"}, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.${guardado?.ref ? `\n🧾 Tu referencia: *${guardado.ref}*` : ""}\n\n${BUSINESS.payment}` });
   }

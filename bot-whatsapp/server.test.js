@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import crypto from "node:crypto";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { openDb } from "./db.js";
@@ -22,7 +24,7 @@ before(async () => {
     cwd: path.dirname(fileURLToPath(import.meta.url)),
     env: {
       ...process.env, DEMO: "1", PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
-      DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: syncDir, BACKUP_DIR: path.join(dir, "respaldos"), ENTRADA_DIR: path.join(dir, "entrada"),
+      DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: syncDir, BACKUP_DIR: path.join(dir, "respaldos"), ENTRADA_DIR: path.join(dir, "entrada"), PUSH_ALLOW_HTTP: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -907,4 +909,87 @@ test("BANDEJA DE ENTRADA: enseña los Excel de la carpeta (con su tipo), no apli
   assert.ok(fs.readdirSync(path.join(carpeta, "aplicados")).some((f) => /^\d{8}-\d{4}-lista\.xlsx$/.test(f)));
   assert.equal((await call("POST", "/api/admin/entrada/archivar", { admin: true, body: { nombre: "lista.xlsx" } })).status, 404);
   assert.equal((await call("GET", "/api/admin/entrada", { admin: true })).json.archivos.some((a) => a.nombre === "lista.xlsx"), false);
+});
+
+// ---- Avisos al móvil (Web Push) ----
+// Un «móvil» de mentira: un servicio de push local que apunta lo que recibe, y un navegador que sabe descifrarlo
+async function movilDePrueba() {
+  const ecdh = crypto.createECDH("prime256v1"); ecdh.generateKeys(); const auth = crypto.randomBytes(16);
+  const recibidos = []; let estado = 201;
+  const srv = http.createServer((req, res) => { const t = []; req.on("data", (d) => t.push(d)); req.on("end", () => { recibidos.push(Buffer.concat(t)); res.writeHead(estado).end(); }); });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const descifrar = (c) => {
+    const salt = c.subarray(0, 16), idlen = c[20], asPub = c.subarray(21, 21 + idlen), datos = c.subarray(21 + idlen), uaPub = ecdh.getPublicKey();
+    const ikm = Buffer.from(crypto.hkdfSync("sha256", ecdh.computeSecret(asPub), auth, Buffer.concat([Buffer.from("WebPush: info\0"), uaPub, asPub]), 32));
+    const cek = Buffer.from(crypto.hkdfSync("sha256", ikm, salt, Buffer.from("Content-Encoding: aes128gcm\0"), 16)), nonce = Buffer.from(crypto.hkdfSync("sha256", ikm, salt, Buffer.from("Content-Encoding: nonce\0"), 12));
+    const d = crypto.createDecipheriv("aes-128-gcm", cek, nonce); d.setAuthTag(datos.subarray(datos.length - 16));
+    const claro = Buffer.concat([d.update(datos.subarray(0, datos.length - 16)), d.final()]); return JSON.parse(claro.subarray(0, claro.length - 1).toString("utf8"));
+  };
+  return {
+    sub: { endpoint: `http://127.0.0.1:${srv.address().port}/push/${crypto.randomBytes(6).toString("hex")}`, keys: { p256dh: ecdh.getPublicKey().toString("base64url"), auth: auth.toString("base64url") } },
+    avisos: () => recibidos.map(descifrar), poner: (e) => { estado = e; }, cerrar: () => srv.close(),
+  };
+}
+const esperar = async (cond, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (cond()) return true; await new Promise((r) => setTimeout(r, 40)); } return cond(); };
+
+test("AVISOS AL MÓVIL: el cliente los activa, recibe «Pedido recibido» solo él, y puede desactivarlos", async () => {
+  assert.equal((await call("GET", "/api/push/clave")).status, 401);
+  assert.equal((await call("POST", "/api/push/suscribir", { body: { subscription: {} } })).status, 401);
+  const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar dos"));
+  const movA = await movilDePrueba(), movB = await movilDePrueba();
+  try {
+    const clave = (await call("GET", "/api/push/clave", { cookie: A })).json.publica; assert.equal(Buffer.from(clave, "base64url").length, 65);
+    // solo móviles de verdad: nada de direcciones raras ni claves mal formadas
+    for (const mala of [{ endpoint: "https://evil.example.com/x", keys: movA.sub.keys }, { endpoint: movA.sub.endpoint, keys: { p256dh: "abc", auth: "def" } }, { endpoint: movA.sub.endpoint }, null]) assert.equal((await call("POST", "/api/push/suscribir", { cookie: A, body: { subscription: mala } })).status, 400);
+    assert.equal((await call("POST", "/api/push/suscribir", { cookie: A, body: { subscription: movA.sub } })).status, 200);
+    assert.equal((await call("POST", "/api/push/suscribir", { cookie: B, body: { subscription: movB.sub } })).status, 200);
+    assert.ok(await esperar(() => movA.avisos().length === 1)); assert.equal(movA.avisos()[0].title, "Avisos activados"); // confirmación al activar
+    // un pedido de A avisa solo a A
+    const rr = await call("POST", "/catalogo", { cookie: A, body: { key: "clave-aviso-pedido-A", lines: [{ id: "1010", qty: 1 }] } });
+    assert.equal(rr.status, 200, JSON.stringify(rr.json));
+    assert.ok(await esperar(() => movA.avisos().length === 2), "A recibe el aviso del pedido");
+    const av = movA.avisos()[1]; assert.equal(av.title, "Pedido recibido"); assert.ok(av.body.includes(rr.json.ref)); assert.equal(av.url, "/cliente");
+    await new Promise((r) => setTimeout(r, 300)); assert.equal(movB.avisos().length, 1, "B solo tiene el de activar: no recibe lo de A");
+    // B no puede desactivar el móvil de A; A sí el suyo
+    await call("POST", "/api/push/baja", { cookie: B, body: { endpoint: movA.sub.endpoint } });
+    const rr2 = await call("POST", "/catalogo", { cookie: A, body: { key: "clave-aviso-pedido-A2", lines: [{ id: "1010", qty: 1 }] } }); assert.equal(rr2.status, 200);
+    assert.ok(await esperar(() => movA.avisos().length === 3), "el móvil de A sigue activo");
+    await call("POST", "/api/push/baja", { cookie: A, body: { endpoint: movA.sub.endpoint } });
+    await call("POST", "/catalogo", { cookie: A, body: { key: "clave-aviso-pedido-A3", lines: [{ id: "1010", qty: 1 }] } });
+    await new Promise((r) => setTimeout(r, 400)); assert.equal(movA.avisos().length, 3, "desactivado: ya no llegan avisos");
+    // lo que se guarda no enseña las claves del móvil al cliente en «Mi cuenta»
+    assert.equal(JSON.stringify((await call("GET", "/api/mi-cuenta", { cookie: B })).json).includes(movB.sub.keys.auth), false);
+  } finally { movA.cerrar(); movB.cerrar(); }
+});
+
+test("AVISOS A CLIENTES (empresa): a todos o a uno, con confirmación; los móviles que caducan se borran", async () => {
+  const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar dos"));
+  const movA = await movilDePrueba(), movB = await movilDePrueba();
+  try {
+    await call("POST", "/api/push/suscribir", { cookie: A, body: { subscription: movA.sub } }); await call("POST", "/api/push/suscribir", { cookie: B, body: { subscription: movB.sub } });
+    await esperar(() => movA.avisos().length >= 1 && movB.avisos().length >= 1);
+    const base = { titulo: "Oferta de la semana", texto: "Cerveza al mejor precio", destino: "todos", confirmo: true };
+    assert.equal((await call("GET", "/api/admin/avisos")).status, 403); // solo la empresa
+    assert.equal((await call("POST", "/api/admin/avisos/enviar", { body: base })).status, 403);
+    for (const mal of [{ ...base, confirmo: false }, { ...base, titulo: "" }, { ...base, titulo: "x".repeat(51) }, { ...base, texto: "x".repeat(181) }, { ...base, destino: "otros" }, { ...base, destino: "cliente", clienteId: "no-existe" }]) assert.equal((await call("POST", "/api/admin/avisos/enviar", { admin: true, body: mal })).status, 400, JSON.stringify(mal).slice(0, 60));
+    const n0 = (await call("GET", "/api/admin/avisos", { admin: true })).json;
+    assert.ok(n0.moviles >= 2 && n0.clientes >= 2);
+    // a todos
+    const t = (await call("POST", "/api/admin/avisos/enviar", { admin: true, body: base })).json;
+    assert.ok(t.ok && t.enviados >= 2);
+    assert.ok(await esperar(() => movA.avisos().some((x) => x.title === "Oferta de la semana") && movB.avisos().some((x) => x.title === "Oferta de la semana")));
+    // a un solo cliente
+    const idA = (await call("GET", "/api/admin/cuentas", { admin: true })).json.find((c) => c.cliente === "CAFETERIA IMPORTADA").customerId;
+    const antesB = movB.avisos().length;
+    const u = (await call("POST", "/api/admin/avisos/enviar", { admin: true, body: { ...base, titulo: "Solo para ti", destino: "cliente", clienteId: idA } })).json;
+    assert.equal(u.enviados, 1);
+    assert.ok(await esperar(() => movA.avisos().some((x) => x.title === "Solo para ti"))); assert.equal(movB.avisos().length, antesB, "el otro cliente no recibe el aviso individual");
+    // registro de lo enviado
+    const log = (await call("GET", "/api/admin/avisos", { admin: true })).json.ultimos; assert.equal(log[0].titulo, "Solo para ti"); assert.equal(log[1].destino, "todos");
+    // un móvil que ya no existe (410) se borra solo
+    movB.poner(410);
+    await call("POST", "/api/admin/avisos/enviar", { admin: true, body: { ...base, titulo: "Prueba caducado" } });
+    assert.ok(await esperar(async () => true));
+    const despues = (await call("GET", "/api/admin/avisos", { admin: true })).json; assert.equal(despues.moviles, n0.moviles - 1, "el móvil caducado se ha quitado");
+  } finally { movA.cerrar(); movB.cerrar(); }
 });
