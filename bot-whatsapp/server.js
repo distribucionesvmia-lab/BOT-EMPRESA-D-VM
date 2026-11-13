@@ -413,7 +413,7 @@ const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
 const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));
 // Avisos al móvil (Web Push) de los clientes que los han activado. Nunca bloquean ni hacen fallar un pedido.
-let _avisos = null;
+let _avisos = null, _origenAt = 0;
 const avisosPush = () => (_avisos ??= crearAvisos({ accountsDb: getAccountsDb() }));
 if (clientEnabled) avisosPush(); // crea ya los avisos: así deja guardado el contacto (PUBLIC_URL) para que también lo use la aplicación de la empresa
 function avisoPedido(account, guardado, modificado = false) {
@@ -489,6 +489,7 @@ async function appRoutes(req, res, url) {
   if (await auth.route(req, res, url)) return;
 
   const account = auth.sessionOf(req);
+  if (account && clientEnabled && Date.now() - _origenAt > 600_000 && avisosPush().recordarOrigen(req)) _origenAt = Date.now(); // deja guardada la dirección pública desde la que entran los clientes (contacto de los avisos)
 
   if (p === "/api/chat" && req.method === "POST") {
     if (!account) return void sendJson(res, 401, { error: "No has iniciado sesión." });

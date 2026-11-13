@@ -986,6 +986,10 @@ test("AVISOS A CLIENTES (empresa): a todos o a uno, con confirmación; los móvi
     assert.ok(await esperar(() => movA.avisos().some((x) => x.title === "Solo para ti"))); assert.equal(movB.avisos().length, antesB, "el otro cliente no recibe el aviso individual");
     // registro de lo enviado
     const log = (await call("GET", "/api/admin/avisos", { admin: true })).json.ultimos; assert.equal(log[0].titulo, "Solo para ti"); assert.equal(log[1].destino, "todos");
+    // el contacto que se identifica ante Apple/Google sale de la dirección pública por la que entran los clientes (el panel lo enseña)
+    assert.equal((await call("GET", "/api/admin/avisos", { admin: true })).json.contacto, null); // por localhost no sirve
+    await call("GET", "/api/mi-cuenta", { cookie: A, headers: { "x-forwarded-host": "pedidos.empresa.es" } });
+    assert.equal((await call("GET", "/api/admin/avisos", { admin: true })).json.contacto, "https://pedidos.empresa.es");
     // si el servicio de notificaciones falla, la empresa lo sabe y se le dice por qué (y queda en el registro)
     movA.poner(403);
     const rechazo = (await call("POST", "/api/admin/avisos/enviar", { admin: true, body: { ...base, titulo: "Prueba rechazo", destino: "cliente", clienteId: idA } })).json;

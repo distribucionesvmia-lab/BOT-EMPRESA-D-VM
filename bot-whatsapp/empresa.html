@@ -156,6 +156,7 @@
       <div class="panel">
         <h2>Avisos a clientes</h2>
         <p class="muted" id="av-estado" style="margin:0 0 10px"></p>
+        <p class="muted" id="av-contacto" style="margin:0 0 10px;font-size:13px"></p>
         <p class="muted" style="margin:0 0 10px">Los avisos llegan como una notificación al móvil de los clientes que han abierto la aplicación, han pulsado «Activar avisos» en «Mi cuenta» y la tienen instalada en su pantalla de inicio. El aviso de «Pedido recibido» sale solo cada vez que un cliente hace un pedido.</p>
         <form id="f-avisos" autocomplete="off" style="display:grid;gap:10px;max-width:560px">
           <label style="display:flex;flex-direction:column;gap:4px"><span class="lab"><b>Para quién</b></span>
@@ -629,12 +630,14 @@ function explicarPush(errores) {
   const que = !cod ? "No se ha podido conectar con el servicio de notificaciones (revisa la conexión a internet del ordenador de la oficina y que el antivirus o el cortafuegos no lo bloqueen)."
     : cod === 429 ? "El servicio de notificaciones pide esperar un poco antes de enviar más."
     : cod === 413 ? "El mensaje es demasiado largo."
+    : /BadJwtToken/.test(t) ? "Apple ha rechazado la identificación del servidor (suele ser por la dirección de contacto que se envía; mira la línea de arriba)."
     : cod >= 500 ? "El servicio de notificaciones del móvil está fallando; vuelve a intentarlo dentro de un rato."
     : "El servicio de notificaciones ha rechazado el aviso (suele ser un problema de configuración del servidor).";
   return `${que} (Detalle técnico: ${t})`;
 }
 async function avisosClientes() {
   const r = await call("/api/admin/avisos");
+  $("av-contacto").textContent = r.contacto ? `Los avisos se envían identificando al servidor con: ${r.contacto}` : "Falta la dirección pública para identificar los avisos (Apple los rechaza sin ella). Entra una vez como cliente por la dirección pública (la de las «Avisos activados») o pon VAPID_SUB en C:\\vm\\config.";
   $("av-estado").textContent = r.moviles ? `Ahora mismo hay ${r.clientes} cliente${r.clientes === 1 ? "" : "s"} con los avisos activados (${r.moviles} móvil${r.moviles === 1 ? "" : "es"}).` : "Todavía ningún cliente ha activado los avisos en su móvil.";
   const tb = $("av-hist"); tb.innerHTML = ""; $("av-vacio").hidden = r.ultimos.length > 0;
   for (const x of r.ultimos) { const tr = document.createElement("tr"), t = el("td"); t.append(el("b", x.titulo), el("div", x.texto, { className: "muted" })); tr.append(el("td", hora(x.at)), t, el("td", x.destino === "todos" ? "A todos" : "A " + x.destino), el("td", `${x.enviados} enviado${x.enviados === 1 ? "" : "s"}${x.fallidos ? ` · ${x.fallidos} sin entregar${x.detalle ? " (" + x.detalle + ")" : ""}` : ""}`)); tb.appendChild(tr); }

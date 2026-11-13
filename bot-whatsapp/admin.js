@@ -283,7 +283,7 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       }
     }
     // ---- Avisos al móvil de los clientes (Web Push) ----
-    if (p === "/api/admin/avisos" && get) return send(res, 200, { ...accounts.pushResumen(), ultimos: accounts.pushLogList(15) }), true;
+    if (p === "/api/admin/avisos" && get) return send(res, 200, { ...accounts.pushResumen(), contacto: avisos.contacto(), ultimos: accounts.pushLogList(15) }), true;
     if (p === "/api/admin/avisos/enviar" && post) {
       const b = (await readJson(req)) ?? {};
       const titulo = String(b.titulo ?? "").trim(), texto = String(b.texto ?? "").trim();
