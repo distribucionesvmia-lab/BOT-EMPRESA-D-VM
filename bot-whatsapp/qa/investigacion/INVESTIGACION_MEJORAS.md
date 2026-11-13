@@ -2,7 +2,7 @@
 
 **Qué es:** investigación continua para que al cliente le sea fácil, rápido y cómodo pedir, y para vender mejor.
 **Cómo se trabaja:** yo investigo, mido y propongo; tú decides. Cada propuesta tiene un código y un estado (tabla de seguimiento, sección 5). Nada se cambia en la app sin tu «aplícalo».
-**Última actualización:** 11-nov-2026 · **Ronda:** 1 (con verificación de tus arreglos)
+**Última actualización:** 13-nov-2026 · **Ronda:** 1 (con verificación de tus arreglos)
 
 ---
 
@@ -87,8 +87,8 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 | M-01 | Catálogo usable en apaisado | Alto | Bajo | **Mejorada** (11-nov) | Apaisado: lista 82 → 100 px útiles, carrito 0 → 159 px. Resto: N-02 |
 | M-02 | Botón y contador de tamaño estable | Alto | Bajo-Medio | **Hecha y verificada** (11-nov) | Un tamaño por pantalla; la tarjeta no cambia de alto al pulsar (216 px antes y después) |
 | M-03 | Zonas táctiles ≥ 44 px | Medio | Bajo | **Hecha en la lista** (11-nov) | Lista: 98 → 0 zonas pequeñas. Carrito: ver N-01 |
-| N-01 | Carrito: controles a 48 px (Cajas/Uds 61×42, − y + 44×40, cantidad 56×40, «+ Añadir observación» 251×40) | Medio | Bajo | Propuesta (nueva) | Hallada al verificar M-03 |
-| N-02 | Quitar la barra gris «Añade productos para empezar» mientras el carrito esté vacío; en apaisado, cabecera que se colapsa al hacer scroll | Medio | Bajo | Propuesta (nueva) | Hallada al verificar M-01 |
+| N-01 | Carrito: controles a 48 px (Cajas/Uds 61×42, − y + 44×40, cantidad 56×40, «+ Añadir observación» 251×40) | Medio | Bajo | **Hecha casi del todo** (13-nov) · quedan 2 controles de 40–42 px en el carrito (4 en 320 px) | Hallada al verificar M-03 |
+| N-02 | Quitar la barra gris «Añade productos para empezar» mientras el carrito esté vacío; en apaisado, cabecera que se colapsa al hacer scroll | Medio | Bajo | **Hecha** (13-nov) | Hallada al verificar M-01 |
 | M-04 / F-07 | Vista de escritorio en tabla / 2 columnas | Medio | Medio | Propuesta | |
 | M-05 / F-08 | Respetar letra del sistema (hasta +30 %) + A−/A+ | Medio | Bajo | **Aprobada** (11-nov) | Decisión 1 = sí. Prompt listo: `PROMPT_CONSTRUCTOR_letra_y_aviso_entrega.md` |
 | M-06 / F-06 | Poca cobertura: carrito local + instalable | Alto | Medio | Propuesta | Medir primero con red lenta |
@@ -124,6 +124,7 @@ Estados: **Propuesta** → **Aprobada** (tú dices sí) → **En curso** → **H
 | Fecha | Qué se hizo |
 |---|---|
 | 11-nov-2026 | Aprobadas e incluidas en el prompt del constructor `PROMPT_CONSTRUCTOR_paquete_compra_facil.md`: F-02, F-16, F-17 (versión sin API: lista en el panel + botón wa.me), F-18, F-20, F-21, F-22, F-23, F-24. Excluidas por decisión: F-19 y F-25. |
+| 13-nov-2026 | Ronda 2: puesta al día con la versión instalada, verificación de lo hecho, diagnóstico visual (D-1 a D-8), maqueta de tres pantallas y propuestas P-01 a P-12. PDF `Diseno_premium_app_cliente.pdf`. |
 | 11-nov-2026 | Segunda búsqueda de ideas para facilitar la compra: añadidas F-16 a F-25 (pedido fijo, recordatorio por WhatsApp, editar pedido enviado, estado del pedido, búsqueda, abrir en «lo mío», cantidades rápidas, deshacer, ayuda, notas recordadas). |
 | 11-nov-2026 | Decisiones: letra = respetarla (aprobada); aviso de entrega hoy antes de las 10:00 en Medina del Campo (nueva F-15, aprobada). Prompt para el constructor en `PROMPT_CONSTRUCTOR_letra_y_aviso_entrega.md`. |
 | 11-nov-2026 | Tras tus arreglos, nueva medición de la versión `1794389456-64de` en los 9 tamaños: M-02 y M-03 (lista) verificadas, M-01 mejorada, nuevas N-01 y N-02; resto sin cambios. PDF actualizado. |
@@ -178,3 +179,28 @@ El informe completo, con tabla y fiabilidad de cada fuente, está en `Investigac
 7. Medir el uso sin datos personales (F-14).
 8. Vino: ¿21 € es por botella o por caja? (F6-1)
 +. ¿Se pide más desde el móvil o desde el ordenador del bar?
+
+## 10. Ronda 2 (13-nov-2026): diseño premium de la parte del cliente
+
+Informe en PDF: `Diseno_premium_app_cliente.pdf` (9 páginas, con maqueta de tres pantallas hecha con productos y fotos reales).
+
+**Verificado en la versión del 12-nov (15,1 MB):** M-02, M-03, N-02, M-07 y M-08 hechos; M-01 mejorado (lista 214 px útiles, carrito 155 px apaisado); N-01 casi hecho (quedan 2 controles de 40–42 px en el carrito). Letra A−/A+ y botón de ayuda instalados; Tu pedido de siempre, Deshacer, pedido fijo, «Hoy toca», aviso de entrega, Modificar pedido y Recordatorios aparecen en el código pero **sin probar** (el cliente de prueba no tiene historial). M-04 (escritorio) sin cambios.
+
+**Datos nuevos:** la página pesa 15,1 MB (1.655 fotos incrustadas, 14,2 MB); 1.027 fotos (62 %) miden ≤ 64 px, 306 entre 65 y 200 px, 322 > 200 px; 81 fotos marcadas como generadas con IA (80 de menaje).
+
+| Código | Propuesta | Impacto | Esfuerzo | Estado |
+|---|---|---|---|---|
+| P-01 | Sistema de diseño sobrio (fondo cálido, rojo solo de acento, una tipografía, espaciado de 8) y fuera la barra verde / cabecera roja a pantalla completa | Alto | Medio | Propuesta · decisión 1 |
+| P-02 | Navegación inferior de 5 pestañas + mini-carrito fijo | Alto | Medio | Propuesta · decisión 2 |
+| P-03 | Pantalla Inicio personalizada | Alto | Medio | Propuesta |
+| P-04 | Tarjeta de producto de una fila (~100 px en vez de 216) con «+» que pasa a contador | Alto | Medio | Propuesta |
+| P-05 | Fotos ≥ 400×400, fondo uniforme, WebP, por categoría bajo demanda; «imagen orientativa» en las 81 de IA | Alto | Alto | Propuesta · decisión 3 |
+| P-06 | Nombres de producto limpios (con tabla de excepciones) | Medio-Alto | Medio | Propuesta · decisión 4 |
+| P-07 | Micro-interacciones útiles (200–400 ms) | Medio | Bajo | Propuesta |
+| P-08 | Pedido y entrega en una sola pantalla | Alto | Medio | Propuesta |
+| P-09 | Estados vacíos y de error cuidados | Medio | Bajo | Propuesta |
+| P-10 | Escritorio: rejilla y carrito lateral | Medio | Medio | Propuesta · decisión 6 |
+| P-11 | Tarjeta del comercial | Medio | Bajo | Propuesta · decisión 5 |
+| P-12 | Rendimiento (< 3 s con buena cobertura) | Alto | Medio | Propuesta |
+
+Fases propuestas: A (P-01, P-04, P-06) · B (P-02, P-03, P-08) · C (P-05, P-07, P-09) · D (P-10, P-11, P-12). Pendiente de decisión también: portes gratis / pedido mínimo (decisión 7).
