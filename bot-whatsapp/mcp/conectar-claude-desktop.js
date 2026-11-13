@@ -2,6 +2,7 @@
 // Busca el archivo claude_desktop_config.json (también el de la versión de la tienda de Windows), guarda una copia, añade la conexión conservando todo lo demás y comprueba que queda bien.
 //   Uso: node conectar-claude-desktop.js            → conecta
 //        node conectar-claude-desktop.js --quitar   → desconecta
+//        node conectar-claude-desktop.js --archivo "C:\ruta\claude_desktop_config.json"   → si no lo encuentra solo
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,7 +32,8 @@ export function configurar(archivo, { node, script, envFile, url = "http://local
   const leer = (t) => (t.trim() ? JSON.parse(t) : {});
   try { json = leer(texto); }
   catch (e) {
-    const limpio = texto.replace(BLOQUE_A_MANO, ""); // quizá lo pegado a mano está mal puesto: se retira y se vuelve a intentar
+    // quizá lo pegado a mano está mal puesto: se retira el bloque y cualquier resto de texto suelto (comillas invertidas, la palabra «json»…) entre la primera «{» y la primera clave
+    const limpio = texto.replace(BLOQUE_A_MANO, "").replace(/^(\s*\{)([^"}]*)/, (m, llave, resto) => (resto.trim() ? llave + "\n  " : m));
     try { json = leer(limpio); arreglado = limpio !== texto; } catch { json = null; }
     if (!arreglado) { const err = new Error(`El archivo de configuración tiene un error y no he querido tocarlo (${e.message}).`); err.codigo = "json"; throw err; }
   }
@@ -59,7 +61,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const quitar = process.argv.includes("--quitar");
   const script = path.join(path.dirname(fileURLToPath(import.meta.url)), "vm-mcp.js");
   const envFile = process.env.VM_ENV_FILE || "C:\\vm\\config\\empresa.env";
-  const hallados = buscarConfiguraciones();
+  const i = process.argv.findIndex((x) => x === "--archivo" || x.startsWith("--archivo=")), indicado = i < 0 ? null : process.argv[i].includes("=") ? process.argv[i].split("=").slice(1).join("=") : process.argv[i + 1];
+  const hallados = indicado ? (fs.existsSync(indicado) ? [path.resolve(indicado)] : []) : buscarConfiguraciones(); // --archivo "ruta": si no lo encuentra solo
   if (!hallados.length) { console.log("No encuentro el archivo de configuración de Claude Desktop.\nAbre Claude Desktop → Ajustes → Desarrollador → «Editar configuración» una vez (así se crea) y vuelve a ejecutar esto."); process.exit(1); }
   if (!quitar && !fs.existsSync(envFile)) console.log(`Aviso: no existe ${envFile}. La conexión necesita la clave de la empresa de ese archivo (si está en otro sitio, ejecútalo con la variable VM_ENV_FILE).`);
   let mal = false;

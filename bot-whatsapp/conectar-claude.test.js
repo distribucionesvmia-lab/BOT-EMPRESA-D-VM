@@ -54,3 +54,14 @@ test("CONECTAR CLAUDE: encuentra el archivo normal y el de la versión de la tie
   fs.mkdirSync(path.join(LOCALAPPDATA, "Packages", "Otro_abc", "LocalCache", "Roaming", "Claude"), { recursive: true }); fs.writeFileSync(path.join(LOCALAPPDATA, "Packages", "Otro_abc", "LocalCache", "Roaming", "Claude", "claude_desktop_config.json"), "{}");
   assert.deepEqual(buscarConfiguraciones({ APPDATA, LOCALAPPDATA }).sort(), [normal, tienda].sort());
 });
+
+test("CONECTAR CLAUDE: también arregla restos sueltos pegados al principio (comillas invertidas o la palabra «json» de un bloque de código copiado)", () => {
+  for (const basura of ["```json", "json", "`", "..."]) {
+    const roto = `{\n${basura}\n  "mcpServers": {\n    "vm-pedidos": {\n      "command": "node",\n      "args": ["C:\\\\x\\\\vm-mcp.js"],\n      "env": {\n        "VM_URL": "http://localhost:3001",\n        "VM_ENV_FILE": "C:\\\\e.env"\n      }\n    }\n  },\n  "preferences": { "a": 1 }\n}\n`;
+    assert.throws(() => JSON.parse(roto), basura);
+    const f = escribir(roto), r = configurar(f, datos);
+    assert.deepEqual(r, { cambio: "añadida", arreglado: true }, basura); assert.equal(leer(f).preferences.a, 1); assert.equal(leer(f).mcpServers["vm-pedidos"].command, datos.node);
+  }
+  // un archivo bueno nunca se «arregla»: lo que hay entre la llave y la primera clave solo se toca si es texto suelto
+  const bueno = escribir(JSON.stringify({ preferences: { a: 1 } }, null, 2)); assert.equal(configurar(bueno, datos).arreglado, false);
+});
