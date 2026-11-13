@@ -19,7 +19,14 @@ Con esta conexión, un asistente de Claude (Claude Desktop o Claude Code) puede 
 
 **Seguridad:** las que cambian algo solo funcionan si el asistente declara que **tú has visto lo que va a hacer y has dicho que sí** (`confirmado_por_el_usuario`). Las instrucciones de la conexión le dicen que te enseñe antes el texto exacto. Un aviso enviado **no se puede deshacer** y el panel no deja pasar de 10 avisos por hora. La clave de la empresa nunca sale del ordenador ni se la enseña al asistente.
 
-## Cómo conectarlo (en el ordenador de la oficina)
+## Forma fácil: un doble clic
+Cuando el programa esté actualizado en el ordenador de la oficina, haz **doble clic en `C:\vm\bot\bot-whatsapp\mcp\conectar-claude-desktop.bat`**. Busca el archivo de configuración de Claude Desktop (también el de la versión de la tienda de Windows), guarda una copia (`…antes-de-vm-pedidos.json`), añade la conexión **sin tocar nada más** y comprueba que queda bien. Si en un intento anterior se pegó a mano un bloque mal puesto (por ejemplo, sin la coma), lo retira y lo deja bien. Después **cierra Claude Desktop del todo y ábrelo**. Para quitar la conexión: `conectar-claude-desktop.bat --quitar`.
+
+(No hagas doble clic en `vm-mcp.js`: Windows lo abre con otro programa y da un error. Ese archivo lo arranca Claude Desktop solo.)
+
+La forma manual, por si hace falta:
+
+## Cómo conectarlo a mano (en el ordenador de la oficina)
 Es lo más sencillo y no abre nada a internet: el programa de la conexión habla con el panel desde el propio ordenador (`http://localhost:3001`). Necesitas tener instalada la aplicación **Claude Desktop** en ese ordenador (y Node.js, que ya está por el programa).
 
 1. Abre Claude Desktop → **Ajustes → Desarrollador → Editar configuración**. Se abre el archivo `claude_desktop_config.json` (en `%APPDATA%\Claude`).
