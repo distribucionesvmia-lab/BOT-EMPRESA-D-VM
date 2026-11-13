@@ -19,7 +19,10 @@ export function buscarConfiguraciones(env = process.env) {
   if (env.LOCALAPPDATA) { // instalación de la tienda de Windows: la configuración vive dentro de la carpeta del paquete (el nombre del paquete varía)
     const paquetes = path.join(env.LOCALAPPDATA, "Packages");
     try { for (const p of fs.readdirSync(paquetes)) for (const c of carpetasClaude(path.join(paquetes, p, "LocalCache", "Roaming"))) rutas.push(path.join(c, NOMBRE_ARCHIVO)); } catch { /* sin carpeta de paquetes */ }
-    for (const c of carpetasClaude(env.LOCALAPPDATA)) rutas.push(path.join(c, NOMBRE_ARCHIVO));
+    for (const c of carpetasClaude(env.LOCALAPPDATA)) { // p. ej. Local\\Claude-Data\\claude_pzs8sxrjxfjjc\\claude_desktop_config.json (el archivo, o una subcarpeta con él)
+      rutas.push(path.join(c, NOMBRE_ARCHIVO));
+      try { for (const sub of fs.readdirSync(c, { withFileTypes: true })) if (sub.isDirectory()) rutas.push(path.join(c, sub.name, NOMBRE_ARCHIVO)); } catch { /* sin subcarpetas */ }
+    }
   }
   return [...new Set(rutas)].filter((r) => fs.existsSync(r));
 }

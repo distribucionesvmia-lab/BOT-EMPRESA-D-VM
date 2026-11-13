@@ -57,6 +57,9 @@ test("CONECTAR CLAUDE: encuentra el archivo normal y el de la versión de la tie
   const rara = path.join(LOCALAPPDATA, "Packages", "AnthropicPBC.ClaudeDesktop_8wekyb3d8bbwe", "LocalCache", "Roaming", "Claude-3p", "claude_desktop_config.json"); fs.mkdirSync(path.dirname(rara), { recursive: true }); fs.writeFileSync(rara, "{}");
   const roam = path.join(APPDATA, "Claude-3p", "claude_desktop_config.json"); fs.mkdirSync(path.dirname(roam), { recursive: true }); fs.writeFileSync(roam, "{}");
   assert.deepEqual(buscarConfiguraciones({ APPDATA, LOCALAPPDATA }).sort(), [normal, tienda, rara, roam].sort());
+  // la ruta real de una instalación: Local\\Claude-Data\\claude_<paquete>\\claude_desktop_config.json
+  const datosL = path.join(LOCALAPPDATA, "Claude-Data", "claude_pzs8sxrjxfjjc", "claude_desktop_config.json"); fs.mkdirSync(path.dirname(datosL), { recursive: true }); fs.writeFileSync(datosL, "{}");
+  assert.deepEqual(buscarConfiguraciones({ APPDATA, LOCALAPPDATA }).sort(), [normal, tienda, rara, roam, datosL].sort());
 });
 
 test("CONECTAR CLAUDE: también arregla restos sueltos pegados al principio (comillas invertidas o la palabra «json» de un bloque de código copiado)", () => {
