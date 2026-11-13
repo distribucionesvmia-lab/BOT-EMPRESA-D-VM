@@ -244,6 +244,22 @@ const seleccionExportacion = (refs) => {
     /** Lo que se exportaría ahora (sin exportar nada ni marcar nada): para ver el Excel antes de generarlo. */
     previewPending: ({ refs = null } = {}) => seleccionExportacion(refs ? new Set(refs) : null),
 
+    /** Borra pedidos (cabecera, líneas y su presencia en Excel repetidos) por su referencia. Todo o nada. Devuelve { borrados, ids }. */
+    deleteOrders(refs) {
+      const lista = [...new Set(refs.map(String))];
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const rows = lista.map((r) => db.prepare("SELECT id FROM orders WHERE ref = ?").get(r)).filter(Boolean);
+        for (const { id } of rows) {
+          db.prepare("DELETE FROM export_orders WHERE order_id = ?").run(id);
+          db.prepare("DELETE FROM order_lines WHERE order_id = ?").run(id);
+          db.prepare("DELETE FROM orders WHERE id = ?").run(id);
+        }
+        db.exec("COMMIT");
+        return { borrados: rows.length, ids: rows.map((r) => r.id) };
+      } catch (e) { db.exec("ROLLBACK"); throw e; }
+    },
+
     listExports: (limit = 100) => db.prepare("SELECT * FROM exports ORDER BY id DESC LIMIT ?").all(limit),
     getExport: (id) => db.prepare("SELECT * FROM exports WHERE id = ?").get(id) ?? null,
     exportedOrders: (exportId) => db.prepare("SELECT * FROM orders WHERE export_id = ? OR id IN (SELECT order_id FROM export_orders WHERE export_id = ?) ORDER BY id").all(exportId, exportId).map(withLines),

@@ -22,7 +22,7 @@ before(async () => {
     cwd: path.dirname(fileURLToPath(import.meta.url)),
     env: {
       ...process.env, DEMO: "1", PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
-      DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: syncDir,
+      DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: syncDir, BACKUP_DIR: path.join(dir, "respaldos"),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -816,4 +816,39 @@ test("VER EL EXCEL: enseña las hojas antes de exportar sin marcar ningún pedid
   const hecha = (await call("GET", `/api/admin/exportaciones/${ex.id}/vista`, { admin: true })).json;
   assert.equal(hecha.orderCount, 1); assert.equal(hecha.archivo, ex.archivo);
   assert.equal((await call("GET", "/api/admin/exportaciones/99999/vista", { admin: true })).status, 404);
+});
+
+test("PEDIDOS: se filtran por día, horas y cliente, y se borran los elegidos (con copia de seguridad y confirmación)", async () => {
+  const { cookie } = await entrarNif("111111").then((r) => ({ cookie: cookieOf(r) }));
+  for (const k of ["clave-borrar-a", "clave-borrar-b"]) assert.equal((await call("POST", "/catalogo", { cookie, body: { key: k, lines: [{ id: "1010", qty: 1 }] } })).status, 200);
+  const lista = async (q = "") => (await call("GET", "/api/admin/pedidos" + q, { admin: true })).json;
+  const todos = await lista();
+  const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" }); // AAAA-MM-DD
+  // día: hoy salen, un día lejano no; un rango que incluye hoy sí
+  assert.ok((await lista(`?dia=${hoy}`)).length >= 2);
+  assert.equal((await lista("?dia=2000-01-01")).length, 0);
+  assert.ok((await lista(`?dia=2000-01-01&diaHasta=${hoy}`)).length >= 2);
+  // horas: todo el día salen; un tramo imposible, ninguno
+  assert.ok((await lista("?horaDesde=00:00&horaHasta=23:59")).length >= 2);
+  assert.equal((await lista("?horaDesde=23:59&horaHasta=00:00")).length, 0);
+  // cliente: por parte del nombre (sin tildes ni mayúsculas) o por código; uno que no existe, ninguno
+  const uno = todos.find((o) => o.codigo);
+  assert.ok((await lista("?cliente=" + encodeURIComponent(uno.cliente.slice(0, 4).toUpperCase()))).some((o) => o.ref === uno.ref));
+  assert.ok((await lista("?cliente=" + encodeURIComponent(uno.codigo))).some((o) => o.ref === uno.ref));
+  assert.equal((await lista("?cliente=zzzz-no-existe")).length, 0);
+  assert.equal((await lista("?dia=basura&cliente=")).length, todos.length); // un filtro mal escrito se ignora
+  // borrar: solo la empresa, con confirmación y referencias válidas
+  const [a, b] = todos.filter((o) => o.estado === "pendiente").slice(0, 2).map((o) => o.ref);
+  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { body: { refs: [a], confirmo: true } })).status, 403);
+  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: [a] } })).status, 400); // sin confirmar
+  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: [], confirmo: true } })).status, 400);
+  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: ["x; DROP"], confirmo: true } })).status, 400);
+  assert.equal((await lista()).filter((o) => o.ref === a || o.ref === b).length, 2); // nada se ha borrado todavía
+  const r = (await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: [a], confirmo: true } })).json;
+  assert.equal(r.borrados, 1); assert.match(r.copia, /^pedidos-antes-de-borrar-\d{8}-\d{4}\.sqlite$/);
+  assert.ok(fs.existsSync(path.join(dir, "respaldos", r.copia)), "se guarda la copia antes de borrar");
+  const tras = await lista();
+  assert.equal(tras.find((o) => o.ref === a), undefined); // borrado
+  assert.ok(tras.find((o) => o.ref === b)); // el no elegido sigue
+  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: [a], confirmo: true } })).json.borrados, 0); // repetirlo no rompe nada
 });

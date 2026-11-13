@@ -16,6 +16,7 @@
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
   input, select { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
   button { font: inherit; font-weight: 600; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+  button.peligro { border-color:#c0392b; color:#c0392b; } button.peligro:not(:disabled):hover { background:#c0392b; color:#fff; } @media (prefers-color-scheme: dark) { button.peligro { border-color:#ff7b6b; color:#ff9a8d; } button.peligro:not(:disabled):hover { background:#b3382a; color:#fff; } }
   button.main { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); } button:disabled { opacity: .5; cursor: default; }
   button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; } th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
@@ -78,7 +79,16 @@
       <div class="panel">
         <h2>Pedidos recibidos</h2>
         <p class="muted" id="correo-estado" style="margin:0 0 8px"></p>
-        <div class="row" style="margin-bottom:10px"><button class="main" id="exportar-sel" disabled>Exportar seleccionados (0)</button><button id="exportar">Exportar todos los pendientes</button><button id="ver-excel" type="button" title="Enseña cómo quedará el Excel sin exportar nada">Ver cómo queda el Excel</button><span class="muted" id="expmsg" role="status"></span></div>
+        <div class="row" style="margin-bottom:10px"><button class="main" id="exportar-sel" disabled>Exportar seleccionados (0)</button><button id="exportar">Exportar todos los pendientes</button><button id="ver-excel" type="button" title="Enseña cómo quedará el Excel sin exportar nada">Ver cómo queda el Excel</button><button type="button" id="marcar-todos" title="Marca todos los pedidos que se ven ahora (sean del estado que sean)">Marcar todos los que se ven</button><button type="button" id="borrar-sel" class="peligro" disabled>Borrar seleccionados (0)</button><span class="muted" id="expmsg" role="status"></span></div>
+        <form class="row" id="f-filtro" style="margin:0 0 8px;align-items:flex-end;gap:10px" aria-label="Filtrar pedidos">
+          <label style="display:flex;flex-direction:column;gap:3px;font-size:12px"><span class="muted">Día</span><input type="date" id="fl-dia"></label>
+          <label style="display:flex;flex-direction:column;gap:3px;font-size:12px"><span class="muted">hasta el día (opcional)</span><input type="date" id="fl-dia2"></label>
+          <label style="display:flex;flex-direction:column;gap:3px;font-size:12px"><span class="muted">Desde las</span><input type="time" id="fl-h1"></label>
+          <label style="display:flex;flex-direction:column;gap:3px;font-size:12px"><span class="muted">Hasta las</span><input type="time" id="fl-h2"></label>
+          <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;flex:1;min-width:170px"><span class="muted">Cliente (nombre, código o teléfono)</span><input type="search" id="fl-cli" autocomplete="off" placeholder="Escribe para buscar"></label>
+          <button type="button" id="fl-quitar" hidden>Quitar filtros</button>
+        </form>
+        <p class="muted" id="fl-estado" role="status" style="margin:0 0 8px"></p>
         <p class="muted" style="margin:0 0 8px">Marca los pedidos pendientes que quieras llevar al Excel; los que no marques siguen pendientes.</p>
         <div class="scroll"><table><thead><tr><th><input type="checkbox" id="sel-todos" aria-label="Seleccionar todos los pendientes"></th><th>Pedido</th><th>Recibido</th><th>Cliente</th><th>Artículos</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody id="ped"></tbody></table></div>
         <p class="muted" id="ped-vacio" hidden>Todavía no hay pedidos.</p>
@@ -181,14 +191,25 @@ async function correo() {
 }
 // ---- Pedidos ----
 const sel = new Set(); // referencias de los pedidos marcados para exportar (se conservan al refrescar)
+const estadoDe = new Map(); // referencia → estado (pendiente, exportado, retenido) de los pedidos que se ven
+const exportables = () => [...sel].filter((r) => estadoDe.get(r) !== "retenido"); // los retenidos se pueden marcar para borrarlos, pero no para exportarlos
 function actualizarSel() {
-  const pend = [...document.querySelectorAll("#ped input.sel:not(.re)")]; // «seleccionar todos» solo marca los pendientes
-  $("exportar-sel").textContent = `Exportar seleccionados (${sel.size})`; $("exportar-sel").disabled = !sel.size;
+  const pend = [...document.querySelectorAll("#ped input.sel:not(.re):not(.ret)")]; // «seleccionar todos» solo marca los pendientes
+  const nExp = exportables().length;
+  $("exportar-sel").textContent = `Exportar seleccionados (${nExp})`; $("exportar-sel").disabled = !nExp;
+  $("borrar-sel").textContent = `Borrar seleccionados (${sel.size})`; $("borrar-sel").disabled = !sel.size;
   $("sel-todos").checked = pend.length > 0 && pend.every((c) => c.checked); $("sel-todos").disabled = !pend.length;
 }
-$("sel-todos").onchange = (e) => { document.querySelectorAll("#ped input.sel:not(.re)").forEach((c) => { c.checked = e.target.checked; e.target.checked ? sel.add(c.dataset.ref) : sel.delete(c.dataset.ref); }); actualizarSel(); };
+$("sel-todos").onchange = (e) => { document.querySelectorAll("#ped input.sel:not(.re):not(.ret)").forEach((c) => { c.checked = e.target.checked; e.target.checked ? sel.add(c.dataset.ref) : sel.delete(c.dataset.ref); }); actualizarSel(); };
+const filtro = () => ({ dia: $("fl-dia").value, diaHasta: $("fl-dia2").value, horaDesde: $("fl-h1").value, horaHasta: $("fl-h2").value, cliente: $("fl-cli").value.trim() });
+const hayFiltro = () => Object.values(filtro()).some(Boolean);
 async function pedidos() {
-  const list = await call("/api/admin/pedidos");
+  const qs = new URLSearchParams(Object.entries(filtro()).filter(([, v]) => v)).toString();
+  const list = await call("/api/admin/pedidos" + (qs ? "?" + qs : ""));
+  $("fl-quitar").hidden = !hayFiltro();
+  $("fl-estado").textContent = hayFiltro() ? (list.length ? `Se ven ${list.length} pedido${list.length === 1 ? "" : "s"} con estos filtros.${list.length >= 500 ? " (máximo 500: afina el filtro)" : ""}` : "Ningún pedido cumple estos filtros.") : (list.length >= 150 ? "Se ven los 150 últimos pedidos. Usa los filtros para buscar más atrás." : "");
+  $("ped-vacio").textContent = hayFiltro() ? "Ningún pedido cumple estos filtros." : "Todavía no hay pedidos.";
+  estadoDe.clear(); for (const o of list) estadoDe.set(o.ref, o.estado);
   const first = seen === null; seen ??= new Set();
   const tb = $("ped"); tb.innerHTML = ""; $("ped-vacio").hidden = list.length > 0;
   for (const o of list) {
@@ -206,13 +227,13 @@ async function pedidos() {
     if (o.estado === "retenido" && o.codigo) { const b = el("button", "Revisado: exportar"); b.onclick = async () => { await call(`/api/admin/pedidos/${o.ref}/aprobar`, {}); refrescar(); }; est.appendChild(b); }
     const detTd = el("td"); detTd.appendChild(det);
     const chk = el("td");
-    if (o.estado === "pendiente" || o.estado === "exportado") { // también los ya exportados: se pueden volver a exportar las veces que haga falta
-      const c = el("input", "", { type: "checkbox", className: "sel" + (o.estado === "exportado" ? " re" : "") }); c.dataset.ref = o.ref; c.checked = sel.has(o.ref); c.setAttribute("aria-label", (o.estado === "exportado" ? "Volver a exportar " : "Exportar ") + o.ref);
+    { // casilla en todos: sirve para exportar (pendientes y ya exportados, que se pueden repetir) y para borrar (cualquiera)
+      const c = el("input", "", { type: "checkbox", className: "sel" + (o.estado === "exportado" ? " re" : o.estado === "retenido" ? " ret" : "") }); c.dataset.ref = o.ref; c.checked = sel.has(o.ref); c.setAttribute("aria-label", "Marcar " + o.ref);
       c.onchange = () => { c.checked ? sel.add(o.ref) : sel.delete(o.ref); actualizarSel(); }; chk.appendChild(c);
     }
     tr.append(chk, el("td", o.ref, { className: "ref" }), el("td", hora(o.fecha)), cli, detTd, el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
   }
-  const vivos = new Set(list.filter((o) => o.estado === "pendiente" || o.estado === "exportado").map((o) => o.ref)); for (const r of [...sel]) if (!vivos.has(r)) sel.delete(r); // retenidos o que ya no están
+  const vivos = new Set(list.map((o) => o.ref)); for (const r of [...sel]) if (!vivos.has(r)) sel.delete(r); // los que ya no se ven (filtrados o borrados) dejan de estar marcados: así nunca se borra algo que no se ve
   actualizarSel();
   const h = await call("/api/admin/exportaciones"); $("hist-panel").hidden = !h.length;
   const th = $("hist"); th.innerHTML = "";
@@ -250,7 +271,28 @@ async function exportar(refs) {
   } catch (e) { $("expmsg").textContent = e.message; } finally { $("exportar").disabled = false; actualizarSel(); }
 }
 $("exportar").onclick = () => exportar(null);
-$("exportar-sel").onclick = () => sel.size && exportar([...sel]);
+$("exportar-sel").onclick = () => exportables().length && exportar(exportables());
+
+// ---- Filtros del listado y borrado de pedidos ----
+let tFiltro = null; const aplicarFiltro = () => { clearTimeout(tFiltro); tFiltro = setTimeout(() => pedidos().catch((e) => ($("fl-estado").textContent = e.message)), 250); };
+$("f-filtro").onsubmit = (e) => { e.preventDefault(); aplicarFiltro(); };
+for (const id of ["fl-dia", "fl-dia2", "fl-h1", "fl-h2", "fl-cli"]) { $(id).oninput = aplicarFiltro; $(id).onchange = aplicarFiltro; }
+$("fl-quitar").onclick = () => { for (const id of ["fl-dia", "fl-dia2", "fl-h1", "fl-h2", "fl-cli"]) $(id).value = ""; aplicarFiltro(); };
+$("marcar-todos").onclick = () => { document.querySelectorAll("#ped input.sel").forEach((c) => { c.checked = true; sel.add(c.dataset.ref); }); actualizarSel(); };
+$("borrar-sel").onclick = async () => {
+  const refs = [...sel]; if (!refs.length) return;
+  const exportados = refs.filter((r) => estadoDe.get(r) === "exportado").length, pendientes = refs.filter((r) => estadoDe.get(r) === "pendiente").length;
+  let aviso = `¿Borrar ${refs.length} pedido${refs.length === 1 ? "" : "s"}?\n\nSe borran del programa y también desaparecen del historial del cliente.`;
+  if (pendientes) aviso += `\n· ${pendientes} aún NO se ha${pendientes === 1 ? "" : "n"} exportado a Excel: ${pendientes === 1 ? "no llegará" : "no llegarán"} a a3ERP.`;
+  if (exportados) aviso += `\n· ${exportados} ya ${exportados === 1 ? "está exportado" : "están exportados"}: el Excel que ya descargaste no cambia, pero el pedido dejará de estar aquí.`;
+  aviso += "\n\nAntes de borrar se guarda una copia de seguridad. Esta acción no se puede deshacer desde el panel.";
+  if (!confirm(aviso)) return;
+  const b = $("borrar-sel"); b.disabled = true;
+  try {
+    const r = await call("/api/admin/pedidos/borrar", { refs, confirmo: true });
+    sel.clear(); $("expmsg").textContent = `${r.borrados} pedido${r.borrados === 1 ? "" : "s"} borrado${r.borrados === 1 ? "" : "s"}. Copia de seguridad: ${r.copia}`; refrescar();
+  } catch (e) { $("expmsg").textContent = e.message; } finally { actualizarSel(); }
+};
 
 // ---- Ver el Excel en pantalla (sin exportar nada, o el de una exportación ya hecha) ----
 let vistaExcel = null;
@@ -289,7 +331,7 @@ $("xl-cerrar").onclick = () => { $("xl-panel").hidden = true; vistaExcel = null;
 $("ver-excel").onclick = async () => {
   const b = $("ver-excel"); b.disabled = true;
   try {
-    const v = await call("/api/admin/exportar/vista", sel.size ? { refs: [...sel] } : {});
+    const v = await call("/api/admin/exportar/vista", exportables().length ? { refs: exportables() } : {});
     if (v.vacio) { $("expmsg").textContent = "No hay pedidos listos para exportar." + (v.retenidos ? ` (${v.retenidos} retenidos para revisar)` : ""); return; }
     const n = v.orderCount, l = v.lineCount;
     mostrarExcel(v, "Así quedará el Excel (aún sin exportar)", `${n} pedido${n === 1 ? "" : "s"} · ${l} línea${l === 1 ? "" : "s"}. Esto es solo una vista: no se ha exportado nada ni se ha marcado ningún pedido.`);

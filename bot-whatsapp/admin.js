@@ -8,9 +8,10 @@ import { send, readJson, makeAdminCheck } from "./auth.js";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2 } from "./pricing.js";
 import { runExport } from "./exporter.js";
+import { backupDb } from "./backup.js";
 import { execFile } from "node:child_process";
 import { recordatoriosDeHoy } from "./recordatorios.js";
-import { imprimirHtml, FORMAT } from "./export-format.js";
+import { imprimirHtml, FORMAT, madrid } from "./export-format.js";
 import { estiloCss, estiloDecimales } from "./xlsx-files.js";
 
 const amountOf = (l) => l.amount ?? round2((l.units ?? l.qty) * (l.price ?? 0) * (1 - (l.discount ?? 0) / 100));
@@ -46,6 +47,25 @@ function orderView(o) {
  * accounts: base de cuentas · customers: { list, getById, suggest } · orders: base de pedidos (db.js)
  * Devuelve route(req, res, url) → true si atendió la petición.
  */
+// Filtros del listado de pedidos (hora de Madrid): día (o de un día a otro), tramo de horas y cliente (nombre, código o teléfono)
+const sinTildes = (t) => String(t ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+function filtroPedidos(q) {
+  const dia = /^\d{4}-\d{2}-\d{2}$/.test(q.get("dia") ?? "") ? q.get("dia") : null;
+  const diaHasta = /^\d{4}-\d{2}-\d{2}$/.test(q.get("diaHasta") ?? "") ? q.get("diaHasta") : null;
+  const h1 = /^\d{2}:\d{2}$/.test(q.get("horaDesde") ?? "") ? q.get("horaDesde") : null;
+  const h2 = /^\d{2}:\d{2}$/.test(q.get("horaHasta") ?? "") ? q.get("horaHasta") : null;
+  const cli = sinTildes((q.get("cliente") ?? "").slice(0, 60));
+  if (!dia && !diaHasta && !h1 && !h2 && !cli) return null;
+  return (o) => {
+    const [d, t] = madrid(o.created_at).split(" "), hm = t.slice(0, 5);
+    if (dia && d < dia) return false;
+    if ((diaHasta || dia) && d > (diaHasta ?? dia)) return false;
+    if (h1 && hm < h1) return false;
+    if (h2 && hm > h2) return false;
+    if (cli && !sinTildes(`${o.name} ${o.customer_id ?? ""} ${o.phone ?? ""}`).includes(cli)) return false;
+    return true;
+  };
+}
 // Vista previa del Excel (las mismas hojas que se escribirían en el .xlsx), con el CSS de cada estilo, para enseñarla en el panel
 function vistaExcel(lista) {
   const { sheets, lineCount } = FORMAT.build(lista);
@@ -122,7 +142,24 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       return send(res, 200, { ok: true }), true;
     }
     // ---- Pedidos ----
-    if (p === "/api/admin/pedidos" && get) return send(res, 200, orders.listOrders({ limit: 150 }).map(orderView)), true;
+    if (p === "/api/admin/pedidos" && get) {
+      const filtro = filtroPedidos(url.searchParams); // sin filtros: los 150 últimos; con filtros se busca más atrás
+      const lista = filtro ? orders.listOrders({ limit: 5000 }).filter(filtro) : orders.listOrders({ limit: 150 });
+      return send(res, 200, lista.slice(0, 500).map(orderView)), true;
+    }
+    if (p === "/api/admin/pedidos/borrar" && post) { // borra los pedidos elegidos (con copia de seguridad antes y confirmación expresa)
+      const body = (await readJson(req)) ?? {};
+      if (body.confirmo !== true) return send(res, 400, { error: "Falta la confirmación para borrar." }), true;
+      if (!Array.isArray(body.refs) || !body.refs.length || body.refs.length > 500 || !body.refs.every((r) => /^VM-\d{4}-\d{6}$/.test(String(r)))) return send(res, 400, { error: "Elige al menos un pedido válido para borrar." }), true;
+      let copia;
+      try { copia = path.basename(backupDb(orders, { dir: process.env.BACKUP_DIR ?? "respaldos", name: "pedidos-antes-de-borrar" })); }
+      catch (e) { console.error("Copia antes de borrar:", e); return send(res, 500, { error: "No se pudo hacer la copia de seguridad, así que NO se ha borrado nada." }), true; }
+      try {
+        const r = orders.deleteOrders(body.refs);
+        console.log(`Pedidos borrados por la empresa: ${r.borrados} (copia: ${copia})`);
+        return send(res, 200, { ok: true, borrados: r.borrados, copia }), true;
+      } catch (e) { console.error("Error borrando pedidos:", e); return send(res, 500, { error: "No se pudieron borrar los pedidos. No se ha borrado nada." }), true; }
+    }
     if (p === "/api/admin/exportar/vista" && post) { // ver cómo quedará el Excel SIN exportar nada (no marca pedidos)
       const body = (await readJson(req)) ?? {};
       if (body.refs !== undefined && (!Array.isArray(body.refs) || !body.refs.length || body.refs.length > 500 || !body.refs.every((r) => /^VM-\d{4}-\d{6}$/.test(String(r))))) return send(res, 400, { error: "Elige al menos un pedido válido." }), true;
