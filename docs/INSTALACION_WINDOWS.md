@@ -88,7 +88,11 @@ schtasks /Create /TN "VM Actualizar" /TR "C:\vm\bot\bot-whatsapp\deploy\windows\
 4. Las bases de datos y la configuración (`C:\vm\datos`, `C:\vm\config`) no se tocan nunca.
 5. Los pedidos que lleguen justo mientras se reinicia (unos segundos) pueden dar un error de conexión al cliente; vuelve a intentarlo y funciona.
 
-**7.1 Entrar a la app de la empresa desde fuera, sin publicarla:** instala **Tailscale** en el ordenador de la oficina y en tu móvil/portátil (misma cuenta). Desde cualquier sitio abres `http://NOMBRE-DEL-PC:3001/empresa` y entras con tu clave. Solo entran tus dispositivos. Para eso, en `empresa.env` pon `HOST=0.0.0.0` (y no publiques nunca el puerto 3001 en internet).
+**7.1 Entrar a la app de la empresa desde fuera, sin publicarla:** instala **Tailscale** en el ordenador de la oficina y en tu móvil/portátil (misma cuenta). La app de la empresa escucha solo en el propio ordenador (`HOST=127.0.0.1`), así que hay que ofrecerla **solo a tus dispositivos** con `tailscale serve` (NO `funnel`; `funnel` es público y solo se usa con el puerto 3000). Una vez, en un `cmd` como administrador en el ordenador de la oficina:
+```
+tailscale serve --bg --https=8443 http://127.0.0.1:3001
+```
+Desde tus dispositivos con Tailscale abre `https://NOMBRE-DEL-PC.TU-RED.ts.net:8443/empresa` (la misma dirección que la pública, con `:8443` y `/empresa`) y entra con tu clave. Para comprobar que NO es público: `tailscale funnel status` no debe mostrar el 8443. Quitarlo: `tailscale serve --https=8443 off`.
 
 ## Que no se pierdan los datos
 - Todo está en `C:\vm\datos`. **Haz copia de esa carpeta** (o activa `BACKUP_DIR` en una carpeta de Drive).
