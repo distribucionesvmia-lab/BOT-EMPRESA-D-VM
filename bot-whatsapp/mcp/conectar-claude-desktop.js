@@ -13,11 +13,13 @@ const BLOQUE_A_MANO = /\s*"mcpServers"\s*:\s*\{\s*"vm-pedidos"\s*:\s*\{[^{}]*\{[
 
 /** Rutas posibles del archivo de configuración de Claude Desktop que existen en este ordenador. */
 export function buscarConfiguraciones(env = process.env) {
-  const rutas = [];
-  if (env.APPDATA) rutas.push(path.join(env.APPDATA, "Claude", "claude_desktop_config.json"));
-  if (env.LOCALAPPDATA) { // instalación de la tienda de Windows: la configuración vive dentro de la carpeta del paquete
+  const rutas = [], NOMBRE_ARCHIVO = "claude_desktop_config.json";
+  const carpetasClaude = (base) => { try { return fs.readdirSync(base).filter((n) => /^claude/i.test(n)).map((n) => path.join(base, n)); } catch { return []; } };
+  if (env.APPDATA) for (const c of carpetasClaude(env.APPDATA)) rutas.push(path.join(c, NOMBRE_ARCHIVO)); // «Claude» y variantes («Claude-3p»…)
+  if (env.LOCALAPPDATA) { // instalación de la tienda de Windows: la configuración vive dentro de la carpeta del paquete (el nombre del paquete varía)
     const paquetes = path.join(env.LOCALAPPDATA, "Packages");
-    try { for (const p of fs.readdirSync(paquetes)) if (/^Claude_|^AnthropicPBC/i.test(p)) rutas.push(path.join(paquetes, p, "LocalCache", "Roaming", "Claude", "claude_desktop_config.json")); } catch { /* sin carpeta de paquetes */ }
+    try { for (const p of fs.readdirSync(paquetes)) for (const c of carpetasClaude(path.join(paquetes, p, "LocalCache", "Roaming"))) rutas.push(path.join(c, NOMBRE_ARCHIVO)); } catch { /* sin carpeta de paquetes */ }
+    for (const c of carpetasClaude(env.LOCALAPPDATA)) rutas.push(path.join(c, NOMBRE_ARCHIVO));
   }
   return [...new Set(rutas)].filter((r) => fs.existsSync(r));
 }

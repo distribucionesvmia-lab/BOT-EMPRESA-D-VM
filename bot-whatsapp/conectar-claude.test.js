@@ -51,8 +51,12 @@ test("CONECTAR CLAUDE: encuentra el archivo normal y el de la versión de la tie
   assert.deepEqual(buscarConfiguraciones({ APPDATA, LOCALAPPDATA }), []);
   const normal = path.join(APPDATA, "Claude", "claude_desktop_config.json"); fs.mkdirSync(path.dirname(normal), { recursive: true }); fs.writeFileSync(normal, "{}");
   const tienda = path.join(LOCALAPPDATA, "Packages", "Claude_pzs8sxrjxfjjc", "LocalCache", "Roaming", "Claude", "claude_desktop_config.json"); fs.mkdirSync(path.dirname(tienda), { recursive: true }); fs.writeFileSync(tienda, "{}");
-  fs.mkdirSync(path.join(LOCALAPPDATA, "Packages", "Otro_abc", "LocalCache", "Roaming", "Claude"), { recursive: true }); fs.writeFileSync(path.join(LOCALAPPDATA, "Packages", "Otro_abc", "LocalCache", "Roaming", "Claude", "claude_desktop_config.json"), "{}");
-  assert.deepEqual(buscarConfiguraciones({ APPDATA, LOCALAPPDATA }).sort(), [normal, tienda].sort());
+  fs.mkdirSync(path.join(LOCALAPPDATA, "Packages", "Otro_abc", "LocalCache", "Roaming", "OtraApp"), { recursive: true }); fs.writeFileSync(path.join(LOCALAPPDATA, "Packages", "Otro_abc", "LocalCache", "Roaming", "OtraApp", "claude_desktop_config.json"), "{}");
+  assert.deepEqual(buscarConfiguraciones({ APPDATA, LOCALAPPDATA }).sort(), [normal, tienda].sort()); // (una carpeta que no se llama «Claude…» no cuenta)
+  // el nombre del paquete de la tienda y de la carpeta puede variar
+  const rara = path.join(LOCALAPPDATA, "Packages", "AnthropicPBC.ClaudeDesktop_8wekyb3d8bbwe", "LocalCache", "Roaming", "Claude-3p", "claude_desktop_config.json"); fs.mkdirSync(path.dirname(rara), { recursive: true }); fs.writeFileSync(rara, "{}");
+  const roam = path.join(APPDATA, "Claude-3p", "claude_desktop_config.json"); fs.mkdirSync(path.dirname(roam), { recursive: true }); fs.writeFileSync(roam, "{}");
+  assert.deepEqual(buscarConfiguraciones({ APPDATA, LOCALAPPDATA }).sort(), [normal, tienda, rara, roam].sort());
 });
 
 test("CONECTAR CLAUDE: también arregla restos sueltos pegados al principio (comillas invertidas o la palabra «json» de un bloque de código copiado)", () => {
