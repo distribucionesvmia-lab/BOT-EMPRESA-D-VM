@@ -60,7 +60,7 @@ const cuentaDe = async (clienteId, telefono) => (await call("GET", "/api/admin/c
 
 let A, B;
 test("sin sesión no se accede a nada del cliente", async () => {
-  assert.equal((await call("GET", "/api/yo")).status, 401);
+  { const g = await call("GET", "/api/yo"); assert.equal(g.status, 200); assert.equal(g.json.cliente, null); } // invitado: 200 con cliente nulo, sin ensuciar la consola
   assert.equal((await call("POST", "/api/chat", { body: { text: "hola" } })).status, 401);
   assert.equal((await call("GET", "/catalogo/datos")).status, 401);
   assert.equal((await call("POST", "/catalogo", { body: { key: "abcdefgh1", lines: [] } })).status, 401);
@@ -166,7 +166,7 @@ test("AISLAMIENTO: cada cliente ve solo su conversación y su catálogo habitual
 
 test("AISLAMIENTO: el navegador no puede elegir el cliente (ni por parámetro ni en el cuerpo ni con una cookie falsa)", async () => {
   const ficticias = [`vm_session=${A.cookie.split("=")[1]}x`, "vm_session=", "vm_session=inventada", "otra=1"];
-  for (const c of ficticias) assert.equal((await call("GET", "/api/yo", { cookie: c })).status, 401);
+  for (const c of ficticias) assert.equal((await call("GET", "/api/yo", { cookie: c })).json.cliente, null);
   // A intenta pedir "como" el cliente 9002 de todas las formas posibles: el pedido sale siempre a nombre de 9001
   const r = await call("POST", "/catalogo?cliente=9002&customerId=9002", { cookie: A.cookie, body: { key: "clave-pedido-1", customerId: "9002", clienteId: "9002", phone: "600000002", lines: [{ id: "1010", qty: 1 }] } });
   assert.equal(r.status, 200);
@@ -210,13 +210,13 @@ test("un nuevo PIN cierra las sesiones y el PIN viejo deja de valer; bloquear co
   const cuentas = (await call("GET", "/api/admin/cuentas", { admin: true })).json;
   const cuentaB = cuentas.find((c) => c.customerId === "9002");
   const nuevo = await call("POST", `/api/admin/cuentas/${cuentaB.id}/pin`, { admin: true, body: {} });
-  assert.equal((await call("GET", "/api/yo", { cookie: B.cookie })).status, 401);
+  assert.equal((await call("GET", "/api/yo", { cookie: B.cookie })).json.cliente, null);
   assert.equal((await entrar("600000002", "Tienda Ficticia", B.pin)).status, 401);
   const ok = await call("POST", "/api/acceso", { body: { telefono: "600000002", empresa: "Tienda Ficticia", pin: nuevo.json.pin } });
   assert.equal(ok.status, 200);
   const cookieB = cookieOf(ok);
   await call("POST", `/api/admin/cuentas/${cuentaB.id}/bloquear`, { admin: true, body: { bloquear: true } });
-  assert.equal((await call("GET", "/api/yo", { cookie: cookieB })).status, 401);
+  assert.equal((await call("GET", "/api/yo", { cookie: cookieB })).json.cliente, null);
 });
 
 test("tras varios PIN erróneos la cuenta se bloquea aunque luego se ponga el PIN bueno", async () => {
@@ -235,7 +235,7 @@ test("salir cierra la sesión", async () => {
   const cookie = cookieOf(ok);
   assert.equal((await call("GET", "/api/yo", { cookie })).status, 200);
   await call("POST", "/api/salir", { cookie, body: {} });
-  assert.equal((await call("GET", "/api/yo", { cookie })).status, 401);
+  assert.equal((await call("GET", "/api/yo", { cookie })).json.cliente, null);
 });
 
 // ---- Aplicación de la empresa: pedidos y exportación ----
@@ -627,7 +627,7 @@ test("DERECHOS Y ACCESO DEL CLIENTE HABITUAL: teléfono de la lista + contraseñ
   assert.equal((await call("POST", "/api/eliminar-cuenta", { cookie, body: { confirmo: "si" } })).status, 400);
   const del = await call("POST", "/api/eliminar-cuenta", { cookie, body: { confirmo: "eliminar" } });
   assert.equal(del.status, 200);
-  assert.equal((await call("GET", "/api/yo", { cookie })).status, 401); // la sesión ya no vale
+  assert.equal((await call("GET", "/api/yo", { cookie })).json.cliente, null); // la sesión ya no vale
   const volver = await call("POST", "/api/acceso", { body: { telefono: "655444333", empresa: "Taberna Derechos", pin: "Ab12Cd" } });
   assert.equal(volver.status, 401);
   const volverNif = await entrarNif("765432");

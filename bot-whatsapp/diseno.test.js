@@ -191,3 +191,15 @@ test("chat: los atajos son botones pequeños (44 px, ancho a su texto), sin lín
   assert.match(cli, /\.quick \{ display:flex; flex-wrap:nowrap; justify-content:flex-start;[^}]*padding:var\(--s2\) max\(var\(--gutter\)[^}]*var\(--s3\); \}/);
   assert.match(cli, /\.quick button \{ flex:none; width:auto; min-height:44px;/); assert.match(cli, /\.quick \.q-tx small \{ display:none; \}/);
 });
+
+test("acceso (tanda 1): NIF primero, validación propia en español, aviso de los 6 primeros dígitos, error que se borra al editar, cerrar sesión en Mi cuenta, invitado sin 401", () => {
+  const cli = leer("./cliente.html");
+  assert.match(cli, /<form class="vm-card" id="f-acceso" autocomplete="off" novalidate>/); // sin avisos nativos del navegador en inglés
+  assert.match(cli, /id="m-nif" aria-pressed="true">Entrar con mi NIF</); assert.match(cli, /modoAcceso\(false\);\n\/\/ Validación con mensajes propios/);
+  assert.match(cli, /id="a-nif" type="text" inputmode="numeric"/); assert.doesNotMatch(cli, /id="a-nif"[^>]*pattern=/);
+  for (const m of ["Escribe los 6 primeros dígitos de tu DNI o CIF", "Formato incorrecto", "Solo cuentan los 6 primeros dígitos del DNI o CIF", "Las letras no cuentan", "Escribe el nombre de tu empresa."]) assert.ok(cli.includes(m), m);
+  assert.match(cli, /\$\("a-err"\)\.textContent = ""; \$\(id\)\.removeAttribute\("aria-invalid"\)/); // se borra al corregir
+  assert.match(cli, /nodo\("button", "Cerrar sesión", "vm-btn ghost cu-salir"\)/); assert.match(cli, /async function cerrarSesion\(\)/);
+  assert.match(cli, /sin sesión responde 200 con cliente nulo/);
+  assert.doesNotMatch(cli, /id="ir-pin"/);
+});

@@ -102,8 +102,9 @@ test("MÓVIL: «Mostrar más» no se sale del ancho y el código y la contraseñ
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
   assert.match(ped, /m\.style\.width = "calc\(100% - 28px\)"/);
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
-  for (const id of ["a-nif", "a-pin", "r-pin", "r-pin2", "c-nuevo", "c-nuevo2"]) assert.match(cli, new RegExp(`id="${id}"[^>]*maxlength="6"`), id);
-  assert.match(cli, /replace\(\/\[\^A-Za-z0-9\]\/g, ""\)\.slice\(0, 6\)/);
+  for (const id of ["a-pin", "r-pin", "r-pin2", "c-nuevo", "c-nuevo2"]) assert.match(cli, new RegExp(`id="${id}"[^>]*maxlength="6"`), id);
+  assert.match(cli, /id="a-nif"[^>]*maxlength="12"/); // el NIF no se corta a los 6 en silencio: se avisa de que solo cuentan los 6 primeros dígitos
+  assert.match(cli, /replace\(\/\[\^A-Za-z0-9\]\/g, ""\)\.slice\(0, id === "a-nif" \? 12 : 6\)/); // solo letras y números; el NIF admite hasta 12 para poder avisar
 });
 
 test("MÓVIL con letra grande (Samsung): ninguna caja de altura fija corta los textos y las categorías caben en 2 columnas", async () => {

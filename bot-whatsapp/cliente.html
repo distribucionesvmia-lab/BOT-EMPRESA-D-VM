@@ -167,7 +167,7 @@
   .vm input::placeholder, form.send input::placeholder { color:var(--text-2); opacity:.8; }
   .vm label, .vm-modal label { display:flex; flex-direction:column; gap:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; color:var(--text); }
   .vm input#a-nif { text-align:center; letter-spacing:.18em; font-weight:700; text-transform:uppercase; }
-  .vm input#a-nif::placeholder { letter-spacing:normal; font-weight:400; }
+  .vm input#a-nif::placeholder { letter-spacing:normal; font-weight:400; text-transform:none; }
   .vm-btn { display:inline-flex; align-items:center; justify-content:center; width:100%; min-height:50px; padding:0 var(--s6); border:0; border-radius:var(--r-pill); font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; line-height:1.2; cursor:pointer; text-align:center; }
   .vm-btn.primary { background:var(--accent); color:var(--on-accent); }
   .vm-btn.ghost { background:var(--accent-soft); color:var(--accent); }
@@ -481,6 +481,16 @@
   .quick .q-tx b { font-size:calc(var(--t-sec) / var(--k,1)); white-space:nowrap; }
   @media (max-width:359px) { .quick button { padding:0 var(--s3) 0 var(--s2); } }
   @media (min-width:1024px) { .quick { grid-template-columns:none; } }
+
+  /* Acceso: dos opciones bien visibles (NIF primero) y avisos propios */
+  .acc-modo { display:grid; grid-template-columns:1fr 1fr; gap:2px; padding:2px; border-radius:var(--r-pill); background:var(--field); }
+  .acc-modo button { min-height:44px; padding:0 var(--s2); border:0; border-radius:var(--r-pill); background:transparent; color:var(--text-2); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; line-height:1.15; }
+  .acc-modo button[aria-pressed="true"] { background:var(--surface); color:var(--accent); box-shadow:0 0 0 .5px var(--mat-line), 0 1px 3px rgba(0,0,0,.08); }
+  .pista { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); line-height:1.35; margin-top:calc(-1 * var(--s1)); }
+  .pista:empty { display:none; }
+  .vm input[aria-invalid="true"] { box-shadow:0 0 0 2px var(--accent); }
+  #nif-letras { min-height:44px; font-size:calc(var(--t-cap) / var(--k,1)); }
+  #m-cuenta .cu-salir { margin:var(--s4) var(--s5) 0; width:calc(100% - 2 * var(--s5)); }
 </style>
 </head>
 <body>
@@ -494,18 +504,20 @@
         <p>Haz tu pedido en un momento, desde el móvil o el ordenador.</p>
       </header>
 
-      <form class="vm-card" id="f-acceso" autocomplete="off">
+      <form class="vm-card" id="f-acceso" autocomplete="off" novalidate>
         <span class="tag">Cliente habitual</span>
         <h2>Inicia sesión</h2>
+        <div class="acc-modo" role="group" aria-label="Cómo quieres entrar"><button type="button" id="m-nif" aria-pressed="true">Entrar con mi NIF</button><button type="button" id="m-tel" aria-pressed="false">Teléfono y contraseña</button></div>
         <p id="t-tel">Entra con el <b>teléfono que usas habitualmente para contactar con nosotros</b> y tu contraseña.</p>
         <p id="t-nif" hidden>Solo para <b>clientes habituales</b>: entra con los <b>6 primeros dígitos de tu DNI o CIF</b> (en un CIF, los 6 primeros números, sin la letra). Una vez dentro podrás <b>poner una contraseña personal</b> y entrar después con tu teléfono.</p>
         <label id="l-tel">Teléfono con el que sueles contactar con nosotros<input id="a-tel" type="tel" inputmode="tel" autocomplete="tel"></label>
         <label id="l-pin">Contraseña de 6 letras o números<input id="a-pin" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="current-password"></label>
         <label id="l-emp">Nombre de tu empresa<input id="a-emp" maxlength="80" autocomplete="organization"></label>
-        <label id="l-nif" hidden>Primeros 6 dígitos del DNI o CIF (o tu contraseña)<input id="a-nif" type="text" pattern="[A-Za-z0-9]{6}" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 123456"></label>
+        <label id="l-nif" hidden>Primeros 6 dígitos del DNI o CIF (o tu contraseña)<input id="a-nif" type="text" inputmode="numeric" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 123456" aria-describedby="a-aviso a-err"></label>
+        <div class="pista" id="a-aviso" role="status" aria-live="polite"></div>
+        <button class="vm-link" type="button" id="nif-letras" hidden>Mi contraseña tiene letras: usar el teclado completo</button>
         <div class="err" id="a-err" role="alert"></div><div class="okmsg" id="a-ok" role="status"></div>
         <button class="vm-btn primary">Entrar</button>
-        <button class="vm-link" type="button" id="ir-pin">¿Sin contraseña? Entra con tu NIF (solo clientes habituales)</button>
         <div data-privacidad></div>
       </form>
 
@@ -666,27 +678,56 @@ $("f-registro").onsubmit = async (e) => {
 // Código de entrada y contraseña: solo letras y números (sin acentos ni símbolos) y como máximo 6, también si se pega
 for (const id of ["a-nif", "a-pin", "r-pin", "r-pin2", "c-nuevo", "c-nuevo2"]) {
   const e = document.getElementById(id);
-  if (e) e.addEventListener("input", () => { const v = e.value.replace(/[^A-Za-z0-9]/g, "").slice(0, 6); if (v !== e.value) e.value = v; });
+  if (e) e.addEventListener("input", () => { const v = e.value.replace(/[^A-Za-z0-9]/g, "").slice(0, id === "a-nif" ? 12 : 6); if (v !== e.value) e.value = v; }); // el NIF no se corta a 6: si hay de más, se avisa (más abajo)
 }
-let conPin = true; // por defecto: teléfono + contraseña; alternativa: NIF (solo clientes habituales)
+let conPin = false; // por defecto: NIF (los clientes habituales entran así); alternativa: teléfono + contraseña + empresa
+const limpia = (id) => $(id).value.replace(/[^A-Za-z0-9]/g, "");
 function modoAcceso(pin) {
   conPin = pin;
   $("t-tel").hidden = !pin; $("t-nif").hidden = pin;
   $("l-nif").hidden = pin; $("l-tel").hidden = !pin; $("l-pin").hidden = !pin; $("l-emp").hidden = !pin; if (!pin) $("a-emp").value = "";
-  $("a-nif").required = !pin; $("a-emp").required = pin; $("a-tel").required = pin; $("a-pin").required = pin;
-  $("ir-pin").textContent = pin ? "¿Sin contraseña? Entra con tu NIF (solo clientes habituales)" : "Entrar con teléfono y contraseña";
-  $("a-err").textContent = "";
+  $("nif-letras").hidden = pin; $("a-aviso").textContent = "";
+  $("m-nif").setAttribute("aria-pressed", String(!pin)); $("m-tel").setAttribute("aria-pressed", String(pin));
+  $("a-err").textContent = ""; marcaError(null);
 }
-modoAcceso(true);
-$("ir-pin").onclick = () => modoAcceso(!conPin);
+function marcaError(id) { for (const x of ["a-nif", "a-tel", "a-pin", "a-emp"]) { $(x).removeAttribute("aria-invalid"); } if (id) { $(id).setAttribute("aria-invalid", "true"); $(id).focus(); } }
+// Aviso en directo: de un NIF solo cuentan los 6 primeros dígitos (las letras no cuentan); nada se corta sin decirlo
+function avisoNif() {
+  const v = limpia("a-nif"), dig = v.replace(/\D/g, ""), hay = /[A-Za-z]/.test(v);
+  let t = "";
+  if (v.length > 6 && dig.length >= 6) t = `Solo cuentan los 6 primeros dígitos del DNI o CIF: ${dig.slice(0, 6)}.` + (hay ? " Las letras no cuentan." : "");
+  else if (v.length > 6) t = "Son 6 caracteres: los 6 primeros dígitos de tu DNI o CIF.";
+  $("a-aviso").textContent = t;
+}
+$("a-nif").addEventListener("input", avisoNif);
+for (const id of ["a-nif", "a-tel", "a-pin", "a-emp"]) $(id).addEventListener("input", () => { $("a-err").textContent = ""; $(id).removeAttribute("aria-invalid"); }); // el aviso anterior se borra al corregir
+$("m-nif").onclick = () => modoAcceso(false); $("m-tel").onclick = () => modoAcceso(true);
+$("nif-letras").onclick = () => { $("a-nif").setAttribute("inputmode", "text"); $("nif-letras").hidden = true; $("a-nif").focus(); };
+modoAcceso(false);
+// Validación con mensajes propios (sin los avisos del navegador en inglés): dice qué falta y en qué campo
+function validaAcceso() {
+  const fallo = (id, msg) => { $("a-err").textContent = msg; marcaError(id); return false; };
+  if (!conPin) {
+    const v = limpia("a-nif"), dig = v.replace(/\D/g, "");
+    if (!v) return fallo("a-nif", "Escribe los 6 primeros dígitos de tu DNI o CIF (o tu contraseña personal).");
+    if (v.length < 6) return fallo("a-nif", `${6 - v.length === 1 ? "Falta 1 carácter" : "Faltan " + (6 - v.length) + " caracteres"}: son los 6 primeros dígitos de tu DNI o CIF.`);
+    if (v.length > 6 && dig.length < 6) return fallo("a-nif", "Formato incorrecto: escribe los 6 primeros dígitos de tu DNI o CIF, sin letras.");
+    return true;
+  }
+  if (!$("a-tel").value.trim()) return fallo("a-tel", "Escribe el teléfono con el que sueles contactar con nosotros.");
+  if (limpia("a-pin").length !== 6) return fallo("a-pin", $("a-pin").value ? "La contraseña tiene 6 letras o números." : "Escribe tu contraseña de 6 letras o números.");
+  if ($("a-emp").value.trim().length < 2) return fallo("a-emp", "Escribe el nombre de tu empresa.");
+  return true;
+}
 $("f-acceso").onsubmit = async (e) => {
   e.preventDefault(); $("a-err").textContent = "";
-  const body = conPin ? { telefono: $("a-tel").value, empresa: $("a-emp").value, pin: $("a-pin").value } : { nif: $("a-nif").value, ...(!$("l-emp").hidden && { empresa: $("a-emp").value }) };
+  if (!validaAcceso()) return;
+  const body = conPin ? { telefono: $("a-tel").value, empresa: $("a-emp").value, pin: $("a-pin").value } : { nif: limpia("a-nif"), ...(!$("l-emp").hidden && { empresa: $("a-emp").value }) };
   const r = await post("/api/acceso", body);
   const j = await r.json().catch(() => ({}));
-  if (j.necesitaNombre) { $("l-emp").hidden = false; $("a-emp").focus(); $("a-err").textContent = j.error; return; } // mismo NIF en varios negocios: pide el nombre
-  if (!r.ok) { const f = $("f-acceso"); f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); $("a-err").textContent = j.error || "No se pudo entrar."; $("a-pin").value = ""; $("a-nif").value = ""; return; }
-  $("f-acceso").reset(); entrar(j.cliente.nombre);
+  if (j.necesitaNombre) { $("l-emp").hidden = false; $("a-emp").required = true; $("a-emp").focus(); $("a-err").textContent = j.error; return; } // mismo NIF en varios negocios: pide el nombre
+  if (!r.ok) { const f = $("f-acceso"); f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); $("a-err").textContent = j.error || "No se pudo entrar."; $("a-pin").value = ""; $("a-nif").value = ""; $("a-aviso").textContent = ""; return; }
+  $("f-acceso").reset(); $("a-aviso").textContent = ""; entrar(j.cliente.nombre);
 };
 $("cambiar").onclick = () => { $("c-err").textContent = ""; $("c-ok").textContent = ""; $("f-codigo").reset(); $("m-codigo").hidden = false; $("c-nuevo").focus(); };
 $("c-cerrar").onclick = () => ($("m-codigo").hidden = true);
@@ -768,6 +809,7 @@ async function abrirCuenta(irAPedidos) {
   B.appendChild(corr);
   // Avisos en este móvil (notificaciones)
   const avisosCaja = nodo("div"); B.appendChild(avisosCaja); pintarAvisos(avisosCaja).catch(() => { avisosCaja.textContent = ""; });
+  const cs = nodo("button", "Cerrar sesión", "vm-btn ghost cu-salir"); cs.type = "button"; cs.onclick = () => { $("m-cuenta").hidden = true; cerrarSesion(); }; B.appendChild(cs);
   // Mis pedidos, por meses
   const tp = nodo("h3", "Mis pedidos", "cu-tit"); tp.id = "cu-pedidos"; B.appendChild(tp);
   if (!j.pedidos.length) B.appendChild(estadoVacio({ icono: "reloj", titulo: "Aún no tienes pedidos", texto: "Cuando hagas uno, aparecerá aquí para repetirlo cuando quieras.", boton: "Hacer pedido", onclick: () => { $("m-cuenta").hidden = true; enviar("h:open", "Hacer pedido"); } })); 
@@ -834,9 +876,10 @@ $("d-confirmar").onclick = async () => {
   const r = await post("/api/eliminar-cuenta", { confirmo: $("d-eliminar").value });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { $("d-err2").textContent = j.error || "No se pudo eliminar la cuenta."; return; }
-  $("m-datos").hidden = true; $("d-eliminar").value = ""; chat.innerHTML = ""; modoAcceso(true); ver("acceso"); $("a-ok").textContent = "Tu cuenta se ha eliminado. Gracias por haber sido cliente.";
+  $("m-datos").hidden = true; $("d-eliminar").value = ""; chat.innerHTML = ""; modoAcceso(false); ver("acceso"); $("a-ok").textContent = "Tu cuenta se ha eliminado. Gracias por haber sido cliente.";
 };
-$("salir").onclick = async () => { await post("/api/salir", {}); chat.innerHTML = ""; modoAcceso(true); ver("acceso"); };
+async function cerrarSesion() { await post("/api/salir", {}); chat.innerHTML = ""; modoAcceso(false); ver("acceso"); }
+$("salir").onclick = cerrarSesion;
 
 const hora = () => new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 function burbuja(texto, clase) {
@@ -1076,8 +1119,9 @@ $("f").onsubmit = (e) => { e.preventDefault(); const v = $("t").value.trim(); if
 function entrar(nombre) { $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
 
 (async () => {
-  const r = await fetch("/api/yo");
-  if (r.ok) entrar((await r.json()).cliente.nombre); else ver("acceso");
+  const r = await fetch("/api/yo").catch(() => null);
+  const j = r && r.ok ? await r.json().catch(() => null) : null; // sin sesión responde 200 con cliente nulo (invitado)
+  if (j && j.cliente) entrar(j.cliente.nombre); else ver("acceso");
 })();
 </script>
 <script>

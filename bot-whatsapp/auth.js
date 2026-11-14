@@ -14,7 +14,7 @@ const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache
 /** Límite de intentos en memoria: máximo `max` por `windowMs` para cada clave. */
 export function rateLimiter(max, windowMs) {
   const hits = new Map();
-  return (key, now = Date.now()) => {
+  const f = (key, now = Date.now()) => {
     const list = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
     if (list.length >= max) {
       hits.set(key, list);
@@ -25,6 +25,14 @@ export function rateLimiter(max, windowMs) {
     if (hits.size > 5000) for (const [k, v] of hits) if (!v.some((t) => now - t < windowMs)) hits.delete(k);
     return true;
   };
+  /** Milisegundos que faltan para que se libere un intento de esa clave (0 si ya puede). */
+  f.espera = (key, now = Date.now()) => { const l = (hits.get(key) ?? []).filter((t) => now - t < windowMs); return l.length < max ? 0 : Math.max(0, l[0] + windowMs - now); };
+  return f;
+}
+/** Respuesta 429 que dice cuántos minutos hay que esperar. */
+function demasiados(res, limiter, key, aviso = "Demasiados intentos.") {
+  const min = Math.max(1, Math.ceil(limiter.espera(key) / 60_000));
+  return send(res, 429, { error: `${aviso} Prueba de nuevo en ${min} minuto${min === 1 ? "" : "s"}.`, esperaMinutos: min }, { "Retry-After": String(min * 60) });
 }
 
 const parseCookies = (header) =>
@@ -95,7 +103,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (!p.startsWith("/api/")) return false;
 
     if (p === "/api/registro" && req.method === "POST") {
-      if (!registerLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+      if (!registerLimit(ip(req))) return demasiados(res, registerLimit, ip(req)), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       const empresa = String(b.empresa ?? "").trim().replace(/\s+/g, " ");
@@ -124,14 +132,14 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     }
 
     if (p === "/api/acceso" && req.method === "POST") {
-      if (!loginLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+      if (!loginLimit(ip(req))) return demasiados(res, loginLimit, ip(req)), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       const empresa = String(b.empresa ?? "").slice(0, 80);
       // Cliente habitual: solo los 6 primeros dígitos del DNI/CIF (el nombre es opcional: si se envía, estrecha la búsqueda)
       if (b.nif !== undefined) {
         if (nifCodes(b.nif).length === 0 && !validCode(b.nif)) return send(res, 400, { error: "Escribe los 6 primeros dígitos de tu DNI o CIF." }), true; // o el PIN personal
-        if (!nifLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+        if (!nifLimit(ip(req))) return demasiados(res, nifLimit, ip(req)), true;
         // ¿Es el código personal que el cliente puso en lugar del NIF? (si es así, no hace falta nada más)
         if (validCode(b.nif)) {
           const own = accounts.loginByCode(codeKey(b.nif));
@@ -145,8 +153,8 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         const ids = customers.findByNif(b.nif).filter((id) => (!nombre || nombre.has(id)) && !accounts.hasOwnCode(id)); // con código personal, el NIF ya no vale
         // Si nadie coincide no hay cuenta a la que anotar el fallo: se cuenta en conjunto y, si hay demasiados, se frena a todo el mundo un rato
         if (!ids.length) {
-          if (!nifGlobalFails("fallos")) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde o llama a la empresa." }), true;
-          return send(res, 401, { error: "Ese NIF no consta entre los clientes habituales. Si eres un cliente nuevo, solicita el alta (más abajo); si ya lo eres, llámanos." }), true;
+          if (!nifGlobalFails("fallos")) return demasiados(res, nifGlobalFails, "fallos", "Demasiados intentos. Si lo necesitas, llama a la empresa."), true;
+          return send(res, 401, { error: "No encontramos ese NIF ni esa contraseña entre los clientes habituales. Revisa los 6 primeros dígitos de tu DNI o CIF. Si eres cliente nuevo, solicita el alta (más abajo); si ya lo eres, llámanos." }), true;
         }
         // Varios negocios con el mismo NIF (p. ej. un mismo titular con dos locales): se pide además el nombre, sin anotar fallo
         if (ids.length > 1 && !nombre) return send(res, 409, { necesitaNombre: true, error: "Hay varios negocios con ese NIF. Escribe también el nombre de tu empresa." }), true;
@@ -177,7 +185,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
 
     if (p === "/api/yo" && req.method === "GET") {
       const acc = sessionOf(req);
-      if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
+      if (!acc) return send(res, 200, { cliente: null }), true; // invitado: sin sesión no es un error (la consola del navegador queda limpia)
       return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode } }), true;
     }
 
@@ -185,7 +193,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (p === "/api/codigo" && req.method === "POST") {
       const acc = sessionOf(req);
       if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
-      if (!loginLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+      if (!loginLimit(ip(req))) return demasiados(res, loginLimit, ip(req)), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       if (!validCode(b.nuevo)) return send(res, 400, { error: "La contraseña debe tener exactamente 6 letras o números." }), true;
@@ -209,7 +217,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (p === "/api/mis-datos" && req.method === "GET") {
       const acc = sessionOf(req);
       if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
-      if (!loginLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+      if (!loginLimit(ip(req))) return demasiados(res, loginLimit, ip(req)), true;
       const datos = misDatos ? misDatos(acc) : { cuenta: { telefono: acc.phone, correo: acc.email } };
       const fecha = new Date().toISOString().slice(0, 10);
       return send(res, 200, datos, { "Content-Disposition": `attachment; filename="mis-datos-${fecha}.json"` }), true;
@@ -218,7 +226,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (p === "/api/derechos" && req.method === "POST") {
       const acc = sessionOf(req);
       if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
-      if (!registerLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+      if (!registerLimit(ip(req))) return demasiados(res, registerLimit, ip(req)), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       const r = accounts.addRightsRequest({ customerId: acc.customerId, tipo: b.tipo, texto: b.texto });
@@ -229,7 +237,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (p === "/api/eliminar-cuenta" && req.method === "POST") {
       const acc = sessionOf(req);
       if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
-      if (!loginLimit(ip(req))) return send(res, 429, { error: "Demasiados intentos. Prueba más tarde." }), true;
+      if (!loginLimit(ip(req))) return demasiados(res, loginLimit, ip(req)), true;
       const b = await readJson(req);
       if (!b || String(b.confirmo ?? "").trim().toUpperCase() !== "ELIMINAR") return send(res, 400, { error: "Para eliminar la cuenta escribe ELIMINAR." }), true;
       const r = accounts.deleteAccount(acc.id);

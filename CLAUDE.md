@@ -99,3 +99,8 @@ Barra de 5 pestañas fija abajo: **Inicio** (vuelve al chat `/cliente`), **Catá
 - **Esqueletos de carga** (clase `.sk`, brillo suave): filas del catálogo (ya en el HTML, se quitan al pintar la lista), tarjetas del Inicio y Mi cuenta.
 - **La foto vuela al carrito** (`volarAlCarrito`, 400 ms): al añadir por primera vez un artículo, su miniatura viaja a la pestaña Pedido (o al panel de la derecha en ordenador).
 - **Botón «Confirmar pedido»** con estados: rueda «Enviando…», tick verde «Pedido enviado» (650 ms) y, si falla, sacudida + «Reintentar».
+
+## Pantalla de acceso (tanda 1 de fallos)
+- Dos opciones visibles arriba del formulario: **«Entrar con mi NIF»** (por defecto: los clientes habituales entran así) y «Teléfono y contraseña». El campo del NIF acepta los 6 primeros dígitos del DNI/CIF **o la contraseña personal de 6 letras o números** (por eso admite letras; teclado numérico con «Mi contraseña tiene letras» para cambiar). Si se escribe de más, avisa: «Solo cuentan los 6 primeros dígitos del DNI o CIF: 818181» (las letras no cuentan); nada se corta en silencio.
+- Validación propia en español (`novalidate`): dice qué falta y en qué campo; «formato incorrecto» (cliente) se distingue de «No encontramos ese NIF ni esa contraseña» (servidor). El error se borra al editar.
+- 429 «Demasiados intentos»: dice los minutos que hay que esperar (`demasiados()` en `auth.js`, cabecera `Retry-After`). `/api/yo` sin sesión responde 200 con `cliente: null`. «Cerrar sesión» también está en Mi cuenta.
