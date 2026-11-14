@@ -1136,6 +1136,44 @@ test("ENLACES PARA PERSONAS NUEVAS: alta con su nombre, ver sin pedir y pedir co
   const lista = (await call("GET", "/api/admin/invitaciones", { admin: true })).json.enlaces; const la = lista.find((x) => x.tipo === "alta" && x.nombre === "Bar Nuevo Alta"); assert.ok(la); assert.equal(la.estado, "activo");
 });
 
+test("ESTADÍSTICAS: no cuentan los pedidos de prueba (nombre o NIF 818181), el reinicio no borra nada, el «en directo» sale del latido y hay patrones por cliente", async () => {
+  const est = async (q = "rango=todo") => (await call("GET", "/api/admin/estadisticas?" + q, { admin: true })).json;
+  assert.ok([401, 403].includes((await call("GET", "/api/admin/estadisticas?rango=todo")).status)); // sin la clave de la oficina, nada
+  const A = cookieOf(await entrarNif("111111")), antes = (await est()).resumen.actual.pedidos, excl0 = (await est()).excluidos;
+  const ra = await call("POST", "/catalogo", { cookie: A, body: { key: "estad-a-1", lines: [{ id: "1010", qty: 2, unit: "ud" }] } }); assert.equal(ra.status, 200, JSON.stringify(ra.json));
+  let d = await est(); assert.equal(d.resumen.actual.pedidos, antes + 1); assert.ok(d.resumen.actual.importe > 0); assert.equal(d.excluidos, excl0);
+  assert.ok(d.ranking.porUnidades.length >= 1 && d.ranking.porImporte.length >= 1); assert.equal(d.horas.reduce((a, b) => a + b, 0), d.resumen.actual.pedidos); assert.equal(d.calor.flat().reduce((a, b) => a + b, 0), d.resumen.actual.pedidos);
+  // dos clientes de prueba: uno por su NIF (818181), otro por su nombre (sin mayúsculas ni tildes); sus pedidos no cuentan y se anotan como excluidos
+  const alta = (b) => call("POST", "/api/admin/clientes/nuevo", { admin: true, body: b });
+  assert.equal((await alta({ nombre: "Cuenta de pruebas", nif: "81818123A", telefono: "600818181", direccion: "Calle Prueba 1", poblacion: "Medina del Campo" })).status, 200);
+  assert.equal((await alta({ nombre: "enrique MARTIN gallego", nif: "99999912B", telefono: "600999912", direccion: "Calle Prueba 2", poblacion: "Medina del Campo" })).status, 200);
+  const T1 = cookieOf(await entrarNif("818181")), T2 = cookieOf(await entrarNif("999999"));
+  for (const [c, k] of [[T1, "estad-t1"], [T2, "estad-t2"]]) { const r = await call("POST", "/catalogo", { cookie: c, body: { key: k, lines: [{ id: "1010", qty: 5, unit: "ud" }] } }); assert.equal(r.status, 200, JSON.stringify(r.json)); }
+  d = await est(); assert.equal(d.resumen.actual.pedidos, antes + 1); assert.equal(d.excluidos, excl0 + 2); // los dos de prueba, fuera
+  // en directo: solo cuenta lo que llega con sesión, con 2 minutos de vida, y no cuenta a los de prueba
+  assert.equal((await call("POST", "/api/latido", { body: { pantalla: "catalogo", lineas: 3 } })).status, 204); // sin sesión: se ignora
+  assert.equal((await call("POST", "/api/latido", { cookie: A, body: { pantalla: "catalogo", lineas: 3 } })).status, 204);
+  assert.equal((await call("POST", "/api/latido", { cookie: T1, body: { pantalla: "catalogo", lineas: 9 } })).status, 204);
+  const v = (await call("GET", "/api/admin/estadisticas/vivo", { admin: true })).json; assert.equal(v.viendo, 1); assert.equal(v.conCarrito, 1); assert.equal(v.lineas, 3); assert.deepEqual(Object.keys(v.personas[0]).sort(), ["hace", "id", "lineas", "nombre", "pantalla"]);
+  // patrones del cliente
+  const id = (await call("GET", "/api/admin/pedidos", { admin: true })).json.find((o) => o.referencia === ra.json.ref || o.ref === ra.json.ref)?.codigo; assert.ok(id);
+  const pc = (await call("GET", `/api/admin/estadisticas/cliente?id=${id}`, { admin: true })).json; assert.ok(pc.pedidos >= 1); assert.ok(pc.frecuentes.length >= 1); assert.equal((await call("GET", "/api/admin/estadisticas/cliente?id=../x", { admin: true })).status, 400);
+  // reinicio: solo anota la fecha; los pedidos siguen; se puede deshacer
+  const nPed = (await call("GET", "/api/admin/pedidos", { admin: true })).json.length;
+  assert.equal((await call("POST", "/api/admin/estadisticas/reiniciar", { admin: true, body: {} })).status, 400); // sin confirmar no hace nada
+  assert.equal((await est()).desdeRecuento, null);
+  assert.equal((await call("POST", "/api/admin/estadisticas/reiniciar", { admin: true, body: { confirmo: true } })).status, 200);
+  d = await est(); assert.ok(d.desdeRecuento); assert.equal(d.resumen.actual.pedidos, 0); assert.equal(d.sePuedeDeshacer, true);
+  assert.equal((await call("GET", "/api/admin/pedidos", { admin: true })).json.length, nPed); // NO se borró ningún pedido
+  assert.equal((await call("POST", "/api/admin/estadisticas/deshacer", { admin: true, body: {} })).status, 200);
+  d = await est(); assert.equal(d.desdeRecuento, null); assert.equal(d.resumen.actual.pedidos, antes + 1);
+  assert.equal((await call("POST", "/api/admin/estadisticas/deshacer", { admin: true, body: {} })).status, 409); // ya no hay nada que deshacer
+  // lista de excluidos configurable, con validación
+  assert.equal((await call("POST", "/api/admin/estadisticas/excluidos", { admin: true, body: { nombres: ["ab"] } })).status, 400);
+  assert.equal((await call("POST", "/api/admin/estadisticas/excluidos", { admin: true, body: { nombres: ["PABLO MARTÍN CASTAÑEDA", "ENRIQUE MARTÍN GALLEGO"], nifs: ["818181"], codigos: [] } })).status, 200);
+  assert.equal((await call("GET", "/api/admin/estadisticas?rango=nada", { admin: true })).status, 400); assert.equal((await call("GET", "/api/admin/estadisticas?rango=custom&desde=2026-02-01&hasta=2026-01-01", { admin: true })).status, 400);
+});
+
 test("BENCH 10: enlace de invitación de la oficina: un solo uso, caduca, se guarda solo su huella y entra como ESE cliente", async () => {
   const lista = (await call("GET", "/api/admin/clientes?q=ejemplo", { admin: true })).json; assert.ok(lista.length >= 1);
   const id = lista[0].id;

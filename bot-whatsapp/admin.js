@@ -1,6 +1,7 @@
 // Rutas HTTP de la EMPRESA (el empresario): pedidos recibidos y su exportación a Excel, solicitudes de alta de
 // clientes y cuentas. Es una aplicación aparte de la del cliente: todo va bajo /api/admin y exige la clave de la empresa.
 import { deliveryInfo, madridDay } from "./delivery.js";
+import { leerExcluidos, resolverExcluidos, excluidosValidos, prepararPedidos, rangoDe, calcular, atrasados, patronesCliente } from "./estadisticas.js";
 import { opcionesInvitacion, plantillaValida, textoWhatsapp, PLANTILLA_DEFECTO, PLANTILLA_ALTA, PLANTILLA_VER } from "./invitaciones.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -80,6 +81,7 @@ function vistaExcel(lista) {
 export function createAdmin({ sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "", catalogDb = null }) {
   const isAdmin = makeAdminCheck(adminToken);
   const avisos = crearAvisos({ accountsDb: accounts });
+  const estCache = new Map(); // estadísticas ya calculadas (se renuevan solas cuando cambian los pedidos)
   // ---- Artículos: precio, ofertas y la campana que avisa a los clientes ----
   const eurTxt = (n) => { let t = Number(n).toFixed(3).replace(/0$/, ""); return t.replace(".", ",") + " €"; };
   const fechaTxt = (f) => f.split("-").reverse().slice(0, 2).join("/");
@@ -338,6 +340,67 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       if (v.error) return send(res, 400, { error: v.error }), true;
       accounts.ajusteGuardar("plantilla_enlace", v.texto);
       return send(res, 200, { ok: true, plantilla: v.texto || PLANTILLA_DEFECTO }), true;
+    }
+    // ---- Estadísticas y patrones: se calcula aquí, se guarda unos segundos y solo LEE los pedidos (nunca cambia ni borra nada) ----
+    if (p.startsWith("/api/admin/estadisticas")) {
+      const ahora = new Date().toISOString(), hoy = madridDay(ahora), recuento = () => accounts.ajuste("stats_desde") || null;
+      const exCfg = leerExcluidos(accounts), rev = orders.ordersRevision(), exK = JSON.stringify(exCfg) + "|" + rev;
+      let exRes = estCache.get("ex"); // quién es de prueba: se vuelve a resolver cuando entra, cambia o se cancela un pedido o cuando se cambia la lista
+      if (!exRes || exRes.k !== exK) estCache.set("ex", (exRes = { k: exK, v: resolverExcluidos(exCfg, customers) }));
+      const esPruebaId = (id) => { // comprobación directa y barata para un cliente concreto (en directo, buscador)
+        const cid = String(id), nm = sinTildes(customers.getById(cid)?.name ?? "");
+        return exRes.v.ids.has(cid) || exCfg.codigos.includes(cid) || [...exRes.v.nombres].some((n) => nm.includes(n)) || exCfg.nifs.some((n) => { try { return customers.checkNif?.(cid, n); } catch { return false; } });
+      };
+      const base = () => { // pedidos válidos desde el último reinicio, sin los de prueba (se vuelve a calcular solo si entra, cambia o se cancela algún pedido)
+        const rec = recuento(), k = `${rev}|${rec}|${exRes.k}`, b = estCache.get("base");
+        if (b && b.k === k) return b;
+        const prep = prepararPedidos(orders.ordersForStats(rec), exRes.v), nuevo = { k, rec, ...prep };
+        estCache.set("base", nuevo); estCache.delete("calc"); return nuevo;
+      };
+      const nombreDe = (id) => customers.getById(id)?.name ?? "Cliente " + id;
+      if (p === "/api/admin/estadisticas" && get) {
+        const q = Object.fromEntries(url.searchParams), b = base(), r = rangoDe(q, ahora, b.rec);
+        if (r.error) return send(res, 400, { error: r.error }), true;
+        const k = `${b.k}|${hoy}|${q.rango ?? "30d"}|${q.desde ?? ""}|${q.hasta ?? ""}`, calcCache = estCache.get("calc") ?? estCache.set("calc", new Map()).get("calc");
+        let v = calcCache.get(k);
+        if (!v) {
+          v = { ...calcular(b.validos, b.excluidos, r, (id) => { try { return catalogDb?.get(id) ?? null; } catch { return null; } }), atrasados: atrasados(b.validos, ahora), generado: ahora };
+          if (calcCache.size > 30) calcCache.clear(); calcCache.set(k, v);
+        }
+        return send(res, 200, { ...v, desdeRecuento: b.rec, sePuedeDeshacer: accounts.ajuste("stats_desde_prev") !== null, excluidosConfig: exCfg, totalPedidosContados: b.validos.length }), true;
+      }
+      if (p === "/api/admin/estadisticas/vivo" && get) {
+        const filas = accounts.presenciaAhora();
+        const personas = filas.filter((f) => !esPruebaId(f.customer_id))
+          .map((f) => ({ id: f.customer_id, nombre: nombreDe(f.customer_id), pantalla: f.pantalla, lineas: f.lineas, hace: Math.max(0, Math.round((Date.now() - Date.parse(f.at)) / 1000)) }));
+        return send(res, 200, { viendo: personas.length, conCarrito: personas.filter((x) => x.lineas > 0).length, lineas: personas.reduce((s, x) => s + x.lineas, 0), personas: personas.slice(0, 30), actualizado: ahora }), true;
+      }
+      if (p === "/api/admin/estadisticas/clientes" && get) { // buscador de cliente (los de prueba no salen)
+        const q = String(url.searchParams.get("q") ?? "").trim(); if (q.length < 2) return send(res, 200, []), true;
+        return send(res, 200, customers.search({ q, limit: 40 }).rows.filter((c) => !esPruebaId(c.id)).slice(0, 12).map((c) => ({ id: c.id, nombre: c.name, poblacion: c.city ?? "" }))), true;
+      }
+      if (p === "/api/admin/estadisticas/cliente" && get) {
+        const id = String(url.searchParams.get("id") ?? ""); if (!/^[\w-]{1,20}$/.test(id)) return send(res, 400, { error: "Cliente no válido." }), true;
+        const b = base();
+        return send(res, 200, { id, nombre: nombreDe(id), esPrueba: esPruebaId(id), desdeRecuento: b.rec, ...patronesCliente(b.validos.filter((o) => String(o.customer_id) === id), ahora) }), true;
+      }
+      if (p === "/api/admin/estadisticas/reiniciar" && post) { // NO borra nada: solo anota desde cuándo se cuenta
+        const body = (await readJson(req)) ?? {};
+        if (body.confirmo !== true) return send(res, 400, { error: "Falta la confirmación." }), true;
+        accounts.ajusteGuardar("stats_desde_prev", accounts.ajuste("stats_desde") ?? ""); accounts.ajusteGuardar("stats_desde", ahora);
+        estCache.delete("base"); estCache.delete("calc");
+        return send(res, 200, { ok: true, desde: ahora }), true;
+      }
+      if (p === "/api/admin/estadisticas/deshacer" && post) {
+        const prev = accounts.ajuste("stats_desde_prev"); if (prev === null) return send(res, 409, { error: "No hay ningún reinicio que deshacer." }), true;
+        accounts.ajusteGuardar("stats_desde", prev); accounts.ajusteBorrar("stats_desde_prev"); estCache.delete("base"); estCache.delete("calc");
+        return send(res, 200, { ok: true, desde: prev || null }), true;
+      }
+      if (p === "/api/admin/estadisticas/excluidos" && post) {
+        const v = excluidosValidos((await readJson(req)) ?? {}); if (v.error) return send(res, 400, { error: v.error }), true;
+        accounts.ajusteGuardar("stats_excluidos", JSON.stringify(v.excluidos)); estCache.delete("base"); estCache.delete("calc"); estCache.delete("ex");
+        return send(res, 200, { ok: true, excluidos: v.excluidos }), true;
+      }
     }
     // ---- Errores de la app del cliente (últimos 7 días): recuento por tipo, por cliente y por API ----
     if (p === "/api/admin/errores" && get) {

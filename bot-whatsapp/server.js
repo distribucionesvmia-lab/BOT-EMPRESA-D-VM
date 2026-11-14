@@ -46,6 +46,7 @@ import { empaquetar, estatico } from "./estaticos.js";
 import { avisarCortes, horaAviso } from "./avisocorte.js";
 import { zip as zipNode } from "./zip.js";
 import { limpiaError, navegadorCorto } from "./errores.js";
+const latidoLimite = rateLimiter(Number(process.env.LATIDO_LIMIT ?? 20), 60e3); // latidos por minuto y cliente (el normal es 1 cada 45 s)
 const errLimitCliente = rateLimiter(Number(process.env.ERR_LIMIT ?? 30), 3600e3), errLimitIp = rateLimiter(Number(process.env.ERR_LIMIT_IP ?? 60), 3600e3); // avisos de error por hora: por cliente y, sin sesión, por dirección
 import { puedeEditarPedido, plazoModificacion, longDate, weekday, addDays } from "./delivery.js";
 const DIAS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -821,6 +822,14 @@ async function appRoutes(req, res, url) {
     return void sendJson(res, 200, { ok: getAccountsDb().bienvenidaMarcar(account.customerId) });
   }
   // Registro de errores de la app: el navegador avisa de lo que falla. Responde siempre rápido y sin cuerpo; si el aviso no vale, se ignora (nunca estorba a la app).
+  if (p === "/api/latido" && req.method === "POST") { // el catálogo avisa cada ~45 s de que sigue abierto: solo pantalla y nº de líneas del carrito (la empresa lo ve en «Estadísticas», en directo)
+    if (!account) return void res.writeHead(204).end();
+    try {
+      const b = await readJson(req), cid = String(account.customerId);
+      if (b && latidoLimite(cid)) getAccountsDb().presenciaLatido(cid, { pantalla: String(b.pantalla ?? ""), lineas: Number.isInteger(b.lineas) ? b.lineas : 0 });
+    } catch { /* un latido perdido no importa */ }
+    return void res.writeHead(204).end();
+  }
   if (p === "/api/log-error" && req.method === "POST") {
     if (Number(req.headers["content-length"] ?? 0) > 4096) { req.resume(); return void res.writeHead(413).end(); }
     try {

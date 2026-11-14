@@ -180,6 +180,16 @@ const seleccionExportacion = (refs) => {
       for (const r of db.prepare("SELECT customer_id, created_at FROM orders WHERE customer_id IS NOT NULL AND status != 'cancelled'").all()) { const d = madridDay(r.created_at); (m.get(r.customer_id) ?? m.set(r.customer_id, []).get(r.customer_id)).push(d); }
       return m;
     },
+    /** Para las estadísticas: pedidos no cancelados desde una fecha (o todos) con sus líneas, en dos consultas. Solo lee. */
+    ordersForStats(sinceIso = null) {
+      const w = sinceIso ? " AND created_at >= ?" : "", args = sinceIso ? [sinceIso] : [];
+      const rows = db.prepare("SELECT id, ref, customer_id, phone, name, re, created_at FROM orders WHERE status != 'cancelled'" + w + " ORDER BY created_at, id").all(...args);
+      const byId = new Map(rows.map((r) => [r.id, { ...r, re: !!r.re, items: [] }]));
+      for (const l of db.prepare("SELECT l.order_id, l.product_id AS id, l.name, l.price, l.qty, l.unit, l.boxes, l.units, l.discount, l.vat_rate, l.amount FROM order_lines l JOIN orders o ON o.id = l.order_id WHERE o.status != 'cancelled'" + w.replace("created_at", "o.created_at") + " ORDER BY l.id").all(...args)) byId.get(l.order_id)?.items.push(l);
+      return [...byId.values()];
+    },
+    /** Cambia cuando entra, se modifica o se cancela un pedido: sirve para saber si las estadísticas guardadas siguen valiendo. */
+    ordersRevision() { const r = db.prepare("SELECT COUNT(*) AS n, MAX(id) AS m, MAX(COALESCE(modified_at, '')) AS x, SUM(status = 'cancelled') AS c FROM orders").get(); return `${r.n}:${r.m}:${r.x}:${r.c ?? 0}`; },
     getOrderByRef: (ref) => withLines(db.prepare("SELECT * FROM orders WHERE ref = ?").get(String(ref))) ?? null,
     /** Sustituye el contenido de un pedido pendiente (el cliente lo modifica): mismo número de pedido, sin duplicados, marcado como modificado. null si ya no está pendiente. */
     replaceOrder(ref, o, now = new Date().toISOString()) {

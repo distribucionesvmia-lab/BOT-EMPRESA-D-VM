@@ -3023,6 +3023,11 @@ const copiaCat = (() => {
   const tx = async (modo, fn) => { const db = await abre(); return new Promise((ok, ko) => { const t = db.transaction("datos", modo), r = fn(t.objectStore("datos")); t.oncomplete = () => { db.close(); ok(r && r.result); }; t.onerror = t.onabort = () => { db.close(); ko(t.error); }; }); };
   return { leer: () => (nada ? Promise.resolve(null) : tx("readonly", (s) => s.get("ultimo"))), guardar: (o) => (nada ? Promise.resolve() : tx("readwrite", (s) => s.put(o, "ultimo"))), borrar: () => (nada ? Promise.resolve() : tx("readwrite", (s) => s.delete("ultimo"))) };
 })();
+// Latido para «Estadísticas» de la empresa («en directo»): cada 45 s y solo con la pantalla a la vista. Manda únicamente la pantalla y el nº de líneas del carrito (sin precios ni datos personales; el cliente sale de la sesión).
+(() => {
+  const latido = () => { try { if (document.hidden || navigator.onLine === false || typeof data === "undefined" || !data || !data.customer) return; fetch("/api/latido", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pantalla: $("resumen").hidden ? "catalogo" : "resumen", lineas: lines().length }) }).catch(() => {}); } catch {} };
+  setInterval(latido, 45000); document.addEventListener("visibilitychange", () => { if (!document.hidden) latido(); }); setTimeout(latido, 4000);
+})();
 let huboCorte = false; // se perdió la cobertura en algún momento: los precios en pantalla pueden ser viejos
 const clavePend = () => "vm_pend_" + clave();
 const pendienteGuardado = () => { try { return JSON.parse(localStorage.getItem(clavePend()) || "null"); } catch { return null; } };

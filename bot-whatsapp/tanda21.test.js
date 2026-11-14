@@ -43,7 +43,7 @@ test("4. lo que no carga se dice y se ofrece «Reintentar» (nada de .catch(() =
   for (const t of ["No hemos podido cargar tu pedido fijo.", "No hemos podido calcular hasta cuándo podrás modificarlo."]) assert.ok(p.includes(t), t);
   assert.match(c, /function falloCarga\(caja, texto, reintentar\)/); assert.match(p, /function falloCarga\(caja, texto, reintentar\)/);
   const mudos = (c.match(/catch\(\(\) => \{\}\)/g) ?? []).length + (p.match(/catch\(\(\) => \{\}\)/g) ?? []).length;
-  assert.ok(mudos <= 5, "solo quedan los que no tienen nada que enseñar (telemetría, instalar app, service worker, y las 2 de la copia de precios del móvil, que es un extra): " + mudos);
+  assert.ok(mudos <= 6, "solo quedan los que no tienen nada que enseñar (telemetría y latido, instalar app, service worker, y las 2 de la copia de precios del móvil, que es un extra): " + mudos);
 });
 test("5. las fotos de las listas llevan width y height fijos (la lista no salta)", () => {
   const p = leer("./pedido.html"), c = leer("./cliente.html");

@@ -116,6 +116,7 @@
   #app > .tabs .tab[data-t="solicitudes"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M19 8v6M22 11h-6'/></svg>"); }
   #app > .tabs .tab[data-t="cuentas"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'/></svg>"); }
   #app > .tabs .tab[data-t="articulos"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m21 8-9-5-9 5 9 5z'/><path d='M3 8v8l9 5 9-5V8'/><path d='M12 13v8'/></svg>"); }
+  #app > .tabs .tab[data-t="estadisticas"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3v18h18'/><path d='M7 15v3M12 9v9M17 5v13'/></svg>"); }
   #app > .tabs .tab[data-t="avisos"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9'/><path d='M13.7 21a2 2 0 0 1-3.4 0'/></svg>"); }
   #app > .tabs .tab[data-t="datos"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><ellipse cx='12' cy='5' rx='9' ry='3'/><path d='M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5'/><path d='M3 12c0 1.7 4 3 9 3s9-1.3 9-3'/></svg>"); }
   button.tab[aria-selected="true"]:hover:not(:disabled) { background:var(--accent); border-color:var(--accent); color:var(--accent-fg); } /* la pestaña elegida no se aclara al pasar el ratón */
@@ -128,6 +129,49 @@
   .filtros input { width:100%; min-width:0; height:40px; } .filtros button { height:40px; white-space:nowrap; }
   @media (max-width: 1099px) { .filtros { grid-template-columns:repeat(4, minmax(0, 1fr)); } .filtros .campo-cliente { grid-column:1 / -1; } .filtros button { grid-column:1 / -1; } }
   @media (max-width: 640px) { .filtros { grid-template-columns:repeat(2, minmax(0, 1fr)); } .filtros .campo > span { white-space:normal; line-height:15px; min-height:30px; display:flex; align-items:flex-end; } }
+  /* ═════════ Estadísticas y patrones ═════════ */
+  .est { display:grid; gap:16px; align-content:start; grid-template-columns:minmax(0, 1fr); }
+  .est-cab { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:flex-end; justify-content:space-between; } .est-t { font-size:22px; text-transform:none; letter-spacing:-.02em; color:var(--fg); margin:0 0 2px; font-weight:800; }
+  .est-filtros { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; }
+  .seg { display:inline-flex; flex-wrap:wrap; gap:2px; padding:3px; border-radius:10px; background:var(--th); border:1px solid var(--line); } .seg button { min-height:32px; padding:0 12px; border:0; background:transparent; border-radius:8px; font-weight:600; color:var(--muted); box-shadow:none; transition:background .2s, color .2s; }
+  .seg button:hover:not(:disabled) { background:var(--hover); color:var(--fg); border:0; } .seg button.on, .seg button.on:hover { background:var(--panel); color:var(--accent); box-shadow:0 1px 2px rgba(15,23,42,.12); } .seg-s button { min-height:28px; padding:0 10px; font-size:12.5px; }
+  .est-custom { display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; } .est-custom .campo { display:grid; gap:4px; font-size:12px; font-weight:600; color:var(--muted); } .est-custom input { height:36px; min-height:36px; }
+  .est-banda { display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; padding:10px 14px; background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); }
+  .est-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:999px; background:var(--th); border:1px solid var(--line); font-size:12.5px; font-weight:600; } .est-acc { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; } .est-acc button { min-height:34px; }
+  .est-vacio { margin:0; text-align:center; padding:26px; color:var(--muted); font-size:15px; }
+  .est-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:14px; }
+  .kpi { background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); padding:16px 18px; display:grid; gap:4px; position:relative; overflow:hidden; } .kpi::before { content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent); opacity:.85; }
+  .kpi small { font-size:11.5px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); } .kpi b { font-size:30px; line-height:1.1; letter-spacing:-.02em; font-variant-numeric:tabular-nums; font-weight:800; }
+  .var { display:inline-flex; width:fit-content; align-items:center; gap:4px; padding:2px 9px; border-radius:999px; font-size:12px; font-weight:700; background:var(--th); color:var(--muted); } .var.sube { background:var(--ok); color:var(--ok-fg); } .var.baja { background:var(--hold); color:var(--hold-fg); }
+  .est .panel { padding:18px 20px; } .est-sec { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; justify-content:space-between; margin-bottom:12px; } .est-sec h2 { margin:0; }
+  .est-g2 { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; } .est-g2 > .panel { min-width:0; }
+  .est-vivo-cab { display:flex; justify-content:space-between; align-items:center; gap:10px; } .est-vivo-cab h2 { margin:0; display:flex; align-items:center; gap:10px; }
+  .late { width:10px; height:10px; border-radius:50%; background:var(--accent); position:relative; display:inline-block; } .late::after { content:""; position:absolute; inset:0; border-radius:50%; background:var(--accent); animation:late 1.6s ease-out infinite; } @keyframes late { 0% { transform:scale(1); opacity:.55; } 100% { transform:scale(3); opacity:0; } }
+  .est-vivo-num { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px 22px; margin:12px 0; } .est-vivo-num > div { display:grid; } .est-vivo-num b { font-size:34px; line-height:1.05; font-variant-numeric:tabular-nums; font-weight:800; } .est-vivo-num span { color:var(--muted); font-size:13px; }
+  .est-vivo-num b.pop { animation:pop .35s ease-out; } @keyframes pop { 0% { transform:scale(1); } 40% { transform:scale(1.12); color:var(--accent); } 100% { transform:scale(1); } }
+  .est-vivo-lista { list-style:none; margin:0; padding:0; display:grid; gap:6px; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); } .est-vivo-lista li { display:flex; justify-content:space-between; gap:10px; padding:7px 12px; background:var(--th); border:1px solid var(--line); border-radius:9px; font-size:13px; } .est-vivo-lista li span { color:var(--muted); white-space:nowrap; }
+  .est-rank { list-style:none; margin:0; padding:0; display:grid; gap:10px; } .rk { display:grid; grid-template-columns:26px minmax(0, 1fr) auto; gap:10px; align-items:center; } .rk .pos { width:26px; height:26px; border-radius:8px; background:var(--soft); color:var(--accent); font-weight:800; font-size:12.5px; display:grid; place-items:center; }
+  .rk-main { min-width:0; display:grid; gap:5px; } .rk-main b { font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; } .rk-bar { height:6px; border-radius:99px; background:var(--th); overflow:hidden; } .rk-bar i { display:block; height:100%; width:0; border-radius:99px; background:linear-gradient(90deg, var(--accent-2), var(--accent)); transition:width .7s cubic-bezier(.2,.8,.2,1); } .on .rk-bar i, .on.cat-wrap .rk-bar i { width:var(--w); }
+  .rk-v { text-align:right; font-variant-numeric:tabular-nums; font-weight:700; font-size:13.5px; white-space:nowrap; } .rk-v small { display:block; color:var(--muted); font-weight:500; font-size:11.5px; }
+  .est-mas { margin-top:12px; width:100%; } .cat { border-top:1px solid var(--line-2); } .cat:first-child { border-top:0; } .cat > summary { list-style:none; display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:4px 10px; padding:10px 0; cursor:pointer; } .cat > summary::-webkit-details-marker { display:none; } .cat > summary b { font-weight:700; font-size:13.5px; } .cat > summary .rk-bar { grid-column:1 / -1; } .cat > summary::before { content:"▸"; color:var(--muted); margin-right:6px; } .cat[open] > summary::before { content:"▾"; }
+  .cat > summary { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; } .cat > summary b { flex:1; min-width:0; } .cat > summary .rk-bar { flex-basis:100%; } .cat > summary::before { margin-right:0; flex:none; width:12px; }
+  .est .campo { display:grid; gap:5px; font-size:12px; font-weight:600; color:var(--muted); min-width:0; } .est .campo input, .est .campo textarea { width:100%; max-width:100%; font-weight:400; color:var(--fg); } .est-vivo-lista li.muted { grid-column:1 / -1; background:transparent; border-style:dashed; }
+  .cat .subs { display:grid; gap:8px; padding:2px 0 12px 16px; } .sub { display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:3px 10px; font-size:13px; } .sub .rk-bar { grid-column:1 / -1; height:4px; }
+  .est-svg { width:100%; height:auto; display:block; } .est-svg text { fill:var(--muted); font-size:11px; font-family:inherit; } .est-svg .grid { stroke:var(--line-2); stroke-width:1; } .est-svg .b { fill:var(--accent); transform-box:fill-box; transform-origin:50% 100%; transform:scaleY(0); transition:transform .6s cubic-bezier(.2,.8,.2,1), opacity .15s; opacity:.9; } .est-svg .b.on { transform:scaleY(1); } .est-svg .b:hover, .est-svg .b:focus { opacity:1; outline:none; fill:var(--accent-2); } .est-svg .b.pico { fill:var(--accent-2); }
+  .heat { display:grid; grid-template-columns:34px repeat(24, minmax(0, 1fr)); gap:3px; align-items:center; font-size:11px; color:var(--muted); } .heat .c { aspect-ratio:1; min-height:11px; border-radius:3px; background:var(--th); transition:background .5s, transform .15s; } .heat .c:hover, .heat .c:focus { transform:scale(1.35); outline:2px solid var(--accent); z-index:2; } .heat .h { text-align:center; font-size:10px; } .heat .d { font-weight:700; }
+  .heat-leyenda { display:flex; align-items:center; gap:8px; margin-top:12px; font-size:12px; color:var(--muted); } .heat-leyenda i { width:120px; height:8px; border-radius:99px; background:linear-gradient(90deg, var(--th), var(--accent)); border:1px solid var(--line); }
+  .est-res { list-style:none; margin:8px 0 0; padding:0; display:grid; gap:4px; } .est-res button { width:100%; text-align:left; display:flex; justify-content:space-between; gap:8px; min-height:36px; } .est-res small { color:var(--muted); font-weight:500; }
+  .est-cli { margin-top:14px; display:grid; gap:14px; } .est-cli h3 { margin:0; font-size:18px; } .est-chips { display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; } .est-chips > div { background:var(--th); border:1px solid var(--line); border-radius:10px; padding:10px 12px; display:grid; gap:2px; } .est-chips small { color:var(--muted); font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; } .est-chips b { font-size:17px; font-variant-numeric:tabular-nums; }
+  .est-aviso { padding:10px 14px; border-radius:10px; background:var(--warn); color:var(--warn-fg); font-weight:600; font-size:13.5px; }
+  .est-tabla { width:100%; font-size:13px; } .est-tabla td, .est-tabla th { padding:8px 10px; } .est-tabla .num { text-align:right; }
+  .est-dlg { border:1px solid var(--line); border-radius:16px; padding:22px 24px; max-width:min(460px, calc(100vw - 32px)); background:var(--panel); color:var(--fg); box-shadow:0 24px 60px rgba(0,0,0,.35); } .est-dlg::backdrop { background:rgba(10,14,20,.55); backdrop-filter:blur(2px); } .est-dlg h3 { margin:0 0 8px; font-size:19px; } .est-dlg p { margin:0 0 8px; }
+  .est-tip { position:fixed; z-index:200; pointer-events:none; max-width:280px; padding:7px 11px; border-radius:8px; background:#0f1d2b; color:#fff; font-size:12.5px; line-height:1.35; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+  .est-sk { height:var(--h, 120px); border-radius:10px; background:linear-gradient(100deg, var(--th) 30%, var(--hover) 50%, var(--th) 70%); background-size:200% 100%; animation:brillo 1.3s linear infinite; } @keyframes brillo { to { background-position:-200% 0; } }
+  .est.cargando .kpi b, .est.cargando .est-vivo-num b { color:transparent; background:linear-gradient(100deg, var(--th) 30%, var(--hover) 50%, var(--th) 70%); background-size:200% 100%; animation:brillo 1.3s linear infinite; border-radius:8px; width:fit-content; min-width:70px; }
+  .est .refresca { opacity:.55; transition:opacity .25s; } .est .refresca-no { transition:opacity .35s; }
+  @media (max-width: 1099px) { .est-g2 { grid-template-columns:minmax(0, 1fr); } .est-acc { margin-left:0; } }
+  @media (max-width: 640px) { .kpi b { font-size:26px; } .est-t { font-size:19px; } .seg button { padding:0 9px; } .heat { grid-template-columns:28px repeat(24, minmax(0, 1fr)); gap:2px; } }
+  @media (prefers-reduced-motion: reduce) { .late::after { animation:none; opacity:0; } .rk-bar i, .est-svg .b, .heat .c { transition:none; } .est-sk, .est.cargando .kpi b, .est.cargando .est-vivo-num b { animation:none; } .est-vivo-num b.pop { animation:none; } }
   /* menos de 1100 px: pestañas en fila, deslizables */
   @media (max-width: 1099px) { #app > .tabs { flex-wrap:nowrap; overflow-x:auto; gap:6px; padding:12px 0; position:sticky; top:58px; z-index:20; background:var(--bg); } #app > .tabs .tab { white-space:nowrap; border-radius:999px; } #app > .tabs .tab::before { display:none; } #app { padding-top:0; } }
   @media (max-width: 640px) { .panel, .card { padding:16px; } .inv-grid { grid-template-columns:1fr; } }
@@ -149,6 +193,7 @@
       <button class="tab" role="tab" data-t="solicitudes" aria-selected="false">Solicitudes de alta <span class="n" id="n-sol" hidden></span></button>
       <button class="tab" role="tab" data-t="cuentas" aria-selected="false">Cuentas de clientes <span class="n" id="n-cue" hidden></span></button>
       <button class="tab" role="tab" data-t="articulos" aria-selected="false">Artículos</button>
+      <button class="tab" role="tab" data-t="estadisticas" aria-selected="false">Estadísticas y patrones</button>
       <button class="tab" role="tab" data-t="avisos" aria-selected="false">Avisos a clientes</button>
       <button class="tab" role="tab" data-t="datos" aria-selected="false">Datos y Excel <span class="n" id="n-dat" hidden></span></button>
     </div>
@@ -185,6 +230,83 @@
         <div class="scroll xl-hoja" style="margin-top:8px"><table class="xl" id="xl"></table></div>
       </div>
       <div class="panel" id="hist-panel" hidden style="margin-top:14px"><h2>Excel exportados</h2><div class="scroll"><table><tbody id="hist"></tbody></table></div></div>
+    </div>
+
+    <!-- Estadísticas y patrones -->
+    <div id="p-estadisticas" class="est" hidden>
+      <div class="est-cab">
+        <div><h2 class="est-t">Estadísticas y patrones</h2><p class="muted" id="est-sub" style="margin:0"></p></div>
+        <div class="est-filtros">
+          <div class="seg" role="group" aria-label="Periodo">
+            <button type="button" data-r="hoy">Hoy</button><button type="button" data-r="7d">7 días</button><button type="button" data-r="30d" class="on">30 días</button><button type="button" data-r="mes">Este mes</button><button type="button" data-r="todo">Todo</button><button type="button" data-r="custom">Personalizado</button>
+          </div>
+          <form id="est-custom" class="est-custom" hidden>
+            <label class="campo"><span>Desde</span><input type="date" id="est-d0" required></label>
+            <label class="campo"><span>Hasta</span><input type="date" id="est-d1" required></label>
+            <button class="main" type="submit">Aplicar</button>
+          </form>
+        </div>
+      </div>
+      <div class="est-banda" id="est-banda" role="status">
+        <span class="est-chip" id="est-desde">Contando todos los pedidos desde el principio</span>
+        <span class="est-chip" id="est-excl">Se excluyen 0 pedidos de prueba</span>
+        <span class="est-acc"><button type="button" id="est-deshacer" hidden>Deshacer reinicio</button><button type="button" id="est-reiniciar" class="peligro">Reiniciar estadísticas</button></span>
+      </div>
+      <p class="panel est-vacio" id="est-vacio" hidden></p>
+      <section class="est-kpis" id="est-kpis" aria-label="Cifras clave"></section>
+      <section class="panel est-vivo" aria-live="polite">
+        <div class="est-vivo-cab"><h2><span class="late" aria-hidden="true"></span>Ahora mismo, en directo</h2><span class="muted" id="est-vivo-hora"></span></div>
+        <div class="est-vivo-num">
+          <div><b id="est-v1">0</b><span>viendo el catálogo</span></div>
+          <div><b id="est-v2">0</b><span>con cosas en el carrito sin enviar</span></div>
+          <div><b id="est-v3">0</b><span>líneas en carritos</span></div>
+        </div>
+        <ul class="est-vivo-lista" id="est-vivo-lista"></ul>
+        <p class="muted" style="margin:8px 0 0;font-size:12.5px">Se cuenta a quien tiene el catálogo abierto y ha dado señales en los últimos 2 minutos.</p>
+      </section>
+      <div class="est-g2">
+        <section class="panel">
+          <div class="est-sec"><h2>Lo que más se compra</h2><div class="seg seg-s" role="group" aria-label="Ordenar por"><button type="button" data-m="uds" class="on">Cantidad</button><button type="button" data-m="eur">Importe</button></div></div>
+          <ol class="est-rank" id="est-rank"></ol><button type="button" id="est-mas" class="est-mas" hidden>Ver más artículos</button>
+        </section>
+        <section class="panel">
+          <div class="est-sec"><h2>Por categoría y subcategoría</h2></div>
+          <div id="est-cats"></div>
+        </section>
+      </div>
+      <div class="est-g2">
+        <section class="panel"><div class="est-sec"><h2>A qué hora se hacen más pedidos</h2><span class="muted" id="est-pico"></span></div><div id="est-horas"></div></section>
+        <section class="panel"><div class="est-sec"><h2>Mapa de calor: día × hora</h2></div><div id="est-calor"></div></section>
+      </div>
+      <div class="est-g2">
+        <section class="panel">
+          <div class="est-sec"><h2>Patrones de compra por cliente</h2></div>
+          <label class="campo"><span>Buscar cliente (nombre o código)</span><input id="est-q" type="search" autocomplete="off" placeholder="Escribe al menos 2 letras"></label>
+          <ul class="est-res" id="est-res"></ul>
+          <div id="est-cli" class="est-cli"><p class="muted" style="margin:10px 0 0">Elige un cliente para ver qué suele pedir, cada cuánto, qué día y a qué hora.</p></div>
+        </section>
+        <section class="panel">
+          <div class="est-sec"><h2>Llevan más tiempo de lo normal sin pedir</h2></div>
+          <div id="est-atr"></div>
+        </section>
+      </div>
+      <details class="panel" id="est-ajustes">
+        <summary class="alta-sum">Pedidos de prueba que no cuentan</summary>
+        <p class="muted" style="margin:0 0 10px">Los pedidos de estas personas, de estos clientes y del NIF indicado no entran nunca en las estadísticas (se compara sin mayúsculas ni tildes). Nunca se borran.</p>
+        <div class="inv-grid">
+          <label class="campo"><span>Nombres (uno por línea)</span><textarea id="est-ex-n" rows="4" maxlength="2000"></textarea></label>
+          <label class="campo"><span>NIF de prueba (6 primeros dígitos, separados por comas)</span><input id="est-ex-nif" type="text" maxlength="200"></label>
+          <label class="campo"><span>Códigos de cliente de prueba (separados por comas)</span><input id="est-ex-cod" type="text" maxlength="400"></label>
+        </div>
+        <div class="row" style="margin-top:10px"><button class="main" type="button" id="est-ex-g">Guardar lista</button><span class="muted" id="est-ex-msg" role="status"></span></div>
+      </details>
+      <dialog id="est-dlg" class="est-dlg" aria-labelledby="est-dlg-t">
+        <h3 id="est-dlg-t">¿Reiniciar las estadísticas?</h3>
+        <p>Las estadísticas empezarán a contar desde ahora. <b>Los pedidos NO se borran.</b></p>
+        <p class="muted" style="margin:0">Solo se guarda la fecha y hora de inicio del recuento. Podrás deshacerlo después con «Deshacer reinicio».</p>
+        <div class="row" style="margin-top:14px;justify-content:flex-end"><button type="button" id="est-dlg-no">Cancelar</button><button type="button" class="main" id="est-dlg-si">Reiniciar estadísticas</button></div>
+      </dialog>
+      <div id="est-tip" class="est-tip" role="tooltip" hidden></div>
     </div>
 
     <!-- Solicitudes -->
@@ -939,9 +1061,182 @@ async function avisos() {
 }
 async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
+// ═════════ Estadísticas y patrones ═════════
+const est = { rango: "30d", d0: "", d1: "", datos: null, modo: "uds", mas: false, timerVivo: 0, timerDatos: 0, cliente: null };
+const nf = new Intl.NumberFormat("es-ES"), nfd = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const sinMov = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const fechaMadrid = (iso) => new Date(iso).toLocaleString("es-ES", { timeZone: "Europe/Madrid", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const diaEs = (d) => String(d).split("-").reverse().join("/");
+const horaTxt = (h) => String(h).padStart(2, "0") + ":00";
+const fmtEst = { n: (v) => nf.format(Math.round(v)), eur: (v) => nfd.format(v) + " €" };
+const activo = (el_) => !!el_ && !$("p-estadisticas").hidden;
+/** Pone una cifra y, si el usuario no pide «reducir movimiento», la hace contar hasta su valor. */
+function contarHasta(nodo, valor, fmt = "n") {
+  const f = fmtEst[fmt]; cancelAnimationFrame(nodo._raf || 0); const fin = Number(valor) || 0;
+  if (sinMov() || !fin) { nodo.textContent = f(fin); return; }
+  const t0 = performance.now(), dur = 700;
+  const paso = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); nodo.textContent = f(fin * e); if (k < 1) nodo._raf = requestAnimationFrame(paso); else nodo.textContent = f(fin); };
+  nodo._raf = requestAnimationFrame(paso);
+}
+const creceEn = (cont) => { cont.classList.remove("on"); requestAnimationFrame(() => requestAnimationFrame(() => cont.classList.add("on"))); };
+const sk = (alto) => { const d = el("div", "", { className: "est-sk" }); d.style.setProperty("--h", alto + "px"); return d; };
+const NS = "http://www.w3.org/2000/svg", sv = (tag, attrs = {}) => { const n = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+
+// Tooltips: un solo globo para todo el panel (también con teclado)
+{ const tip = () => $("est-tip");
+  const poner = (t, x, y) => { const g = tip(); g.textContent = t; g.hidden = false; const w = g.offsetWidth, h = g.offsetHeight; g.style.left = Math.max(8, Math.min(innerWidth - w - 8, x + 14)) + "px"; g.style.top = Math.max(8, y - h - 12 < 8 ? y + 18 : y - h - 12) + "px"; };
+  document.addEventListener("mousemove", (e) => { const n = e.target.closest?.("[data-tip]"); if (n && activo(n)) poner(n.dataset.tip, e.clientX, e.clientY); else tip().hidden = true; });
+  document.addEventListener("focusin", (e) => { const n = e.target.closest?.("[data-tip]"); if (n && activo(n)) { const r = n.getBoundingClientRect(); poner(n.dataset.tip, r.left + r.width / 2, r.top); } });
+  document.addEventListener("focusout", () => { tip().hidden = true; }); document.addEventListener("scroll", () => { tip().hidden = true; }, true); }
+
+function estVar(nodo, v, hay) {
+  nodo.className = "var";
+  if (!hay) { nodo.textContent = "sin comparación"; return; }
+  if (v == null) { nodo.textContent = "antes: 0"; return; }
+  if (v === 0) { nodo.textContent = "= igual que antes"; return; }
+  nodo.classList.add(v > 0 ? "sube" : "baja"); nodo.textContent = `${v > 0 ? "▲" : "▼"} ${nfd.format(Math.abs(v))} % vs. periodo anterior`;
+}
+function estKpis(d) {
+  const cont = $("est-kpis"), a = d.resumen.actual, v = d.resumen.variacion, def = [["pedidos", "Pedidos", "n"], ["importe", "Importe total con IVA", "eur"], ["ticket", "Ticket medio", "eur"], ["clientes", "Clientes distintos", "n"], ["articulos", "Artículos vendidos", "n"]];
+  if (!cont.children.length) for (const [k, t] of def) { const c = el("article", "", { className: "kpi" }); c.append(el("small", t), el("b", "0", { id: "k-" + k }), el("span", "", { id: "kv-" + k })); cont.append(c); }
+  for (const [k, , fmt] of def) { contarHasta($("k-" + k), a[k], fmt); estVar($("kv-" + k), v ? v[k] : null, d.comparacion); }
+}
+function estRanking(d) {
+  const ul = $("est-rank"), eur_ = est.modo === "eur", lista = eur_ ? d.ranking.porImporte : d.ranking.porUnidades, tope = est.mas ? 30 : 10, ver = lista.slice(0, tope);
+  ul.replaceChildren(); $("est-mas").hidden = lista.length <= 10; $("est-mas").textContent = est.mas ? "Ver menos" : "Ver más artículos";
+  if (!lista.length) { ul.append(el("li", "Todavía no hay artículos vendidos en este periodo.", { className: "muted" })); return; }
+  const max = Math.max(...ver.map((x) => (eur_ ? x.importe : x.unidades)), 1);
+  ver.forEach((x, i) => {
+    const li = el("li", "", { className: "rk", tabIndex: 0 }); li.dataset.tip = `${x.nombre} · ${nf.format(x.unidades)} uds${x.cajas ? ` (${nf.format(x.cajas)} cajas)` : ""} · ${nfd.format(x.importe)} € sin IVA · en ${nf.format(x.pedidos)} pedidos`;
+    const barra = el("div", "", { className: "rk-bar" }), r = el("i"); r.style.setProperty("--w", ((eur_ ? x.importe : x.unidades) / max * 100).toFixed(1) + "%"); r.style.transitionDelay = i * 35 + "ms"; barra.append(r);
+    const m = el("div", "", { className: "rk-main" }); m.append(el("b", x.nombre), barra);
+    const v = el("span", "", { className: "rk-v" }); if (eur_) { v.append(document.createTextNode(nfd.format(x.importe) + " €"), el("small", `${nf.format(x.unidades)} uds`)); } else { v.append(document.createTextNode(`${nf.format(x.unidades)} uds`), el("small", x.cajas ? `${nf.format(x.cajas)} cajas` : "sueltas")); }
+    li.append(el("span", String(i + 1), { className: "pos" }), m, v); ul.append(li);
+  });
+  creceEn(ul);
+}
+function estCategorias(d) {
+  const box = $("est-cats"), eur_ = est.modo === "eur", val = (x) => (eur_ ? x.importe : x.unidades), txt = (x) => (eur_ ? nfd.format(x.importe) + " €" : nf.format(x.unidades) + " uds");
+  const abiertas = new Set([...box.querySelectorAll("details[open]")].map((x) => x.dataset.n)); box.replaceChildren();
+  if (!d.categorias.length) { box.append(el("p", "Todavía no hay ventas en este periodo.", { className: "muted" })); return; }
+  const cats = [...d.categorias].sort((a, b) => val(b) - val(a)), max = Math.max(...cats.map(val), 1), wrap = el("div", "", { className: "cat-wrap" });
+  for (const c of cats) {
+    const det = el("details", "", { className: "cat" }); det.dataset.n = c.nombre; if (abiertas.has(c.nombre)) det.open = true;
+    const sm = el("summary"); const barra = el("div", "", { className: "rk-bar" }), r = el("i"); r.style.setProperty("--w", (val(c) / max * 100).toFixed(1) + "%"); barra.append(r);
+    sm.append(el("b", c.nombre), el("span", txt(c), { className: "rk-v" }), barra); sm.dataset.tip = `${c.nombre} · ${nf.format(c.unidades)} uds · ${nfd.format(c.importe)} € sin IVA`;
+    const subs = el("div", "", { className: "subs" }), mx = Math.max(...c.subs.map(val), 1);
+    for (const s of [...c.subs].sort((a, b) => val(b) - val(a))) { const f = el("div", "", { className: "sub" }), br = el("div", "", { className: "rk-bar" }), i2 = el("i"); i2.style.setProperty("--w", (val(s) / mx * 100).toFixed(1) + "%"); br.append(i2); f.append(el("span", s.nombre), el("span", txt(s), { className: "rk-v" }), br); f.dataset.tip = `${c.nombre} › ${s.nombre} · ${nf.format(s.unidades)} uds · ${nfd.format(s.importe)} € sin IVA`; subs.append(f); }
+    det.append(sm, subs); wrap.append(det);
+  }
+  box.append(wrap); creceEn(wrap);
+}
+function estHoras(d) {
+  const box = $("est-horas"), W = 720, H = 210, L = 30, B = 24, T = 10, total = d.horas.reduce((a, b) => a + b, 0);
+  box.replaceChildren(); $("est-pico").textContent = d.horaPico == null ? "" : `Más pedidos: ${horaTxt(d.horaPico)}–${String(d.horaPico).padStart(2, "0")}:59`;
+  if (!total) { box.append(el("p", "Todavía no hay pedidos en este periodo.", { className: "muted" })); return; }
+  const max = Math.max(...d.horas), tope = Math.max(4, Math.ceil(max / 4) * 4), svg = sv("svg", { viewBox: `0 0 ${W} ${H}`, class: "est-svg", role: "img", "aria-label": "Pedidos por hora del día" });
+  for (let i = 0; i <= 4; i++) { const y = T + (H - B - T) * (1 - i / 4); svg.append(sv("line", { x1: L, x2: W, y1: y, y2: y, class: "grid" })); const t = sv("text", { x: L - 6, y: y + 4, "text-anchor": "end" }); t.textContent = String(Math.round(tope * i / 4)); svg.append(t); }
+  const ancho = (W - L) / 24;
+  d.horas.forEach((n, h) => {
+    const alto = (H - B - T) * (n / tope), x = L + h * ancho + 3, r = sv("rect", { x, y: H - B - alto, width: ancho - 6, height: Math.max(alto, n ? 2 : 0), rx: 4, class: "b" + (h === d.horaPico ? " pico" : ""), tabindex: 0 });
+    r.dataset.tip = `${horaTxt(h)}–${String(h).padStart(2, "0")}:59 · ${nf.format(n)} pedidos (${Math.round(n / total * 100)} %)`; r.style.transitionDelay = h * 18 + "ms"; svg.append(r);
+    if (h % 3 === 0) { const t = sv("text", { x: x + (ancho - 6) / 2, y: H - 6, "text-anchor": "middle" }); t.textContent = String(h).padStart(2, "0"); svg.append(t); }
+  });
+  box.append(svg); requestAnimationFrame(() => requestAnimationFrame(() => svg.querySelectorAll(".b").forEach((b) => b.classList.add("on"))));
+}
+const DIAS_LARGO = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"], DIAS_CORTO = ["L", "M", "X", "J", "V", "S", "D"];
+function estCalor(d) {
+  const box = $("est-calor"); box.replaceChildren(); const total = d.calor.flat().reduce((a, b) => a + b, 0);
+  if (!total) { box.append(el("p", "Todavía no hay pedidos en este periodo.", { className: "muted" })); return; }
+  const max = Math.max(...d.calor.flat()), g = el("div", "", { className: "heat", role: "img" }); g.setAttribute("aria-label", "Pedidos por día de la semana y hora");
+  g.append(el("span")); for (let h = 0; h < 24; h++) g.append(el("span", h % 3 === 0 ? String(h) : "", { className: "h" }));
+  d.calor.forEach((fila, dow) => {
+    g.append(el("span", DIAS_CORTO[dow], { className: "d" }));
+    fila.forEach((n, h) => { const c = el("span", "", { className: "c", tabIndex: 0 }); c.dataset.tip = `${DIAS_LARGO[dow][0].toUpperCase() + DIAS_LARGO[dow].slice(1)} ${horaTxt(h)} · ${nf.format(n)} pedido${n === 1 ? "" : "s"}`; if (n) c.style.background = `color-mix(in srgb, var(--accent) ${Math.round(18 + 82 * n / max)}%, var(--th))`; g.append(c); });
+  });
+  box.append(g, (() => { const l = el("div", "", { className: "heat-leyenda" }); l.append(document.createTextNode("Menos"), el("i"), document.createTextNode("Más pedidos")); return l; })());
+}
+function estAtrasados(d) {
+  const box = $("est-atr"); box.replaceChildren();
+  if (!d.atrasados.length) { box.append(el("p", "Ningún cliente habitual se está retrasando. (Hacen falta al menos 3 pedidos de un cliente para conocer su ritmo.)", { className: "muted" })); return; }
+  const t = el("table", "", { className: "est-tabla" }), th = el("thead"), tr = el("tr");
+  for (const x of ["Cliente", "Suele pedir cada", "Lleva sin pedir", ""]) tr.append(el("th", x)); th.append(tr); t.append(th); const tb = el("tbody");
+  for (const c of d.atrasados) { const r = el("tr"), b = el("button", "Ver patrón"); b.type = "button"; b.onclick = () => { estCliente(c.id); $("est-cli").scrollIntoView({ behavior: sinMov() ? "auto" : "smooth", block: "nearest" }); }; const act = el("td"); act.append(b); r.append(el("td", c.nombre ?? "Cliente " + c.id), el("td", `${String(c.ciclo).replace(".", ",")} días`), el("td", `${c.dias} días (último: ${diaEs(c.ultimo)})`), act); tb.append(r); }
+  t.append(tb); const sc = el("div", "", { className: "scroll" }); sc.append(t); box.append(sc);
+}
+function estBanda(d) {
+  $("est-desde").textContent = d.desdeRecuento ? `Contando desde el ${fechaMadrid(d.desdeRecuento)}` : "Contando todos los pedidos desde el principio";
+  $("est-excl").textContent = `Se excluyen ${nf.format(d.excluidos)} pedido${d.excluidos === 1 ? "" : "s"} de prueba`;
+  $("est-deshacer").hidden = !d.sePuedeDeshacer;
+  const c = d.excluidosConfig; if (document.activeElement && !$("est-ajustes").contains(document.activeElement)) { $("est-ex-n").value = c.nombres.join("\n"); $("est-ex-nif").value = c.nifs.join(", "); $("est-ex-cod").value = c.codigos.join(", "); }
+  $("est-sub").textContent = `${d.etiqueta}${d.comparacion ? " · comparado con el periodo anterior de la misma duración" : ""}`;
+  const vacio = d.resumen.actual.pedidos === 0; $("est-vacio").hidden = !vacio;
+  $("est-vacio").textContent = vacio ? (d.desdeRecuento ? `Aún no hay pedidos desde el ${fechaMadrid(d.desdeRecuento)}. Cuando entren pedidos aparecerán aquí.` : "No hay pedidos en este periodo. Prueba con otro periodo (por ejemplo «Todo»).") : "";
+}
+async function estCargar(conEsqueleto = true) {
+  const P = $("p-estadisticas"), qs = new URLSearchParams({ rango: est.rango }); if (est.rango === "custom") { qs.set("desde", est.d0); qs.set("hasta", est.d1); }
+  if (conEsqueleto && !est.datos) { P.classList.add("cargando"); for (const [id, h] of [["est-horas", 210], ["est-calor", 190], ["est-atr", 90]]) $(id).replaceChildren(sk(h)); $("est-rank").replaceChildren(...[0, 1, 2, 3, 4].map(() => { const l = el("li"); l.append(sk(34)); return l; })); $("est-cats").replaceChildren(sk(150)); estKpis({ comparacion: false, resumen: { actual: { pedidos: 0, importe: 0, ticket: 0, clientes: 0, articulos: 0 }, variacion: null } }); }
+  else for (const s of P.querySelectorAll(".est-g2 > .panel, .est-kpis")) s.classList.add("refresca");
+  try {
+    const d = await call("/api/admin/estadisticas?" + qs);
+    est.datos = d; P.classList.remove("cargando"); for (const s of P.querySelectorAll(".refresca")) s.classList.remove("refresca");
+    estBanda(d); estKpis(d); estRanking(d); estCategorias(d); estHoras(d); estCalor(d); estAtrasados(d);
+  } catch (e) { P.classList.remove("cargando"); for (const s of P.querySelectorAll(".refresca")) s.classList.remove("refresca"); $("est-sub").textContent = e.message; }
+}
+async function estVivo() {
+  if (!activo(1)) return;
+  try {
+    const v = await call("/api/admin/estadisticas/vivo");
+    for (const [id, n] of [["est-v1", v.viendo], ["est-v2", v.conCarrito], ["est-v3", v.lineas]]) { const b = $(id); if (b.textContent !== String(n)) { b.textContent = String(n); b.classList.remove("pop"); void b.offsetWidth; if (!sinMov()) b.classList.add("pop"); } }
+    $("est-vivo-hora").textContent = "Actualizado " + new Date(v.actualizado).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const ul = $("est-vivo-lista"); ul.replaceChildren();
+    if (!v.personas.length) ul.append(el("li", "Ahora mismo no hay nadie con el catálogo abierto.", { className: "muted" }));
+    for (const p of v.personas) { const li = el("li"); li.append(el("b", p.nombre), el("span", `${p.lineas ? p.lineas + " línea" + (p.lineas === 1 ? "" : "s") + " en el carrito" : "mirando"} · hace ${p.hace < 90 ? p.hace + " s" : Math.round(p.hace / 60) + " min"}`)); ul.append(li); }
+  } catch { /* se reintenta en 10 s */ }
+}
+async function estCliente(id) {
+  const box = $("est-cli"); box.replaceChildren(sk(160)); est.cliente = id;
+  let c; try { c = await call("/api/admin/estadisticas/cliente?id=" + encodeURIComponent(id)); } catch (e) { box.replaceChildren(el("p", e.message, { className: "err" })); return; }
+  box.replaceChildren(); box.append(el("h3", c.nombre));
+  if (c.esPrueba) { box.append(el("p", "Este cliente es de prueba: sus pedidos no cuentan en las estadísticas.", { className: "est-aviso" })); return; }
+  if (!c.pedidos) { box.append(el("p", c.desdeRecuento ? `Aún no hay pedidos de este cliente desde el ${fechaMadrid(c.desdeRecuento)}.` : "Este cliente todavía no tiene pedidos.", { className: "muted" })); return; }
+  if (c.sinPedirDeMas) box.append(el("p", `Lleva ${c.sinPedirDeMas.dias} días sin pedir y lo normal es cada ${String(c.sinPedirDeMas.ciclo).replace(".", ",")} días.`, { className: "est-aviso" }));
+  const chips = el("div", "", { className: "est-chips" });
+  const chip = (t, v, sub) => { const d = el("div"); d.append(el("small", t), el("b", v)); if (sub) d.append(el("span", sub, { className: "muted" })); chips.append(d); };
+  chip("Pedidos", nf.format(c.pedidos), `del ${diaEs(c.primero)} al ${diaEs(c.ultimo)}`);
+  chip("Pide cada", c.cada ? `${String(c.cada.mediana).replace(".", ",")} días` : "—", c.cada ? `media ${String(c.cada.media).replace(".", ",")} días` : "con un solo pedido no se sabe");
+  chip("Ticket medio", nfd.format(c.ticket) + " €", `total ${nfd.format(c.total)} €`);
+  chip("Día habitual", c.dias.length ? c.dias.map((x) => `${x.dia} (${x.pct} %)`).join(", ") : "—");
+  chip("Hora habitual", horaTxt(c.hora.habitual), `suele pedir entre las ${horaTxt(c.hora.desde)} y las ${String(c.hora.hasta).padStart(2, "0")}:59`);
+  chip("Último pedido", c.diasDesdeUltimo === 0 ? "hoy" : `hace ${c.diasDesdeUltimo} día${c.diasDesdeUltimo === 1 ? "" : "s"}`, diaEs(c.ultimo));
+  box.append(chips);
+  const tabla = (titulo, filas, cols, vacio) => { const w = el("div"); w.append(el("h2", titulo)); if (!filas.length) { w.append(el("p", vacio, { className: "muted", style: "margin:0" })); return w; } const t = el("table", "", { className: "est-tabla" }), th = el("tr"); for (const x of cols) th.append(el("th", x[0])); const h = el("thead"); h.append(th); t.append(h); const tb = el("tbody"); for (const f of filas) { const r = el("tr"); for (const x of cols) r.append(el("td", x[1](f), x[2] ? { className: "num" } : {})); tb.append(r); } t.append(tb); const sc = el("div", "", { className: "scroll" }); sc.append(t); w.append(sc); return w; };
+  box.append(tabla("Lo que suele pedir", c.frecuentes, [["Artículo", (f) => f.nombre], ["Veces", (f) => `${f.veces} de ${c.pedidos}`, 1], ["Uds. por pedido", (f) => String(f.mediaUds).replace(".", ","), 1], ["Último", (f) => diaEs(f.ultimo), 1]], ""));
+  box.append(tabla("Antes lo pedía y ha dejado de pedirlo", c.dejados, [["Artículo", (f) => f.nombre], ["Lo pidió", (f) => `${f.veces} veces`, 1], ["Última vez", (f) => diaEs(f.ultimo), 1]], c.avisoPocoHistorial || "No ha dejado de pedir ningún artículo habitual."));
+}
+let tBus = 0;
+$("est-q").oninput = () => { clearTimeout(tBus); tBus = setTimeout(async () => { const ul = $("est-res"), q = $("est-q").value.trim(); ul.replaceChildren(); if (q.length < 2) return; const r = await call("/api/admin/estadisticas/clientes?q=" + encodeURIComponent(q)).catch(() => []); if (!r.length) ul.append(el("li", "Ningún cliente con ese nombre.", { className: "muted" })); for (const c of r) { const li = el("li"), b = el("button"); b.type = "button"; b.append(document.createTextNode(c.nombre), el("small", c.poblacion)); b.onclick = () => { ul.replaceChildren(); $("est-q").value = ""; estCliente(c.id); }; li.append(b); ul.append(li); } }, 280); };
+for (const b of document.querySelectorAll("#p-estadisticas .seg button[data-r]")) b.onclick = () => {
+  est.rango = b.dataset.r; for (const x of document.querySelectorAll("#p-estadisticas .seg button[data-r]")) x.classList.toggle("on", x === b);
+  $("est-custom").hidden = est.rango !== "custom"; if (est.rango !== "custom") estCargar(false);
+};
+$("est-custom").onsubmit = (e) => { e.preventDefault(); est.d0 = $("est-d0").value; est.d1 = $("est-d1").value; if (!est.d0 || !est.d1 || est.d0 > est.d1) { $("est-sub").textContent = "Elige un rango válido: la fecha de inicio no puede ser posterior a la de fin."; return; } estCargar(false); };
+for (const b of document.querySelectorAll("#p-estadisticas .seg button[data-m]")) b.onclick = () => { est.modo = b.dataset.m; for (const x of document.querySelectorAll("#p-estadisticas .seg button[data-m]")) x.classList.toggle("on", x === b); if (est.datos) { estRanking(est.datos); estCategorias(est.datos); } };
+$("est-mas").onclick = () => { est.mas = !est.mas; if (est.datos) estRanking(est.datos); };
+$("est-reiniciar").onclick = () => $("est-dlg").showModal();
+$("est-dlg-no").onclick = () => $("est-dlg").close();
+$("est-dlg-si").onclick = async () => { $("est-dlg-si").disabled = true; try { await call("/api/admin/estadisticas/reiniciar", { confirmo: true }); $("est-dlg").close(); est.datos = null; await estCargar(true); } catch (e) { alert(e.message); } $("est-dlg-si").disabled = false; };
+$("est-deshacer").onclick = async () => { try { await call("/api/admin/estadisticas/deshacer", {}); est.datos = null; await estCargar(true); } catch (e) { alert(e.message); } };
+$("est-ex-g").onclick = async () => {
+  const lista = (t) => t.split(/[,\n;]/).map((x) => x.trim()).filter(Boolean);
+  const r = await call("/api/admin/estadisticas/excluidos", { nombres: $("est-ex-n").value.split("\n").map((x) => x.trim()).filter(Boolean), nifs: lista($("est-ex-nif").value), codigos: lista($("est-ex-cod").value) }).catch((e) => ({ error: e.message }));
+  $("est-ex-msg").textContent = r.error || "Lista guardada."; if (!r.error) estCargar(false);
+};
+function estAbrir() { estCargar(true); estVivo(); clearInterval(est.timerVivo); clearInterval(est.timerDatos); est.timerVivo = setInterval(estVivo, 10000); est.timerDatos = setInterval(() => { if (activo(1) && !document.hidden) estCargar(false); }, 60000); }
+function estCerrar() { clearInterval(est.timerVivo); clearInterval(est.timerDatos); }
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b))); if (b.dataset.t === "avisos") avisosClientes().catch(() => {});
-  $("p-pedidos").hidden = b.dataset.t !== "pedidos"; $("p-solicitudes").hidden = b.dataset.t !== "solicitudes"; $("p-cuentas").hidden = b.dataset.t !== "cuentas"; $("p-avisos").hidden = b.dataset.t !== "avisos"; $("p-articulos").hidden = b.dataset.t !== "articulos"; if (b.dataset.t === "articulos") articulos().catch((e) => ($("ar-msg").textContent = e.message)); $("p-datos").hidden = b.dataset.t !== "datos"; if (b.dataset.t === "datos") ultimasSubidas();
+  $("p-pedidos").hidden = b.dataset.t !== "pedidos"; $("p-solicitudes").hidden = b.dataset.t !== "solicitudes"; $("p-cuentas").hidden = b.dataset.t !== "cuentas"; $("p-avisos").hidden = b.dataset.t !== "avisos"; $("p-articulos").hidden = b.dataset.t !== "articulos"; if (b.dataset.t === "articulos") articulos().catch((e) => ($("ar-msg").textContent = e.message)); $("p-estadisticas").hidden = b.dataset.t !== "estadisticas"; if (b.dataset.t === "estadisticas") estAbrir(); else estCerrar(); $("p-datos").hidden = b.dataset.t !== "datos"; if (b.dataset.t === "datos") ultimasSubidas();
 }));
 async function entrar() { try { await refrescar(); if ($("app").hidden && clave) { await call("/api/admin/resumen"); $("login").hidden = true; $("app").hidden = false; clearInterval(timer); timer = setInterval(refrescar, 15000); } } catch (e) { $("l-err").textContent = e.message; } }
 $("f-login").onsubmit = (e) => { e.preventDefault(); clave = $("clave").value; try { sessionStorage.setItem("vm_admin", clave); } catch {} $("l-err").textContent = ""; entrar(); };

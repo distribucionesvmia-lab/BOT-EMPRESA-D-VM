@@ -100,6 +100,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   addCol("invitaciones", "welcome", "TEXT"); addCol("invitaciones", "solo_ver", "INTEGER NOT NULL DEFAULT 0"); addCol("invitaciones", "pedir_codigo", "INTEGER NOT NULL DEFAULT 1");
   addCol("invitaciones", "tipo", "TEXT NOT NULL DEFAULT 'cliente'"); addCol("invitaciones", "nombre", "TEXT"); // tipo 'alta' = enlace para una persona nueva que solo rellena su solicitud de alta (sin cliente ni sesión)
   addCol("sessions", "solo_ver", "INTEGER NOT NULL DEFAULT 0"); addCol("sessions", "welcome", "TEXT"); addCol("sessions", "pedir_codigo", "INTEGER NOT NULL DEFAULT 1"); // la sesión abierta con un enlace recuerda con qué condiciones
+  // Quién tiene el catálogo abierto ahora mismo (latido cada ~45 s desde /catalogo): solo código de cliente, pantalla y nº de líneas del carrito; nada de precios ni datos personales.
+  db.exec("CREATE TABLE IF NOT EXISTS presencia (customer_id TEXT PRIMARY KEY, pantalla TEXT NOT NULL, lineas INTEGER NOT NULL DEFAULT 0, at TEXT NOT NULL)");
   db.exec("CREATE TABLE IF NOT EXISTS bienvenida_vista (customer_id TEXT PRIMARY KEY, at TEXT NOT NULL)"); // la tarjeta de bienvenida ya cerrada («Entendido»), por cliente
   db.exec("CREATE TABLE IF NOT EXISTS corte_pref (customer_id TEXT PRIMARY KEY, activo INTEGER NOT NULL)"); // «Avisarme antes de la hora límite»: sin fila = activado (si tiene los avisos del móvil activados)
   db.exec("CREATE TABLE IF NOT EXISTS corte_avisos (customer_id TEXT NOT NULL, day TEXT NOT NULL, PRIMARY KEY (customer_id, day))"); // un aviso por día y cliente como máximo
@@ -307,6 +309,17 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       if (r.ok && r.token) db.prepare("UPDATE sessions SET solo_ver = ?, welcome = ?, pedir_codigo = ? WHERE token_hash = ?").run(soloVer ? 1 : 0, mensaje || null, pedirCodigo ? 1 : 0, sha(r.token));
       return r;
     },
+    /** Latido del catálogo: solo se guarda el último de cada cliente (código, pantalla y nº de líneas del carrito). */
+    presenciaLatido(customerId, { pantalla = "catalogo", lineas = 0, now = new Date().toISOString() } = {}) {
+      const pan = ["catalogo", "carrito", "resumen"].includes(pantalla) ? pantalla : "catalogo", n = Number.isInteger(lineas) && lineas >= 0 ? Math.min(lineas, 999) : 0;
+      db.prepare("INSERT INTO presencia (customer_id, pantalla, lineas, at) VALUES (?, ?, ?, ?) ON CONFLICT(customer_id) DO UPDATE SET pantalla = excluded.pantalla, lineas = excluded.lineas, at = excluded.at").run(String(customerId), pan, n, now);
+      if (Math.random() < 0.02) db.prepare("DELETE FROM presencia WHERE at < ?").run(new Date(new Date(now).getTime() - 86_400_000).toISOString()); // limpieza ocasional
+      return true;
+    },
+    /** Quién ha dado señales en los últimos `segundos` (2 minutos sin latido = desconectado). */
+    presenciaAhora({ segundos = 120, now = new Date().toISOString() } = {}) {
+      return db.prepare("SELECT customer_id, pantalla, lineas, at FROM presencia WHERE at >= ? ORDER BY at DESC").all(new Date(new Date(now).getTime() - segundos * 1000).toISOString());
+    },
     /** Tarjeta de bienvenida: ¿ya la cerró este cliente con «Entendido»? */
     bienvenidaVista: (customerId) => !!db.prepare("SELECT 1 FROM bienvenida_vista WHERE customer_id = ?").get(String(customerId)),
     bienvenidaMarcar(customerId, now = new Date().toISOString()) { db.prepare("INSERT OR IGNORE INTO bienvenida_vista (customer_id, at) VALUES (?, ?)").run(String(customerId), now); return true; },
@@ -507,6 +520,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     /** Un ajuste interno (p. ej. las claves VAPID): se guarda una vez y todas las aplicaciones leen el mismo. */
     ajuste: (clave) => db.prepare("SELECT valor FROM ajustes WHERE clave = ?").get(clave)?.valor ?? null,
     ajusteGuardar: (clave, valor) => db.prepare("INSERT INTO ajustes (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor").run(clave, String(valor)),
+    ajusteBorrar: (clave) => db.prepare("DELETE FROM ajustes WHERE clave = ?").run(clave),
     ajusteSiFalta(clave, crearValor) { db.prepare("INSERT OR IGNORE INTO ajustes (clave, valor) VALUES (?, ?)").run(clave, crearValor()); return db.prepare("SELECT valor FROM ajustes WHERE clave = ?").get(clave).valor; },
     pushLogAdd: (x, now = new Date().toISOString()) => db.prepare("INSERT INTO push_log (at, titulo, texto, destino, enviados, fallidos, detalle) VALUES (?, ?, ?, ?, ?, ?, ?)").run(now, x.titulo, x.texto, x.destino, x.enviados, x.fallidos, x.detalle ?? null),
     pushLogList: (limit = 15) => db.prepare("SELECT at, titulo, texto, destino, enviados, fallidos, detalle FROM push_log ORDER BY id DESC LIMIT ?").all(limit),
@@ -524,7 +538,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM corte_pref WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM bienvenida_vista WHERE customer_id = ?").run(row.customer_id);
-        db.prepare("DELETE FROM invitaciones WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM invitaciones WHERE customer_id = ?").run(row.customer_id); db.prepare("DELETE FROM presencia WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM corte_avisos WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM push_subs WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM registrations WHERE customer_id = ? OR (phone = ? AND ? IS NOT NULL)").run(row.customer_id, row.phone, row.phone);
