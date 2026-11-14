@@ -62,3 +62,13 @@ test("navegación inferior: 5 pestañas, aria-current, sin «Paso 1 de 3» ni pe
   assert.match(pedido, /history\.pushState\(\{ vmTab: t \}/); // «Atrás» del móvil vuelve a la pestaña anterior
   assert.match(pedido, /aviso\("Quitado: "/); // «Quitado · Deshacer»
 });
+
+test("pantalla Pedido única: fichas de día de 64 px, «Hoy» solo si el servidor lo ofrece, tick que se dibuja y referencia", () => {
+  assert.match(pedido, /\.dchip \{[^}]*min-height:64px/);
+  assert.match(pedido, /for \(const o of ops\) \{/); // las fichas salen de data.delivery (el servidor decide si hay «Hoy»)
+  assert.doesNotMatch(pedido, /ficha\("Hoy"/);
+  assert.match(pedido, /Elige el día de entrega\./); assert.match(pedido, /tick-c 400ms/);
+  assert.match(pedido, /"Referencia " \+ j\.ref/); assert.match(pedido, /id="doneVer"/); assert.match(pedido, /Volver al inicio/);
+  assert.match(pedido, /dx < -90/); assert.match(pedido, /8000 : 4000/); // deslizar quita; «Deshacer» 8 s
+  assert.match(pedido, /#cart \.tl \.av\.tl-av, #cart \.tl \.tl-av \{ width:52px; height:52px/);
+});

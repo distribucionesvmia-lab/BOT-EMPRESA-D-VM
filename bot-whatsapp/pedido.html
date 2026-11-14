@@ -869,6 +869,48 @@
   /* Móvil apaisado y pantallas bajas: la barra se compacta */
   @media (orientation:landscape) and (max-height:520px) { .app { --tb-h:calc(48px + env(safe-area-inset-bottom)); } .tb { min-height:48px; flex-direction:row; gap:var(--s2); padding:4px; } .tb-t { font-size:calc(var(--t-micro) / var(--k,1)); } .tb-dot { top:2px; left:auto; right:12%; } .app footer { left:auto; right:var(--gutter); } .pill-cart { width:auto; min-width:260px; min-height:48px; } main, .app.sin-carrito main { padding-bottom:calc(var(--tb-h) + 70px); } .app footer #verCarrito.pill-cart { min-height:48px; } }
   @media (max-width:359px) { .tb-t { font-size:calc(10.5px / var(--k,1)); } .tb svg { width:22px; height:22px; } }
+
+  /* ═══ Pantalla «Pedido» única: líneas, entrega, resumen y confirmar ═══ */
+  #cart { background:var(--bg); }
+  .ped-cab { padding:calc(var(--s3) + env(safe-area-inset-top)) var(--gutter) var(--s2); background:var(--bg); }
+  .ped-tit { margin:0; font-size:calc(var(--t-xl) / var(--k,1)); line-height:1.1; font-weight:700; letter-spacing:-.022em; color:var(--text); }
+  .ped-sub { margin:var(--s1) 0 0; font-size:calc(var(--t-sec) / var(--k,1)); color:var(--text-2); }
+  #cart .cartbody { padding:var(--s2) var(--gutter) var(--s6); }
+  .ped-h { margin:var(--s6) 0 var(--s2); font-size:calc(var(--t-md) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; }
+  #cart .tl .av.tl-av, #cart .tl .tl-av { width:52px; height:52px; border-radius:var(--r-img); }
+  #cart .tl-wrap { overflow:hidden; }
+  #cart .tl tr.tl-fila { transition:transform var(--t-norm) var(--ease), opacity var(--t-norm) var(--ease); touch-action:pan-y; background:var(--surface); }
+  .ped-dias { margin:var(--s3) 0; }
+  .ped-dias[hidden] { display:none; }
+  .ped-dias .ctit { margin-bottom:var(--s2); font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; }
+  .dchips { display:flex; gap:var(--s2); overflow-x:auto; padding:2px 0 var(--s2); scrollbar-width:none; scroll-snap-type:x proximity; }
+  .dchips::-webkit-scrollbar { display:none; }
+  .dchip { flex:none; scroll-snap-align:start; min-width:84px; min-height:64px; padding:var(--s2) var(--s4); border:0; border-radius:var(--r-card); background:var(--surface); color:var(--text); font:inherit; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; cursor:pointer; transition:background-color var(--t-norm) var(--ease), color var(--t-norm) var(--ease), transform var(--t-press) var(--ease); }
+  .dchip b { font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; }
+  .dchip small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); white-space:nowrap; }
+  .dchip:active { transform:scale(.97); }
+  .dchip.on { background:var(--text); color:var(--surface); } .dchip.on small { color:var(--surface); opacity:.85; }
+  #diaInfo:empty { display:none; }
+  .ped-res .rr { display:flex; justify-content:space-between; gap:var(--s3); padding:var(--s2) 0; font-size:calc(var(--t-sec) / var(--k,1)); color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .ped-res .rr b { color:var(--text); font-weight:600; }
+  .ped-res .rr[hidden] { display:none; }
+  .ped-res .rr.tt { margin-top:var(--s1); padding-top:var(--s3); border-top:.5px solid var(--line); font-size:calc(var(--t-body) / var(--k,1)); color:var(--text); font-weight:600; }
+  .ped-res .rr.tt b { font-size:calc(var(--t-lg) / var(--k,1)); font-weight:700; }
+  #cart .cartfoot { padding:var(--s3) var(--gutter) var(--s3); text-align:center; }
+  #cart .cartfoot .big { width:100%; min-height:50px; border-radius:var(--r-pill); font-variant-numeric:tabular-nums; }
+  .plazo { margin:var(--s2) 0 0; font-size:calc(var(--t-cap) / var(--k,1)); line-height:1.3; color:var(--text-2); }
+  #cart .keepbtn { display:block; margin:var(--s2) auto 0; }
+  /* Pedido enviado: el tick se dibuja en 400 ms */
+  #done { background:var(--bg); }
+  #done .ok { display:flex; flex-direction:column; align-items:center; text-align:center; gap:var(--s2); padding:var(--s10) var(--gutter); }
+  .tick-svg { width:72px; height:72px; color:var(--ok); }
+  .tick-svg circle { stroke-dasharray:151; stroke-dashoffset:151; animation:tick-c 400ms var(--ease) forwards; }
+  .tick-trazo { stroke-dasharray:40; stroke-dashoffset:40; animation:tick-t 300ms 150ms var(--ease) forwards; }
+  @keyframes tick-c { to { stroke-dashoffset:0; } } @keyframes tick-t { to { stroke-dashoffset:0; } }
+  @media (prefers-reduced-motion: reduce) { .tick-svg circle, .tick-trazo { animation:none; stroke-dashoffset:0; } #cart .tl tr.tl-fila, .dchip { transition:none; } }
+  .done-ref { margin:0; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .done-btns { display:flex; flex-direction:column; gap:var(--s2); width:100%; max-width:360px; margin-top:var(--s4); }
+  .done-btns .big { display:flex; align-items:center; justify-content:center; text-decoration:none; width:100%; min-height:50px; border-radius:var(--r-pill); }
 </style>
 </head>
 <body>
@@ -899,14 +941,15 @@
   </nav>
   <footer hidden role="status" aria-live="polite"><button class="pill-cart" id="verCarrito" type="button" disabled><span class="pc-info"><b id="pcN">0 artículos</b><small id="pcT"></small></span><span class="pc-ver">Ver pedido</span></button></footer>
 
-  <section class="screen" id="cart" hidden>
-    <div class="head"><button id="back" type="button" aria-label="Volver a los productos">←</button><div><small>Paso 2 de 3</small><h2>Revisa tu pedido</h2></div></div>
+  <section class="screen" id="cart" hidden aria-label="Pedido">
+    <div class="ped-cab"><h2 class="ped-tit">Pedido</h2><p class="ped-sub" id="cartCount"></p></div>
     <div class="aviso" id="modBanner" role="status" aria-live="polite" hidden></div>
     <div class="aviso" id="avisoHoy2" role="status" aria-live="polite" hidden>Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
     <div class="body cartbody">
-      <div class="cartcount" id="cartCount"></div>
       <div id="cartLines"></div>
       <button type="button" class="vaciar" id="vaciar">Vaciar el pedido</button>
+      <button class="keepbtn" id="keep" type="button">+ Seguir añadiendo productos</button>
+      <h3 class="ped-h">Entrega</h3>
       <div class="card" id="entregaCard"><div class="ctit" id="addrTit">Entrega en</div><div id="addr" class="cval"></div>
         <div id="addrOpc" class="addropc" role="radiogroup" aria-label="Dónde entregamos">
           <label class="addrop"><input type="radio" name="addrmode" value="hab" checked><span>En la dirección de siempre</span></label>
@@ -914,29 +957,18 @@
         </div>
         <input id="addrOtra" type="text" maxlength="160" autocomplete="street-address" placeholder="Calle, número y localidad" aria-label="Dirección de entrega" hidden>
       </div>
+      <div class="ped-dias" id="pedDias"><div class="ctit" id="diaTit">¿Qué día lo quieres?</div><div class="dchips" id="diaChips" role="radiogroup" aria-label="Día de entrega"></div><div class="nota" id="diaInfo" role="status" aria-live="polite"></div></div>
       <div class="card" id="fijoCard" hidden><div class="ctit">Repetir cada semana</div><p class="cval" id="fijoTxt" style="margin:0 0 8px"></p>
         <div id="fijoDias" class="diasfijo" role="group" aria-label="Días de reparto"></div>
         <button class="big sec" id="fijoGuardar" type="button" style="margin-top:10px">Guardar como pedido fijo</button><div class="nota" id="fijoMsg" role="status" aria-live="polite"></div></div>
       <div class="card"><label for="note" class="ctit">Observaciones del pedido</label><textarea id="note" placeholder="Ej.: avísame por teléfono antes de entregar (opcional)" maxlength="200"></textarea></div>
+      <h3 class="ped-h">Resumen</h3>
+      <div class="card ped-res" id="pedRes"><div class="rr"><span>Base imponible</span><b id="sumBase">0,00 €</b></div><div class="rr"><span>IVA</span><b id="sumIva">0,00 €</b></div><div class="rr" id="sumReFila" hidden><span>Recargo de equivalencia</span><b id="sumRe">0,00 €</b></div><div class="rr tt"><span>Total con IVA</span><b id="sumTotal">0,00 €</b></div></div>
       <div class="nota" id="priceNote"></div>
       <div class="err" id="err" role="alert"></div>
     </div>
-    <div class="cartfoot">
-      <div class="tot"><span>Total sin IVA<small id="totSub"></small></span><b id="total">0,00 €</b></div>
-      <button class="big" id="confirm" type="button">Elegir el día de entrega →</button>
-      <button class="keepbtn" id="keep" type="button">+ Seguir añadiendo productos</button>
-    </div>
+    <div class="cartfoot"><button class="big" id="confirm" type="button">Confirmar pedido</button><p class="plazo" id="plazo">Después de enviarlo verás hasta cuándo puedes modificarlo.</p></div>
   </section>
-
-  <!-- Al finalizar: ¿cuándo quieres recibirlo? -->
-  <section class="screen" id="when" hidden style="z-index:6">
-    <div class="head"><button id="backWhen" type="button" aria-label="Volver al carrito">←</button><div><small>Paso 3 de 3</small><h2>¿Cuándo quieres recibirlo?</h2></div></div>
-    <div class="body" style="padding:14px">
-      <div class="box" id="whenTot" style="margin:0 0 14px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#fff;border-radius:16px;border:2px solid var(--rojo)"><span style="font-weight:700;font-size:calc(17px / var(--k,1))">Total con IVA<small id="whenSub" style="display:block;font-weight:400;color:var(--gris);font-size:calc(13px / var(--k,1))"></small></span><b id="whenTotal" style="font-size:calc(26px / var(--k,1));color:var(--rojo-o);white-space:nowrap">0,00 €</b></div>
-      <p style="margin:0 0 14px;color:var(--gris);font-size:calc(18px / var(--k,1))">Toca el día de entrega. <b>Después podrás revisar el pedido y confirmarlo.</b></p>
-      <div id="whenOpts" style="display:grid;gap:12px"></div>
-      <div class="err" id="errWhen" role="alert"></div>
-    </div>
     <div class="cal-fondo" id="calFondo" hidden>
       <div class="cal" role="dialog" aria-modal="true" aria-label="Elegir otro día de entrega">
         <div class="cal-h"><button id="calAnt" type="button" aria-label="Mes anterior">‹</button><b id="calMes"></b><button id="calSig" type="button" aria-label="Mes siguiente">›</button></div>
@@ -944,23 +976,9 @@
         <div class="cal-pie"><p id="calSel">Toca el día que quieras</p><button class="big" id="calOk" type="button" disabled>Elegir este día</button><button class="big sec" id="calCerrar" type="button" style="margin-top:0">Cancelar</button></div>
       </div>
     </div>
-  </section>
-
-  <!-- Último paso: resumen y confirmación antes de enviar -->
-  <section class="screen" id="resumen" hidden style="z-index:7">
-    <div class="head"><button id="backRes" type="button" aria-label="Volver a elegir el día">←</button><div><small>Último paso</small><h2>Confirma tu pedido</h2></div></div>
-    <div class="body" style="padding:14px">
-      <div class="box" style="padding:0 0 10px"><b style="font-size:calc(18px / var(--k,1))">Entrega</b><div id="resDia" style="font-size:calc(20px / var(--k,1));font-weight:700;color:var(--rojo-o);margin-top:4px"></div><div id="resAddr" style="color:var(--gris);font-size:calc(16px / var(--k,1));margin-top:2px"></div></div>
-      <div id="resLineas"></div>
-      <div id="resNota" style="margin-top:10px;font-size:calc(16px / var(--k,1))"></div>
-      <div class="err" id="errRes" role="alert"></div>
-    </div>
-    <div class="tot"><span>Total con IVA<small id="resSub" style="display:block;font-weight:400"></small></span><b id="resTotal">0,00 €</b></div>
-    <div class="box pie"><button class="big" id="resOk" type="button">✓ Confirmar y enviar pedido</button><button class="big sec" id="resCambiar" type="button">← Cambiar el día</button></div>
-  </section>
 
   <section class="screen" id="done" hidden>
-    <div class="ok"><div class="tick">✓</div><h2 id="doneT">¡Pedido recibido!</h2><p id="doneP" style="color:var(--gris)"></p><p id="modInfo" style="color:var(--gris);margin:6px 0" hidden></p><button type="button" class="big sec" id="modBtn" hidden style="margin:8px 0">Modificar pedido</button><p id="backlink" hidden><a href="/cliente">Volver al chat</a></p></div>
+    <div class="ok"><svg class="tick-svg" viewBox="0 0 52 52" aria-hidden="true" focusable="false"><circle cx="26" cy="26" r="24" fill="none" stroke="currentColor" stroke-width="3"/><path class="tick-trazo" d="M15 27l8 8 14-16" fill="none" stroke="currentColor" stroke-width="3.500" stroke-linecap="round" stroke-linejoin="round"/></svg><h2 id="doneT">¡Pedido recibido!</h2><p id="doneRef" class="done-ref" hidden></p><p id="doneP" style="color:var(--gris)"></p><p id="modInfo" style="color:var(--gris);margin:6px 0" hidden></p><button type="button" class="big sec" id="modBtn" hidden style="margin:8px 0">Modificar pedido</button><div class="done-btns"><button type="button" class="big" id="doneVer" hidden>Ver pedido</button><a class="big sec" id="doneInicio" href="/cliente">Volver al inicio</a></div></div>
   </section>
 </div>
 
@@ -1426,6 +1444,13 @@ function tablaLineas(ls) {
     const is = document.createElement("small"); is.textContent = cj ? `${l.qty} ${l.qty === 1 ? "caja" : "cajas"} = ${uds(l)} uds` : `${uds(l)} ${uds(l) === 1 ? "unidad" : "unidades"}`;
     const x = document.createElement("button"); x.type = "button"; x.className = "cx"; x.textContent = "Quitar"; x.setAttribute("aria-label", "Quitar " + l.name); x.onclick = () => setQty(l.id, 0);
     m.append(ib, is, x);
+    // Deslizar la línea hacia la izquierda la quita (con «Deshacer» durante 8 s); el botón «Quitar» hace lo mismo
+    if (!tablaLineas.sinObs) {
+      let x0 = null, y0 = 0, dx = 0;
+      tr.addEventListener("touchstart", e => { if (e.target.closest("input")) return; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; }, { passive: true });
+      tr.addEventListener("touchmove", e => { if (x0 == null) return; dx = e.touches[0].clientX - x0; const dy = e.touches[0].clientY - y0; if (Math.abs(dy) > Math.abs(dx) || dx > 0) { tr.style.transform = ""; return; } tr.style.transition = "none"; tr.style.transform = `translateX(${Math.max(dx, -140)}px)`; tr.style.opacity = String(1 - Math.min(1, -dx / 220)); }, { passive: true });
+      tr.addEventListener("touchend", () => { if (x0 == null) return; const quita = dx < -90; x0 = null; tr.style.transition = ""; tr.style.transform = ""; tr.style.opacity = ""; if (quita) setQty(l.id, 0); });
+    }
     // Observación de la línea: plegada hasta que se necesita
     if (!tablaLineas.sinObs) {
       const ro = tb.insertRow(); ro.className = "tl-obs"; const co = ro.insertCell(); co.colSpan = 3;
@@ -1458,12 +1483,18 @@ function pintarFalta(box) {
   }
   box.appendChild(s);
 }
+function pintarResumen() {
+  const c = calc();
+  $("sumBase").textContent = eur(c.base); $("sumIva").textContent = eur(c.iva);
+  $("sumReFila").hidden = !data.customer.re; $("sumRe").textContent = eur(c.re); $("sumTotal").textContent = eur(c.total);
+  $("confirm").textContent = c.base ? `Confirmar pedido · ${eur(c.total)}` : "Confirmar pedido";
+}
 function renderCart() {
   const box = $("cartLines"); box.innerHTML = "";
   const ls = lines(), nUds = ls.reduce((t, l) => t + uds(l), 0);
   $("cartCount").textContent = `${ls.length} artículo${ls.length === 1 ? "" : "s"} · ${nUds} unidad${nUds === 1 ? "" : "es"}`;
   box.appendChild(tablaLineas(ls)); pintarFalta(box);
-  tween($("total"), calc().base); $("totSub").textContent = "El IVA se suma al elegir el día de entrega"; // en el carrito se ve el importe sin IVA; con IVA, en el paso 3
+  pintarResumen(); pintarDias();
   if (!count()) showCart(false);
 }
 
@@ -1536,7 +1567,7 @@ async function modificar(ref) {
   modificando = { ref: j.ref, hasta: j.hasta };
   $("note").value = j.nota || ""; if (j.direccion) { document.querySelector('input[name="addrmode"][value="otra"]').checked = true; $("addrOtra").value = j.direccion; } pintarDireccion();
   $("modBanner").hidden = false; $("modBanner").textContent = `Estás modificando el pedido ${j.ref}. ${j.hasta}.`;
-  ["done", "when", "resumen"].forEach(id => ($(id).hidden = true)); $("confirm").disabled = false; $("resOk").disabled = false; pedidoEnviado = false; refresh(); showCart(true);
+  $("done").hidden = true; $("confirm").disabled = false; pedidoEnviado = false; refresh(); showCart(true);
   if (falta) aviso(falta === 1 ? "1 artículo ya no está disponible." : falta + " artículos ya no están disponibles.");
 }
 // ── Pedido fijo semanal (F-16): se guarda la plantilla y los días; nunca se envía solo ──
@@ -1620,7 +1651,7 @@ $("q").addEventListener("blur", () => setTimeout(() => { $("sugs").hidden = true
 $("q").addEventListener("keydown", e => { if (e.key === "Escape") { $("sugs").hidden = true; } if (e.key === "Enter") { $("sugs").hidden = true; anotarBusqueda($("q").value); $("q").blur(); } });
 $("q").addEventListener("search", () => anotarBusqueda($("q").value)); // Enter o la X de borrar
 $("verCarrito").onclick = $("cartIcon").onclick = () => count() && showCart(true);
-$("back").onclick = $("keep").onclick = () => showCart(false);
+$("keep").onclick = () => showCart(false);
 $("vaciar").onclick = () => { // vacía todo el pedido, con «Deshacer» durante 8 segundos
   if (!count()) return;
   const copia = { q: new Map(qty), u: new Map(unitOf), n: new Map(notes) };
@@ -1647,22 +1678,33 @@ function direccionOk(errBox) {
 }
 $("confirm").onclick = () => {
   $("err").textContent = ""; if (!direccionOk($("err"))) return;
-  if (!(data.delivery || []).length) return enviarPedido(null, $("err"));
-  $("errWhen").textContent = ""; pintarOpciones(); $("when").hidden = false;
+  if ((data.delivery || []).length && !diaElegido) { $("err").textContent = "Elige el día de entrega."; $("pedDias").scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+  enviarPedido(diaElegido, $("err"));
 };
-function pintarOpciones() {
-  $("whenTotal").textContent = eur(total()); $("whenSub").textContent = desgloseIva(); // aquí, el importe FINAL con IVA
-  const box = $("whenOpts"); box.innerHTML = "";
-  for (const o of data.delivery) {
-    const b = document.createElement("button"); b.type = "button"; b.className = "opt";
-    b.append(o.label); if (o.detail) { const d = document.createElement("small"); d.textContent = o.detail; b.appendChild(d); }
-    b.onclick = () => resumen(o.date);
-    box.appendChild(b);
+// Día de entrega: fichas de 64 px (Hoy solo si toca, Mañana, los siguientes días de servicio y «Otro día» con calendario)
+let diaElegido = null;
+function pintarDias() {
+  const box = $("diaChips"); box.innerHTML = "";
+  const ops = data.delivery || [];
+  $("pedDias").hidden = !ops.length;
+  if (diaElegido && !ops.some(o => o.date === diaElegido) && !diaPersonal) diaElegido = null;
+  const ficha = (titulo, sub, activa, onclick, id) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "dchip" + (activa ? " on" : ""); if (id) b.id = id;
+    b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(!!activa));
+    const t = document.createElement("b"); t.textContent = titulo; b.appendChild(t);
+    if (sub) { const m = document.createElement("small"); m.textContent = sub; b.appendChild(m); }
+    b.onclick = onclick; box.appendChild(b);
+  };
+  for (const o of ops) {
+    const [titulo, sub] = o.kind === "dia" ? [o.label.split(" ")[0].replace(/^./, c => c.toUpperCase()), o.label.split(" ").slice(1).join(" ")] : [o.label, o.detail.replace(/^[^ ]+ /, "")];
+    ficha(titulo, sub, diaElegido === o.date, () => { diaPersonal = false; elegirDia(o.date); });
   }
-  const otro = document.createElement("button"); otro.type = "button"; otro.className = "opt"; otro.id = "otroDia";
-  otro.append("Otro día"); const sm = document.createElement("small"); sm.textContent = "Abre un calendario para elegir una fecha más adelante"; otro.appendChild(sm);
-  otro.onclick = abrirCal; box.appendChild(otro);
+  const otro = diaPersonal && diaElegido ? largo(diaElegido).replace(/^./, c => c.toUpperCase()) : null;
+  ficha("Otro día", otro ? otro.split(" ").slice(1).join(" ") : "Calendario", !!otro, abrirCal, "otroDia");
+  $("diaInfo").textContent = diaElegido ? "Entrega: " + largo(diaElegido).replace(/^./, c => c.toUpperCase()) : "";
 }
+let diaPersonal = false;
+function elegirDia(date) { diaElegido = date; $("err").textContent = ""; pintarDias(); }
 // «Otro día»: calendario pequeño para marcar un día de servicio (lunes a viernes) más adelante de los botones, hasta dentro de 90 días
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -1697,34 +1739,11 @@ function abrirCal() {
 $("calAnt").onclick = () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } pintarCal(); };
 $("calSig").onclick = () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } pintarCal(); };
 $("calCerrar").onclick = () => ($("calFondo").hidden = true);
-$("calOk").onclick = () => { if (cal.sel) { $("calFondo").hidden = true; resumen(cal.sel); } };
-$("backWhen").onclick = () => ($("when").hidden = true);
-// Antes de enviar se enseña el resumen (día, líneas, observaciones y total) y se pide confirmación
-let diaElegido = null;
-function resumen(day) {
-  diaElegido = day;
-  $("resDia").textContent = largo(day).replace(/^./, c => c.toUpperCase());
-  $("resAddr").textContent = "" + (dirFinal() || "La dirección que tenemos de tu negocio (la confirmaremos contigo)");
-  const box = $("resLineas"); box.innerHTML = "";
-  for (const l of lines()) {
-    const k = l.unitsPerBox || 1, cj = unit(l.id) === "caja", d = document.createElement("div");
-    d.className = "rl"; d.style.cssText = "display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--linea);font-size:calc(16px / var(--k,1))";
-    const a = document.createElement("span"), b = document.createElement("b");
-    a.textContent = `${cj ? l.qty + (l.qty === 1 ? " caja" : " cajas") + " (" + uds(l) + " uds)" : uds(l) + (uds(l) === 1 ? " ud" : " uds")} · ${l.name}` + ((notes.get(l.id) || "").trim() ? ` — «${notes.get(l.id).trim()}»` : "");
-    b.textContent = eur(importe(l)); b.style.whiteSpace = "nowrap";
-    d.append(a, b); box.appendChild(d);
-  }
-  const n = $("note").value.trim();
-  $("resNota").textContent = n ? "Observaciones: " + n : "";
-  $("resTotal").textContent = eur(total()); $("resSub").textContent = desgloseIva(); $("errRes").textContent = "";
-  $("resOk").disabled = false; $("resumen").hidden = false;
-}
-$("resOk").onclick = () => enviarPedido(diaElegido, $("errRes"));
-$("resCambiar").onclick = $("backRes").onclick = () => ($("resumen").hidden = true);
+$("calOk").onclick = () => { if (cal.sel) { $("calFondo").hidden = true; diaPersonal = !(data.delivery || []).some(o => o.date === cal.sel); elegirDia(cal.sel); } };
 async function enviarPedido(delivery, errBox) {
   if (delivery) { await refrescarEntrega(); if (delivery === data.today && !(data.delivery || []).some(o => o.kind === "hoy")) { errBox.textContent = "Ya no llegamos a entregarlo hoy: elige otro día."; return; } } // «hoy» solo vale antes de las 10:00
-  const opts = [...document.querySelectorAll("#whenOpts .opt")], btn = $("confirm");
-  opts.forEach(o => (o.disabled = true)); btn.disabled = true; $("resOk").disabled = true; errBox.textContent = "";
+  const btn = $("confirm"), textoBtn = btn.textContent;
+  btn.disabled = true; btn.textContent = "Enviando…"; errBox.textContent = "";
   try {
     const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, ...(modificando ? { replaces: modificando.ref } : {}), lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value, deliveryAddress: dirEntrega(), delivery }) });
     const j = await r.json();
@@ -1734,14 +1753,15 @@ async function enviarPedido(delivery, errBox) {
     $("doneT").textContent = j.modificado ? "¡Pedido modificado!" : "¡Pedido recibido!";
     $("modInfo").hidden = !j.modificable; $("modInfo").textContent = j.modificable ? j.modificable + "." : ""; $("modBtn").hidden = !(j.modificable && j.ref); if (j.ref) $("modBtn").onclick = () => modificar(j.ref);
     modificando = null; $("modBanner").hidden = true;
-    $("doneP").textContent = String(j.message || "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim(); $("when").hidden = true; $("resumen").hidden = true; $("cart").hidden = true; $("done").hidden = false; $("backlink").hidden = parent !== window;
+    $("doneP").textContent = String(j.message || "").replace(/\*/g, "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim(); $("cart").hidden = true; diaElegido = null; diaPersonal = false; $("done").hidden = false; marcaNav();
+    $("doneRef").hidden = !j.ref; $("doneRef").textContent = j.ref ? "Referencia " + j.ref : ""; $("doneVer").hidden = false; $("doneVer").onclick = () => { location.href = "/cliente#cuenta"; };
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
   } catch (e) {
-    errBox.textContent = e.message; opts.forEach(o => (o.disabled = false)); btn.disabled = false; $("resOk").disabled = false;
-    if (!$("resumen").hidden && /10:00|día|fecha/i.test(e.message)) { $("resumen").hidden = true; errBox = $("errWhen"); errBox.textContent = e.message; } // el día ya no vale: vuelve a la elección
+    errBox.textContent = e.message; btn.disabled = false; btn.textContent = textoBtn;
+    if (/10:00|día|fecha/i.test(e.message)) { diaElegido = null; diaPersonal = false; pintarDias(); errBox.textContent = e.message; } // el día ya no vale: hay que elegir otro
     if (/10:00/.test(e.message)) { // pasó la hora de corte mientras elegía: se actualizan las opciones
       const r2 = await fetch(location.pathname + "/datos").catch(() => null);
-      if (r2 && r2.ok) { const d2 = await r2.json(); data.delivery = d2.delivery; data.today = d2.today; data.minDate = d2.minDate; pintarOpciones(); errBox.textContent = e.message; }
+      if (r2 && r2.ok) { const d2 = await r2.json(); data.delivery = d2.delivery; data.today = d2.today; data.minDate = d2.minDate; pintarDias(); errBox.textContent = e.message; }
     }
   }
 }
@@ -1761,11 +1781,8 @@ async function refrescarEntrega() {
     pintarAviso();
     const quedaHoy = data.delivery.some(o => o.kind === "hoy");
     if (teniaHoy && !quedaHoy) { // pasaron las 10:00 mientras elegía: «Hoy» desaparece y, si la tenía elegida, se le dice claro
-      if (!$("when").hidden) pintarOpciones();
-      if (diaElegido === hoyViejo) {
-        diaElegido = null; $("resumen").hidden = true; $("when").hidden = false; pintarOpciones();
-        $("errWhen").textContent = "Ya no llegamos a entregarlo hoy: elige otro día.";
-      }
+      if (diaElegido === hoyViejo) { diaElegido = null; diaPersonal = false; $("err").textContent = "Ya no llegamos a entregarlo hoy: elige otro día."; }
+      pintarDias();
     }
   } finally { refrescando = false; }
 }
@@ -1773,12 +1790,10 @@ setInterval(refrescarEntrega, 30000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refrescarEntrega(); });
 
 // Pantallas superpuestas (carrito, día de entrega, resumen, calendario): foco, tecla Esc y botón «Atrás» del móvil
-const CAPAS = ["cart", "when", "resumen"], FONDO = ["header", ".guia", ".buscar", ".filbar", "#list", "footer"];
+const CAPAS = ["cart"], FONDO = ["header", ".guia", ".buscar", ".filbar", "#list", "footer"];
 const abiertas = () => [...CAPAS.filter(id => !$(id).hidden), ...($("calFondo").hidden ? [] : ["calFondo"])];
 function cerrarArriba() {
   if (!$("calFondo").hidden) $("calFondo").hidden = true;
-  else if (!$("resumen").hidden) $("resumen").hidden = true;
-  else if (!$("when").hidden) $("when").hidden = true;
   else if (!$("cart").hidden) showCart(false);
 }
 let prof = 0, silencio = false, foco = null, nPrev = 0;
@@ -1813,7 +1828,7 @@ const obs = new MutationObserver(capasCambian);
   $("sub").textContent = "Haz tu pedido a " + data.business;
   $("addr").textContent = data.customer.address || "La dirección que tenemos de tu negocio (la confirmaremos contigo).";
   pintarDireccion();
-  $("priceNote").textContent = data.priceNote || "";
+  $("priceNote").textContent = data.priceNote ? "Las líneas y el carrito van sin IVA; el resumen de arriba ya lo incluye. Los importes se confirman al preparar el pedido." : "";
   if (data.used) { $("doneT").textContent = "Este pedido ya se envió"; $("doneP").textContent = "Vuelve al chat para hacer otro pedido."; $("done").hidden = false; return; }
   if (!data.products.some(p => p.count > 0)) { tab = "all"; try { history.replaceState({ vmTab: "all" }, ""); } catch {} }
   (data.favs || []).forEach(id => favs.add(id));

@@ -294,13 +294,14 @@ test("ALTAS A MANO Y CLIENTE NUEVO: formularios en el panel (producto, cliente y
   assert.match(cli, /id="r-dir"/); assert.match(cli, /direccion: \$\("r-dir"\)\.value/);
 });
 
-test("TOTALES EN EL CATÁLOGO: el carrito y la barra de abajo van SIN IVA; el total con IVA sale arriba del paso de elegir el día", async () => {
+test("TOTALES EN EL CATÁLOGO: la barra flotante va SIN IVA; la pantalla Pedido enseña base, IVA, recargo y total con IVA y el botón confirma con ese total", async () => {
   const fs = await import("node:fs");
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
-  assert.match(ped, /\$\{eur\(calc\(\)\.base\)\} sin IVA/); // barra «Ver carrito»
-  assert.match(ped, /<span>Total sin IVA<small id="totSub">/); assert.match(ped, /tween\(\$\("total"\), calc\(\)\.base\)/); // paso 2
-  assert.match(ped, /id="whenTotal"/); assert.match(ped, /\$\("whenTotal"\)\.textContent = eur\(total\(\)\)/); // paso 3: con IVA
-  assert.match(ped, /\$\("resTotal"\)\.textContent = eur\(total\(\)\)/); // y el resumen final también
+  assert.match(ped, /\$\("pcT"\)\.textContent = n \? `\$\{eur\(calc\(\)\.base\)\} sin IVA`/); // carrito flotante: sin IVA
+  assert.match(ped, /\$\("sumBase"\)\.textContent = eur\(c\.base\); \$\("sumIva"\)\.textContent = eur\(c\.iva\)/); // resumen: base + IVA
+  assert.match(ped, /\$\("sumRe"\)\.textContent = eur\(c\.re\); \$\("sumTotal"\)\.textContent = eur\(c\.total\)/); // recargo de equivalencia y total
+  assert.match(ped, /`Confirmar pedido · \$\{eur\(c\.total\)\}`/); // «Confirmar pedido · 169,91 €»
+  assert.doesNotMatch(ped, /id="when"/); assert.doesNotMatch(ped, /id="resumen"/); // ya no hay pasos 2 y 3 aparte
 });
 
 test("CÓDIGOS CON PUNTO (157.10, 151.21…): «repetir pedido» separa bien el código de la cantidad", async () => {
