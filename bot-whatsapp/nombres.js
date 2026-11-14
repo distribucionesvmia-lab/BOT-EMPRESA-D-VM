@@ -31,6 +31,7 @@ function limpiaBase(original) {
   // « " 12 " LITROS » → «12 L»: comillas sueltas alrededor de una cantidad
   s = s.replace(/"\s*(\d+(?:[.,]\d+)?)\s*"\s*(litros?|lts?|l|cl|ml|kgs?|kilos?|grs?|g)\b/gi, (_, n, u) => `${n} ${UNIDADES[u.toLowerCase()]}`);
   s = s.replace(/"/g, "").replace(/\s*'\s*$/, "");
+  s = s.replace(/\(\s*[A-Z]{1,3}\.[A-Z]{1,3}\s*\)/g, ""); // códigos internos como «(EN.N)»
   // «23 CL.VALENCIA» → «23 cl · Valencia»: tamaño pegado por un punto a otra palabra
   s = s.replace(/(\d+(?:[.,]\d+)?)\s*(litros?|lts?|l|cl|ml|kgs?|kilos?|grs?|g)\.\s*(?=[A-Za-zÁÉÍÓÚÑáéíóúñ])/gi, (_, n, u) => `${n} ${UNIDADES[u.toLowerCase()]} · `);
   s = s.replace(/\.\s*(?=[A-Za-zÁÉÍÓÚÑ])/g, ". ").replace(/\s*[.,;:]+\s*$/g, "").replace(/\s+([.,)])/g, "$1").replace(/\(\s+/g, "(").replace(/\s+/g, " ").trim();

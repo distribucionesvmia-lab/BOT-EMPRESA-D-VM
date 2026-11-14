@@ -1,6 +1,35 @@
 import { deliveryAllowed, madridDay, puedeHoy } from "./delivery.js";
 import { categorizar, arbolCategorias } from "./categorias.js";
 import { soloCaja, precioEfectivo, promoVigente } from "./pricing.js";
+import { limpiarNombre } from "./nombres.js";
+import fs from "node:fs";
+
+// Nombres limpios (Mayúscula inicial, unidades, marca aparte): solo si la empresa lo activa con NOMBRES_LIMPIOS=1 tras revisar los ejemplos (node nombres-informe.js)
+let _excepciones = null;
+const excepcionesNombres = () => { if (_excepciones) return _excepciones; try { _excepciones = process.env.NOMBRES_EXCEPCIONES ? JSON.parse(fs.readFileSync(process.env.NOMBRES_EXCEPCIONES, "utf8")) : {}; } catch { _excepciones = {}; } return _excepciones; };
+
+const normNombre = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+/** Quita repetidos del catálogo: el mismo código solo una vez, y los artículos con el mismo nombre, precio, descuento y unidades por caja (se queda el primero). */
+export function catalogoSinDuplicados(catalog) {
+  const ids = new Set(), claves = new Set();
+  return catalog.filter((p) => {
+    const id = String(p.id); if (ids.has(id) || !String(p.name ?? "").trim()) return false; // sin nombre no hay nada que enseñar
+    ids.add(id);
+    const k = [normNombre(p.name), p.price, p.discount ?? 0, p.unitsPerBox ?? 0].join("|");
+    if (claves.has(k)) return false; claves.add(k); return true;
+  });
+}
+/** Accesos directos del catálogo (Limpieza, Papel y desechables, Cervezas): la subcategoría que mejor encaja con cada uno, si existe. */
+export function accesosDe(tree) {
+  const quiero = [["Limpieza", /limpieza|higiene/i], ["Papel y desechables", /papel|desechable|servilleta/i], ["Cervezas", /^cervezas?$/i]];
+  const out = [];
+  for (const [titulo, re] of quiero) {
+    let mejor = null;
+    for (const c of tree ?? []) for (const s of c.subs ?? []) if (re.test(s.nombre) && (!mejor || s.count > mejor.count)) mejor = { cat: c.id, sub: s.id, count: s.count };
+    if (mejor) out.push({ nombre: titulo, ...mejor });
+  }
+  return out;
+}
 
 // Lógica de la mini-aplicación de pedido, sin red ni disco (la comparten el servidor y la demo del navegador).
 
@@ -13,10 +42,12 @@ function oferta(p, customer) {
 }
 export function webProducts(customer, catalog, habitualProducts, imgOf = () => null, iaOf = () => false) {
   const habit = new Map(habitualProducts(customer).map((p) => [p.id, p]));
+  const limpio = process.env.NOMBRES_LIMPIOS === "1";
   return catalog
     .map((p) => ({
       id: String(p.id),
       name: p.name,
+      ...(limpio ? (({ nombre, marca, cambiado }) => (cambiado ? { nombreCorto: nombre, ...(marca ? { marca } : {}) } : {}))(limpiarNombre(p.name, { excepciones: excepcionesNombres() })) : {}),
       // Mismo criterio que pricing.js (priceLine): precio y descuento especiales del cliente si los hay, si no los de la ficha
       price: precioEfectivo(p, customer, String(p.id)).price,
       discount: precioEfectivo(p, customer, String(p.id)).discount,
@@ -30,11 +61,18 @@ export function webProducts(customer, catalog, habitualProducts, imgOf = () => n
       lastQty: habit.get(p.id)?.lastQty ?? null,
       count: habit.get(p.id)?.count ?? 0,
     }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .filter((p, i, todos) => todos.findIndex((x) => x.id === p.id) === i && String(p.name ?? "").trim()) // mismo código solo una vez; sin nombre, no hay tarjeta
+    .reduce((acc, p) => { // mismo nombre, precio y caja → se enseña uno: el que el cliente ya compra o, si no, el de código menor
+      const k = [normNombre(p.name), p.price, p.discount ?? 0, p.unitsPerBox ?? 0].join("|"), j = acc.claves.get(k);
+      const mejor = (a, b) => b.count > a.count || (b.count === a.count && b.id.localeCompare(a.id, undefined, { numeric: true }) < 0);
+      if (j === undefined) { acc.claves.set(k, acc.lista.length); acc.lista.push(p); } else if (mejor(acc.lista[j], p)) acc.lista[j] = p;
+      return acc;
+    }, { lista: [], claves: new Map() }).lista;
 }
 
 /** Árbol de categorías del catálogo que ve el cliente (con cuántos productos tiene cada una). */
-export const webTree = (catalog) => arbolCategorias(catalog);
+export const webTree = (catalog) => arbolCategorias(catalogoSinDuplicados(catalog)); // los mismos repetidos que se quitan de la lista, para que los contadores cuadren
 
 /** Pone el histórico indicado ({ código de cliente: [pedidos] }) a los clientes de la lista que lo tengan (sustituye al que traían). */
 export function conHistorial(clientes, historial = {}) {

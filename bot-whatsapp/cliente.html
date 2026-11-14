@@ -409,6 +409,7 @@
   .vm-inicio .in-ayuda p { margin:0 0 var(--s3); color:var(--text-2); font-size:calc(var(--t-sec) / var(--k,1)); }
   .vm-inicio .in-ayuda-bt { display:flex; flex-direction:column; gap:var(--s2); }
   .vm-inicio .in-ayuda-bt .vm-btn { text-decoration:none; width:100%; }
+  .vm-inicio .in-acceso { background:var(--accent-soft); color:var(--accent); }
   .vm-inicio .in-chips { display:flex; flex-wrap:wrap; gap:var(--s2); }
   .vm-inicio .in-chip { min-height:44px; display:inline-flex; align-items:center; padding:0 var(--s4); border-radius:var(--r-pill); background:var(--surface); color:var(--text); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; text-decoration:none; }
   .vm-inicio .in-prod:active, .vm-inicio .in-chip:active { transform:scale(.97); }
@@ -1084,7 +1085,7 @@ function inicio(ui) {
     }
     if (j.categorias?.length) {
       const sec = el("section", "in-sec"); sec.setAttribute("aria-label", "Categorías"); sec.appendChild(el("h3", null, "Categorías"));
-      const fila = el("div", "in-chips"); for (const k of j.categorias) { const a = el("a", "in-chip", k.nombre); a.href = cat + "#cat=" + encodeURIComponent(k.id); fila.appendChild(a); }
+      const fila = el("div", "in-chips"); for (const a of j.accesos || []) { const x = el("a", "in-chip in-acceso", a.nombre); x.href = cat + "#cat=" + encodeURIComponent(a.cat) + "&sub=" + encodeURIComponent(a.sub); fila.appendChild(x); } for (const k of j.categorias) { const a = el("a", "in-chip", k.nombre); a.href = cat + "#cat=" + encodeURIComponent(k.id); fila.appendChild(a); }
       sec.appendChild(fila); secciones.appendChild(sec);
     }
     chat.scrollTop = 0;

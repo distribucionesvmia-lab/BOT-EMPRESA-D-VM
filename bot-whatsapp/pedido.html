@@ -1094,6 +1094,41 @@
   .app > main#list { scrollbar-width:thin; }
 
   @media (min-width:768px) and (max-width:1023px) { .pf-av img { width:82%; height:82%; max-width:none; max-height:none; } }
+
+  /* ═══ Tanda 3: catálogo, categorías y búsqueda ═══ */
+  .cab-cat { position:sticky; top:0; z-index:4; background:var(--bg); border-bottom:.5px solid var(--line); }
+  .cab-cat .migas { position:static; background:var(--bg); border:0; padding-bottom:var(--s1); }
+  .subchips { display:flex; gap:var(--s2); overflow-x:auto; padding:0 var(--gutter) var(--s2); scrollbar-width:none; }
+  .subchips::-webkit-scrollbar { display:none; }
+  .subchip { flex:none; min-height:44px; padding:0 var(--s4); border:0; border-radius:var(--r-pill); background:var(--surface); color:var(--text); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; box-shadow:0 0 0 .5px var(--line); white-space:nowrap; }
+  .subchip small { color:var(--text-2); font-weight:400; font-size:calc(var(--t-cap) / var(--k,1)); }
+  .subchip[aria-pressed="true"] { background:var(--text); color:var(--surface); box-shadow:none; } .subchip[aria-pressed="true"] small { color:var(--surface); opacity:.8; }
+  .accesos { display:flex; gap:var(--s2); flex-wrap:wrap; padding:var(--s2) var(--gutter) 0; }
+  .acceso { min-height:44px; padding:0 var(--s4); border:0; border-radius:var(--r-pill); background:var(--accent-soft); color:var(--accent); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; }
+  .cuenta-lista { padding:var(--s2) var(--gutter) 0; font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); }
+  .grp-tit { margin:var(--s4) var(--gutter) var(--s1); font-size:calc(var(--t-md) / var(--k,1)); font-weight:700; letter-spacing:-.015em; color:var(--text); }
+  .pf-compras { display:inline-block; margin-left:var(--s2); padding:1px var(--s2); border-radius:var(--r-pill); background:var(--ok); color:#fff; font-size:calc(var(--t-micro) / var(--k,1)); font-weight:700; line-height:1.4; letter-spacing:.01em; white-space:nowrap; vertical-align:middle; }
+  /* «¿Te falta algo?»: foto a la izquierda; nombre de hasta 2 líneas y el botón debajo (ya no se parte letra a letra) */
+  .falta .falta-fila { display:grid; grid-template-columns:56px minmax(0, 1fr); gap:2px var(--s3); align-items:start; padding:var(--s2) 0; }
+  .falta .falta-fila .falta-av { grid-row:1 / span 2; }
+  .falta .falta-n { grid-column:2; display:flex; flex-direction:column; min-width:0; overflow-wrap:normal; }
+  .falta .falta-n b { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; line-height:1.25; }
+  .falta .falta-n small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .falta .falta-fila .add { grid-column:2; justify-self:start; width:auto; min-width:0; min-height:44px; height:44px; padding:0 var(--s4); border-radius:var(--r-pill); }
+  /* Tarjetas de producto: selector Caja | Ud de 44 px, «+» siempre abajo y mismo alto en todas */
+  .pf-seg { height:44px; padding:2px; } .pf-seg button { height:40px; min-width:48px; }
+  .pf-fijo { min-height:44px; }
+  .pf-sec { min-height:1.25em; } .pf-sec:empty { display:block; }
+  .pf-ctl { gap:var(--s2); }
+  @media (min-width:1024px) {
+    .pf { display:flex; flex-direction:column; align-items:stretch; height:100%; }
+    .pf-av { aspect-ratio:4 / 3; width:100%; height:auto; flex:none; }
+    .pf-info { flex:1; align-self:stretch; }
+    .pf-ctl { margin-top:auto; flex-direction:row; align-items:center; }
+    .pf-ctl .pf-seg, .pf-ctl .pf-fijo { flex:none; }
+    .cab-cat .migas, .subchips, .grp-tit, .cuenta-lista, .accesos { padding-left:0; padding-right:0; margin-left:0; margin-right:0; }
+  }
+  .accesos[hidden], .subchips[hidden] { display:none; }
 </style>
 </head>
 <body>
@@ -1188,7 +1223,7 @@ const uds = l => l.qty * (unit(l.id) === "caja" ? (l.unitsPerBox || 1) : 1);
 
 const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const hue = s => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
-const initials = n => n.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9 ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+const initials = n => { const r = String(n ?? "").replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9 ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase(); return r || "•"; }; // siempre hay marcador, aunque el nombre empiece por comillas o símbolos
 const lines = () => data.products.filter(p => qty.get(p.id) > 0).map(p => ({ ...p, qty: qty.get(p.id) }));
 const count = () => lines().length;
 // Importes EXACTOS (en céntimos, con enteros): el mismo cálculo que el servidor (pricing.js), sin errores de coma flotante
@@ -1329,7 +1364,7 @@ function control(p) {
       sel.appendChild(b);
     }
     box.appendChild(sel);
-  } else { const sp = document.createElement("div"); sp.className = "pf-fijo"; sp.setAttribute("aria-hidden", "true"); box.appendChild(sp); } // solo se vende suelto: no hace falta selector (el hueco mantiene la fila igual)
+  } else { const sp = document.createElement("div"); sp.className = "pf-fijo"; sp.textContent = "Por unidades"; box.appendChild(sp); } // solo se vende suelto: no hace falta selector (el hueco mantiene la fila igual)
   const hueco = document.createElement("div"); hueco.className = "pf-slot"; box.appendChild(hueco);
   if (!q) {
     const b = document.createElement("button");
@@ -1378,6 +1413,7 @@ function verFoto(p) {
 }
 
 function row(p) {
+  if (!String(p.name ?? "").trim()) return document.createDocumentFragment(); // sin nombre no hay tarjeta (nunca una tarjeta vacía)
   const el = document.createElement("div"); el.className = "pf" + (qty.get(p.id) > 0 ? " sel" : ""); el.dataset.id = p.id; el.tabIndex = -1; el.setAttribute("role", "group"); el.setAttribute("aria-label", p.name); // teclas: + añade, − quita
   const av = document.createElement("div"); av.className = "pf-av"; av.style.background = hue(p.name); av.textContent = initials(p.name);
   if (p.img) { // foto del producto encima de las iniciales; si no carga, se queda el marcador
@@ -1388,15 +1424,17 @@ function row(p) {
     av.addEventListener("click", (ev) => { if (!ev.target.closest("button")) verFoto(p); });
   }
   const info = document.createElement("div"); info.className = "pf-info";
-  if (p.marca || (tab === "all" && p.count > 0)) { const mi = document.createElement("div"); mi.className = "pf-micro"; mi.textContent = [p.marca, tab === "all" && p.count > 0 ? "Lo compras" : ""].filter(Boolean).join(" · "); info.appendChild(mi); }
+  if (p.marca) { const mi = document.createElement("div"); mi.className = "pf-micro"; mi.textContent = p.marca; info.appendChild(mi); }
   const n = document.createElement("div"); n.className = "pf-n"; n.textContent = p.nombreCorto || p.name;
   if (p.nombreCorto && p.nombreCorto !== p.name) n.title = p.name;
   const c = document.createElement("div"); c.className = "pf-sec"; // el código de producto no se muestra
-  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " · " + eur(precioCaja(p));
+  const pk = /(\d+)\s*[xX×]\s*(\d+)/.exec(p.name), esPack = /\bpack\b/i.test(p.name) || (pk && Number(pk[1]) * Number(pk[2]) > 1);
+  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " · " + eur(precioCaja(p)); else if (esPack) c.textContent = pk && Number(pk[1]) * Number(pk[2]) > 1 ? "Pack de " + Number(pk[1]) * Number(pk[2]) : "Pack"; // se dice siempre el formato
   const pr = document.createElement("div"); pr.className = "pf-pr";
-  const price = document.createElement("b"); price.textContent = eurp(p.price); const ud = document.createElement("span"); ud.className = "pf-ud"; ud.textContent = " /ud"; pr.append(price, ud);
+  const price = document.createElement("b"); price.textContent = eurp(p.price); const ud = document.createElement("span"); ud.className = "pf-ud"; ud.textContent = esPack ? " /pack" : " /ud"; pr.append(price, ud);
   if (p.discount) { const dto = document.createElement("span"); dto.className = "pf-dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} %`; pr.appendChild(dto); }
   if (p.oferta) { const of = document.createElement("span"); of.className = "pf-oferta"; of.textContent = "OFERTA" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().slice(0, 2).join("/") : ""); pr.appendChild(of); }
+  if (tab === "all" && p.count > 0) { const lc = document.createElement("span"); lc.className = "pf-compras"; lc.textContent = "Lo compras"; pr.appendChild(lc); } // etiqueta aparte del nombre, junto al precio
   info.append(n, c, pr);
   if (p.ia) { const ia = document.createElement("div"); ia.className = "pf-ia"; ia.textContent = "Imagen orientativa"; av.appendChild(ia); }
   if (data.favs) {
@@ -1454,7 +1492,7 @@ function conTransicion(fn) {
   const h = document.documentElement; h.classList.add("vt-lista");
   try { const t = document.startViewTransition(fn); t.finished.finally(() => h.classList.remove("vt-lista")); } catch { h.classList.remove("vt-lista"); fn(); }
 }
-const irA = (cat, sub) => conTransicion(() => { animarLista = true; limite = 150; nav = { cat, sub }; $("list").scrollTop = 0; renderList(); });
+const irA = (cat, sub) => conTransicion(() => { animarLista = true; limite = 150; nav = { cat, sub: cat && sub === null ? "*" : sub }; $("list").scrollTop = 0; renderList(); }); // entrar en una categoría enseña ya sus productos (las subcategorías son chips arriba)
 // Foto representativa de una sección: un producto suyo con foto (se prefiere el más típico de la sección); sin foto, una letra de color
 const PREFIERE = { cafe: /capsula|molido|grano|natural/i, pascual: /leche/i, vinos: /ribera|crianza|reserva|verdejo|rueda|cava/i, aguas: /\bagua\b|bezoya/i, despensa: /aceite|oliva/i, refrigerados: /queso|jamon|chorizo|salchich/i, "f-hosteleria-y-menaje": /\bvaso|copa/i };
 function fotoDe(cat, sub) {
@@ -1483,13 +1521,18 @@ function renderCategorias(list) {
     for (const p of top.slice(0, 6)) list.appendChild(row(p));
     const h2 = document.createElement("h3"); h2.className = "top-tit"; h2.textContent = "Todo el catálogo"; list.appendChild(h2);
   }
+  if ((data.accesos || []).length) { // accesos directos (Limpieza, Papel y desechables, Cervezas): un solo toque
+    const at = document.createElement("div"); at.className = "accesos"; at.setAttribute("role", "group"); at.setAttribute("aria-label", "Accesos directos");
+    for (const a of data.accesos) { const b = document.createElement("button"); b.type = "button"; b.className = "acceso"; b.textContent = a.nombre; b.onclick = () => irA(a.cat, a.sub); at.appendChild(b); }
+    list.appendChild(at);
+  }
   const g = document.createElement("div"); g.className = "cats";
   for (const c of data.tree) {
     const b = document.createElement("button"); b.type = "button"; b.className = "cat";
     const i = document.createElement("span"); i.className = "ico"; i.innerHTML = iconoCat(c.id); // icono de línea de la categoría (sin foto de un producto al azar)
     const n = document.createElement("b"); n.textContent = c.nombre;
     const k = document.createElement("small"); k.textContent = c.count + (c.count === 1 ? " producto" : " productos");
-    b.append(i, n, k); b.onclick = () => (c.subs.length === 1 ? irA(c.id, c.subs[0].id) : irA(c.id, null)); g.appendChild(b);
+    b.append(i, n, k); b.onclick = () => irA(c.id, null); g.appendChild(b);
   }
   list.appendChild(g);
 }
@@ -1516,10 +1559,46 @@ function renderSubs(list, c) {
 // Búsqueda: cada palabra escrita debe aparecer en el nombre (sin acentos ni mayúsculas, en cualquier orden) o ser parte del código
 // Distancia de edición (para perdonar una errata: «cervesa» encuentra «cerveza»)
 const dist = (a, b) => { const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]); for (let j = 1; j <= b.length; j++) d[0][j] = j; for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; };
-const coincide = (p, q) => {
-  const n = norm(p.name), toks = n.split(/[^a-z0-9]+/).filter(Boolean);
-  return q.split(/\s+/).every(w => n.includes(w) || p.id.includes(w) || (w.length >= 5 && toks.some(t => Math.abs(t.length - w.length) <= 1 && dist(w, t) <= 1)));
-};
+// ── Buscador: entiende plurales y tildes, sinónimos y nombres de categoría; el producto va antes que el accesorio y lo que el cliente compra, arriba ──
+const PALABRAS_VACIAS_B = new Set(["de", "del", "la", "las", "el", "los", "y", "e", "en", "con", "sin", "para", "por", "un", "una", "al"]);
+const ACCESORIOS = new Set(["cuchara", "cucharilla", "cucharon", "copa", "vaso", "jarra", "estuche", "pinza", "taza", "plato", "cubierto", "tenedor", "cuchillo", "bandeja", "dispensador", "soporte", "abridor", "abrebotellas", "set", "juego", "molinillo", "cafetera", "azucarero", "servilletero", "cubitera", "pala", "colador", "termo", "expositor", "cesta", "mantel", "delantal", "espatula", "cazo", "olla", "sarten"]);
+const SINONIMOS = { refresco: ["cola", "fanta", "sprite", "kas", "tonica", "gaseosa", "limonada", "naranjada", "bitter"], hielo: ["cubito"], limpieza: ["limpiador", "lejia", "fregasuelos", "friegasuelos", "detergente", "desinfectante", "estropajo", "bayeta", "jabon", "amoniaco"], barril: ["keg", "barrica"], cafe: ["capsula"], vino: ["rioja", "ribera", "rueda", "verdejo", "crianza"], servilleta: ["servilleta"], desechable: ["desechable"] };
+const stemB = w => { w = norm(w).replace(/[^a-z0-9]/g, ""); if (w.length > 4) { if (w.endsWith("ces")) return w.slice(0, -3) + "z"; if (/[^aeiou]es$/.test(w)) return w.slice(0, -2); } return w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w; };
+const tokensB = t => norm(String(t)).split(/[^a-z0-9]+/).filter(w => w && !PALABRAS_VACIAS_B.has(w));
+let indiceBusq = null;
+function indiceBusqueda() {
+  if (indiceBusq) return indiceBusq;
+  const cats = new Map();
+  for (const c of data.tree || []) { cats.set(c.id, tokensB(c.nombre).map(stemB)); for (const sb of c.subs) cats.set(c.id + "/" + sb.id, tokensB(sb.nombre).map(stemB)); }
+  return (indiceBusq = data.products.map(p => ({ p, t: tokensB(p.name).map(stemB), ct: [...(cats.get(p.cat) || []), ...(cats.get(p.cat + "/" + p.sub) || [])], n: norm(p.name) })));
+}
+/** Devuelve un Map código → puntos, ya ordenado (más puntos primero), o null si no hay nada que buscar. */
+function buscarOrden(raw) {
+  const qt = tokensB(raw).map(stemB).filter(Boolean); if (!qt.length) return null;
+  const res = [];
+  for (const e of indiceBusqueda()) {
+    let total = 0, ok = true;
+    for (const w of qt) {
+      const alts = SINONIMOS[w] || []; let sc = 0;
+      for (let i = 0; i < e.t.length; i++) {
+        const t = e.t[i]; let pts = 0;
+        if (t === w) pts = i === 0 ? 10 : 6; else if (t.startsWith(w)) pts = i === 0 ? 8 : 4;
+        else if (w.length >= 6 && t[0] === w[0] && Math.abs(t.length - w.length) <= 1 && dist(w, t) <= 1) pts = 2;
+        else if (alts.some(x => t === x || t.startsWith(x))) pts = 3;
+        if (pts && i > 0 && ACCESORIOS.has(e.t[0])) pts = Math.max(pts - 8, 0.5); // «copas de vino», «cucharas de café»: el accesorio va detrás del producto
+        sc = Math.max(sc, pts);
+      }
+      if (!sc && e.ct.some(c => c === w || c.startsWith(w) || alts.includes(c))) sc = 2; // nombre de la categoría o subcategoría («refrescos», «limpieza»)
+      if (!sc && /\d/.test(w) && e.p.id.includes(w)) sc = 8; // código de producto
+      if (!sc && w.length >= 3 && e.n.includes(w)) sc = 1; // trozo dentro de una palabra («33cl»)
+      if (!sc) { ok = false; break; }
+      total += sc;
+    }
+    if (ok) res.push([e.p, total + (e.p.count > 0 ? 3 + Math.min(e.p.count, 10) / 10 : 0)]);
+  }
+  res.sort((a, b) => b[1] - a[1] || a[0].name.localeCompare(b[0].name));
+  return new Map(res.map(([p, v]) => [p.id, v]));
+}
 // ── Búsqueda: filtros por marca (la subcategoría de la tarifa) y por formato (sacado del nombre: 33 cl, 1,5 l, 500 gr…) ──
 const FORMATO_RE = /(\d+(?:[.,]\d+)?)\s?(cl|ml|lt|l|kg|gr|g)\b/i;
 function formatoDe(p) {
@@ -1600,10 +1679,11 @@ function arrastrable(caja, cerrar) {
   };
   caja.addEventListener("pointerup", suelta); caja.addEventListener("pointercancel", suelta);
 }
+let obsMas = null;
 function renderList() {
   const list = $("list"); list.innerHTML = ""; list.removeAttribute("aria-busy");
   const q = norm(query.trim());
-  const enBusqueda = !!q;
+  const enBusqueda = !!q, orden = q ? buscarOrden(query.trim()) : null;
   $("fil").hidden = $("filinfo").hidden = enBusqueda || tab !== "hab";
   $("filbar").hidden = !(tab === "hab" && !enBusqueda) && !enBusqueda && !$("busqfil").children.length; // en una búsqueda la barra trae marca y formato; si no, solo en «Histórico»
   if (!enBusqueda) { if ($("busqfil").dataset.modo === "recientes") pintarRecientes(); else $("busqfil").innerHTML = ""; }
@@ -1615,15 +1695,26 @@ function renderList() {
     if (!nav.cat) { renderCategorias(list); return entrada(list, ".cat"); }
     const c = data.tree.find(x => x.id === nav.cat);
     if (!c) { nav = { cat: null, sub: null }; return renderCategorias(list); }
-    if (nav.sub === null) { renderSubs(list, c); return entrada(list, ".sub"); }
-    const s = c.subs.find(x => x.id === nav.sub);
-    cabecera = () => migas(list, `<b>${nav.sub === "*" ? "Todo" : esc(s ? s.nombre : "")}</b>`, () => (c.subs.length === 1 ? irA(null, null) : irA(c.id, null)), c.subs.length === 1 ? "Catálogo" : c.nombre);
+    if (nav.sub === null) nav.sub = "*";
+    cabecera = () => { // barra fija con fondo: «‹ Catálogo», el nombre y, si hay varias, las subcategorías como chips
+      const w = document.createElement("div"); w.className = "cab-cat";
+      migas(w, `<b>${esc(c.nombre)}</b>`, () => irA(null, null), "Catálogo");
+      if (c.subs.length > 1) {
+        const ch = document.createElement("div"); ch.className = "subchips"; ch.setAttribute("role", "group"); ch.setAttribute("aria-label", "Subcategorías de " + c.nombre);
+        const chip = (txt, n, on, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "subchip"; b.setAttribute("aria-pressed", String(on)); b.append(txt + " "); const sm = document.createElement("small"); sm.textContent = n; b.appendChild(sm); b.onclick = fn; ch.appendChild(b); };
+        chip("Todo", c.count, nav.sub === "*", () => irA(c.id, "*"));
+        for (const sb of c.subs) chip(sb.nombre, sb.count, nav.sub === sb.id, () => irA(c.id, sb.id));
+        w.appendChild(ch);
+      }
+      list.appendChild(w);
+    };
   }
-  let items = data.products.filter(p => (tab === "all" || p.count > 0 || favs.has(p.id) || q) && (!q || coincide(p, q)) && (!filtra || qty.get(p.id) > 0)
+  let items = data.products.filter(p => (tab === "all" || p.count > 0 || favs.has(p.id) || q) && (!q || orden.has(p.id)) && (!filtra || qty.get(p.id) > 0)
     && (!arbol || (p.cat === nav.cat && (nav.sub === "*" || p.sub === nav.sub))));
   if (enBusqueda) { // la búsqueda mira TODO el catálogo; debajo, filtros de marca y formato (se quitan con un toque)
     const base = items; pintarFiltrosBusqueda(base);
     if (fMarca) items = items.filter(p => marcaDe(p) === fMarca); if (fFormato) items = items.filter(p => formatoDe(p) === fFormato);
+    items.sort((a, b) => orden.get(b.id) - orden.get(a.id) || a.name.localeCompare(b.name)); // lo mejor primero: el producto antes que el accesorio, y lo que compra el cliente arriba
     $("filbar").hidden = false; $("filinfo").hidden = false; $("filinfo").textContent = items.length === 1 ? "1 resultado" : `${items.length} resultados`;
   }
   $("fil").setAttribute("aria-pressed", String(soloCantidad));
@@ -1646,12 +1737,21 @@ function renderList() {
     tablaLineas.sinObs = true; list.appendChild(tablaLineas(items.map(p => ({ ...p, qty: qty.get(p.id) })))); tablaLineas.sinObs = false;
     return;
   }
-  items.slice(0, limite).forEach(p => list.appendChild(row(p)));
+  if (items.length > limite) { const info = document.createElement("div"); info.className = "cuenta-lista"; info.setAttribute("role", "status"); info.textContent = `Mostrando ${limite} de ${items.length}`; list.appendChild(info); }
+  const conGrupos = arbol && items.some(p => p.count > 0) && items.some(p => !(p.count > 0)); // en una sección: primero lo que ya compra, con su título
+  let grupo = null;
+  items.slice(0, limite).forEach(p => {
+    if (conGrupos && (p.count > 0 ? "hab" : "resto") !== grupo) { grupo = p.count > 0 ? "hab" : "resto"; const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = grupo === "hab" ? "Lo que sueles pedir" : "Todo lo demás"; list.appendChild(t); }
+    list.appendChild(row(p));
+  });
   entrada(list, ".pf");
+  if (obsMas) { obsMas.disconnect(); obsMas = null; }
   if (items.length > limite) {
     const m = document.createElement("button"); m.type = "button"; m.className = "big sec"; m.style.margin = "12px 14px"; m.style.width = "calc(100% - 28px)"; // sin esto el botón se salía 28 px y la lista se movía de lado
-    m.textContent = `Mostrar más (${items.length - limite} restantes)`; m.onclick = () => { limite += 150; renderList(); };
+    const mas = () => { const alto = list.scrollTop; limite += 150; renderList(); list.scrollTop = alto; };
+    m.textContent = `Mostrar más (${items.length - limite} restantes)`; m.onclick = mas;
     list.appendChild(m);
+    if ("IntersectionObserver" in window) { obsMas = new IntersectionObserver(es => { if (es[0].isIntersecting) mas(); }, { root: list, rootMargin: "700px 0px" }); obsMas.observe(m); } // al acercarse al final, se cargan más solos
   }
 }
 
@@ -1738,7 +1838,7 @@ function pintarFalta(box) {
     const f = document.createElement("div"); f.className = "falta-fila";
     const av = document.createElement("button"); av.type = "button"; av.className = "falta-av"; av.style.background = hue(x.name); av.textContent = initials(x.name); av.setAttribute("aria-label", x.img ? "Ampliar la foto de " + x.name : x.name);
     if (x.img) { const im = document.createElement("img"); im.src = x.img; im.alt = ""; im.loading = "lazy"; av.textContent = ""; im.onerror = () => { im.remove(); av.textContent = initials(x.name); }; av.appendChild(im); av.onclick = () => verFoto(x); } else av.style.cursor = "default";
-    const n = document.createElement("span"); n.className = "falta-n"; n.textContent = x.name + " · " + eurp(x.price) + (x.unitsPerBox ? " · caja de " + x.unitsPerBox : "");
+    const n = document.createElement("span"); n.className = "falta-n"; const nb = document.createElement("b"); nb.textContent = x.nombreCorto || x.name; nb.title = x.name; const ns = document.createElement("small"); ns.textContent = eurp(x.price) + (x.unitsPerBox ? " · caja de " + x.unitsPerBox : ""); n.append(nb, ns);
     const b = document.createElement("button"); b.type = "button"; b.className = "add"; b.textContent = "+ Añadir"; b.setAttribute("aria-label", "Añadir " + x.name); b.onclick = () => setQty(x.id, 1);
     f.append(av, n, b); s.appendChild(f);
   }
@@ -1779,7 +1879,7 @@ function refresh() {
   $("verCarrito").disabled = !n; document.querySelector("footer").hidden = !n; document.querySelector(".app").classList.toggle("sin-carrito", !n); // sin nada en el carrito no hay barra fija que tape la lista
   const fila = bumpId && !bumpFav && !(tab === "hab" && soloCantidad) ? $("list").querySelector(`.pf[data-id="${CSS.escape(bumpId)}"]`) : null;
   const prod = fila && productoPorId.get(bumpId);
-  if (fila && prod) { const tenia = fila.contains(document.activeElement), nueva = row(prod); fila.replaceWith(nueva); if (tenia) nueva.focus({ preventScroll: true }); } // cambio de cantidad: solo se repinta ese producto (antes se repintaba toda la lista, fotos incluidas)
+  if (fila && prod) { const tenia = fila.contains(document.activeElement), nueva = row(prod); fila.replaceWith(nueva); if (tenia && nueva.focus) nueva.focus({ preventScroll: true }); } // cambio de cantidad: solo se repinta ese producto (antes se repintaba toda la lista, fotos incluidas)
   else { const scroll = $("list").scrollTop; renderList(); $("list").scrollTop = scroll; }
   if (!$("cart").hidden || escritorio()) renderCart();
   bumpId = null; bumpFav = null;
@@ -1900,7 +2000,7 @@ function precargar() {
   if (mod) { setTimeout(() => modificar(mod[1]), 0); return; }
   if (/[#&]tab=hab(?:&|$)/.test(String(window.vmPrecarga ?? location.hash))) { tab = "hab"; try { history.replaceState({ vmTab: "hab" }, ""); } catch {} marcaNav(); return; } // «Ver todos» de «Lo que sueles pedir»
   const kat = /[#&]cat=([\w-]+)/.exec(String(window.vmPrecarga ?? location.hash)); // categoría elegida en el Inicio del chat
-  if (kat && (data.tree || []).some(c => c.id === kat[1])) { const c = data.tree.find(x => x.id === kat[1]); tab = "all"; nav = { cat: c.id, sub: c.subs.length === 1 ? c.subs[0].id : null }; marcaNav(); return; }
+  if (kat && (data.tree || []).some(c => c.id === kat[1])) { const c = data.tree.find(x => x.id === kat[1]), sb = /[#&]sub=([\w-]+)/.exec(String(window.vmPrecarga ?? location.hash)); tab = "all"; nav = { cat: c.id, sub: sb && c.subs.some(x => x.id === sb[1]) ? sb[1] : "*" }; marcaNav(); return; }
   const m = /[#&]c=([^&]*)/.exec(String(window.vmPrecarga ?? location.hash));
   if (!m) return;
   const byId = new Set(data.products.map(p => p.id));
@@ -1937,8 +2037,7 @@ function pintarSugs() {
   const box = $("sugs"), qn = norm($("q").value.trim());
   box.innerHTML = "";
   if (!qn || document.activeElement !== $("q")) { box.hidden = true; $("q").setAttribute("aria-expanded", "false"); return; }
-  const orden = p => (norm(p.name).startsWith(qn) ? 0 : 1) + (p.count > 0 ? 0 : 0.5);
-  const res = data.products.filter(p => coincide(p, qn)).sort((a, b) => orden(a) - orden(b) || a.name.localeCompare(b.name)).slice(0, 6);
+  const ord = buscarOrden($("q").value.trim()), res = ord ? [...ord.keys()].slice(0, 6).map(id => productoPorId.get(id)).filter(Boolean) : [];
   if (!res.length) { box.hidden = true; $("q").setAttribute("aria-expanded", "false"); return; }
   for (const p of res) {
     const fila = document.createElement("div"); fila.className = "sug"; fila.setAttribute("role", "option"); fila.dataset.id = p.id; fila.id = "sug-" + p.id;

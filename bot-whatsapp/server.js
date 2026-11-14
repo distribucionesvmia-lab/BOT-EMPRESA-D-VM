@@ -15,7 +15,7 @@ import { crearActualizador } from "./actualizar-datos.js";
 import { estadoSistema, crearVigilante } from "./monitor.js";
 import { privacidadHtml } from "./privacidad.js";
 import { sendMail } from "./mailer.js";
-import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders } from "./weborder.js";
+import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, accesosDe } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "./delivery.js";
 // Lo que el catálogo necesita para el aviso «entrega hoy» y las opciones de día: se calcula SIEMPRE en el servidor con la hora de Madrid
 // «Lo más pedido» (para un cliente sin historial): identificadores de los artículos que más clientes compran, sin ningún dato personal; se recalcula cada 10 minutos
@@ -301,7 +301,7 @@ function webOrderRoutes(req, res, url) {
         used: getDb().hasOrderKey(linkKey(link)),
         products,
         history: webHistory(view, catalogNow()),
-        tree: webTree(catalogNow()),
+        tree: webTree(catalogNow()), accesos: accesosDe(webTree(catalogNow())),
         top: topIds(),
       ayuda: ayudaPublica(),
         ayuda: ayudaPublica(),
@@ -559,7 +559,7 @@ async function appRoutes(req, res, url) {
     return void sendJson(res, 200, {
       habituales, ofertas, loMasPedido: lo_mas, tieneHistorial: todos.some((x) => x.count > 0),
       fotos: Object.fromEntries(ids.map((id) => [id, porId.get(id)?.img ?? null])),
-      categorias: webTree(catalogNow()).map((c) => ({ id: c.id, nombre: c.nombre })),
+      categorias: webTree(catalogNow()).map((c) => ({ id: c.id, nombre: c.nombre })), accesos: accesosDe(webTree(catalogNow())),
       ayuda: ayudaPublica(),
     });
   }
@@ -579,7 +579,7 @@ async function appRoutes(req, res, url) {
       favs: getAccountsDb().favorites(account.customerId),
       products: webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa),
       history: webHistory(customer, catalogNow()),
-      tree: webTree(catalogNow()),
+      tree: webTree(catalogNow()), accesos: accesosDe(webTree(catalogNow())),
       top: topIds(),
       retirados: retiradosDe(customer),
       ...avisoEntrega(customer),
