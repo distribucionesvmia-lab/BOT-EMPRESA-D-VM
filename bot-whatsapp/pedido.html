@@ -1592,6 +1592,8 @@ $("fijoGuardar").onclick = async () => {
 function precargar() {
   const mod = /[#&]m=([\w-]+)/.exec(String(window.vmPrecarga ?? location.hash)); // «Modificar pedido» desde el chat
   if (mod) { setTimeout(() => modificar(mod[1]), 0); return; }
+  const kat = /[#&]cat=([\w-]+)/.exec(String(window.vmPrecarga ?? location.hash)); // categoría elegida en el Inicio del chat
+  if (kat && (data.tree || []).some(c => c.id === kat[1])) { const c = data.tree.find(x => x.id === kat[1]); tab = "all"; nav = { cat: c.id, sub: c.subs.length === 1 ? c.subs[0].id : null }; marcaNav(); return; }
   const m = /[#&]c=([^&]*)/.exec(String(window.vmPrecarga ?? location.hash));
   if (!m) return;
   const byId = new Set(data.products.map(p => p.id));

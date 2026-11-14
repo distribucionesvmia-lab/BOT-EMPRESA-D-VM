@@ -238,7 +238,7 @@ const greeting = (s, justIdentified = false) => {
         `• Elige el día de entrega, confirma y listo.`,
       ui: {
         type: "link", title: "Hacer pedido", url: s.link, home: true,
-        ...(ult ? { last: { date: fmtDateFull(ult.o.date), articulos: ult.items.length, total: Math.round(total(ult.items) * 100) / 100, conIva: true, lineas: ult.items.slice(0, 5).map((i) => `${cantidadH(i)} · ${i.name}`), mas: Math.max(0, ult.items.length - 5), repetir: hashRepetir(ult.items) } } : {}),
+        ...(ult ? { last: { date: fmtDateFull(ult.o.date), articulos: ult.items.length, total: Math.round(total(ult.items) * 100) / 100, conIva: true, lineas: ult.items.slice(0, 5).map((i) => `${cantidadH(i)} · ${i.name}`), mas: Math.max(0, ult.items.length - 5), repetir: hashRepetir(ult.items), fecha: ult.o.date } } : {}),
       },
     };
   }

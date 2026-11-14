@@ -364,6 +364,47 @@
   .vm .hero h1, .vm .hero p { color:var(--on-accent); }
   .vm .hero .ds-logo.grande { padding:0; margin:0 auto var(--s5); }
   .vm .hero .ds-logo.grande img { width:min(220px, 56vw); height:auto; }
+
+  /* ═══ Inicio (pantalla de bienvenida del chat) ═══ */
+  .mrow:has(.vm-inicio) .av { display:none; }
+  .mrow:has(.vm-inicio) { max-width:min(100%, 600px); align-self:stretch; }
+  .vm-inicio { background:transparent; border:0; border-radius:0; overflow:visible; display:flex; flex-direction:column; gap:var(--s3); width:100%; max-width:560px; animation:vm-sube .3s var(--ease) both; }
+  .vm-inicio .in-saludo h2 { margin:0; font-size:calc(var(--t-lg) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; overflow-wrap:anywhere; }
+  .vm-inicio .in-saludo p { margin:var(--s1) 0 0; font-size:calc(var(--t-sec) / var(--k,1)); color:var(--text-2); }
+  .vm-inicio .in-hoy { padding:var(--s3) var(--s4); border-radius:var(--r-field); background:var(--ok-bg); color:var(--ok); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; line-height:1.3; }
+  .vm-inicio .in-hoy[hidden], .vm-inicio .in-fijo:empty { display:none; }
+  .vm-inicio .in-card { background:var(--surface); border-radius:var(--r-card); padding:var(--s5); display:flex; flex-direction:column; gap:var(--s3); }
+  .vm-inicio .in-card h3 { margin:0; font-size:calc(var(--t-md) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; }
+  .vm-inicio .in-card p { margin:0; color:var(--text-2); font-size:calc(var(--t-sec) / var(--k,1)); line-height:1.35; }
+  .vm-inicio .in-peq { color:var(--text-2); font-size:calc(var(--t-cap) / var(--k,1)); }
+  .vm-inicio .in-total { color:var(--text) !important; font-weight:600; font-variant-numeric:tabular-nums; }
+  .vm-inicio .in-fotos { display:flex; padding-left:var(--s3); min-height:44px; }
+  .vm-inicio .in-foto { width:44px; height:44px; margin-left:calc(-1 * var(--s3)); border-radius:50%; border:2px solid var(--surface); background:var(--fill); overflow:hidden; display:grid; place-items:center; color:var(--text-2); }
+  .vm-inicio .in-foto img { width:100%; height:100%; object-fit:contain; background:var(--fill); }
+  .vm-inicio .in-card .vm-btn { width:100%; }
+  .vm-inicio ul.lineas { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:var(--s1); }
+  .vm-inicio ul.lineas li { font-size:calc(var(--t-sec) / var(--k,1)); line-height:1.3; overflow-wrap:anywhere; }
+  .vm-inicio ul.lineas li:last-child:not(:only-child) { color:var(--text-2); }
+  .vm-inicio .in-secs { display:flex; flex-direction:column; gap:var(--s4); }
+  .vm-inicio .in-hacer { align-self:stretch; }
+  .vm-inicio .in-sec h3, .vm-inicio .in-ayuda h3 { margin:0 0 var(--s2); font-size:calc(var(--t-md) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; }
+  .vm-inicio .in-hscroll { scroll-padding-left:var(--gutter); display:flex; gap:var(--s3); overflow-x:auto; padding:2px var(--gutter) var(--s2); margin:0 calc(-1 * var(--gutter)); scrollbar-width:none; scroll-snap-type:x proximity; }
+  .vm-inicio .in-hscroll::-webkit-scrollbar { display:none; }
+  .vm-inicio .in-prod { flex:none; width:148px; scroll-snap-align:start; display:flex; flex-direction:column; gap:var(--s1); padding:var(--s2); background:var(--surface); border-radius:var(--r-card); color:var(--text); text-decoration:none; }
+  .vm-inicio .in-pim { position:relative; width:100%; aspect-ratio:1/1; border-radius:var(--r-img); background:var(--fill); overflow:hidden; display:grid; place-items:center; color:var(--text-2); font-weight:700; }
+  .vm-inicio .in-pim img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; padding:8px; }
+  .vm-inicio .in-mas { position:absolute; right:var(--s2); bottom:var(--s2); width:32px; height:32px; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; }
+  .vm-inicio .in-mas svg { width:18px; height:18px; display:block; }
+  .vm-inicio .in-pn { font-size:calc(var(--t-sec) / var(--k,1)); line-height:1.2; font-weight:600; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; min-height:2.4em; }
+  .vm-inicio .in-prod small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .vm-inicio .in-ayuda { background:var(--surface); border-radius:var(--r-card); padding:var(--s5); }
+  .vm-inicio .in-ayuda p { margin:0 0 var(--s3); color:var(--text-2); font-size:calc(var(--t-sec) / var(--k,1)); }
+  .vm-inicio .in-ayuda-bt { display:flex; flex-direction:column; gap:var(--s2); }
+  .vm-inicio .in-ayuda-bt .vm-btn { text-decoration:none; width:100%; }
+  .vm-inicio .in-chips { display:flex; flex-wrap:wrap; gap:var(--s2); }
+  .vm-inicio .in-chip { min-height:44px; display:inline-flex; align-items:center; padding:0 var(--s4); border-radius:var(--r-pill); background:var(--surface); color:var(--text); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; text-decoration:none; }
+  .vm-inicio .in-prod:active, .vm-inicio .in-chip:active { transform:scale(.97); }
+  @media (prefers-reduced-motion: reduce) { .vm-inicio, .vm-inicio .in-prod:active, .vm-inicio .in-chip:active { animation:none; transform:none; } }
 </style>
 </head>
 <body>
@@ -752,45 +793,82 @@ function tarjetaTabla(card) {
   const ft = t.createTFoot().insertRow(); const a = ft.insertCell(); a.colSpan = 2; a.textContent = card.conIva ? "Total con IVA" : "Total"; const b = ft.insertCell(); b.className = "c-imp"; b.textContent = eur(card.total);
   c.append(h, t); chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
 }
-// Inicio: «Hacer pedido» en su fila con su botón
+// ── Inicio: saludo, aviso de «hoy», tu pedido de siempre, lo que sueles pedir, ayuda y categorías ──
+const DIAS_LARGO = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const saludoMadrid = () => { const h = Number(new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", hour: "numeric", hourCycle: "h23" }).format(new Date())); return h < 13 ? "Buenos días" : h < 21 ? "Buenas tardes" : "Buenas noches"; };
+const diaSemanaDe = (iso) => { try { return new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", weekday: "long" }).format(new Date(iso)); } catch { return ""; } };
+const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+const flecha = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function inicio(ui) {
-  const c = document.createElement("div"); c.className = "vm-inicio";
-  if (window.__saludo) { // saludo de bienvenida dentro de la propia tarjeta
-    const h = document.createElement("div"); h.className = "saludo";
-    h.innerHTML = sinEmoji(String(window.__saludo).replace(/[&<>]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[ch]))).replace(/\*([^*\n]+)\*/g, "<b>$1</b>"); c.appendChild(h); window.__saludo = null;
-  }
-  const pasos = document.createElement("div"); pasos.className = "pasos"; // cómo se hace un pedido, de un vistazo
-  for (const [n, t, s] of [["1", "Elige tus productos", "Pulsa «Hacer pedido»"], ["2", "Elige el día", "de entrega"], ["3", "Confirma", "y listo"]]) { const p = document.createElement("div"); p.className = "paso"; const nn = document.createElement("span"); nn.className = "n"; nn.textContent = n; const b = document.createElement("b"); b.textContent = t; const sm = document.createElement("small"); sm.textContent = s; p.append(nn, b, sm); pasos.appendChild(p); }
-  const tip = document.createElement("div"); tip.className = "tip"; tip.append("También puedes escribir lo que necesitas, por ejemplo "); const ej = document.createElement("i"); ej.textContent = "«6 aguas y 2 cervezas»"; tip.append(ej, ".");
-  c.append(pasos, tip);
-  const fila = (peque, grande, boton, accion) => {
-    const f = document.createElement("div"); f.className = "fila";
-    const t = document.createElement("div"); const s = document.createElement("small"); s.textContent = peque; const b = document.createElement("b"); b.textContent = grande; t.append(s, b);
-    const bt = document.createElement("button"); bt.type = "button"; bt.textContent = boton; bt.onclick = accion;
-    f.append(t, bt); c.appendChild(f);
-  };
-  fila("Pedido nuevo", "Elige del catálogo", "Hacer pedido", () => enviar("h:open", "Hacer pedido")); // lo contesta el asistente (con el aviso de «entrega hoy» si toca) y abre el catálogo
-  if (ui.last?.lineas?.length) { // «Tu pedido de siempre»: las líneas del último pedido y un botón que lo abre en el catálogo para revisarlo
-    const f = document.createElement("div"); f.className = "fila siempre";
-    const t = document.createElement("div"); const s = document.createElement("small"); s.textContent = "Tu pedido de siempre · " + ui.last.date; const b = document.createElement("b"); b.textContent = "Tu pedido de siempre";
-    const ul = document.createElement("ul"); ul.className = "lineas";
-    for (const l of ui.last.lineas) { const li = document.createElement("li"); li.textContent = l; ul.appendChild(li); }
-    if (ui.last.mas) { const li = document.createElement("li"); li.textContent = "… y " + ui.last.mas + " más"; ul.appendChild(li); }
-    t.append(s, b, ul);
-    const sem = document.createElement("button"); sem.type = "button"; sem.className = "sec";  sem.textContent = "Repetir cada semana"; // abre el catálogo con este pedido y la opción del pedido fijo a la vista
-    sem.onclick = () => { location.href = ui.url + "#" + ui.last.repetir + "&f=1"; }; const bt = document.createElement("button"); bt.type = "button"; bt.textContent = "Repetir y revisar"; bt.onclick = () => { location.href = ui.url + "#" + ui.last.repetir; };
-    f.append(t, bt, sem); c.appendChild(f);
-  }
-  { const fila = document.createElement("div"); fila.className = "mrow in"; const av = document.createElement("div"); av.className = "av"; av.textContent = "VM"; av.setAttribute("aria-hidden", "true"); fila.append(av, c); chat.appendChild(fila); chat.scrollTop = chat.scrollHeight; }
+  window.__saludo = null;
   window.__catUrl = ui.url || "/catalogo";
+  const cat = ui.url || "/catalogo", c = el("div", "vm-inicio");
+  const nombre = ($("cli").textContent || "").trim();
+  const sal = el("div", "in-saludo"); sal.append(el("h2", null, saludoMadrid() + (nombre ? ", " + nombre : "")), el("p", null, "¿Qué necesitas hoy?")); c.appendChild(sal);
+  const hoy = el("div", "in-hoy"); hoy.hidden = true; hoy.setAttribute("role", "status"); hoy.textContent = "Si haces el pedido antes de las 10:00, te lo entregamos hoy."; c.appendChild(hoy);
+  const sitioFijo = el("div", "in-fijo"); c.appendChild(sitioFijo);
+  const principal = el("div", "in-card"); c.appendChild(principal);
+  const secciones = el("div", "in-secs"); c.appendChild(secciones);
+  const hacer = el("button", "vm-btn primary in-hacer", "Hacer pedido"); hacer.type = "button"; hacer.onclick = () => enviar("h:open", "Hacer pedido"); // lo contesta el asistente (con el aviso de «entrega hoy» si toca) y abre el catálogo
+  // Tu pedido de siempre (o «Empieza tu primer pedido»)
+  const ids = [];
+  if (ui.last?.lineas?.length) {
+    const m = /(?:^|[#&])c=([^&]*)/.exec(ui.last.repetir || ""); for (const par of (m ? m[1].split(",") : []).slice(0, 4)) { const i = par.lastIndexOf("."); if (i > 0) ids.push(decodeURIComponent(par.slice(0, i))); }
+    principal.append(el("small", "in-peq", "Tu pedido de siempre · " + ui.last.date));
+    const fotos = el("div", "in-fotos"); fotos.setAttribute("aria-hidden", "true"); principal.appendChild(fotos);
+    const lin = el("ul", "lineas"); for (const l of ui.last.lineas) lin.appendChild(el("li", null, l)); if (ui.last.mas) lin.appendChild(el("li", null, "… y " + ui.last.mas + " más")); principal.appendChild(lin);
+    principal.appendChild(el("p", "in-total", `${ui.last.articulos} artículo${ui.last.articulos === 1 ? "" : "s"} · ${eur(ui.last.total)} con IVA`));
+    const rep = el("button", "vm-btn primary", "Repetir y revisar"); rep.type = "button"; rep.onclick = () => { location.href = ui.url + "#" + ui.last.repetir; }; // carga con los precios de hoy y abre «Pedido»; nunca se envía solo
+    const dia = diaSemanaDe(ui.last.fecha);
+    const sem = el("button", "vm-btn ghost", dia ? "Repetir cada " + dia : "Repetir cada semana"); sem.type = "button"; sem.onclick = () => { location.href = ui.url + "#" + ui.last.repetir + "&f=1"; };
+    principal.append(rep, sem);
+  } else {
+    principal.classList.add("vacio"); principal.append(el("h3", null, "Empieza tu primer pedido"), el("p", null, "Elige lo que necesitas del catálogo y te lo llevamos."), hacer);
+  }
+  if (ui.last?.lineas?.length) secciones.appendChild(hacer);
+  // Datos que completan la pantalla
+  fetch("/catalogo/aviso").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j?.entregaHoy) hoy.hidden = false; }).catch(() => {});
+  fetch("/api/inicio?ids=" + encodeURIComponent(ids.join(","))).then((r) => (r.ok ? r.json() : null)).then((j) => {
+    if (!j) return;
+    const fotos = principal.querySelector(".in-fotos");
+    if (fotos) for (const id of ids) { const t = el("span", "in-foto"); const f = j.fotos?.[id]; if (f) { const im = document.createElement("img"); im.src = f; im.alt = ""; im.loading = "lazy"; im.onerror = () => im.remove(); t.appendChild(im); } else t.textContent = "·"; fotos.appendChild(t); }
+    const lista = j.tieneHistorial ? j.habituales : j.loMasPedido;
+    if (lista?.length) {
+      const sec = el("section", "in-sec"); sec.setAttribute("aria-label", j.tieneHistorial ? "Lo que sueles pedir" : "Lo más pedido");
+      sec.appendChild(el("h3", null, j.tieneHistorial ? "Lo que sueles pedir" : "Lo más pedido"));
+      const fila = el("div", "in-hscroll");
+      for (const p of lista) {
+        const t = el("a", "in-prod"); t.href = cat + "#c=" + encodeURIComponent(p.id) + ".1&a=1"; t.setAttribute("aria-label", `${p.name}, ${eur(p.price)} la unidad. Añadir al pedido`);
+        const im = el("span", "in-pim"); if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.onerror = () => i.remove(); im.appendChild(i); } else im.textContent = p.name.slice(0, 2).toUpperCase();
+        const mas = el("span", "in-mas"); mas.setAttribute("aria-hidden", "true"); mas.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'; im.appendChild(mas);
+        t.append(im, el("b", "in-pn", p.name), el("small", null, eur(p.price) + " /ud")); fila.appendChild(t);
+      }
+      sec.appendChild(fila); secciones.appendChild(sec);
+    }
+    if (j.ayuda && (j.ayuda.tel || j.ayuda.horario || j.ayuda.whatsappHref)) { // tarjeta comercial: solo con teléfono u horario configurados
+      const ay = el("section", "in-ayuda"); ay.setAttribute("aria-label", "Tu comercial"); ay.appendChild(el("h3", null, "¿Necesitas ayuda?"));
+      if (j.ayuda.horario) ay.appendChild(el("p", null, j.ayuda.horario));
+      const bs = el("div", "in-ayuda-bt");
+      if (j.ayuda.telHref) { const a = el("a", "vm-btn ghost", "Llamar" + (j.ayuda.tel ? " · " + j.ayuda.tel : "")); a.href = j.ayuda.telHref; bs.appendChild(a); }
+      if (j.ayuda.whatsappHref) { const a = el("a", "vm-btn ghost", "WhatsApp"); a.href = j.ayuda.whatsappHref + "?text=" + encodeURIComponent("Hola, necesito ayuda con mi pedido" + (nombre ? ". Soy " + nombre : "")); a.target = "_blank"; a.rel = "noopener"; bs.appendChild(a); }
+      ay.appendChild(bs); secciones.appendChild(ay);
+    }
+    if (j.categorias?.length) {
+      const sec = el("section", "in-sec"); sec.setAttribute("aria-label", "Categorías"); sec.appendChild(el("h3", null, "Categorías"));
+      const fila = el("div", "in-chips"); for (const k of j.categorias) { const a = el("a", "in-chip", k.nombre); a.href = cat + "#cat=" + encodeURIComponent(k.id); fila.appendChild(a); }
+      sec.appendChild(fila); secciones.appendChild(sec);
+    }
+    chat.scrollTop = 0;
+  }).catch(() => {});
+  { const fila = document.createElement("div"); fila.className = "mrow in"; fila.appendChild(c); chat.appendChild(fila); chat.scrollTop = 0; }
   // «Hoy toca tu pedido de los martes»: solo si tiene pedido fijo, hoy es uno de sus días, no está pausado y todavía no ha pedido hoy. Nunca se envía solo: se abre para revisarlo.
   fetch("/api/pedido-fijo").then((r) => (r.ok ? r.json() : null)).then((j) => {
     if (!j?.fijo || !j.hoy.toca || j.hoy.yaPidio) return;
-    const f = document.createElement("div"); f.className = "fila fijo"; f.setAttribute("role", "status");
-    const t = document.createElement("div"); const s = document.createElement("small"); s.textContent = "Tu pedido fijo"; const b = document.createElement("b"); b.textContent = `Hoy toca tu pedido de los ${j.hoy.nombre}`; t.append(s, b);
-    const bt = document.createElement("button"); bt.type = "button"; bt.textContent = "Revisar y enviar";
-    bt.onclick = () => { location.href = (ui.url || "/catalogo") + "#c=" + j.fijo.lineas.map((l) => encodeURIComponent(l.id) + "." + l.uds).join(",") + "&r=1"; };
-    f.append(t, bt); c.insertBefore(f, c.firstChild); chat.scrollTop = chat.scrollHeight;
+    const f = el("div", "in-card in-fijo-card"); f.setAttribute("role", "status");
+    f.append(el("small", "in-peq", "Tu pedido fijo"), el("h3", null, `Hoy toca tu pedido de los ${j.hoy.nombre}`));
+    const bt = el("button", "vm-btn primary", "Revisar y enviar"); bt.type = "button";
+    bt.onclick = () => { location.href = cat + "#c=" + j.fijo.lineas.map((l) => encodeURIComponent(l.id) + "." + l.uds).join(",") + "&r=1"; };
+    f.appendChild(bt); sitioFijo.appendChild(f);
   }).catch(() => {});
 }
 const sinEmoji = (t) => String(t ?? "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim();

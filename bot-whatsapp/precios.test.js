@@ -175,7 +175,7 @@ test("CATÁLOGO WEB: controles del carrito a 48 px, sin barra fija con el carrit
   assert.match(ped, /\.app\.compacto \.buscar \{ max-height:0;/); // en apaisado se pliega también el buscador al bajar
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
   assert.doesNotMatch(cli, /data-q="hacer pedido"/); // el atajo de abajo se quitó…
-  assert.match(cli, /fila\("Pedido nuevo", "Elige del catálogo", "Hacer pedido"/); // …y queda el de la tarjeta de inicio
+  assert.match(cli, /el\("button", "vm-btn primary in-hacer", "Hacer pedido"\)/); assert.match(cli, /enviar\("h:open", "Hacer pedido"\)/); // un solo «Hacer pedido» en la tarjeta de inicio
 });
 
 test("LETRA: nivel elegido 100/115/130 % con A− / A+ y «Automático» (tope +30 %), el mismo en el chat y el catálogo; controles táctiles de 48 px", async () => {
@@ -281,7 +281,7 @@ test("BIENVENIDA: el saludo va dentro de la tarjeta de inicio (un solo mensaje a
   const fs = await import("node:fs");
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
   assert.match(cli, /if \(j\.ui\?\.home\) window\.__saludo = String\(j\.reply\)\.split\("\\n\\n"\)\[0\]; else burbuja\([^;]*"in"\); \(j\.cards \?\? \[\]\)\.forEach\(tarjetaTabla\); if \(j\.ui\) interactivo\(j\.ui\);/); // un comentario en esa línea se comía la tarjeta
-  assert.match(cli, /className = "pasos"/); assert.match(cli, /fila\.className = "mrow in"; const av = document\.createElement\("div"\); av\.className = "av"/);
+  assert.match(cli, /saludoMadrid\(\) \+ \(nombre \? ", " \+ nombre : ""\)/); assert.match(cli, /fila\.className = "mrow in"; fila\.appendChild\(c\)/); // saludo por la hora de Madrid y nombre comercial
 });
 
 test("ALTAS A MANO Y CLIENTE NUEVO: formularios en el panel (producto, cliente y «crear su ficha» al aceptar una solicitud) y dirección en el alta del cliente", async () => {
@@ -313,8 +313,8 @@ test("CÓDIGOS CON PUNTO (157.10, 151.21…): «repetir pedido» separa bien el 
 test("TU PEDIDO DE SIEMPRE en el móvil: el texto a todo el ancho y los botones debajo, sin una columna estrecha", async () => {
   const fs = await import("node:fs");
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
-  assert.match(cli, /\.vm-inicio \.fila\.siempre \{ flex-direction:column; align-items:stretch;/);
-  assert.match(cli, /f\.append\(t, bt, sem\); c\.appendChild\(f\);/); assert.match(cli, /sem\.className = "sec"/);
+  assert.match(cli, /\.vm-inicio \.in-card \.vm-btn \{ width:100%; \}/); // botones a todo el ancho, debajo
+  assert.match(cli, /principal\.append\(rep, sem\);/); assert.match(cli, /"Repetir cada " \+ dia/); assert.match(cli, /"Repetir y revisar"/);
 });
 
 test("MI CUENTA (app del cliente): botón arriba, datos del cliente y pedidos por meses con «Repetir» y «Añadir al carrito»", () => {

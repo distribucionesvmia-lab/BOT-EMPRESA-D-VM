@@ -697,6 +697,18 @@ test("MODIFICAR UN PEDIDO ENVIADO: sustituye al anterior (mismo número, sin dup
   assert.equal((await call("GET", `/catalogo/pedido?ref=${ref}`, { cookie: A })).status, 409);
 });
 
+test("INICIO DEL CLIENTE: /api/inicio exige sesión, devuelve solo su catálogo (habituales, categorías, fotos pedidas) y no enseña nada de la administración", async () => {
+  assert.equal((await call("GET", "/api/inicio")).status, 401);
+  const A = cookieOf(await entrarNif("111111"));
+  const r = await call("GET", "/api/inicio?ids=1010,NOEXISTE", { cookie: A });
+  assert.equal(r.status, 200);
+  assert.ok(Array.isArray(r.json.habituales) && Array.isArray(r.json.categorias) && r.json.categorias.length > 0);
+  assert.ok(r.json.categorias.every((c) => c.id && c.nombre));
+  assert.equal(r.json.fotos.NOEXISTE ?? null, null);
+  const txt = JSON.stringify(r.json);
+  assert.doesNotMatch(txt, /ADMIN|token|nif|NIF/i);
+});
+
 test("PEDIDO FIJO SEMANAL: se guarda la plantilla y los días, se puede pausar y borrar, «toca hoy» solo en sus días y nunca se envía nada solo", async () => {
   assert.equal((await call("GET", "/api/pedido-fijo")).status, 401);
   const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar uno"));

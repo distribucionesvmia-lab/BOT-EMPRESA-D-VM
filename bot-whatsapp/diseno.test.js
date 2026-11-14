@@ -72,3 +72,15 @@ test("pantalla Pedido única: fichas de día de 64 px, «Hoy» solo si el servid
   assert.match(pedido, /dx < -90/); assert.match(pedido, /8000 : 4000/); // deslizar quita; «Deshacer» 8 s
   assert.match(pedido, /#cart \.tl \.av\.tl-av, #cart \.tl \.tl-av \{ width:52px; height:52px/);
 });
+
+test("Inicio: saludo por hora de Madrid, «hoy» solo con la regla de siempre, pedido de siempre con fotos solapadas, tarjeta comercial solo con datos", () => {
+  const cli = leer("./cliente.html");
+  assert.match(cli, /timeZone: "Europe\/Madrid", hour: "numeric"/); assert.match(cli, /"Buenos días" : h < 21 \? "Buenas tardes" : "Buenas noches"/);
+  assert.match(cli, /fetch\("\/catalogo\/aviso"\)[^\n]*j\?\.entregaHoy/); // la misma regla del servidor (Medina del Campo, laborable, antes de las 10:00)
+  assert.match(cli, /\.in-foto \{ width:44px; height:44px; margin-left:calc\(-1 \* var\(--s3\)\)/); // miniaturas solapadas
+  assert.match(cli, /Empieza tu primer pedido/); assert.match(cli, /"Lo más pedido"/); assert.match(cli, /"Lo que sueles pedir"/);
+  assert.match(cli, /\.in-prod \{[^}]*width:148px/);
+  assert.match(cli, /j\.ayuda && \(j\.ayuda\.tel \|\| j\.ayuda\.horario \|\| j\.ayuda\.whatsappHref\)/);
+  assert.match(cli, /if \(!j\?\.fijo \|\| !j\.hoy\.toca \|\| j\.hoy\.yaPidio\) return;/); // «Revisar y enviar» solo el día que toca
+  assert.doesNotMatch(cli, /Hoy toca[^\n]*enviar\(/); // nunca se envía solo
+});

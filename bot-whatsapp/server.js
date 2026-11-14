@@ -507,6 +507,23 @@ async function appRoutes(req, res, url) {
     return void enviar(res, 200, HTML, page("pedido.html"));
   }
   if (p === "/api/ayuda" && req.method === "GET") return void sendJson(res, 200, { ayuda: ayudaPublica() }); // datos públicos de contacto de la empresa
+  // Datos de la pantalla de Inicio del cliente: lo que suele pedir, lo más pedido, categorías y fotos de su último pedido (todo de su catálogo; nada de otros clientes)
+  if (p === "/api/inicio" && req.method === "GET") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const customer = clienteConPedidos(account.customerId);
+    const todos = webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa);
+    const corto = (x) => ({ id: x.id, name: x.name, price: x.price, ...(x.img ? { img: x.img } : {}), ...(x.unitsPerBox ? { unitsPerBox: x.unitsPerBox } : {}) });
+    const ids = String(url.searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8);
+    const porId = new Map(todos.map((x) => [x.id, x]));
+    const habituales = todos.filter((x) => x.count > 0).slice(0, 10).map(corto);
+    const lo_mas = habituales.length ? [] : topIds().map((id) => porId.get(String(id))).filter(Boolean).slice(0, 8).map(corto);
+    return void sendJson(res, 200, {
+      habituales, loMasPedido: lo_mas, tieneHistorial: todos.some((x) => x.count > 0),
+      fotos: Object.fromEntries(ids.map((id) => [id, porId.get(id)?.img ?? null])),
+      categorias: webTree(catalogNow()).map((c) => ({ id: c.id, nombre: c.nombre })),
+      ayuda: ayudaPublica(),
+    });
+  }
   if (p === "/catalogo/aviso" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     return void sendJson(res, 200, avisoEntrega(clienteConPedidos(account.customerId)));
