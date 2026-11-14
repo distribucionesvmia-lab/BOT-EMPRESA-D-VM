@@ -129,3 +129,8 @@ test("fotos: cada baldosa con foto está colocada (position:relative) para que l
   assert.match(pedido, /\.falta-av, \.tl-av, \.pf-av, \.sug-im, \.av \{ position:relative; overflow:hidden; \}/);
   const cli = leer("./cliente.html"); assert.match(cli, /\.vm-inicio \.in-pim \{ position:relative;/); assert.match(cli, /\.vm-inicio \.in-foto \{ position:relative; \}/);
 });
+
+test("Pedido: las tarjetas (entrega, pedido fijo, observaciones, resumen) ocupan todo el ancho, alineadas con el resto", () => {
+  assert.match(pedido, /#cart \.cartbody > \.card, #cart \.cartbody > \.ped-res[^{]*\{ margin-left:0; margin-right:0; width:100%;/);
+  assert.match(pedido, /\.falta-fila \.falta-av img \{[^}]*max-width:82%/);
+});

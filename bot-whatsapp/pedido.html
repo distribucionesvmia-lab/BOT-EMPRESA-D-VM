@@ -1014,6 +1014,11 @@
     .app > #toast { left:calc(220px + var(--s6)); right:calc(340px + var(--s6)); bottom:var(--s6); }
   }
   @media (min-width:1440px) { .app > main#list { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
+
+  /* Las tarjetas del Pedido (entrega, pedido fijo, observaciones, resumen) ocupan todo el ancho, alineadas con las fichas de día */
+  #cart .cartbody > .card, #cart .cartbody > .ped-res, #cart .cartbody > .tl-wrap, #cart #cartLines > .tl-wrap, #cart #cartLines > .falta { margin-left:0; margin-right:0; width:100%; box-sizing:border-box; }
+  #cart .dchips { margin-right:calc(-1 * var(--gutter)); padding-right:var(--gutter); }
+  .falta-fila .falta-av img { position:absolute; inset:0; margin:auto; width:auto; height:auto; max-width:82%; max-height:82%; background:none; }
 </style>
 </head>
 <body>
