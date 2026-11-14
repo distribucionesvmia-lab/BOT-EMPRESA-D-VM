@@ -176,3 +176,9 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **Buscador** (`buscarOrden`): palabras pegadas («cocacola» = «coca-cola», `b2`), sinónimos del sector (tercio, caña, botín → cerveza), «hielo bolsa» se resuelve sin la palabra de formato (bolsa, lata, caja, pack…) y lo dice («No hay … tal cual»), «barril» avisa «No vendemos barril… pregunta a tu comercial» y sin resultados el texto remite al comercial (`busquedaAviso`).
 - «Lo que sueles pedir» del Inicio: nombre entero hasta 4 líneas y «Caja de N». El aviso («Quitado…») va encima de la barra inferior y de «Ver pedido» (no tapa categorías) y se quita con un toque si no lleva «Deshacer».
 - Pruebas: `tanda12.test.js`.
+
+## Tanda 14 de QA (acceso y solicitud de alta, sin sesión)
+- **El código de entrada NUNCA se guarda en claro**: `hashPin` en `cuentas-db.js` usa `scrypt` (derivación de claves con memoria, de la familia de bcrypt/argon2, integrada en Node, sin dependencias) con sal aleatoria de 16 bytes en cada código; no hay nada que migrar. El texto de «Información sobre privacidad» (`privacidad.js`) decía «tampoco guardamos tu contraseña en claro» (una negación mal entendida): ahora dice que se guarda solo transformado con una función irreversible y nunca en texto legible.
+- **Alta**: formulario con `novalidate`, campos obligatorios con `*`, un aviso en español junto a cada campo y todos a la vez al enviar (`reglasAlta`). **DNI, NIE y CIF** se validan con formato y letra/dígito de control (`nifValido`, en el navegador; el servidor no los comprueba), en mayúsculas y avisando en cuanto hay 9 caracteres.
+- **Acceso**: el campo «Entrar con mi NIF» solo admite números (explica por qué quita las letras y ofrece «Mi código tiene letras» para quien tenga un código con letras). Arriba, antes de los campos: «¿No puedes entrar? Llámanos o escríbenos» (abre la ayuda; sin sesión no ofrece el chat) y «¿Cliente nuevo? Solicitar acceso».
+- Pruebas: `tanda14.test.js`.

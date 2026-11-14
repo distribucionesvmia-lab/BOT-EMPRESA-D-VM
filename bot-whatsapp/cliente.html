@@ -592,6 +592,11 @@
   .tcard tfoot td { display:block; padding:0; background:none; } .tcard tfoot td:last-child { margin-left:auto; white-space:nowrap; }
   @media (max-width:520px) { .tcard { margin-left:0; width:100%; } } /* en el móvil la tarjeta usa todo el ancho (no deja hueco para el avatar) */
   .vm-inicio .in-pn { -webkit-line-clamp:4; min-height:calc(2 * 1.2em); } .vm-inicio .in-fmt { color:var(--text-2); }
+
+  .req { color:var(--accent); } .req-nota { margin:0; font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); }
+  .err-campo { color:var(--accent); font-weight:600; font-size:calc(var(--t-cap) / var(--k,1)); min-height:0; } .err-campo:empty { display:none; }
+  .vm input[aria-invalid="true"], .vm-modal input[aria-invalid="true"] { box-shadow:0 0 0 2px var(--accent); }
+  .acc-ayuda { display:flex; flex-direction:column; gap:var(--s1); margin:0; } .acc-ayuda .vm-link { min-height:44px; text-align:left; padding:0; }
 </style>
 </head>
 <body>
@@ -608,6 +613,7 @@
       <form class="vm-card" id="f-acceso" autocomplete="off" novalidate>
         <span class="tag">Cliente habitual</span>
         <h2>Inicia sesión</h2>
+        <p class="acc-ayuda"><button class="vm-link" type="button" id="no-entro">¿No puedes entrar? Llámanos o escríbenos</button><button class="vm-link" type="button" id="ir-registro-2">¿Cliente nuevo? Solicitar acceso</button></p>
         <div class="acc-modo" role="group" aria-label="Cómo quieres entrar"><button type="button" id="m-nif" aria-pressed="true">Entrar con mi NIF</button><button type="button" id="m-tel" aria-pressed="false">Teléfono y código</button></div>
         <p id="t-tel">Entra con el <b>teléfono que usas habitualmente para contactar con nosotros</b> y tu código de entrada.</p>
         <p id="t-nif" hidden>Solo para <b>clientes habituales</b>: entra con los <b>6 primeros dígitos de tu DNI o CIF</b> (en un CIF, los 6 primeros números, sin la letra). Una vez dentro podrás <b>poner un código de entrada personal</b> y entrar después con tu teléfono.</p>
@@ -651,15 +657,16 @@
         <span class="ds-logo grande"><img data-logo width="420" height="186" alt="Distribuciones Valentín"></span>
         <h1>Hazte cliente</h1>
       </header>
-      <form class="vm-card" id="f-registro" autocomplete="off">
+      <form class="vm-card" id="f-registro" autocomplete="off" novalidate>
         <p>Cuéntanos quién eres y elige un código de entrada. <b>En 24 a 48 horas te contactaremos y aceptaremos tu cuenta</b> para que puedas hacer pedidos; si tus datos ya constan, entras al momento.</p>
-        <label>Nombre de tu empresa o negocio<input id="r-emp" maxlength="80" required></label>
-        <label>Teléfono<input id="r-tel" type="tel" inputmode="tel" required></label>
-        <label>DNI, NIE o CIF<input id="r-nif" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 12345678Z o B12345678" required></label>
+        <p class="req-nota">Los campos con <b class="req">*</b> son obligatorios.</p>
+        <label>Nombre de tu empresa o negocio <b class="req" aria-hidden="true">*</b><input id="r-emp" maxlength="80" aria-required="true" aria-describedby="e-r-emp"><small class="err-campo" id="e-r-emp" role="alert"></small></label>
+        <label>Teléfono <b class="req" aria-hidden="true">*</b><input id="r-tel" type="tel" inputmode="tel" aria-required="true" aria-describedby="e-r-tel"><small class="err-campo" id="e-r-tel" role="alert"></small></label>
+        <label>DNI, NIE o CIF <b class="req" aria-hidden="true">*</b><input id="r-nif" maxlength="9" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 12345678Z o B12345678" aria-required="true" aria-describedby="e-r-nif"><small class="err-campo" id="e-r-nif" role="alert"></small></label>
         <label>Dirección de entrega (opcional)<input id="r-dir" maxlength="160" autocomplete="street-address" placeholder="Calle, número y localidad"></label>
-        <label>Correo electrónico<input id="r-mail" type="email" autocomplete="email" required></label>
-        <label>Elige un código de entrada de 6 letras o números<input id="r-pin" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
-        <label>Repite el código de entrada<input id="r-pin2" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
+        <label>Correo electrónico <b class="req" aria-hidden="true">*</b><input id="r-mail" type="email" autocomplete="email" aria-required="true" aria-describedby="e-r-mail"><small class="err-campo" id="e-r-mail" role="alert"></small></label>
+        <label>Elige un código de entrada de 6 letras o números <b class="req" aria-hidden="true">*</b><input id="r-pin" type="password" maxlength="6" autocapitalize="off" autocomplete="new-password" aria-required="true" aria-describedby="e-r-pin"><small class="err-campo" id="e-r-pin" role="alert"></small></label>
+        <label>Repite el código de entrada <b class="req" aria-hidden="true">*</b><input id="r-pin2" type="password" maxlength="6" autocapitalize="off" autocomplete="new-password" aria-required="true" aria-describedby="e-r-pin2"><small class="err-campo" id="e-r-pin2" role="alert"></small></label>
         <div class="err" id="r-err" role="alert"></div><div class="okmsg" id="r-ok" role="status"></div>
         <button class="vm-btn primary">Enviar solicitud</button>
         <p style="font-size:calc(13px / var(--k,1));color:#555">Al enviar la solicitud usaremos estos datos (incluido tu DNI/NIE/CIF, que solo sirve para darte de alta como cliente y se borra en cuanto se resuelve) para gestionar tu alta y tus pedidos.</p>
@@ -773,12 +780,47 @@ const uuid = () => (self.crypto && crypto.randomUUID ? crypto.randomUUID() : Str
 const chat = $("chat"), sheet = $("sheet");
 
 function ver(v) { for (const id of ["acceso", "registro", "chatbox"]) $(id).hidden = id !== v; document.body.classList.toggle("app", v === "chatbox"); }
-$("ir-registro").onclick = () => ver("registro");
+$("ir-registro").onclick = $("ir-registro-2").onclick = () => ver("registro");
+$("no-entro").onclick = () => abrirAyuda(AYUDA, "");
 $("ir-acceso").onclick = () => ver("acceso");
 
+// DNI, NIE y CIF: formato y letra de control (en español, mientras se escribe)
+const LETRAS_DNI = "TRWAGMYFPDXBNJZSQVHLCKE";
+function nifValido(v) {
+  v = String(v || "").toUpperCase().replace(/[\s-]/g, "");
+  if (!v) return { ok: false, msg: "Escribe tu DNI, NIE o CIF." };
+  if (!/^[A-Z0-9]+$/.test(v)) return { ok: false, msg: "Solo letras y números, sin espacios ni símbolos." };
+  if (v.length < 9) return { ok: false, corto: true, msg: `${9 - v.length === 1 ? "Falta 1 carácter" : "Faltan " + (9 - v.length) + " caracteres"}: un DNI tiene 8 números y una letra; un CIF, una letra y 7 números más un dígito o letra final.` };
+  if (v.length > 9) return { ok: false, msg: "Tiene más de 9 caracteres: revisa el número." };
+  if (/^\d{8}[A-Z]$/.test(v)) return LETRAS_DNI[Number(v.slice(0, 8)) % 23] === v[8] ? { ok: true, tipo: "DNI" } : { ok: false, msg: "La letra del DNI no coincide con el número. Revísalo." };
+  if (/^[XYZ]\d{7}[A-Z]$/.test(v)) return LETRAS_DNI[Number("XYZ".indexOf(v[0]) + v.slice(1, 8)) % 23] === v[8] ? { ok: true, tipo: "NIE" } : { ok: false, msg: "La letra del NIE no coincide con el número. Revísalo." };
+  if (/^[ABCDEFGHJKLMNPQRSUVW]\d{7}[0-9A-J]$/.test(v)) {
+    const d = v.slice(1, 8); let s = 0;
+    for (let i = 0; i < 7; i++) { const n = Number(d[i]); if (i % 2 === 0) { const x = n * 2; s += Math.floor(x / 10) + (x % 10); } else s += n; }
+    const c = (10 - (s % 10)) % 10, letra = "JABCDEFGHI"[c], ult = v[8], primera = v[0];
+    const soloLetra = "KLMNPQRSW".includes(primera), soloDigito = "ABEH".includes(primera);
+    const bien = soloLetra ? ult === letra : soloDigito ? ult === String(c) : (ult === String(c) || ult === letra);
+    return bien ? { ok: true, tipo: "CIF" } : { ok: false, msg: "El dígito o letra final del CIF no coincide. Revísalo." };
+  }
+  return { ok: false, msg: "No parece un DNI, NIE ni CIF: ejemplos 12345678Z, X1234567L o B12345678." };
+}
+const errCampo = (id, msg) => { const el = $(id), s = $("e-" + id); if (s) s.textContent = msg || ""; if (msg) el.setAttribute("aria-invalid", "true"); else el.removeAttribute("aria-invalid"); };
+const reglasAlta = {
+  "r-emp": (v) => (v.trim().length < 2 ? "Escribe el nombre de tu empresa o negocio." : ""),
+  "r-tel": (v) => { const d = v.replace(/[\s.-]/g, "").replace(/^(\+34|0034)/, ""); return !d ? "Escribe tu teléfono." : /^[6-9]\d{8}$/.test(d) ? "" : "El teléfono debe tener 9 cifras, por ejemplo 600123456."; },
+  "r-nif": (v) => (nifValido(v).ok ? "" : nifValido(v).msg),
+  "r-mail": (v) => (!v.trim() ? "Escribe tu correo electrónico." : /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? "" : "Escribe un correo válido, por ejemplo nombre@empresa.es."),
+  "r-pin": (v) => (!v ? "Elige un código de entrada de 6 letras o números." : /^[A-Za-z0-9]{6}$/.test(v) ? "" : "Tiene que tener exactamente 6 letras o números, sin espacios ni símbolos."),
+  "r-pin2": (v) => (!v ? "Repite el código de entrada." : v.toUpperCase() !== $("r-pin").value.toUpperCase() ? "No coincide con el código de arriba." : ""),
+};
+// mientras se escribe: el NIF se pasa a mayúsculas y se avisa en cuanto tiene los 9 caracteres; el resto se revisa al salir del campo y se corrige en vivo
+$("r-nif").addEventListener("input", () => { const e = $("r-nif"), v = e.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 9); if (v !== e.value) e.value = v; const r = nifValido(v); errCampo("r-nif", v.length >= 9 && !r.ok ? r.msg : ""); if (v.length >= 9 && r.ok) $("e-r-nif").textContent = ""; });
+for (const id of Object.keys(reglasAlta)) { $(id).addEventListener("blur", () => { if ($(id).value || $(id).dataset.tocado) errCampo(id, reglasAlta[id]($(id).value)); }); $(id).addEventListener("input", () => { $(id).dataset.tocado = "1"; if ($(id).getAttribute("aria-invalid") && id !== "r-nif") errCampo(id, reglasAlta[id]($(id).value)); }); }
 $("f-registro").onsubmit = async (e) => {
   e.preventDefault(); $("r-err").textContent = ""; $("r-ok").textContent = "";
-  if ($("r-pin").value.toUpperCase() !== $("r-pin2").value.toUpperCase()) { $("r-err").textContent = "Los dos códigos de entrada no coinciden."; return; }
+  const malos = []; // todos los errores a la vez, cada uno junto a su campo
+  for (const id of Object.keys(reglasAlta)) { const m = reglasAlta[id]($(id).value); errCampo(id, m); if (m) malos.push(id); }
+  if (malos.length) { $("r-err").textContent = malos.length === 1 ? "Hay 1 campo por corregir (marcado en rojo)." : `Hay ${malos.length} campos por corregir (marcados en rojo).`; $(malos[0]).focus(); return; }
   const r = await post("/api/registro", { empresa: $("r-emp").value, telefono: $("r-tel").value, correo: $("r-mail").value, nif: $("r-nif").value, pin: $("r-pin").value, direccion: $("r-dir").value });
   const j = await r.json().catch(() => ({}));
   if (r.ok) {
@@ -786,10 +828,12 @@ $("f-registro").onsubmit = async (e) => {
     if (j.estado === "activa") setTimeout(() => ver("acceso"), 1800); // ya tiene acceso: pasa a entrar
   } else $("r-err").textContent = j.error || "No se pudo enviar la solicitud.";
 };
+
 // Código de entrada: solo letras y números (sin acentos ni símbolos) y como máximo 6, también si se pega
+let avisoLetras = false; // en el campo del NIF (teclado numérico) se quitaron letras: se explica
 for (const id of ["a-nif", "a-pin", "r-pin", "r-pin2", "c-nuevo", "c-nuevo2"]) {
   const e = document.getElementById(id);
-  if (e) e.addEventListener("input", () => { const v = e.value.replace(/[^A-Za-z0-9]/g, "").slice(0, id === "a-nif" ? 12 : 6); if (v !== e.value) e.value = v; }); // el NIF no se corta a 6: si hay de más, se avisa (más abajo)
+  if (e) e.addEventListener("input", () => { let v = e.value.replace(/[^A-Za-z0-9]/g, ""); avisoLetras = false; if (id === "a-nif" && e.getAttribute("inputmode") === "numeric" && /\D/.test(v)) { v = v.replace(/\D/g, ""); avisoLetras = true; $("nif-letras").hidden = false; } v = v.slice(0, id === "a-nif" ? 12 : 6); if (v !== e.value) e.value = v; }); // el NIF no se corta a 6: si hay de más, se avisa (más abajo)
 }
 let conPin = false; // por defecto: NIF (los clientes habituales entran así); alternativa: teléfono + código + empresa
 const limpia = (id) => $(id).value.replace(/[^A-Za-z0-9]/g, "");
@@ -808,6 +852,7 @@ function avisoNif() {
   let t = "";
   if (v.length > 6 && dig.length >= 6) t = `Solo cuentan los 6 primeros dígitos del DNI o CIF: ${dig.slice(0, 6)}.` + (hay ? " Las letras no cuentan." : "");
   else if (v.length > 6) t = "Son 6 caracteres: los 6 primeros dígitos de tu DNI o CIF.";
+  if (!t && avisoLetras) t = "Aquí solo van números: los 6 primeros dígitos de tu DNI o CIF. Si tu código de entrada tiene letras, pulsa «Mi código tiene letras».";
   $("a-aviso").textContent = t;
 }
 $("a-nif").addEventListener("input", avisoNif);
@@ -1274,13 +1319,14 @@ function abrirAyuda(a, nombre) {
   const viejo = document.getElementById("ayuda-fondo"); if (viejo) viejo.remove();
   const f = document.createElement("div"); f.id = "ayuda-fondo"; f.className = "ayuda-fondo"; f.setAttribute("role", "dialog"); f.setAttribute("aria-modal", "true"); f.setAttribute("aria-label", "¿Necesitas ayuda?");
   const c = document.createElement("div"); c.className = "ayuda-caja";
-  const hayContacto = !!(a.telHref || a.whatsappHref);
-  const h = document.createElement("h2"); h.textContent = hayContacto ? "¿Necesitas ayuda?" : "Ayuda y ajustes de pantalla"; c.appendChild(h);
+  const enChat = !$("chatbox").hidden, hayContacto = !!(a.telHref || a.whatsappHref);
+  const h = document.createElement("h2"); h.textContent = !enChat ? "¿No puedes entrar?" : hayContacto ? "¿Necesitas ayuda?" : "Ayuda y ajustes de pantalla"; c.appendChild(h);
   const enlace = (txt, href, ext) => { const l = document.createElement("a"); l.className = "ayuda-btn"; l.href = href; l.textContent = txt; if (ext) { l.target = "_blank"; l.rel = "noopener"; } c.appendChild(l); };
   if (a.telHref) enlace("Llamar" + (a.tel ? " · " + a.tel : ""), a.telHref);
   if (a.whatsappHref) enlace("WhatsApp", a.whatsappHref + "?text=" + encodeURIComponent("Hola, necesito ayuda con mi pedido" + (nombre ? ". Soy " + nombre : "")), true);
   if (a.horario) { const p = document.createElement("p"); p.textContent = "" + a.horario; c.appendChild(p); }
-  { const hp = document.createElement("button"); hp.type = "button"; hp.className = "ayuda-btn"; hp.textContent = "Hablar con una persona (por el chat)"; hp.onclick = () => { f.remove(); document.removeEventListener("keydown", esc); enviar("persona", "Hablar con una persona"); }; c.appendChild(hp); } // siempre hay una vía de contacto, haya o no teléfono configurado
+  if (!enChat) { const p = document.createElement("p"); p.textContent = hayContacto ? "Si no consigues entrar, llámanos o escríbenos y lo resolvemos." : "Si no consigues entrar, llama a la oficina (el teléfono está en tu albarán o factura) o pídele a tu comercial que lo revise."; c.appendChild(p); }
+  if (enChat) { const hp = document.createElement("button"); hp.type = "button"; hp.className = "ayuda-btn"; hp.textContent = "Hablar con una persona (por el chat)"; hp.onclick = () => { f.remove(); document.removeEventListener("keydown", esc); enviar("persona", "Hablar con una persona"); }; c.appendChild(hp); } // siempre hay una vía de contacto, haya o no teléfono configurado
   { const lg = document.createElement("button"); lg.type = "button"; lg.className = "ayuda-cerrar"; lg.textContent = "Privacidad y aviso legal"; lg.onclick = () => { f.remove(); document.removeEventListener("keydown", esc); window.vmAbreLegal(); }; c.appendChild(lg); }
   // «Ajustes de pantalla»: Automático (como el móvil) / Claro / Oscuro; se recuerda en este móvil
   const aj = document.createElement("div"); aj.className = "ayuda-aj"; const ajt = document.createElement("h3"); ajt.textContent = "Ajustes de pantalla"; aj.appendChild(ajt);
