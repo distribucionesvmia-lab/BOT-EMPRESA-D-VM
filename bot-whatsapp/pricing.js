@@ -29,7 +29,10 @@ export function importeCentimos(units, price, discount = 0) {
 }
 
 /** Fecha de hoy en Madrid (AAAA-MM-DD). */
-export const hoyMadrid = () => new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+// (Construir un formateador de fechas cuesta mucho y se llamaba una vez por artículo: ahora se crea uno y el resultado vale un segundo.)
+const FORMATO_MADRID = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" });
+let hoyCache = { seg: -1, dia: "" };
+export const hoyMadrid = () => { const seg = Math.floor(Date.now() / 1000); if (seg !== hoyCache.seg) hoyCache = { seg, dia: FORMATO_MADRID.format(new Date()) }; return hoyCache.dia; };
 /** Oferta del artículo si está vigente hoy (la empresa la pone en el panel): { tipo: "pct" | "eur", valor, hasta? } o null. */
 export function promoVigente(product, hoy = hoyMadrid()) {
   const o = product?.promo;

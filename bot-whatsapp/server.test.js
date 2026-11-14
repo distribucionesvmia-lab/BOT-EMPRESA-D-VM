@@ -1017,6 +1017,29 @@ test("BENCH 5: «Saltar esta semana» del pedido fijo, estado en 4 pasos y total
   assert.equal((await call("GET", "/api/admin/pedidos", { admin: true })).json.length, antes + 1); // solo el pedido que hemos hecho a propósito: lo demás no envía nada
 });
 
+test("BENCH 6: el HTML de /cliente y de /catalogo pesa poco, el CSS/JS/logo van a estáticos con huella (inmutables, 304) y /catalogo/datos usa ETag", async () => {
+  const cli = await fetch(`${BASE}/cliente`), htmlC = await cli.text();
+  assert.equal(cli.headers.get("cache-control"), "no-store"); assert.ok(Buffer.byteLength(htmlC) < 40 * 1024, "HTML de /cliente < 40 KB: " + Buffer.byteLength(htmlC));
+  assert.equal(/base64,[A-Za-z0-9+/=]{400,}/.test(htmlC), false); assert.equal(/<style>/.test(htmlC), false);
+  const rutas = [...new Set([...htmlC.matchAll(/(\/estatico\/[\w-]+\/[\w.-]+)/g)].map((m) => m[1]))];
+  assert.ok(rutas.some((r) => r.endsWith(".css")) && rutas.some((r) => r.endsWith(".js")) && rutas.some((r) => r.endsWith(".png")));
+  for (const r of rutas) {
+    const a = await fetch(BASE + r, { headers: { "Accept-Encoding": "identity" } });
+    assert.equal(a.status, 200, r); assert.match(a.headers.get("cache-control"), /max-age=31536000, immutable/); const et = a.headers.get("etag"); assert.ok(et);
+    assert.equal((await fetch(BASE + r, { headers: { "If-None-Match": et } })).status, 304, r + " segunda carga sin bajar nada");
+  }
+  assert.equal((await fetch(`${BASE}/estatico/000000000000/cliente.css`)).status, 404);
+  const png = await fetch(BASE + rutas.find((r) => r.endsWith(".png"))); assert.equal(png.headers.get("content-type"), "image/png"); assert.equal(Buffer.from(await png.arrayBuffer()).subarray(1, 4).toString(), "PNG"); // el logo es el mismo PNG, sin tocar
+  // el catálogo: ETag y 304
+  const A = cookieOf(await entrarNif("111111"));
+  const cat = await fetch(`${BASE}/catalogo`, { headers: { Cookie: A } }), htmlP = await cat.text();
+  assert.equal(cat.status, 200); assert.ok(Buffer.byteLength(htmlP) < 40 * 1024, "HTML de /catalogo < 40 KB: " + Buffer.byteLength(htmlP)); assert.equal(cat.headers.get("cache-control"), "no-store");
+  const d1 = await fetch(`${BASE}/catalogo/datos`, { headers: { Cookie: A } }); const et = d1.headers.get("etag"); assert.equal(d1.status, 200); assert.ok(et); assert.equal(d1.headers.get("cache-control"), "private, no-cache");
+  assert.ok((await d1.json()).products.length > 0);
+  assert.equal((await fetch(`${BASE}/catalogo/datos`, { headers: { Cookie: A, "If-None-Match": et } })).status, 304);
+  assert.equal((await fetch(`${BASE}/catalogo/datos`, { headers: { "If-None-Match": et } })).status, 401); // sin sesión no hay 304 que valga
+});
+
 test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repetir o añadir), nunca los de otro ni su NIF", async () => {
   assert.equal((await call("GET", "/api/mi-cuenta")).status, 401);
   const A = cookieOf(await entrarNif("111111"));

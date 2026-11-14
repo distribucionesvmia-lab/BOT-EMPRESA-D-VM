@@ -42,6 +42,7 @@ import nodePath from "node:path";
 import { BUSINESS, AYUDA, ayudaPublica, condicionesPedido, envTexto } from "./config.js";
 import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
 import { categorizar } from "./categorias.js";
+import { empaquetar, estatico } from "./estaticos.js";
 import { puedeEditarPedido, plazoModificacion, longDate, weekday, addDays } from "./delivery.js";
 const DIAS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
@@ -197,6 +198,13 @@ const conGzip = (res, headers, body) => {
 };
 const enviar = (res, code, headers, body) => { const [h, b] = conGzip(res, headers, body); return res.writeHead(code, h).end(b); };
 
+// Respuesta con ETag: si el navegador ya tiene exactamente lo mismo (If-None-Match), se contesta 304 sin cuerpo (el catálogo pesa más de 1 MB)
+const sendJsonEtag = (req, res, data) => {
+  const cuerpo = JSON.stringify(data), etag = `"${crypto.createHash("sha1").update(cuerpo).digest("base64url")}"`;
+  const h = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "private, no-cache", ETag: etag };
+  if (req.headers["if-none-match"] === etag) return res.writeHead(304, { ETag: etag, "Cache-Control": "private, no-cache" }).end();
+  return enviar(res, 200, h, cuerpo);
+};
 const json = (res, data, code = 200) => enviar(res, code, { "Content-Type": "application/json" }, JSON.stringify(data));
 
 function readBody(req) {
@@ -283,7 +291,7 @@ function webOrderRoutes(req, res, url) {
   const token = m[1];
 
   if (req.method === "GET" && !m[2]) {
-    return enviar(res, 200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }, fs.readFileSync(new URL("./pedido.html", import.meta.url)));
+    return enviar(res, 200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }, empaquetar(fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8"), "pedido"));
   }
 
   (async () => {
@@ -295,6 +303,7 @@ function webOrderRoutes(req, res, url) {
     if (req.method === "GET" && m[2] === "/aviso") return json(res, avisoEntrega(customer));
     if (req.method === "GET") {
       // Identificado solo por nombre (link.u): no se enseña histórico, precios especiales ni dirección de ese cliente
+      const arbolEnlace = webTree(catalogNow());
       const view = link.u ? { ...customer, orders: [], usual: [], frequent: [], specialPrices: {}, discounts: {}, address: "" } : customer;
       const products = webProducts(view, catalogNow(), habitualProducts, imgUrl, imgEsIa);
       return json(res, {
@@ -305,7 +314,7 @@ function webOrderRoutes(req, res, url) {
         used: getDb().hasOrderKey(linkKey(link)),
         products,
         history: webHistory(view, catalogNow()),
-        tree: webTree(catalogNow()), accesos: accesosDe(webTree(catalogNow())),
+        tree: arbolEnlace, accesos: accesosDe(arbolEnlace),
         top: topIds(),
       ayuda: ayudaPublica(),
         ayuda: ayudaPublica(),
@@ -526,6 +535,16 @@ async function appRoutes(req, res, url) {
     try { const cuerpo = fs.readFileSync(new URL(`./pwa/${PWA[p][0]}`, import.meta.url)); return void res.writeHead(200, { "Content-Type": PWA[p][1], "Cache-Control": p === "/sw.js" ? "no-cache" : "public, max-age=86400", "X-Content-Type-Options": "nosniff", ...(p === "/sw.js" ? { "Service-Worker-Allowed": "/" } : {}) }).end(req.method === "HEAD" ? undefined : cuerpo); }
     catch (e) { console.error("archivo fijo no disponible:", p, e.message); return void res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("No encontrado"); }
   }
+  if (p.startsWith("/estatico/") && (req.method === "GET" || req.method === "HEAD")) { // CSS, JS y logo de las páginas (sin datos de nadie): la ruta lleva la huella, así que se guardan un año
+    const f = estatico(p);
+    if (!f) return void res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" }).end("No encontrado");
+    const etag = `"${p.split("/")[2]}"`;
+    if (req.headers["if-none-match"] === etag) return void res.writeHead(304, { ETag: etag, "Cache-Control": "public, max-age=31536000, immutable" }).end();
+    const h = { "Content-Type": f.tipo, "Cache-Control": "public, max-age=31536000, immutable", ETag: etag, "X-Content-Type-Options": "nosniff", Vary: "Accept-Encoding" };
+    let b = f.cuerpo;
+    if (/^text\//.test(f.tipo) && /\bgzip\b/.test(String(req.headers["accept-encoding"] ?? ""))) { f.gz ??= zlib.gzipSync(f.cuerpo, { level: 9 }); b = f.gz; h["Content-Encoding"] = "gzip"; } // se comprime una sola vez
+    return void res.writeHead(200, h).end(req.method === "HEAD" ? undefined : b);
+  }
   if (p === "/robots.txt") return void res.writeHead(200, { "Content-Type": "text/plain" }).end("User-agent: *\nDisallow: /\n"); // que Google no indexe nada
   if (p === "/") {
     if (!String(req.headers.accept ?? "").includes("text/html")) return void res.end("Bot activo");
@@ -542,7 +561,7 @@ async function appRoutes(req, res, url) {
   }
   // Aplicación del cliente
   if (!clientEnabled) return void res.writeHead(404).end();
-  if (p === "/cliente" && req.method === "GET") return void enviar(res, 200, HTML, (() => { const dl = { titular: envTexto("PRIVACY_TITULAR") || undefined, cif: envTexto("PRIVACY_CIF"), direccion: envTexto("PRIVACY_DIRECCION") || undefined, email: envTexto("PRIVACY_EMAIL") }; return page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml(dl)).replaceAll("<div data-aviso-legal></div>", avisoLegalHtml(dl)); })());
+  if (p === "/cliente" && req.method === "GET") return void enviar(res, 200, HTML, (() => { const dl = { titular: envTexto("PRIVACY_TITULAR") || undefined, cif: envTexto("PRIVACY_CIF"), direccion: envTexto("PRIVACY_DIRECCION") || undefined, email: envTexto("PRIVACY_EMAIL") }; return empaquetar(page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml(dl)).replaceAll("<div data-aviso-legal></div>", avisoLegalHtml(dl)), "cliente"); })());
   if (await auth.route(req, res, url)) return;
 
   const account = auth.sessionOf(req);
@@ -561,7 +580,7 @@ async function appRoutes(req, res, url) {
   // Catálogo de pedido (la mini-aplicación) del cliente con sesión
   if (p === "/catalogo" && req.method === "GET") {
     if (!account) return void res.writeHead(302, { Location: "/cliente" }).end();
-    return void enviar(res, 200, HTML, page("pedido.html"));
+    return void enviar(res, 200, HTML, empaquetar(page("pedido.html").toString(), "pedido"));
   }
   // Direcciones de entrega guardadas (solo las suyas; máximo 5)
   if (p === "/api/direcciones" && req.method === "GET") {
@@ -608,7 +627,7 @@ async function appRoutes(req, res, url) {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     await refreshCatalog(); // ve ya las ofertas y los precios que la empresa acaba de cambiar
     const customer = clienteConPedidos(account.customerId);
-    const todos = webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa);
+    const todos = webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa), arbolInicio = webTree(catalogNow());
     const corto = (x) => ({ id: x.id, name: x.name, price: x.price, ...(x.img ? { img: x.img } : {}), ...(x.unitsPerBox ? { unitsPerBox: x.unitsPerBox } : {}), ...(x.soloCaja ? { soloCaja: true } : {}) });
     const ids = String(url.searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8);
     const porId = new Map(todos.map((x) => [x.id, x]));
@@ -618,7 +637,7 @@ async function appRoutes(req, res, url) {
     return void sendJson(res, 200, {
       habituales, ofertas, loMasPedido: lo_mas, tieneHistorial: todos.some((x) => x.count > 0),
       fotos: Object.fromEntries(ids.map((id) => [id, porId.get(id)?.img ?? null])),
-      categorias: webTree(catalogNow()).map((c) => ({ id: c.id, nombre: c.nombre })), accesos: accesosDe(webTree(catalogNow())),
+      categorias: arbolInicio.map((c) => ({ id: c.id, nombre: c.nombre })), accesos: accesosDe(arbolInicio),
       ayuda: ayudaPublica(),
     });
   }
@@ -634,8 +653,8 @@ async function appRoutes(req, res, url) {
   if (p === "/catalogo/datos" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     await refreshCatalog(); // el cliente ve ya los precios y las ofertas que la empresa acaba de cambiar
-    const customer = clienteConPedidos(account.customerId);
-    return void sendJson(res, 200, {
+    const customer = clienteConPedidos(account.customerId), arbol = webTree(catalogNow());
+    return void sendJsonEtag(req, res, {
       business: BUSINESS.name,
       priceNote: BUSINESS.priceNote,
       condiciones: condicionesPedido(),
@@ -644,7 +663,7 @@ async function appRoutes(req, res, url) {
       favs: getAccountsDb().favorites(account.customerId),
       products: webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa),
       history: webHistory(customer, catalogNow()),
-      tree: webTree(catalogNow()), accesos: accesosDe(webTree(catalogNow())),
+      tree: arbol, accesos: accesosDe(arbol),
       top: topIds(),
       retirados: retiradosDe(customer),
       abiertos: abiertosDe(account),
@@ -827,7 +846,7 @@ async function appRoutes(req, res, url) {
 http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://x");
-    if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.png" || url.pathname.startsWith("/captura-") || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/img/")) {
+    if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.png" || url.pathname.startsWith("/captura-") || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/estatico/") || url.pathname.startsWith("/img/")) {
       appRoutes(req, res, url).catch((err) => {
         console.error(err);
         if (!res.headersSent) res.writeHead(500).end();

@@ -402,6 +402,8 @@
   .cu-pasos { list-style:none; margin:var(--s2) 0 0; padding:0; display:flex; gap:2px; } .cu-pasos li { flex:1; text-align:center; font-size:calc(11.5px / var(--k,1)); line-height:1.2; color:var(--text-2); padding-top:10px; border-top:4px solid var(--fill); } .cu-pasos li.hecho { border-top-color:var(--accent); } .cu-pasos li.ahora { border-top-color:var(--accent); color:var(--text); font-weight:700; }
   .cu-total { margin:var(--s2) 0 0; font-weight:600; font-variant-numeric:tabular-nums; }
   #p-cuerpo label { margin-top:var(--s2); } #m-problema { z-index:75; }
+  .carga-fallo { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s3); padding:var(--s3) var(--s4); border-radius:var(--r-field); background:var(--fill); color:var(--text); font-size:calc(var(--t-sec) / var(--k,1)); }
+  .carga-fallo .vm-btn { width:auto; min-height:44px; padding:0 var(--s4); background:var(--surface); color:var(--accent); }
   .vm-inicio .in-total { color:var(--text) !important; font-weight:600; font-variant-numeric:tabular-nums; }
   .vm-inicio .in-fotos { display:flex; padding-left:var(--s3); min-height:44px; }
   .vm-inicio .in-foto { width:44px; height:44px; margin-left:calc(-1 * var(--s3)); border-radius:50%; border:2px solid var(--surface); background:var(--fill); overflow:hidden; display:grid; place-items:center; color:var(--text-2); }
@@ -1313,6 +1315,12 @@ const diaSemanaDe = (iso) => { try { return new Intl.DateTimeFormat("es-ES", { t
 document.addEventListener("load", (e) => { if (e.target && e.target.tagName === "IMG") e.target.classList.add("cargada"); }, true); // fundido de las fotos
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 const flecha = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// Cuando algo no carga, se dice (nunca un hueco en silencio) y se ofrece «Reintentar»
+function falloCarga(caja, texto, reintentar) {
+  for (const x of caja.querySelectorAll(":scope > .carga-fallo")) if (x.dataset.k === String(texto)) x.remove(); // un aviso por cosa que falla
+  const d = el("div", "carga-fallo"); d.dataset.k = String(texto); d.setAttribute("role", "status"); const b = el("button", "vm-btn ghost", "Reintentar"); b.type = "button";
+  b.onclick = () => { d.remove(); reintentar(); }; d.append(el("span", null, texto || "No hemos podido cargar esto."), b); caja.appendChild(d);
+}
 const ultimaTxt = (p) => { const L = p.ultima, k = p.unitsPerBox; if (k && (p.soloCaja || L % k === 0)) { const c = p.soloCaja ? Math.max(1, Math.ceil(L / k)) : L / k; return `${c} ${c === 1 ? "caja" : "cajas"}`; } return `${L} ${L === 1 ? "ud" : "uds"}`; };
 let yoCache = null; const cargaYo = () => (yoCache ??= fetch("/api/yo").then((r) => (r.ok ? r.json() : null)).then((j) => j?.cliente ?? null).catch(() => null));
 function inicio(ui) {
@@ -1360,22 +1368,23 @@ function inicio(ui) {
     be.onclick = () => abrirSiempre("editar"); bb.onclick = () => abrirSiempre("borrar"); acc.append(be, bb); principal.appendChild(acc);
   } else if (ui.siempre === "borrado") {
     principal.classList.add("vacio"); const rest = el("button", "vm-btn ghost", "Volver a mostrar mi último pedido"); rest.type = "button";
-    rest.onclick = async () => { rest.disabled = true; await post("/api/pedido-de-siempre/restaurar", {}).catch(() => {}); location.reload(); };
+    rest.onclick = async () => { rest.disabled = true; const r = await post("/api/pedido-de-siempre/restaurar", {}).catch(() => null); if (!r?.ok) { rest.disabled = false; falloCarga(principal, "No hemos podido recuperar tu último pedido.", () => rest.click()); return; } location.reload(); };
     principal.append(el("h3", null, "Has borrado tu pedido de siempre"), el("p", null, "Puedes elegir lo que necesitas del catálogo o recuperar tu último pedido."), hacer, rest);
   } else {
     principal.classList.add("vacio"); principal.append(el("h3", null, "Empieza tu primer pedido"), el("p", null, "Elige lo que necesitas del catálogo y te lo llevamos."), hacer);
   }
   if (ui.last?.lineas?.length) c.insertBefore(hacer, principal); // «Hacer pedido» arriba del todo: lo primero que se alcanza (antes estaba tras la tarjeta del pedido anterior)
   // Datos que completan la pantalla
-  fetch("/catalogo/aviso").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j?.entregaHoy) hoy.hidden = false; }).catch(() => {});
+  const cargaHoy = () => fetch("/catalogo/aviso").then((r) => { if (!r.ok) throw new Error("aviso"); return r.json(); }).then((j) => { if (j?.entregaHoy) hoy.hidden = false; }).catch(() => falloCarga(sitioFijo, "No hemos podido comprobar si hoy hay entrega.", cargaHoy));
+  cargaHoy();
   fetch("/api/inicio?ids=" + encodeURIComponent(ids.join(","))).then((r) => (r.ok ? r.json() : null)).then((j) => {
     quitaEsq();
     if (!j) return;
     const fotos = principal.querySelector(".in-fotos");
-    if (fotos) for (const id of ids) { const t = el("span", "in-foto"); const f = j.fotos?.[id]; if (f) { const im = document.createElement("img"); im.src = f; im.alt = ""; im.loading = "lazy"; im.onerror = () => im.remove(); t.appendChild(im); } else t.textContent = "·"; fotos.appendChild(t); }
+    if (fotos) for (const id of ids) { const t = el("span", "in-foto"); const f = j.fotos?.[id]; if (f) { const im = document.createElement("img"); im.src = f; im.alt = ""; im.width = 44; im.height = 44; im.loading = "lazy"; im.onerror = () => im.remove(); t.appendChild(im); } else t.textContent = "·"; fotos.appendChild(t); }
     const tarjeta = (p, etiqueta) => {
       const t = el("a", "in-prod"); t.href = cat + "#c=" + encodeURIComponent(p.id) + "." + (p.ultima > 0 ? Math.min(999, p.ultima) : 1) + "&a=1"; // el «+» pone lo de la última vez t.title = p.name; t.setAttribute("aria-label", `${p.name}${etiqueta ? ", " + etiqueta : ""}, ${p.soloCaja && p.unitsPerBox ? eur(Math.round(p.price * p.unitsPerBox * 100) / 100) + " la caja" : eur(p.price) + " la unidad"}${p.ultima ? ". La última vez: " + ultimaTxt(p) : ""}. Añadir al pedido`);
-      const im = el("span", "in-pim"); if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.onerror = () => i.remove(); im.appendChild(i); } else im.textContent = p.name.slice(0, 2).toUpperCase();
+      const im = el("span", "in-pim"); if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.width = 148; i.height = 148; i.onerror = () => i.remove(); im.appendChild(i); } else im.textContent = p.name.slice(0, 2).toUpperCase();
       if (etiqueta) im.appendChild(el("span", "in-oferta", etiqueta));
       const mas = el("span", "in-mas"); mas.setAttribute("aria-hidden", "true"); mas.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
       const pie = el("span", "in-pie"); pie.append(el("small", null, p.soloCaja && p.unitsPerBox ? eur(Math.round(p.price * p.unitsPerBox * 100) / 100) + " /caja" : eur(p.price) + " /ud"), mas);
@@ -1419,7 +1428,7 @@ function inicio(ui) {
   }).catch(() => { quitaEsq(); });
   { const fila = document.createElement("div"); fila.className = "mrow in"; fila.appendChild(c); chat.appendChild(fila); chat.scrollTop = 0; }
   // «Hoy toca tu pedido de los martes»: solo si tiene pedido fijo, hoy es uno de sus días, no está pausado y todavía no ha pedido hoy. Nunca se envía solo: se abre para revisarlo.
-  fetch("/api/pedido-fijo").then((r) => (r.ok ? r.json() : null)).then((j) => {
+  const cargaFijo = () => fetch("/api/pedido-fijo").then((r) => { if (!r.ok) throw new Error("fijo"); return r.json(); }).then((j) => {
     if (!j?.fijo || !j.hoy.toca || j.hoy.yaPidio) return;
     const f = el("div", "in-card in-fijo-card"); f.setAttribute("role", "status");
     f.append(el("small", "in-peq", "Tu pedido fijo"), el("h3", null, `Hoy toca tu pedido de los ${j.hoy.nombre}`));
@@ -1434,7 +1443,8 @@ function inicio(ui) {
       av.appendChild(el("small", null, "Al abrir el pedido te dejamos cambiarlos por uno parecido."));
       f.insertBefore(av, bt);
     }
-  }).catch(() => {});
+  }).catch(() => falloCarga(sitioFijo, "No hemos podido cargar tu pedido fijo.", cargaFijo));
+  cargaFijo();
 }
 const sinEmoji = (t) => String(t ?? "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim();
 function pill(texto, fn, href) {
@@ -1507,13 +1517,15 @@ function abrirAyuda(a, nombre) {
     l.append(cb, document.createTextNode("Contraste alto (textos y bordes más marcados)")); aj.appendChild(l); }
   c.appendChild(aj);
   { const v = document.createElement("p"); v.className = "ayuda-ver"; c.appendChild(v); // versión del programa que está funcionando (para saber qué se ha publicado)
-    fetch("/health", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (j && j.version) v.textContent = "Versión del programa: " + j.version + (j.commitFecha ? " · " + new Date(j.commitFecha).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) : "") + (j.reinicioPendiente ? " (hay otra más nueva pendiente de reiniciar)" : ""); }).catch(() => {}); }
+    fetch("/health", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (j && j.version) v.textContent = "Versión del programa: " + j.version + (j.commitFecha ? " · " + new Date(j.commitFecha).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) : "") + (j.reinicioPendiente ? " (hay otra más nueva pendiente de reiniciar)" : ""); }).catch(() => { v.textContent = "No se ha podido comprobar la versión del programa."; }); }
   const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Cerrar";
   const cerrar = () => { f.remove(); document.removeEventListener("keydown", esc); }; const esc = (e) => { if (e.key === "Escape") cerrar(); };
   arrastrable(c, cerrar); x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
   c.appendChild(x); f.appendChild(c); document.body.appendChild(f); (c.querySelector("a") || x).focus();
 }
-let AYUDA = null; fetch("/api/ayuda").then((r) => r.json()).then((j) => { AYUDA = j.ayuda; pintaContactoAcceso(); }).catch(() => {});
+let AYUDA = null;
+const cargaAyuda = () => fetch("/api/ayuda").then((r) => { if (!r.ok) throw new Error("ayuda"); return r.json(); }).then((j) => { AYUDA = j.ayuda; pintaContactoAcceso(); }).catch(() => { const p = $("acc-contacto"); p.hidden = false; p.textContent = ""; falloCarga(p, "No hemos podido cargar el teléfono de ayuda.", cargaAyuda); });
+cargaAyuda();
 function pintaContactoAcceso() { // teléfono y WhatsApp visibles ya en la portada (no hace falta pulsar nada para tenerlos)
   const p = $("acc-contacto"), a = AYUDA; if (!p) return; p.textContent = "";
   if (!a || !(a.telHref || a.whatsappHref)) { p.hidden = true; return; }

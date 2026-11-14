@@ -7,7 +7,13 @@
 //   3. sin familia: palabras del nombre (REGLAS_GENERALES).
 // Si la ficha ya trae categoría/subcategoría (columnas del Excel), categorizar() las respeta.
 
-const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ñ%]+/g, " ").trim();
+const normCache = new Map(); // los mismos nombres se normalizan una y otra vez (cada visita recorre todo el catálogo)
+const norm = (s) => {
+  const k = String(s ?? ""), c = normCache.get(k); if (c !== undefined) return c;
+  const r = k.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9ñ%]+/g, " ").trim();
+  if (normCache.size > 60000) normCache.clear();
+  normCache.set(k, r); return r;
+};
 const slug = (s) => norm(s).replace(/\s+/g, "-") || "otros";
 
 // subs: nombres de subcategoría (el id es el nombre sin tildes ni espacios); la última recoge lo que no encaja

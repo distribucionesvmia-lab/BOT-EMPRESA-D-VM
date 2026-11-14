@@ -904,6 +904,8 @@
   .dchip:active { transform:scale(.97); }
   .dchip.on { background:var(--text); color:var(--surface); } .dchip.on small { color:var(--surface); opacity:.85; }
   #diaInfo:empty { display:none; }
+  .carga-fallo { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:var(--s3); padding:var(--s3); border-radius:var(--r-field); background:var(--fill); color:var(--text); font-size:calc(var(--t-sec) / var(--k,1)); }
+  .carga-fallo button { min-height:44px; padding:0 var(--s4); background:var(--surface); color:var(--accent); border:0; border-radius:var(--r-pill); font:inherit; font-weight:600; }
   .pf-ultima { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); line-height:1.25; }
   .aviso.abierto { border-radius:var(--r-card); display:flex; flex-direction:column; gap:var(--s2); align-items:flex-start; }
   .aviso.abierto[hidden], .dia-aviso[hidden] { display:none; }
@@ -1474,7 +1476,7 @@ function abrirAyuda(a, nombre) {
     l.append(cb, document.createTextNode("Contraste alto (textos y bordes más marcados)")); aj.appendChild(l); }
   c.appendChild(aj);
   { const v = document.createElement("p"); v.className = "ayuda-ver"; c.appendChild(v); // versión del programa que está funcionando (para saber qué se ha publicado)
-    fetch("/health", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (j && j.version) v.textContent = "Versión del programa: " + j.version + (j.commitFecha ? " · " + new Date(j.commitFecha).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) : "") + (j.reinicioPendiente ? " (hay otra más nueva pendiente de reiniciar)" : ""); }).catch(() => {}); }
+    fetch("/health", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (j && j.version) v.textContent = "Versión del programa: " + j.version + (j.commitFecha ? " · " + new Date(j.commitFecha).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) : "") + (j.reinicioPendiente ? " (hay otra más nueva pendiente de reiniciar)" : ""); }).catch(() => { v.textContent = "No se ha podido comprobar la versión del programa."; }); }
   const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Cerrar";
   const cerrar = () => { f.remove(); document.removeEventListener("keydown", esc); }; const esc = (e) => { if (e.key === "Escape") cerrar(); };
   arrastrable(c, cerrar); x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
@@ -1727,7 +1729,7 @@ function row(p) {
   const el = document.createElement("div"); el.className = "pf" + (qty.get(p.id) > 0 ? " sel" : "") + (p.img ? "" : " sin-foto"); el.dataset.id = p.id; el.tabIndex = -1; el.setAttribute("role", "group"); el.setAttribute("aria-label", p.name); // teclas: + añade, − quita
   const av = document.createElement("div"); av.className = "pf-av"; av.style.background = hue(p.name); av.textContent = initials(p.name);
   if (p.img) { // foto del producto encima de las iniciales; si no carga, se queda el marcador
-    const im = document.createElement("img"); im.src = p.img; im.alt = ""; im.decoding = "async"; im.loading = "lazy";
+    const im = document.createElement("img"); im.src = p.img; im.alt = ""; im.decoding = "async"; im.loading = "lazy"; im.width = 72; im.height = 72; // tamaño fijo: la lista no salta al llegar la foto
     im.onerror = () => im.remove();
     av.appendChild(im);
     av.title = "Toca para ver la ficha del producto";
@@ -2126,7 +2128,7 @@ function tablaLineas(ls) {
     // Artículo: foto (toca para ampliarla) + nombre + precio por unidad
     const a = tr.insertCell(); a.className = "tl-art";
     const av = document.createElement("button"); av.type = "button"; av.className = "av tl-av"; av.style.background = hue(l.name); av.textContent = initials(l.name); av.setAttribute("aria-label", l.img ? "Ampliar la foto de " + l.name : l.name);
-    if (l.img) { const im = document.createElement("img"); im.src = l.img; im.alt = ""; im.onerror = () => im.remove(); av.appendChild(im); av.onclick = () => verFoto(l); } else av.style.cursor = "default";
+    if (l.img) { const im = document.createElement("img"); im.src = l.img; im.alt = ""; im.width = 52; im.height = 52; im.onerror = () => im.remove(); av.appendChild(im); av.onclick = () => verFoto(l); } else av.style.cursor = "default";
     const tx = document.createElement("div"); tx.className = "tl-txt";
     const n = document.createElement("div"); n.className = "cn"; n.textContent = nombreVisible(l); n.title = l.name;
     const pr = document.createElement("div"); pr.className = "cp";
@@ -2186,7 +2188,7 @@ function pintarFalta(box) {
   for (const x of falta) {
     const f = document.createElement("div"); f.className = "falta-fila";
     const av = document.createElement("button"); av.type = "button"; av.className = "falta-av"; av.style.background = hue(x.name); av.textContent = initials(x.name); av.setAttribute("aria-label", x.img ? "Ampliar la foto de " + x.name : x.name);
-    if (x.img) { const im = document.createElement("img"); im.src = x.img; im.alt = ""; im.loading = "lazy"; av.textContent = ""; im.onerror = () => { im.remove(); av.textContent = initials(x.name); }; av.appendChild(im); av.onclick = () => verFoto(x); } else av.style.cursor = "default";
+    if (x.img) { const im = document.createElement("img"); im.src = x.img; im.alt = ""; im.loading = "lazy"; im.width = 52; im.height = 52; av.textContent = ""; im.onerror = () => { im.remove(); av.textContent = initials(x.name); }; av.appendChild(im); av.onclick = () => verFoto(x); } else av.style.cursor = "default";
     const n = document.createElement("span"); n.className = "falta-n"; const nb = document.createElement("b"); nb.textContent = nombreVisible(x); nb.title = x.name; const ns = document.createElement("small"); ns.textContent = eurp(x.price) + (x.unitsPerBox ? " · caja de " + x.unitsPerBox : ""); n.append(nb, ns);
     const b = document.createElement("button"); b.type = "button"; b.className = "add sec-add"; b.textContent = "Añadir"; b.setAttribute("aria-label", "Añadir " + x.name); b.onclick = () => setQty(x.id, 1);
     f.append(av, n, b); s.appendChild(f);
@@ -2330,7 +2332,14 @@ function pintarFijoCard() {
   const f = fijoInfo && fijoInfo.fijo;
   $("fijoTxt").textContent = f ? `Ya tienes un pedido fijo (los ${f.dias.map(d => DIA_LARGO[d]).join(", ")}${f.pausado ? ", en pausa" : ""}). Si lo guardas, sustituye al que tienes. Nunca se envía solo: ese día te lo enseñamos para que lo revises.` : "Guarda este pedido y los días que elijas te lo enseñamos para que lo revises y lo envíes. Nunca se envía solo.";
 }
-fetch("/api/pedido-fijo").then(r => (r.ok ? r.json() : null)).then(j => { if (!j) return; fijoInfo = j; if (j.fijo) fijoDias = new Set(j.fijo.dias); $("fijoCard").hidden = false; pintarFijoCard(); }).catch(() => {});
+// Si algo no carga se dice y se ofrece «Reintentar» (nunca un hueco en silencio)
+function falloCarga(caja, texto, reintentar) {
+  for (const x of caja.querySelectorAll(":scope > .carga-fallo")) if (x.dataset.k === String(texto)) x.remove(); // un aviso por cosa que falla
+  const d = document.createElement("div"); d.className = "carga-fallo"; d.dataset.k = String(texto); d.setAttribute("role", "status"); const s = document.createElement("span"); s.textContent = texto || "No hemos podido cargar esto.";
+  const b = document.createElement("button"); b.type = "button"; b.className = "keepbtn"; b.textContent = "Reintentar"; b.onclick = () => { d.remove(); reintentar(); }; d.append(s, b); caja.appendChild(d);
+}
+const cargaFijoCard = () => fetch("/api/pedido-fijo").then(r => { if (r.status === 401) return null; if (!r.ok) throw new Error("fijo"); return r.json(); }).then(j => { if (!j) return; fijoInfo = j; if (j.fijo) fijoDias = new Set(j.fijo.dias); $("fijoCard").hidden = false; pintarFijoCard(); }).catch(() => { $("fijoCard").hidden = false; $("fijoPanel").hidden = true; $("fijoAbrir").hidden = true; falloCarga($("fijoCard"), "No hemos podido cargar tu pedido fijo.", () => { $("fijoAbrir").hidden = false; cargaFijoCard(); }); });
+cargaFijoCard();
 function abrirFijo(abrir) { $("fijoPanel").hidden = !abrir; $("fijoAbrir").hidden = abrir; if (!abrir) $("fijoMsg").textContent = ""; }
 $("fijoAbrir").onclick = () => { abrirFijo(true); $("fijoPanel").scrollIntoView({ block: "center", behavior: sinMovimiento() ? "auto" : "smooth" }); };
 $("fijoCancelar").onclick = () => abrirFijo(false); // sin guardar nada: el pedido sigue como estaba
@@ -2474,7 +2483,7 @@ function pintarSugs() {
   for (const p of res) {
     const fila = document.createElement("div"); fila.className = "sug"; fila.setAttribute("role", "option"); fila.dataset.id = p.id; fila.id = "sug-" + p.id;
     const im = document.createElement("span"); im.className = "sug-im"; im.style.background = hue(p.name); im.textContent = initials(p.name);
-    if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.onerror = () => i.remove(); im.appendChild(i); }
+    if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.width = 56; i.height = 56; i.onerror = () => i.remove(); im.appendChild(i); }
     const tx = document.createElement("span"); tx.className = "sug-tx"; const n = document.createElement("b"); n.textContent = p.name; const pr = document.createElement("small"); pr.textContent = p.soloCaja && p.unitsPerBox ? `Solo cajas de ${p.unitsPerBox} · ${eur(precioCaja(p))} la caja` : eurp(p.price) + " /ud";
     tx.append(n, pr);
     const mas = document.createElement("button"); mas.type = "button"; mas.className = "sug-mas"; mas.setAttribute("aria-label", "Añadir " + p.name);
@@ -2661,7 +2670,7 @@ function plazoDe(date) { // texto ya sabido (botones) o pedido al servidor (cale
   if (!date) return null; const k = data.plazos?.[date]; if (k) return k;
   if (plazoCache.has(date)) return plazoCache.get(date) || null;
   plazoCache.set(date, null);
-  fetch("/catalogo/plazo?dia=" + encodeURIComponent(date)).then(r => (r.ok ? r.json() : null)).then(j => { plazoCache.set(date, j && j.texto ? j : false); if (diaElegido === date) { pintarPlazo(); } }).catch(() => {});
+  fetch("/catalogo/plazo?dia=" + encodeURIComponent(date)).then(r => (r.ok ? r.json() : null)).then(j => { plazoCache.set(date, j && j.texto ? j : false); if (diaElegido === date) { pintarPlazo(); } }).catch(() => { plazoCache.delete(date); if (diaElegido === date) { $("plazo").textContent = ""; falloCarga($("plazo"), "No hemos podido calcular hasta cuándo podrás modificarlo.", pintarPlazo); } });
   return null;
 }
 function pintarPlazo() {
