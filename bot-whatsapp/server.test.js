@@ -936,6 +936,39 @@ test("PEDIDOS: se filtran por día, horas y cliente, y se borran los elegidos (c
   assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: [a], confirmo: true } })).json.borrados, 0); // repetirlo no rompe nada
 });
 
+test("PEDIDO DE SIEMPRE: el cliente lo puede editar, borrar y recuperar, sin enviar nada y sin tocar a otro cliente", async () => {
+  const A = cookieOf(await entrarNif("111111"));
+  const B = cookieOf(await entrarNif("122222", "bar dos"));
+  const hecho = await call("POST", "/catalogo", { cookie: A, body: { key: "clave-siempre-A", lines: [{ id: "1010", qty: 2 }, { id: "1020", qty: 1 }] } });
+  assert.equal(hecho.status, 200, JSON.stringify(hecho.json));
+  const inicio = async (c) => (await call("POST", "/api/chat", { cookie: c, body: { text: "inicio" } })).json;
+  assert.equal((await call("GET", "/api/pedido-de-siempre")).status, 401);
+  assert.equal((await call("POST", "/api/pedido-de-siempre/borrar", { body: {} })).status, 401);
+  const g0 = (await call("GET", "/api/pedido-de-siempre", { cookie: A })).json;
+  assert.equal(g0.estado, "auto"); assert.ok(g0.lineas.length >= 1 && g0.lineas.every((l) => l.id && l.nombre && l.qty > 0));
+  const pedidosAntes = (await call("GET", "/api/mi-cuenta", { cookie: A })).json.pedidos.length;
+  // editar: cambia cantidades y quita lo demás
+  const id = g0.lineas[0].id;
+  assert.equal((await call("POST", "/api/pedido-de-siempre", { cookie: A, body: { lineas: [{ id, qty: 7, unit: "ud" }, { id: "NO-EXISTE", qty: 3 }] } })).status, 200);
+  const g1 = (await call("GET", "/api/pedido-de-siempre", { cookie: A })).json;
+  assert.equal(g1.estado, "propio"); assert.deepEqual(g1.lineas.map((l) => [l.id, l.qty]), [[id, 7]]); // lo que no existe se ignora
+  const ini1 = await inicio(A);
+  assert.equal(ini1.ui?.siempre, "propio"); assert.equal(ini1.ui.last.articulos, 1); assert.match(ini1.ui.last.lineas[0], /^7 uds? ·/);
+  assert.equal((await call("POST", "/api/pedido-de-siempre", { cookie: A, body: { lineas: [] } })).status, 400); // vacío: hay que usar «Borrar»
+  // otro cliente no ve nada de esto
+  assert.equal((await call("GET", "/api/pedido-de-siempre", { cookie: B })).json.estado, "auto");
+  assert.notEqual((await inicio(B)).ui?.siempre, "propio");
+  // borrar: la tarjeta desaparece
+  assert.equal((await call("POST", "/api/pedido-de-siempre/borrar", { cookie: A, body: {} })).status, 200);
+  const ini2 = await inicio(A); assert.equal(ini2.ui?.siempre, "borrado"); assert.equal(ini2.ui.last, undefined);
+  assert.deepEqual((await call("GET", "/api/pedido-de-siempre", { cookie: A })).json, { estado: "borrado", lineas: [] });
+  // recuperar el último pedido
+  assert.equal((await call("POST", "/api/pedido-de-siempre/restaurar", { cookie: A, body: {} })).status, 200);
+  const ini3 = await inicio(A); assert.equal(ini3.ui?.siempre, "auto"); assert.ok(ini3.ui.last.lineas.length >= 1);
+  // nada de esto crea ni borra pedidos
+  assert.equal((await call("GET", "/api/mi-cuenta", { cookie: A })).json.pedidos.length, pedidosAntes);
+});
+
 test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repetir o añadir), nunca los de otro ni su NIF", async () => {
   assert.equal((await call("GET", "/api/mi-cuenta")).status, 401);
   const A = cookieOf(await entrarNif("111111"));

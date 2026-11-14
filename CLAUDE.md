@@ -215,3 +215,7 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **Precio**: 17 px en negrita y «/ud» o «/caja (6 ud)» según lo que esté elegido (Caja|Ud); con descuento, el original tachado y el neto al lado.
 - **Corazón** de favorito: icono de 20 px en un círculo de 32 px (toque de 44 px). **Foco**: un solo rojo (`--accent`) en toda la app (`outline:3px`), también en el contador de cantidad.
 - `--gris-suave` (#6E6E73 en claro, #A8A8B0 en oscuro) para «Imagen orientativa». Los nombres largos salen en 3 líneas con «…» (4 con letra grande). Pruebas: `bench3.test.js`.
+
+## Tanda 18 (editar y borrar «Tu pedido de siempre»)
+- La tarjeta de la portada tiene **Editar** y **Borrar** (`abrirSiempre` en `cliente.html`, ventana `#m-siempre`). Editar: −/+ por línea, «Quitar», «Guardar cambios» (mínimo un artículo). Borrar: pregunta con la propia ventana («Sí, borrar»); la portada enseña «Has borrado tu pedido de siempre» con «Volver a mostrar mi último pedido».
+- Se guarda en `usual_orders` (base de cuentas): sin fila = el último pedido, como siempre; fila con líneas = lista editada; `hidden` = borrado. **Solo cambia la portada**: no envía nada ni toca los pedidos hechos ni a3ERP. Se borra con la cuenta. Rutas: `GET/POST /api/pedido-de-siempre`, `/borrar`, `/restaurar`; `aplicarSiempre` (server.js) cambia `ui.last` del chat (`ui.siempre`: auto/propio/borrado) y `tarjetaSiempre`/`lineasUltimoPedido` (bot.js) arman la tarjeta. Pruebas: `server.test.js` («PEDIDO DE SIEMPRE») y `tanda18.test.js`.

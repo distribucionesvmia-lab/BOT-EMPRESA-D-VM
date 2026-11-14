@@ -381,6 +381,17 @@ function openCatalog(s, now = new Date()) {
   return showList(s, 0, aviso + "🛒 Elige lo que quieres pedir:");
 }
 /** Lo que va detrás de la dirección del catálogo para abrirlo con un pedido anterior ya puesto («Repetir y revisar»). */
+/** Líneas ({id, nombre, qty, unit, upb}) del último pedido del cliente que siguen en el catálogo: de ahí parte «Tu pedido de siempre» antes de editarlo. */
+export function lineasUltimoPedido(customer) {
+  const ult = pedidosDe(customer).map((o) => ({ o, items: itemsFromLines(o.lines) })).find((x) => x.items.length);
+  return { fecha: ult?.o.date ?? null, lineas: (ult?.items ?? []).slice(0, 80).map((i) => ({ id: String(i.id), nombre: i.name, qty: i.qty, unit: i.unit === "caja" ? "caja" : "ud", upb: i.upb ?? 1 })) };
+}
+/** Tarjeta «Tu pedido de siempre» con las líneas guardadas por el cliente ({id, qty, unit}); lo que ya no está en el catálogo se salta. */
+export function tarjetaSiempre(customer, lineas, fecha) {
+  const items = (lineas ?? []).map((l) => { const p = CATALOG.find((x) => String(x.id) === String(l.id)); return p && mkItem(p, l.qty, l.unit, { unitStated: true }); }).filter(Boolean);
+  if (!items.length) return null;
+  return { date: "editado por ti", articulos: items.length, total: Math.round(total(items, customer) * 100) / 100, conIva: true, lineas: items.slice(0, 30).map((i) => `${cantidadH(i)} · ${i.name}`), mas: Math.max(0, items.length - 30), repetir: hashRepetir(items), ...(fecha ? { fecha } : {}), propio: true };
+}
 const hashRepetir = (items) => "c=" + items.map((i) => `${encodeURIComponent(String(i.id))}.${Math.min(999, i.unit === "caja" ? i.qty * (i.upb || 1) : i.qty)}`).join(",") + "&r=1";
 
 // ── Asistente: preguntas en lenguaje natural y recomendaciones (ver asistente.js) ──

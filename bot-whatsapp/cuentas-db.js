@@ -87,6 +87,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   };
   // Favoritos del cliente (privados, por cliente; no los toca la sincronización con a3ERP)
   // Pedido fijo semanal (F-16): la plantilla de líneas y los días de reparto; NUNCA se envía solo, el cliente la revisa cada día que toca
+  db.exec("CREATE TABLE IF NOT EXISTS usual_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, hidden INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)"); // «Tu pedido de siempre» editado o borrado por el cliente (sin fila = el último pedido, como siempre)
   db.exec("CREATE TABLE IF NOT EXISTS standing_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, days TEXT NOT NULL, paused INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)");
   db.exec("CREATE TABLE IF NOT EXISTS reminders (customer_id TEXT NOT NULL, day TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY (customer_id, day))"); // day = '' para «no avisar más»
   db.exec("CREATE TABLE IF NOT EXISTS delivery_addresses (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL)"); // direcciones de entrega que el cliente guarda para otras veces (máx. 5)
@@ -215,6 +216,19 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       db.prepare("INSERT INTO standing_orders (customer_id, lines, days, paused, updated_at) VALUES (?, ?, ?, 0, ?) ON CONFLICT(customer_id) DO UPDATE SET lines = excluded.lines, days = excluded.days, paused = 0, updated_at = excluded.updated_at").run(String(customerId), JSON.stringify(ls), JSON.stringify(ds), now);
       return true;
     },
+    /** «Tu pedido de siempre» del cliente: null (sin tocar: sale el último pedido), { hidden:true } (borrado) o { lines:[{id,qty,unit}] } (editado). */
+    getUsual(customerId) {
+      const r = db.prepare("SELECT lines, hidden FROM usual_orders WHERE customer_id = ?").get(String(customerId));
+      return r ? { hidden: !!r.hidden, lines: JSON.parse(r.lines) } : null;
+    },
+    setUsual(customerId, lines, now = new Date().toISOString()) {
+      const ls = (Array.isArray(lines) ? lines : []).slice(0, 80).map((l) => ({ id: String(l?.id ?? ""), qty: Math.min(999, Math.max(1, Math.floor(Number(l?.qty)))), unit: l?.unit === "caja" ? "caja" : "ud" })).filter((l) => l.id && Number.isFinite(l.qty));
+      if (!ls.length) return false;
+      db.prepare("INSERT INTO usual_orders (customer_id, lines, hidden, updated_at) VALUES (?, ?, 0, ?) ON CONFLICT(customer_id) DO UPDATE SET lines = excluded.lines, hidden = 0, updated_at = excluded.updated_at").run(String(customerId), JSON.stringify(ls), now);
+      return true;
+    },
+    hideUsual(customerId, now = new Date().toISOString()) { db.prepare("INSERT INTO usual_orders (customer_id, lines, hidden, updated_at) VALUES (?, '[]', 1, ?) ON CONFLICT(customer_id) DO UPDATE SET lines = '[]', hidden = 1, updated_at = excluded.updated_at").run(String(customerId), now); return true; },
+    resetUsual: (customerId) => db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(String(customerId)).changes === 1,
     allStanding() { const m = new Map(); for (const r of db.prepare("SELECT customer_id, days, paused FROM standing_orders").all()) m.set(r.customer_id, { days: JSON.parse(r.days), paused: !!r.paused }); return m; },
     /** «Ya avisado» (solo hoy) o «No avisar más» (siempre) para un cliente. */
     markReminder(customerId, state, day) { if (state === "nunca") db.prepare("INSERT OR REPLACE INTO reminders (customer_id, day, state) VALUES (?, '', 'nunca')").run(String(customerId)); else db.prepare("INSERT OR REPLACE INTO reminders (customer_id, day, state) VALUES (?, ?, 'avisado')").run(String(customerId), String(day)); return true; },
@@ -422,6 +436,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         db.prepare("DELETE FROM favorites WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM delivery_addresses WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM standing_orders WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM push_subs WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM registrations WHERE customer_id = ? OR (phone = ? AND ? IS NOT NULL)").run(row.customer_id, row.phone, row.phone);
         db.prepare("UPDATE accounts SET phone = NULL, email = NULL, pin_hash = NULL, code_key = NULL, status = 'deleted', verified = 0, failed = 0, lock_count = 0, locked_until = NULL, deleted_at = ? WHERE id = ?").run(now, row.id);

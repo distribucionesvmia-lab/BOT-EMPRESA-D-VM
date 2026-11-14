@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import zlib from "node:zlib";
 import fs from "node:fs";
 import path from "node:path";
-import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog as catalogNow, habitualProducts } from "./bot.js";
+import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog as catalogNow, habitualProducts, tarjetaSiempre, lineasUltimoPedido } from "./bot.js";
 import { getCatalog, catalogVersion, getCustomerByPhone, getCustomerById, findCustomers, createOrder, getAccountsDb, customerDirectory, getDatabases, setOrderHook } from "./erp.js";
 import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
@@ -464,6 +464,16 @@ const imgEsIa = (id) => (imgs(), imgIa.has(String(id)));
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow" };
 const sendJson = (res, code, data) => enviar(res, code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify(data));
 
+// «Tu pedido de siempre» que el cliente ha editado o borrado: cambia la tarjeta del Inicio (sin fila guardada sale el último pedido, como siempre)
+function aplicarSiempre(account, customer, ui) {
+  if (!ui?.home) return ui;
+  const u = getAccountsDb().getUsual(account.customerId);
+  if (!u) return { ...ui, siempre: "auto" };
+  const { last, ...resto } = ui;
+  if (u.hidden) return { ...resto, siempre: "borrado" };
+  const t = tarjetaSiempre(customer, u.lines, last?.fecha ?? lineasUltimoPedido(customer).fecha);
+  return t ? { ...resto, last: t, siempre: "propio" } : { ...resto, siempre: "borrado" };
+}
 // Conversación de un cliente con sesión: el cliente sale SIEMPRE de la cuenta (nunca de lo que envíe el navegador)
 async function accountChat(account, text, msgId) {
   const customer = clienteConPedidos(account.customerId);
@@ -524,7 +534,7 @@ async function appRoutes(req, res, url) {
     const text = typeof body?.text === "string" ? body.text.slice(0, 1000) : "";
     const msgId = typeof body?.id === "string" && /^[\w-]{8,64}$/.test(body.id) ? body.id : undefined;
     const out = await accountChat(account, text, msgId);
-    return void sendJson(res, 200, { reply: out.reply, ui: out.ui ?? null, handoff: !!out.handoff, cards: out.cards ?? null, short: out.short ?? null });
+    return void sendJson(res, 200, { reply: out.reply, ui: out.ui ? aplicarSiempre(account, clienteConPedidos(account.customerId), out.ui) : null, handoff: !!out.handoff, cards: out.cards ?? null, short: out.short ?? null });
   }
 
   // Catálogo de pedido (la mini-aplicación) del cliente con sesión
@@ -630,6 +640,31 @@ async function appRoutes(req, res, url) {
     return void sendJson(res, 200, { ok: true, favs: getAccountsDb().favorites(account.customerId) });
   }
   // ── Pedido fijo semanal (F-16): se guarda la plantilla; nunca se envía solo ──
+  // ── «Tu pedido de siempre» (portada): ver las líneas, editarlas, borrarlo o volver al último pedido. Nunca se envía solo. ──
+  if (p === "/api/pedido-de-siempre" && req.method === "GET") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const customer = clienteConPedidos(account.customerId), u = getAccountsDb().getUsual(account.customerId);
+    const nombres = new Map(catalogNow().map((x) => [String(x.id), x]));
+    const lineas = u && !u.hidden
+      ? u.lines.map((l) => { const pr = nombres.get(l.id); return pr && { id: l.id, nombre: pr.name, qty: l.qty, unit: l.unit, upb: Number.isInteger(pr.unitsPerBox) && pr.unitsPerBox > 1 ? pr.unitsPerBox : 1 }; }).filter(Boolean)
+      : lineasUltimoPedido(customer).lineas;
+    return void sendJson(res, 200, { estado: u ? (u.hidden ? "borrado" : "propio") : "auto", lineas: u?.hidden ? [] : lineas });
+  }
+  if (p === "/api/pedido-de-siempre" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const body = await readJson(req), cat = new Set(catalogNow().map((x) => String(x.id)));
+    const ok = getAccountsDb().setUsual(account.customerId, (Array.isArray(body?.lineas) ? body.lineas : []).filter((l) => cat.has(String(l?.id))));
+    return void sendJson(res, ok ? 200 : 400, ok ? { ok: true } : { error: "Deja al menos un artículo, o usa «Borrar»." });
+  }
+  if (p === "/api/pedido-de-siempre/borrar" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    return void sendJson(res, 200, { ok: getAccountsDb().hideUsual(account.customerId) });
+  }
+  if (p === "/api/pedido-de-siempre/restaurar" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    getAccountsDb().resetUsual(account.customerId); return void sendJson(res, 200, { ok: true });
+  }
   if (p === "/api/pedido-fijo" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     const f = getAccountsDb().getStanding(account.customerId);

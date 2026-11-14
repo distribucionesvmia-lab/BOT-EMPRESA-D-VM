@@ -389,6 +389,14 @@
   .vm-inicio .in-card h3 { margin:0; font-size:calc(var(--t-md) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; }
   .vm-inicio .in-card p { margin:0; color:var(--text-2); font-size:calc(var(--t-sec) / var(--k,1)); line-height:1.35; }
   .vm-inicio .in-peq { color:var(--text-2); font-size:calc(var(--t-cap) / var(--k,1)); }
+  .vm-inicio .in-sie-acc { display:flex; gap:var(--s2); margin-top:var(--s2); }
+  .vm-inicio .in-card .in-sie-acc .vm-btn { width:auto; flex:1; min-height:44px; }
+  #s-cuerpo .s-lin { display:grid; grid-template-columns:1fr auto; gap:var(--s2) var(--s3); align-items:center; padding:var(--s3) 0; border-bottom:1px solid var(--fill); }
+  #s-cuerpo .s-nom { font-size:calc(var(--t-sec) / var(--k,1)); line-height:1.3; overflow-wrap:anywhere; }
+  #s-cuerpo .s-ctl { display:flex; align-items:center; gap:var(--s2); }
+  #s-cuerpo .s-ctl button { min-width:44px; min-height:44px; border:0; border-radius:var(--r-field); background:var(--fill); color:var(--text); font-size:calc(20px / var(--k,1)); font-weight:600; }
+  #s-cuerpo .s-ctl output { min-width:2.4em; text-align:center; font-weight:600; font-variant-numeric:tabular-nums; }
+  #s-cuerpo .s-quitar { grid-column:1 / -1; justify-self:start; min-height:44px; background:none; border:0; color:var(--accent); font-weight:600; font-size:calc(var(--t-sec) / var(--k,1)); }
   .vm-inicio .in-total { color:var(--text) !important; font-weight:600; font-variant-numeric:tabular-nums; }
   .vm-inicio .in-fotos { display:flex; padding-left:var(--s3); min-height:44px; }
   .vm-inicio .in-foto { width:44px; height:44px; margin-left:calc(-1 * var(--s3)); border-radius:50%; border:2px solid var(--surface); background:var(--fill); overflow:hidden; display:grid; place-items:center; color:var(--text-2); }
@@ -731,6 +739,15 @@
       <div id="f-cuerpo"></div>
       <p style="font-size:calc(13px / var(--k,1))">No se envía nada solo: los días que elijas te lo recordamos al abrir la aplicación, para que lo revises y lo envíes tú.</p>
       <button class="vm-link" type="button" id="f-cerrar">Cerrar</button>
+    </div>
+  </div>
+  <div class="vm-modal" id="m-siempre" hidden>
+    <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-siempre" style="max-height:92vh;overflow:auto">
+      <div class="cu-cab cab-modal"><h2 id="t-siempre">Tu pedido de siempre</h2><button class="vm-x" type="button" id="s-x" aria-label="Cerrar">×</button></div>
+      <div id="s-cuerpo"></div>
+      <div class="err" id="s-err" role="alert"></div>
+      <p style="font-size:calc(13px / var(--k,1))">Esto solo cambia lo que ves en tu pantalla de inicio. No envía ningún pedido ni toca los que ya has hecho.</p>
+      <button class="vm-link" type="button" id="s-cerrar">Cerrar</button>
     </div>
   </div>
   <div class="vm-modal" id="m-avisos" hidden>
@@ -1111,6 +1128,43 @@ async function pintarFijo() {
   btn(f.pausado ? "Reanudar" : "Pausar", "ghost", async () => { await post("/api/pedido-fijo/pausa", { pausado: !f.pausado }); pintarFijo(); });
   btn("Borrar mi pedido fijo", "ghost", async () => { if (!confirm("¿Borrar tu pedido fijo?")) return; await post("/api/pedido-fijo/borrar", {}); pintarFijo(); });
 }
+// «Tu pedido de siempre»: editar cantidades, quitar artículos, borrarlo (solo cambia la portada; nunca envía nada)
+async function abrirSiempre(modo) {
+  const B = $("s-cuerpo"), E = $("s-err"); E.textContent = ""; B.textContent = "Un momento…"; $("m-siempre").hidden = false;
+  const j = await fetch("/api/pedido-de-siempre").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (!j) { B.textContent = ""; E.textContent = "No se ha podido cargar. Comprueba tu conexión e inténtalo otra vez."; return; }
+  const ls = j.lineas.map((l) => ({ ...l })); B.textContent = "";
+  const cerrar = (recarga) => { $("m-siempre").hidden = true; if (recarga) location.reload(); };
+  const btn = (txt, cls, fn) => { const b = el("button", "vm-btn " + cls, txt); b.type = "button"; b.onclick = fn; B.appendChild(b); return b; };
+  if (modo === "borrar") {
+    B.append(el("p", null, "¿Borrar tu pedido de siempre? Desaparece de tu pantalla de inicio. Tus pedidos anteriores no se tocan y podrás recuperarlo cuando quieras."));
+    btn("Sí, borrar", "primary", async (e) => { e.target.disabled = true; const r = await post("/api/pedido-de-siempre/borrar", {}).catch(() => null); if (r?.ok) cerrar(true); else { E.textContent = "No se ha podido borrar. Inténtalo otra vez."; e.target.disabled = false; } });
+    btn("No, dejarlo como está", "ghost", () => cerrar(false)); return;
+  }
+  const lista = el("div"); B.appendChild(lista);
+  const pinta = () => {
+    lista.textContent = "";
+    if (!ls.length) lista.appendChild(el("p", null, "No queda ningún artículo. Pulsa «Cancelar» para dejarlo como estaba o «Borrar pedido» para quitarlo."));
+    ls.forEach((l, i) => {
+      const fila = el("div", "s-lin"), n = l.unit === "caja" ? (l.qty === 1 ? "caja" : "cajas") : (l.qty === 1 ? "ud" : "uds");
+      const ctl = el("div", "s-ctl"), menos = el("button", null, "−"), mas = el("button", null, "+"), out = el("output", null, String(l.qty));
+      menos.type = mas.type = "button"; menos.setAttribute("aria-label", "Una menos: " + l.nombre); mas.setAttribute("aria-label", "Una más: " + l.nombre);
+      menos.onclick = () => { if (l.qty > 1) { l.qty--; pinta(); } }; mas.onclick = () => { if (l.qty < 999) { l.qty++; pinta(); } };
+      ctl.append(menos, out, el("span", null, n), mas);
+      const q = el("button", "s-quitar", "Quitar"); q.type = "button"; q.setAttribute("aria-label", "Quitar " + l.nombre); q.onclick = () => { ls.splice(i, 1); pinta(); };
+      fila.append(el("div", "s-nom", l.nombre), ctl, q); lista.appendChild(fila);
+    });
+  };
+  pinta();
+  const g = btn("Guardar cambios", "primary", async () => {
+    if (!ls.length) { E.textContent = "Deja al menos un artículo, o usa «Borrar pedido»."; return; }
+    g.disabled = true; const r = await post("/api/pedido-de-siempre", { lineas: ls.map((l) => ({ id: l.id, qty: l.qty, unit: l.unit })) }).catch(() => null);
+    if (r?.ok) cerrar(true); else { E.textContent = "No se han podido guardar los cambios. Inténtalo otra vez."; g.disabled = false; }
+  });
+  btn("Cancelar", "ghost", () => cerrar(false));
+  const bb = btn("Borrar pedido", "ghost", () => abrirSiempre("borrar")); bb.style.marginTop = "var(--s2)";
+}
+$("s-x").onclick = $("s-cerrar").onclick = () => ($("m-siempre").hidden = true);
 $("mifijo").onclick = () => { menu(false); $("m-fijo").hidden = false; pintarFijo(); };
 $("f-cerrar").onclick = () => ($("m-fijo").hidden = true);
 $("misdatos").onclick = () => { menu(false); $("d-err").textContent = $("d-ok").textContent = $("d-err2").textContent = ""; $("d-confirma").hidden = true; $("m-datos").hidden = false; };
@@ -1246,6 +1300,13 @@ function inicio(ui) {
     const dia = diaSemanaDe(ui.last.fecha);
     const sem = el("button", "vm-btn ghost in-rec"); sem.append(el("span", "in-rec-t", dia ? "Repetir cada " + dia : "Repetir cada semana"), el("small", "in-rec-s", "Pedido recurrente: se guarda y tú lo revisas antes de enviar")); sem.type = "button"; sem.onclick = () => { location.href = ui.url + "#" + ui.last.repetir + "&f=1"; };
     principal.append(rep, sem);
+    const acc = el("div", "in-sie-acc"), be = el("button", "vm-btn ghost", "Editar"), bb = el("button", "vm-btn ghost", "Borrar"); be.type = bb.type = "button";
+    be.setAttribute("aria-label", "Editar tu pedido de siempre"); bb.setAttribute("aria-label", "Borrar tu pedido de siempre");
+    be.onclick = () => abrirSiempre("editar"); bb.onclick = () => abrirSiempre("borrar"); acc.append(be, bb); principal.appendChild(acc);
+  } else if (ui.siempre === "borrado") {
+    principal.classList.add("vacio"); const rest = el("button", "vm-btn ghost", "Volver a mostrar mi último pedido"); rest.type = "button";
+    rest.onclick = async () => { rest.disabled = true; await post("/api/pedido-de-siempre/restaurar", {}).catch(() => {}); location.reload(); };
+    principal.append(el("h3", null, "Has borrado tu pedido de siempre"), el("p", null, "Puedes elegir lo que necesitas del catálogo o recuperar tu último pedido."), hacer, rest);
   } else {
     principal.classList.add("vacio"); principal.append(el("h3", null, "Empieza tu primer pedido"), el("p", null, "Elige lo que necesitas del catálogo y te lo llevamos."), hacer);
   }
