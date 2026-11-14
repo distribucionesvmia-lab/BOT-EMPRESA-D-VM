@@ -120,7 +120,7 @@ test("PRECIOS DE ARTÍCULO: se enseñan con 2 decimales, y con 3 solo si cuestan
   const fs = await import("node:fs");
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /const eurp = n => \{ n = Number\(n\); const t = Math\.round\(n \* 1000\)/); // 2 decimales; 3 solo si <1 € y el tercero no es 0
-  assert.match(ped, /price\.textContent = eurp\(p\.price\)/);
+  assert.match(ped, /price\.textContent = fmtP\(enCaja \? precioCaja\(p\) : Number\(p\.price\)\)/);
   assert.match(ped, /pr\.textContent = eurp\(l\.price\) \+ " \/ ud"/);
   assert.match(ped, /const eur = n => n\.toFixed\(2\)/); // los totales siguen con 2
   const { handleMessage, newSession } = await import("./bot.js");

@@ -65,8 +65,8 @@ test("Bench 1.8, 1.10 y T16 3: orderKey nuevo tras cada envío, carrito 7 días 
 import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
 test("T16 1-2 y Bench 1.13-1.14: el PDF enseña formato, unidades por caja, precio ud., descuento e importe, y los datos fiscales de la empresa", () => {
   const l = lineaPdf({ name: "ROSCA VERDEJO", unit: "caja", boxes: 1, units: 6, qty: 1, price: 5, discount: 25.07, amount: 22.48 });
-  assert.deepEqual(l, { cant: "1 caja", formato: "Caja de 6 · 6 uds", nombre: "ROSCA VERDEJO", precio: 5, dto: 25.07, importe: 22.48 });
-  assert.deepEqual(lineaPdf({ name: "AGUA", unit: "ud", qty: 6, units: 6, price: 0.4, amount: 2.4 }), { cant: "6 uds", formato: "Unidades", nombre: "AGUA", precio: 0.4, dto: 0, importe: 2.4 });
+  assert.deepEqual(l, { cant: "1 caja", formato: "Caja de 6 · 6 uds", nombre: "ROSCA VERDEJO", codigo: "", precio: 5, dto: 25.07, importe: 22.48 });
+  assert.deepEqual(lineaPdf({ name: "AGUA", unit: "ud", qty: 6, units: 6, price: 0.4, amount: 2.4 }), { cant: "6 uds", formato: "Unidades", nombre: "AGUA", codigo: "", precio: 0.4, dto: 0, importe: 2.4 });
   const o = { ref: "VM-2026-000004", created_at: "2026-11-13T10:00:00Z", delivery_date: "2026-11-16", address: "Calle Mayor 1", note: "", re: 0, items: [{ product_id: "1", name: "ROSCA VERDEJO", unit: "caja", boxes: 1, units: 6, qty: 1, price: 5, discount: 25.07, vat: 10, amount: 22.48 }] };
   const buf = pdfPedido(datosPdf(o, { empresa: "Distribuciones Valentín Martín", datosEmpresa: ["CIF B12345674 · Calle Ejemplo 1, Medina del Campo", "Tel. 983 000 000 · info@vm.es"], cliente: "BAR UNO", codigoCliente: "T0818", telefonoCliente: "600000001" }));
   const t = buf.toString("latin1");

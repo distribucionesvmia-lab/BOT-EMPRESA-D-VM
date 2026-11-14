@@ -208,3 +208,10 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **Barra inferior**: etiquetas de 12,5 px (12 en < 360 px), sin mayúsculas. **Contrastes**: `--tab-off:#6E6E73` en claro (≥ 4,5:1) y el texto «Imagen orientativa» usa `--text-2`.
 - **Pantalla ancha** (≥ 1024 px): caja de foto de 96 px; el artículo sin foto no enseña cuadrado vacío (`.sin-foto`).
 - Pruebas: `bench2.test.js`.
+
+## Bench 3 (diseño visual II: que se entienda)
+- **Nombre visible** (`limpiarNombre` / `nombreVisible` en `pedido.html`): sin comillas ni «´», en tipo frase («Agua bezoya 1,5 l»; siglas como D.O., AOVE, UHT se respetan) y con la añada (año 19xx/20xx que no sea una medida) al final. Se usa en tarjeta, carrito y ficha; el nombre original sigue en `title`, `aria-label` y en la búsqueda.
+- **Código del artículo** («Cód. 58127») en la tarjeta (`.pf-cod`), el carrito (`.cod`) y el PDF (línea gris bajo el nombre; `lineaPdf` → `codigo`).
+- **Precio**: 17 px en negrita y «/ud» o «/caja (6 ud)» según lo que esté elegido (Caja|Ud); con descuento, el original tachado y el neto al lado.
+- **Corazón** de favorito: icono de 20 px en un círculo de 32 px (toque de 44 px). **Foco**: un solo rojo (`--accent`) en toda la app (`outline:3px`), también en el contador de cantidad.
+- `--gris-suave` (#6E6E73 en claro, #A8A8B0 en oscuro) para «Imagen orientativa». Los nombres largos salen en 3 líneas con «…» (4 con letra grande). Pruebas: `bench3.test.js`.

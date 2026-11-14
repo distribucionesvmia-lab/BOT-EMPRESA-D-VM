@@ -6,7 +6,7 @@ const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").rep
 
 test("1. ficha de producto: foto y nombre abren una hoja con nombre completo, formato, unidades por caja, precio por unidad y caja e IVA", () => {
   assert.match(p, /function abrirFicha\(p\)/);
-  for (const t of ['fila("Formato"', 'fila("Unidades por caja"', 'fila("Precio por unidad"', 'fila("Precio por caja"', 'fila("IVA"', 'fila("Medidas"', "h.textContent = p.name"]) assert.ok(p.includes(t), t);
+  for (const t of ['fila("Formato"', 'fila("Unidades por caja"', 'fila("Precio por unidad"', 'fila("Precio por caja"', 'fila("IVA"', 'fila("Medidas"', "h.textContent = nombreVisible(p)"]) assert.ok(p.includes(t), t);
   assert.match(p, /n\.addEventListener\("click", \(\) => abrirFicha\(p\)\)/); assert.match(p, /av\.addEventListener\("click", \(ev\) => \{ if \(!ev\.target\.closest\("button"\)\) abrirFicha\(p\)/);
   assert.match(p, /"ficha-fondo"/); // «Atrás» y Esc la cierran como al resto de ventanas
   assert.match(p, /b\.onclick = \(\) => verFoto\(p\)/); // y la foto grande se amplía desde la ficha

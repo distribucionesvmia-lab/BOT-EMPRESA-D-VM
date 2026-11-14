@@ -618,6 +618,9 @@
   :root[data-contraste="alto"] *:focus-visible { outline:3px solid currentColor; outline-offset:2px; }
   .ayuda-contraste { display:flex; align-items:center; gap:var(--s2); min-height:44px; margin-top:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; } .ayuda-contraste input { width:22px; height:22px; accent-color:var(--accent); flex:none; }
   .inst-pasos { margin:0; padding-left:var(--s5); display:flex; flex-direction:column; gap:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); line-height:1.4; }
+  /* foco visible: un solo rojo (el de acento) en toda la app */
+  :focus-visible, button:focus-visible, a:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline:3px solid var(--accent) !important; outline-offset:2px; }
+  input:focus, textarea:focus, select:focus, input:focus-visible, textarea:focus-visible { outline:3px solid var(--accent) !important; outline-offset:1px; box-shadow:none !important; }
 </style>
 </head>
 <body>

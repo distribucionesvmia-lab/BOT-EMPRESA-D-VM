@@ -24,9 +24,9 @@ export function pdfPedido(d) {
   for (const [k, v] of info) { if (!v) continue; txt(M, y, k, { b: true, pt: 10 }); for (const l of parte(v, W - 2 * M - 80)) { txt(M + 80, y, l, { pt: 10 }); y -= 14; } }
   y -= 8; linea(y); y -= 16; cabeceraTabla();
   for (const l of d.lineas) {
-    const nombre = parte(l.nombre, 205), formato = parte(l.formato ?? "", 88); const alto = Math.max(nombre.length, formato.length, 1) * 12 + 4;
+    const nombre = parte(l.nombre, 205), codigoFila = l.codigo ? nombre.length : -1, formato = parte(l.formato ?? "", 88); if (codigoFila >= 0) nombre.push("Cód. " + l.codigo); const alto = Math.max(nombre.length, formato.length, 1) * 12 + 4;
     if (y - alto < M + 30) { nueva(); cabeceraTabla(); }
-    txt(M, y, String(l.cant), { pt: 9 }); formato.forEach((n, i) => txt(M + 38, y - i * 12, n, { pt: 9 })); nombre.forEach((n, i) => txt(M + 130, y - i * 12, n, { pt: 9 }));
+    txt(M, y, String(l.cant), { pt: 9 }); formato.forEach((n, i) => txt(M + 38, y - i * 12, n, { pt: 9 })); nombre.forEach((n, i) => txt(M + 130, y - i * 12, n, { pt: i === codigoFila ? 8 : 9, gris: i === codigoFila }));
     txt(W - M - 70, y, fmt(l.precio), { pt: 9, der: true }); txt(W - M - 38, y, l.dto ? String(l.dto).replace(".", ",") + " %" : "—", { pt: 9, der: true }); txt(W - M, y, fmt(l.importe), { pt: 9, der: true });
     y -= alto;
   }
@@ -63,7 +63,7 @@ export function lineaPdf(i) {
   return {
     cant: cajas ? `${cajas} ${cajas === 1 ? "caja" : "cajas"}` : `${ud} ${ud === 1 ? "ud" : "uds"}`,
     formato: cajas ? `Caja de ${porCaja || "?"} · ${ud} uds` : "Unidades",
-    nombre: i.name ?? i.product_id, precio: i.price, dto: Number(i.discount) > 0 ? Number(i.discount) : 0, importe: i.amount,
+    nombre: i.name ?? i.product_id, codigo: String(i.product_id ?? i.id ?? ""), precio: i.price, dto: Number(i.discount) > 0 ? Number(i.discount) : 0, importe: i.amount,
   };
 }
 

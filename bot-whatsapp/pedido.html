@@ -1264,6 +1264,24 @@
   .tb-t { font-size:calc(12.5px / var(--k,1)); text-transform:none; letter-spacing:0; }
   /* tarjeta en pantalla ancha: caja de foto de 96 px y, si no hay foto, sin cuadrado vacío */
   @media (min-width:1024px) { .pf-av { aspect-ratio:auto; width:96px; height:96px; align-self:flex-start; margin:0 auto; } .pf.sin-foto .pf-av { display:none; } .pf-info { align-self:stretch; } }
+
+  /* ═══ Bench 3: que se entienda ═══ */
+  .pf-pr b { font-size:calc(17px / var(--k,1)); font-weight:700; }
+  .pf-cod, .tl .cod { font-size:calc(var(--t-micro) / var(--k,1)); color:var(--text-2); font-variant-numeric:tabular-nums; line-height:1.2; }
+  /* corazón: icono de 20 px dentro de un círculo de 32 px (la zona de toque sigue siendo de 44 px) */
+  @media (max-width:1023px) { .pf-fav { position:relative !important; } } /* para que el círculo se centre en el propio botón */
+  .pf-fav::before { display:block !important; width:32px; height:32px; background:var(--fill); }
+  .pf-fav[aria-pressed="true"]::before { background:var(--accent-soft); }
+  .pf-fav svg { width:20px !important; height:20px !important; }
+  /* foco visible: un solo rojo (el de acento) en toda la app, también en el contador de cantidad */
+  :focus-visible, button:focus-visible, a:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline:3px solid var(--accent) !important; outline-offset:2px; }
+  input:focus, textarea:focus, select:focus, input:focus-visible, textarea:focus-visible { outline:3px solid var(--accent) !important; outline-offset:1px; border-color:var(--accent); box-shadow:none !important; }
+  .pf-step input:focus, .hstep input:focus, .pf-step input:focus-visible, .hstep input:focus-visible { outline:3px solid var(--accent) !important; outline-offset:-3px; border-radius:var(--r-pill); }
+  .pf:focus-visible { outline-offset:-3px; }
+  /* gris suave para textos secundarios pequeños (p. ej. «Imagen orientativa»): #6E6E73 en claro (≥ 4,5:1) */
+  :root { --gris-suave:#6E6E73; } :root[data-tema="oscuro"] { --gris-suave:#A8A8B0; }
+  @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) { --gris-suave:#A8A8B0; } }
+  #zoomFoto .zia, .ficha-ia { color:var(--gris-suave); }
 </style>
 </head>
 <body>
@@ -1382,10 +1400,23 @@ const hue = s => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS
 const initials = n => { const r = String(n ?? "").replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9 ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase(); return r || "•"; }; // siempre hay marcador, aunque el nombre empiece por comillas o símbolos
 // Nombre que se enseña: el corto, salvo que otro artículo se llame igual de corto (entonces el completo, para distinguirlos)
 let _dupCorto = null;
+const SIGLAS = new Set(["DO", "DOP", "IGP", "UHT", "PET", "PVC", "LED", "USB", "XL", "XXL", "AOVE", "IVA", "TV", "VM"]);
+/** Nombre «de cara al cliente»: sin comillas ni acento suelto (´), en tipo frase («Agua bezoya 1,5 l») y con la añada (el año de cosecha) al final. La búsqueda sigue usando el nombre original. */
+function limpiarNombre(n) {
+  let s = String(n ?? "").replace(/[´`]/g, "").replace(/["“”«»‘’']/g, " ").replace(/\s+/g, " ").trim();
+  let anada = ""; const m = /(?:^|\s)((?:19|20)\d{2})(?=\s|$)(?!\s*(?:ml|cl|l|g|gr|kg|uds?|unid\w*|x|mm|cm|m)\b)/i.exec(s);
+  if (m) { anada = m[1]; s = (s.slice(0, m.index) + " " + s.slice(m.index + m[0].length)).replace(/\s+/g, " ").trim(); }
+  s = s.split(" ").map(w => (SIGLAS.has(w.replace(/[.,]/g, "").toUpperCase()) || /^(?:[A-Z]\.){2,}$/.test(w) ? w.toUpperCase() : w.toLowerCase())).join(" ");
+  s = s.charAt(0).toUpperCase() + s.slice(1);
+  return anada ? s + " " + anada : s;
+}
 function nombreVisible(p) {
-  if (!p.nombreCorto || p.nombreCorto === p.name) return p.name;
-  if (!_dupCorto) { _dupCorto = new Map(); for (const x of data.products) { const k = x.nombreCorto || x.name; _dupCorto.set(k, (_dupCorto.get(k) || 0) + 1); } }
-  return _dupCorto.get(p.nombreCorto) > 1 ? p.name : p.nombreCorto;
+  let base = p.name;
+  if (p.nombreCorto && p.nombreCorto !== p.name) {
+    if (!_dupCorto) { _dupCorto = new Map(); for (const x of data.products) { const k = x.nombreCorto || x.name; _dupCorto.set(k, (_dupCorto.get(k) || 0) + 1); } }
+    base = _dupCorto.get(p.nombreCorto) > 1 ? p.name : p.nombreCorto; // si dos artículos se llaman igual de corto, el nombre completo
+  }
+  return limpiarNombre(base);
 }
 const lines = () => [...qty].filter(([id, n]) => n > 0 && productoPorId.has(id)).map(([id, n]) => ({ ...productoPorId.get(id), qty: n })); // en el orden en que se fueron añadiendo (lo nuevo, al final)
 const count = () => lines().length;
@@ -1656,7 +1687,7 @@ function abrirFicha(p) {
   const f = document.createElement("div"); f.id = "ficha-fondo"; f.className = "ayuda-fondo"; f.setAttribute("role", "dialog"); f.setAttribute("aria-modal", "true"); f.setAttribute("aria-label", "Ficha de " + p.name);
   const c = document.createElement("div"); c.className = "ayuda-caja ficha-caja";
   if (p.img) { const b = document.createElement("button"); b.type = "button"; b.className = "ficha-foto"; b.setAttribute("aria-label", "Ampliar la foto"); const im = document.createElement("img"); im.src = p.img; im.alt = ""; b.appendChild(im); b.onclick = () => verFoto(p); c.appendChild(b); if (p.ia) { const ia = document.createElement("p"); ia.className = "ficha-ia"; ia.textContent = "Imagen orientativa"; c.appendChild(ia); } }
-  const h = document.createElement("h2"); h.textContent = p.name; c.appendChild(h);
+  const h = document.createElement("h2"); h.textContent = nombreVisible(p); h.title = p.name; c.appendChild(h);
   const tabla = document.createElement("dl"); tabla.className = "ficha-dl";
   const fila = (t, v, extra) => { if (v == null || v === "") return; const dt = document.createElement("dt"); dt.textContent = t; const dd = document.createElement("dd"); if (extra) dd.innerHTML = v; else dd.textContent = v; tabla.append(dt, dd); };
   if (p.marca) fila("Marca", p.marca);
@@ -1696,13 +1727,16 @@ function row(p) {
   if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " · " + eur(precioCaja(p)); else if (esPack) c.textContent = pk && Number(pk[1]) * Number(pk[2]) > 1 ? "Pack de " + Number(pk[1]) * Number(pk[2]) : "Pack"; else c.textContent = "Por unidades"; // se dice siempre el formato y la unidad de venta
   { const med = medidasDeNombre(p.name); if (med.length) c.textContent += " · " + med.join(" · "); } // las medidas, aunque el nombre salga recortado
   const pr = document.createElement("div"); pr.className = "pf-pr";
-  const price = document.createElement("b"); const ud = document.createElement("span"); ud.className = "pf-ud"; ud.textContent = esPack ? " /pack" : " /ud";
-  if (Number(p.discount) > 0) { const viejo = document.createElement("s"); viejo.className = "pf-viejo"; viejo.textContent = eurp(p.price); price.textContent = eurp(precioUd(p)); pr.append(viejo, price, ud); } // precio ya descontado (el que se factura) y el anterior tachado
-  else { price.textContent = eurp(p.price); pr.append(price, ud); }
+  const price = document.createElement("b"); const ud = document.createElement("span"); ud.className = "pf-ud";
+  const enCaja = !!p.unitsPerBox && unit(p.id) === "caja", fmtP = enCaja ? eur : eurp; // el precio es de lo que se pide: la caja (con sus unidades) o la unidad
+  ud.textContent = enCaja ? ` /caja (${p.unitsPerBox} ud)` : (esPack ? " /pack" : " /ud");
+  if (Number(p.discount) > 0) { const viejo = document.createElement("s"); viejo.className = "pf-viejo"; viejo.textContent = fmtP(enCaja ? Number(p.price) * p.unitsPerBox : Number(p.price)); price.textContent = fmtP(enCaja ? precioCaja(p) : precioUd(p)); pr.append(viejo, price, ud); } // precio original tachado y el neto (el que se factura) al lado
+  else { price.textContent = fmtP(enCaja ? precioCaja(p) : Number(p.price)); pr.append(price, ud); }
   if (p.discount) { const dto = document.createElement("span"); dto.className = "pf-dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} %`; pr.appendChild(dto); }
   if (p.oferta) { const of = document.createElement("span"); of.className = "pf-oferta"; of.textContent = "OFERTA" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().slice(0, 2).join("/") : ""); pr.appendChild(of); }
   if (tab === "all" && p.count > 0) { const lc = document.createElement("span"); lc.className = "pf-compras"; lc.textContent = "Lo compras"; pr.appendChild(lc); } // etiqueta aparte del nombre, junto al precio
-  info.append(n, c, pr);
+  const cod = document.createElement("div"); cod.className = "pf-cod"; cod.textContent = "Cód. " + p.id;
+  info.append(n, c, cod, pr);
   if (p.ia) { const ia = document.createElement("div"); ia.className = "pf-ia"; ia.textContent = "Imagen orientativa"; av.appendChild(ia); }
   if (data.favs) {
     const f = document.createElement("button"); f.type = "button"; f.className = "pf-fav"; const on = favs.has(p.id);
@@ -2079,10 +2113,11 @@ function tablaLineas(ls) {
     const av = document.createElement("button"); av.type = "button"; av.className = "av tl-av"; av.style.background = hue(l.name); av.textContent = initials(l.name); av.setAttribute("aria-label", l.img ? "Ampliar la foto de " + l.name : l.name);
     if (l.img) { const im = document.createElement("img"); im.src = l.img; im.alt = ""; im.onerror = () => im.remove(); av.appendChild(im); av.onclick = () => verFoto(l); } else av.style.cursor = "default";
     const tx = document.createElement("div"); tx.className = "tl-txt";
-    const n = document.createElement("div"); n.className = "cn"; n.textContent = l.name;
+    const n = document.createElement("div"); n.className = "cn"; n.textContent = nombreVisible(l); n.title = l.name;
+    const cod = document.createElement("div"); cod.className = "cod"; cod.textContent = "Cód. " + l.id; // el código distingue artículos que se llaman casi igual
     const pr = document.createElement("div"); pr.className = "cp";
     pr.textContent = eurp(l.price) + " / ud" + (l.discount ? ` · −${String(l.discount).replace(".", ",")} %` : "") + (l.unitsPerBox ? ` · caja de ${l.unitsPerBox}` : "");
-    tx.append(n, pr); a.append(av, tx);
+    tx.append(n, cod, pr); a.append(av, tx);
     // Cantidad: Cajas|Uds + − 1 +
     const q = tr.insertCell(); q.className = "tl-cant";
     const box = document.createElement("div"); box.className = "tl-ctl";
