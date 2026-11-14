@@ -44,6 +44,7 @@ import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
 import { categorizar } from "./categorias.js";
 import { empaquetar, estatico } from "./estaticos.js";
 import { avisarCortes, horaAviso } from "./avisocorte.js";
+import { zip as zipNode } from "./zip.js";
 import { puedeEditarPedido, plazoModificacion, longDate, weekday, addDays } from "./delivery.js";
 const DIAS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
@@ -431,6 +432,27 @@ function datosPdfComunes() {
   const titular = envTexto("PRIVACY_TITULAR") || "Distribuciones Valentín Martín", cif = envTexto("PRIVACY_CIF"), dir = envTexto("PRIVACY_DIRECCION"), tel = AYUDA.telefono, mail = envTexto("PRIVACY_EMAIL");
   return { empresa: titular, datosEmpresa: [[cif && "CIF " + cif, dir].filter(Boolean).join(" · "), [tel && "Tel. " + tel, mail].filter(Boolean).join(" · ")].filter(Boolean) };
 }
+// PDF de un pedido hecho en la aplicación (con los precios guardados del día). null si no existe, es de otro cliente o está cancelado.
+function pdfDePedidoApp(account, ref) {
+  const o = getDb().getOrderByRef(ref);
+  if (!o || o.customer_id !== String(account.customerId) || o.status === "cancelled") return null;
+  const c = customerDirectory.getById(account.customerId);
+  return { buf: pdfPedido(datosPdf(o, { ...datosPdfComunes(), cliente: c?.name ?? "", telefonoCliente: c?.phone ?? c?.phones?.[0] ?? "" })), nombre: `pedido-${o.ref}.pdf` };
+}
+// PDF de un pedido del historial de a3ERP: importes con los precios de hoy (el propio PDF lo avisa). null si no es de SU historial.
+function pdfDeHistorial(account, doc) {
+  const customer = clienteConPedidos(account.customerId, HISTORIAL_VER_MAS), catalog = catalogNow();
+  const o = (customer.orders ?? []).find((x) => String(x.doc) === doc); // solo pedidos de SU historial
+  const nombres = new Map(catalog.map((x) => [String(x.id), x.name]));
+  const items = o ? o.lines.filter((l) => l.qty > 0 && nombres.has(String(l.productId))).map((l) => ({ id: String(l.productId), name: nombres.get(String(l.productId)), qty: l.qty, unit: "ud" })) : [];
+  if (!o || !items.length) return null;
+  const priced = priceOrder({ items }, customer, catalog), t = totals(priced.items, !!customer.recargoEquivalencia);
+  return { buf: pdfPedido({
+    ...datosPdfComunes(), cliente: customer.name ?? "", telefonoCliente: customer.phone ?? "", ref: "Pedido " + doc, fecha: o.date, entrega: null, direccion: customer.address, conRe: !!customer.recargoEquivalencia, totales: t,
+    nota: "Importes con los precios de hoy: este pedido es anterior y no guarda los precios de ese día, así que son orientativos.",
+    lineas: priced.items.map((i) => lineaPdf({ ...i, unit: "ud" })),
+  }), nombre: `pedido-${doc.replace(/[^\w.-]/g, "")}.pdf` };
+}
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
 const clienteConPedidos = (id, max = HISTORIAL_MAX) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id, max), max);
@@ -598,30 +620,29 @@ async function appRoutes(req, res, url) {
   }
   // PDF de SU pedido (solo los hechos en la aplicación; un pedido de otro cliente responde igual que uno que no existe)
   const mPdf = /^\/api\/pedido\/(VM-\d{4}-\d{6})\/pdf$/.exec(p);
+  const enviaPdf = (r) => res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `${url.searchParams.has("descargar") ? "attachment" : "inline"}; filename="${r.nombre}"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": r.buf.length }).end(r.buf);
   if (mPdf && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
-    const o = getDb().getOrderByRef(mPdf[1]);
-    if (!o || o.customer_id !== String(account.customerId) || o.status === "cancelled") return void sendJson(res, 404, { error: "No encontramos ese pedido." });
-    const c = customerDirectory.getById(account.customerId);
-    const buf = pdfPedido(datosPdf(o, { ...datosPdfComunes(), cliente: c?.name ?? "", telefonoCliente: c?.phone ?? c?.phones?.[0] ?? "" }));
-    return void res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `${url.searchParams.has("descargar") ? "attachment" : "inline"}; filename="pedido-${o.ref}.pdf"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": buf.length }).end(buf);
+    const r = pdfDePedidoApp(account, mPdf[1]); if (!r) return void sendJson(res, 404, { error: "No encontramos ese pedido." });
+    return void enviaPdf(r);
   }
   // PDF de un pedido del historial que viene de a3ERP (sin precios guardados): importes con los precios de hoy, avisado en el propio PDF
   const mHist = /^\/api\/historial\/([\w.-]{1,40})\/pdf$/.exec(p);
   if (mHist && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
-    const customer = clienteConPedidos(account.customerId), catalog = catalogNow(), doc = mHist[1];
-    const o = (customer.orders ?? []).find((x) => String(x.doc) === doc); // solo pedidos de SU historial
-    const nombres = new Map(catalog.map((x) => [String(x.id), x.name]));
-    const items = o ? o.lines.filter((l) => l.qty > 0 && nombres.has(String(l.productId))).map((l) => ({ id: String(l.productId), name: nombres.get(String(l.productId)), qty: l.qty, unit: "ud" })) : [];
-    if (!o || !items.length) return void sendJson(res, 404, { error: "No encontramos ese pedido." });
-    const priced = priceOrder({ items }, customer, catalog), t = totals(priced.items, !!customer.recargoEquivalencia);
-    const buf = pdfPedido({
-      ...datosPdfComunes(), cliente: customer.name ?? "", telefonoCliente: customer.phone ?? "", ref: "Pedido " + doc, fecha: o.date, entrega: null, direccion: customer.address, conRe: !!customer.recargoEquivalencia, totales: t,
-      nota: "Importes con los precios de hoy: este pedido es anterior y no guarda los precios de ese día, así que son orientativos.",
-      lineas: priced.items.map((i) => lineaPdf({ ...i, unit: "ud" })),
-    });
-    return void res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `${url.searchParams.has("descargar") ? "attachment" : "inline"}; filename="pedido-${doc.replace(/[^\w.-]/g, "")}.pdf"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": buf.length }).end(buf);
+    const r = pdfDeHistorial(account, mHist[1]); if (!r) return void sendJson(res, 404, { error: "No encontramos ese pedido." });
+    return void enviaPdf(r);
+  }
+  // «Descargar todo el mes»: un ZIP con los PDF de SUS pedidos de ese mes (solo los que tienen PDF; sin PDF no hay ZIP)
+  const mMes = /^\/api\/documentos\/mes\/(\d{4}-\d{2})$/.exec(p);
+  if (mMes && req.method === "GET") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const mes = mMes[1], visibles = webHistory(clienteConPedidos(account.customerId, HISTORIAL_VER_MAS), catalogNow(), HISTORIAL_VER_MAS).filter((o) => String(o.date).slice(0, 7) === mes);
+    const archivos = {};
+    for (const o of visibles) { const r = /^VM-\d{4}-\d{6}$/.test(o.doc) ? pdfDePedidoApp(account, o.doc) : pdfDeHistorial(account, String(o.doc)); if (r) archivos[`${o.date}-${r.nombre}`] = r.buf; }
+    if (!Object.keys(archivos).length) return void sendJson(res, 404, { error: "No hay documentos de ese mes." });
+    const z = zipNode(archivos);
+    return void res.writeHead(200, { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="pedidos-${mes}.zip"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": z.length }).end(z);
   }
   if (p === "/api/ayuda" && req.method === "GET") return void sendJson(res, 200, { ayuda: ayudaPublica() }); // datos públicos de contacto de la empresa
   // Datos de la pantalla de Inicio del cliente: lo que suele pedir, lo más pedido, categorías y fotos de su último pedido (todo de su catálogo; nada de otros clientes)

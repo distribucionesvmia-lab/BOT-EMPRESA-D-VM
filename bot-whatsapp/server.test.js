@@ -1101,6 +1101,23 @@ test("BENCH 10: enlace de invitación de la oficina: un solo uso, caduca, se gua
   assert.equal((await fetch(BASE + new URL(b.url).pathname, { method: "POST", redirect: "manual" })).status, 303);
 });
 
+test("BENCH 11: «Descargar todo el mes» da un ZIP con los PDF de SUS pedidos de ese mes, y nada si no hay", async () => {
+  const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar dos"));
+  const mes = new Date().toISOString().slice(0, 7);
+  assert.equal((await call("GET", `/api/documentos/mes/${mes}`)).status, 401);
+  const r1 = await call("POST", "/catalogo", { cookie: A, body: { key: "bench11-a-1", lines: [{ id: "1010", qty: 1, unit: "ud" }] } }), r2 = await call("POST", "/catalogo", { cookie: A, body: { key: "bench11-a-2", lines: [{ id: "1010", qty: 2, unit: "ud" }] } });
+  assert.equal(r1.status, 200, JSON.stringify(r1.json));
+  const z = await fetch(`${BASE}/api/documentos/mes/${mes}`, { headers: { Cookie: A } }); assert.equal(z.status, 200); assert.equal(z.headers.get("content-type"), "application/zip"); assert.match(z.headers.get("content-disposition"), new RegExp(`attachment; filename="pedidos-${mes}\\.zip"`));
+  const buf = Buffer.from(await z.arrayBuffer()), fin = buf.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06])), n = buf.readUInt16LE(fin + 10); let p = buf.readUInt32LE(fin + 16); const nombres = [], pdfs = [];
+  for (let i = 0; i < n; i++) { const met = buf.readUInt16LE(p + 10), cs = buf.readUInt32LE(p + 20), ln = buf.readUInt16LE(p + 28), le = buf.readUInt16LE(p + 30), lc = buf.readUInt16LE(p + 32), off = buf.readUInt32LE(p + 42); nombres.push(buf.subarray(p + 46, p + 46 + ln).toString()); const ini = off + 30 + buf.readUInt16LE(off + 26) + buf.readUInt16LE(off + 28), raw = buf.subarray(ini, ini + cs); pdfs.push(met === 8 ? (await import("node:zlib")).inflateRawSync(raw) : raw); p += 46 + ln + le + lc; }
+  assert.ok(nombres.length >= 2); assert.ok(nombres.every((x) => /\.pdf$/.test(x))); assert.ok(nombres.some((x) => x.includes(r1.json.ref)) && nombres.some((x) => x.includes(r2.json.ref)));
+  assert.ok(pdfs.every((x) => x.subarray(0, 5).toString() === "%PDF-")); // son PDF de verdad
+  // ni otro mes sin pedidos ni otro cliente ven nada de esto
+  assert.equal((await call("GET", "/api/documentos/mes/2001-01", { cookie: A })).status, 404);
+  const zb = await fetch(`${BASE}/api/documentos/mes/${mes}`, { headers: { Cookie: B } }); if (zb.status === 200) { const bb = Buffer.from(await zb.arrayBuffer()); assert.equal(bb.includes(Buffer.from(r1.json.ref)), false); }
+  assert.equal((await call("GET", "/api/documentos/mes/2026-1x", { cookie: A })).status, 404);
+});
+
 test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repetir o añadir), nunca los de otro ni su NIF", async () => {
   assert.equal((await call("GET", "/api/mi-cuenta")).status, 401);
   const A = cookieOf(await entrarNif("111111"));
