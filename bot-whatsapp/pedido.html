@@ -1905,7 +1905,11 @@ const cmpNombre = (a, b) => claveNombre(a).localeCompare(claveNombre(b), "es");
 const ACCESORIOS = new Set(["cuchara", "cucharilla", "cucharon", "copa", "vaso", "jarra", "estuche", "pinza", "taza", "plato", "cubierto", "tenedor", "cuchillo", "bandeja", "dispensador", "soporte", "abridor", "abrebotellas", "set", "juego", "molinillo", "cafetera", "azucarero", "servilletero", "cubitera", "pala", "colador", "termo", "expositor", "cesta", "mantel", "delantal", "espatula", "cazo", "olla", "sarten"]);
 const SINONIMOS = { tercio: ["cerveza", "vidrio", "botellin"], cana: ["cerveza"], botin: ["cerveza", "botellin"], barril: ["cerveza"],  refresco: ["cola", "fanta", "sprite", "kas", "tonica", "gaseosa", "limonada", "naranjada", "bitter"], hielo: ["cubito"], limpieza: ["limpiador", "lejia", "fregasuelos", "friegasuelos", "detergente", "desinfectante", "estropajo", "bayeta", "jabon", "amoniaco"], barril: ["keg", "barrica"], cafe: ["capsula"], vino: ["rioja", "ribera", "rueda", "verdejo", "crianza"], servilleta: ["servilleta"], desechable: ["desechable"] };
 const stemB = w => { w = norm(w).replace(/[^a-z0-9]/g, ""); if (w.length > 4) { if (w.endsWith("ces")) return w.slice(0, -3) + "z"; if (/[^aeiou]es$/.test(w)) return w.slice(0, -2); } return w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w; };
-const tokensB = t => norm(String(t)).split(/[^a-z0-9]+/).filter(w => w && !PALABRAS_VACIAS_B.has(w));
+// Abreviaturas de las tarifas y del habla de la tienda: valen igual al escribirlas que al leerlas en el nombre del artículo («psc» = «pascual», «cj» = «caja», «uds» = «unidades»…).
+// «un» no se traduce a propósito: es el artículo («un vino») y se ignora como «el» o «la».
+const ABREV = { psc: "pascual", pasc: "pascual", cj: "caja", und: "unidades", unds: "unidades", unid: "unidades", uds: "unidades", ud: "unidades", descafe: "descafeinado", descaf: "descafeinado", birra: "cerveza", birras: "cerveza" };
+const EXPANDE_CONSULTA = { coca: ["coca", "cola"] }; // «coca» = «coca-cola» (solo al escribir: así «cocacola», «coca cola» y «coca-cola» dan lo mismo)
+const tokensB = t => norm(String(t)).split(/[^a-z0-9]+/).filter(w => w && !PALABRAS_VACIAS_B.has(w)).map(w => ABREV[w] ?? w);
 let indiceBusq = null;
 function indiceBusqueda() {
   if (indiceBusq) return indiceBusq;
@@ -1918,7 +1922,7 @@ let busquedaAviso = null; // si la búsqueda se resolvió «a medias» (sin una 
 const PALABRAS_FORMATO_B = new Set(["bolsa", "bolsas", "botella", "botellas", "lata", "latas", "caja", "cajas", "pack", "packs", "paquete", "paquetes", "saco", "sacos", "bote", "botes", "botellin", "botellines"]);
 function buscarOrden(raw) {
   busquedaAviso = null;
-  const qt = tokensB(raw).map(stemB).filter(Boolean); if (!qt.length) return null;
+  const qt = tokensB(raw).flatMap(w => EXPANDE_CONSULTA[w] ?? [w]).map(stemB).filter(Boolean); if (!qt.length) return null;
   const idx = indiceBusqueda();
   const puntua = (qs) => {
     const res = [];
@@ -1938,6 +1942,7 @@ function buscarOrden(raw) {
         if (!sc && w.length >= 6 && e.b2.has(w)) sc = 7; // palabras pegadas: «cocacola» = «coca-cola»
         if (!sc && e.ct.some(c => c === w || c.startsWith(w) || alts.includes(c))) sc = 2; // nombre de la categoría o subcategoría («refrescos», «limpieza»)
         if (!sc && /^\d+$/.test(w) && e.p.id.startsWith(w)) sc = 8; // código de producto: solo si lo escrito son números y es el INICIO del código
+        if (!sc && w.length >= 6 && e.compact.includes(w)) sc = 5; // versión compacta, sin espacios ni guiones («cocacola», «colacao»)
         if (!sc && w.length >= 4 && e.n.includes(w)) sc = 1; // trozo dentro de una palabra («33cl»), solo con 4 letras o más
         if (!sc) { ok = false; break; }
         total += sc;

@@ -23,3 +23,17 @@ test("A. «Sin resultados» útil: 3 artículos parecidos (distancia ≤ 2) y se
   assert.equal(c.parecidos("zzzzzz").articulos.length + c.parecidos("zzzzzz").secciones.length + c.parecidos("  ").articulos.length, 0);
   assert.match(p, /¿Buscabas \$\{s\.nombre\}\?/); assert.match(p, /"Lo más parecido"/); assert.match(p, /¿No lo encuentras\? Habla con una persona/); // el enlace a hablar con una persona se queda
 });
+
+test("B. sinónimos y abreviaturas: psc, cj, uds, coca, birra, descafe, servilletas, lejía, cocacola/colacao", () => {
+  const nombres = (q) => ids(q).map((i) => productos.find((x) => x.id === i).name);
+  assert.ok(nombres("psc").some((n) => /PASCUAL/.test(n))); assert.ok(nombres("pasc leche").some((n) => /PASCUAL/.test(n)));
+  assert.ok(nombres("cj 24").some((n) => /CAJA 24/.test(n))); assert.ok(nombres("24 uds").some((n) => /24 UNIDADES/.test(n))); assert.ok(nombres("24 und").some((n) => /24 UNIDADES/.test(n)));
+  assert.ok(nombres("coca").some((n) => /COCA-COLA/.test(n))); assert.ok(nombres("cocacola").some((n) => /COCA-COLA/.test(n))); assert.ok(nombres("coca cola").some((n) => /COCA-COLA/.test(n))); assert.ok(nombres("coca-cola").some((n) => /COCA-COLA/.test(n)));
+  assert.ok(nombres("colacao").some((n) => /COLA CAO/.test(n))); assert.ok(nombres("cola-cao").some((n) => /COLA CAO/.test(n)));
+  assert.ok(nombres("birra").some((n) => /CERVEZA/.test(n))); assert.ok(nombres("descafe").some((n) => /DESCAFEINADO/.test(n))); assert.ok(nombres("descafeinado").some((n) => /DESCAFEINADO/.test(n)));
+  assert.ok(nombres("servilleta").some((n) => /SERVILLETAS/.test(n))); assert.ok(nombres("servilletas").some((n) => /SERVILLETAS/.test(n)));
+  assert.ok(nombres("lejía").some((n) => /LEJIA/.test(n))); assert.ok(nombres("lejia").some((n) => /LEJIA/.test(n)));
+  assert.ok(nombres("refrescos").some((n) => /COCA-COLA/.test(n)) && nombres("refresco").length === nombres("refrescos").length); // por el nombre de la categoría/subcategoría
+  assert.ok(nombres("un lejia").length > 0); // «un» se ignora como artículo
+  assert.match(p, /const ABREV = /); assert.match(p, /buscarOrden\(\$\("q"\)\.value\.trim\(\)\)/); assert.match(p, /orden = q \? buscarOrden\(query\.trim\(\)\) : null/); // sugerencias y lista usan el MISMO motor
+});
