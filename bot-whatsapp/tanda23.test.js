@@ -37,3 +37,10 @@ test("B. sinónimos y abreviaturas: psc, cj, uds, coca, birra, descafe, serville
   assert.ok(nombres("un lejia").length > 0); // «un» se ignora como artículo
   assert.match(p, /const ABREV = /); assert.match(p, /buscarOrden\(\$\("q"\)\.value\.trim\(\)\)/); assert.match(p, /orden = q \? buscarOrden\(query\.trim\(\)\) : null/); // sugerencias y lista usan el MISMO motor
 });
+
+test("C. «Mis favoritos»: acceso destacado arriba del catálogo y vista con solo los favoritos (entra en el historial como una sección)", () => {
+  assert.match(p, /const FAVS = "__favoritos";/); assert.match(p, /function renderFavoritos\(list\)/);
+  assert.match(p, /if \(nav\.cat === FAVS\) \{ renderFavoritos\(list\); return entrada\(list, "\.pf"\); \}/);
+  assert.match(p, /fb\.className = "fav-acceso"/); assert.match(p, /fb\.onclick = \(\) => irA\(FAVS, "\*"\)/); assert.match(p, /data\.products\.filter\(p => favs\.has\(p\.id\)\)\.sort\(cmpNombre\)/);
+  assert.match(p, /"Aún no tienes favoritos"/); assert.match(p, /\.fav-acceso \{[^}]*min-height:60px/);
+});

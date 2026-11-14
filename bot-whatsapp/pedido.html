@@ -906,6 +906,8 @@
   #diaInfo:empty { display:none; }
   .carga-fallo { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:var(--s3); padding:var(--s3); border-radius:var(--r-field); background:var(--fill); color:var(--text); font-size:calc(var(--t-sec) / var(--k,1)); }
   .carga-fallo button { min-height:44px; padding:0 var(--s4); background:var(--surface); color:var(--accent); border:0; border-radius:var(--r-pill); font:inherit; font-weight:600; }
+  .fav-acceso { display:grid; grid-template-columns:auto 1fr; column-gap:var(--s3); align-items:center; width:calc(100% - 2 * var(--gutter)); min-height:60px; margin:var(--s3) var(--gutter) 0; padding:var(--s3) var(--s4); border:0; border-radius:var(--r-card); background:var(--surface); color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+  .fav-acceso svg { grid-row:1 / 3; width:26px; height:26px; color:var(--accent); } .fav-acceso b { font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; } .fav-acceso small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); }
   .sin-sug { padding:0 var(--gutter) var(--s5); display:flex; flex-direction:column; gap:var(--s2); }
   .sin-sug .sin-sec { min-height:44px; text-align:left; }
   .pf-ultima { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); line-height:1.25; }
@@ -1851,6 +1853,14 @@ const ICONOS_CAT = {
   otros: '<path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/>'
 };
 function iconoCat(id) { return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONOS_CAT[id] || ICONOS_CAT.otros}</svg>`; }
+const FAVS = "__favoritos";
+function renderFavoritos(list) { // solo los artículos que el cliente ha marcado con el corazón
+  const w = document.createElement("div"); w.className = "cab-cat"; migas(w, "<b>Mis favoritos</b>", () => irA(null, null), "Catálogo"); list.appendChild(w);
+  const items = data.products.filter(p => favs.has(p.id)).sort(cmpNombre);
+  if (!items.length) { list.appendChild(estadoVacio({ icono: "marca", titulo: "Aún no tienes favoritos", texto: "Toca el corazón de un artículo y lo tendrás aquí, a un toque.", boton: "Ver el catálogo", onclick: () => irA(null, null) })); return; }
+  const n = document.createElement("div"); n.className = "cuenta-lista"; n.setAttribute("role", "status"); n.textContent = items.length === 1 ? "1 favorito" : items.length + " favoritos"; list.appendChild(n);
+  for (const p of items) list.appendChild(row(p));
+}
 function renderCategorias(list) {
   // Cliente sin historial: «Lo más pedido» entre todos los clientes (solo artículos, nunca de quién)
   const top = (data.top || []).map(id => productoPorId.get(id)).filter(Boolean);
@@ -1863,6 +1873,12 @@ function renderCategorias(list) {
     const at = document.createElement("div"); at.className = "accesos"; at.setAttribute("role", "group"); at.setAttribute("aria-label", "Accesos directos");
     for (const a of data.accesos) { const b = document.createElement("button"); b.type = "button"; b.className = "acceso"; b.textContent = a.nombre; b.onclick = () => irA(a.cat, a.sub); at.appendChild(b); }
     list.appendChild(at);
+  }
+  if (data.favs) { // «Mis favoritos»: bien a la vista, arriba del catálogo
+    const fb = document.createElement("button"); fb.type = "button"; fb.className = "fav-acceso"; fb.setAttribute("aria-label", `Mis favoritos, ${favs.size} artículo${favs.size === 1 ? "" : "s"}`);
+    fb.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 0 1 19.4 13z" fill="currentColor"/></svg>';
+    const t = document.createElement("b"); t.textContent = "Mis favoritos"; const k = document.createElement("small"); k.textContent = favs.size === 0 ? "Marca el corazón de lo que más pides" : favs.size + (favs.size === 1 ? " artículo" : " artículos");
+    fb.append(t, k); fb.onclick = () => irA(FAVS, "*"); list.appendChild(fb);
   }
   const g = document.createElement("div"); g.className = "cats";
   for (const c of data.tree) {
@@ -2075,6 +2091,7 @@ function renderList() {
   let cabecera = null, marcasCat = [];
   if (arbol) {
     if (!nav.cat) { renderCategorias(list); return entrada(list, ".cat"); }
+    if (nav.cat === FAVS) { renderFavoritos(list); return entrada(list, ".pf"); } // «Mis favoritos»: una sección más del catálogo (entra en el historial del navegador como cualquier categoría)
     const c = data.tree.find(x => x.id === nav.cat);
     if (!c) { nav = { cat: null, sub: null }; return renderCategorias(list); }
     if (nav.sub === null) nav.sub = "*";
