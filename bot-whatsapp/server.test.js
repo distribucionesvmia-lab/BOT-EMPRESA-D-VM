@@ -1446,3 +1446,16 @@ test("AVISOS A CLIENTES: el límite de 10 por hora solo cuenta los que llegan, y
     assert.equal(corte.r.status, 400); assert.notEqual(corte.r.status, 429); assert.match(corte.r.json.error, /10 avisos en la última hora/); assert.ok(corte.i <= 10);
   } finally { mov.cerrar(); }
 });
+
+test("COPIAS Y EXPORTAR ESTADÍSTICAS: rutas del panel (solo con la clave, solo lectura, descarga xlsx y csv)", async () => {
+  for (const u of ["/api/admin/copias", "/api/admin/estadisticas/exportar?rango=todo"]) assert.ok([401, 403].includes((await call("GET", u)).status), u);
+  assert.ok([401, 403].includes((await call("POST", "/api/admin/copias/comprobar", { body: {} })).status));
+  const e = await call("GET", "/api/admin/copias", { admin: true }); assert.equal(e.status, 200); assert.equal(e.json.bases.length, 4); assert.equal(typeof e.json.ok, "boolean");
+  const c = await call("POST", "/api/admin/copias/comprobar", { admin: true, body: {} }); assert.equal(c.status, 200); assert.equal(c.json.bases.length, 4); assert.ok(c.json.comprobadoEn);
+  const get = (q) => fetch(BASE + "/api/admin/estadisticas/exportar?" + q, { headers: { Authorization: `Bearer ${ADMIN}` } });
+  const x = await get("rango=todo"); assert.equal(x.status, 200); assert.match(x.headers.get("content-type"), /spreadsheetml/); assert.match(x.headers.get("content-disposition"), /estadisticas-\d{4}-\d\d-\d\d\.xlsx/);
+  assert.equal(Buffer.from(await x.arrayBuffer()).subarray(0, 2).toString(), "PK");
+  const t = await get("rango=7d&formato=csv"); assert.equal(t.status, 200); assert.match(t.headers.get("content-type"), /text\/csv/);
+  const crudo = Buffer.from(await t.arrayBuffer()); assert.deepEqual([...crudo.subarray(0, 3)], [0xEF, 0xBB, 0xBF]); const txt = crudo.toString("utf8").replace(/^\uFEFF/, ""); assert.ok(txt.startsWith("RESUMEN")); assert.match(txt, /Pedidos de prueba excluidos/);
+  assert.equal((await get("rango=todo&formato=pdf")).status, 400); assert.equal((await get("rango=nada")).status, 400);
+});

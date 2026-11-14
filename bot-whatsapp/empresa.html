@@ -135,6 +135,10 @@
   /* ═════════ Estadísticas y patrones ═════════ */
   .est { display:grid; gap:16px; align-content:start; grid-template-columns:minmax(0, 1fr); }
   .est-cab { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:flex-end; justify-content:space-between; } .est-t { font-size:22px; text-transform:none; letter-spacing:-.02em; color:var(--fg); margin:0 0 2px; font-weight:800; }
+  #copias-tabla td { white-space:nowrap; } #copias-tabla td:last-child { white-space:normal; }
+  .copias-aviso { background:var(--warn); color:var(--warn-fg); border-radius:8px; padding:10px 14px; font-weight:600; margin:10px 0; }
+  .est-exp { display:inline-flex; gap:8px; margin-left:auto; }
+  .est-exp button { height:40px; }
   .est-filtros { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; }
   .seg { display:inline-flex; flex-wrap:wrap; gap:2px; padding:3px; border-radius:10px; background:var(--th); border:1px solid var(--line); } .seg button { min-height:32px; padding:0 12px; border:0; background:transparent; border-radius:8px; font-weight:600; color:var(--muted); box-shadow:none; transition:background .2s, color .2s; }
   .seg button:hover:not(:disabled) { background:var(--hover); color:var(--fg); border:0; } .seg button.on, .seg button.on:hover { background:var(--panel); color:var(--accent); box-shadow:0 1px 2px rgba(15,23,42,.12); } .seg-s button { min-height:28px; padding:0 10px; font-size:12.5px; }
@@ -330,6 +334,7 @@
             <label class="campo"><span>Hasta</span><input type="date" id="est-d1" required></label>
             <button class="main" type="submit">Aplicar</button>
           </form>
+          <span class="est-exp" role="group" aria-label="Descargar estas estadísticas"><button type="button" id="est-xlsx" title="Descarga el periodo elegido en Excel, sin los pedidos de prueba">Descargar Excel</button><button type="button" id="est-csv" title="Lo mismo en CSV (texto separado por «;»)">CSV</button></span>
         </div>
       </div>
       <div class="est-banda" id="est-banda" role="status">
@@ -417,6 +422,13 @@
         <p class="muted" id="sync-estado">Cargando…</p>
         <div class="row"><button class="main" id="sync-ahora" type="button" hidden>Sincronizar ahora</button><span class="muted" id="sync-msg" role="status"></span></div>
         <ul id="sync-reg" class="muted" style="margin:8px 0 0;padding-left:18px"></ul>
+      </div>
+      <div class="panel" id="copias-panel">
+        <h2>Copias de seguridad</h2>
+        <p class="muted">Cada noche (03:00) se guarda una copia de las cuatro bases de datos. Aquí ves la última de cada una y puedes comprobar que se podría restaurar. <b>Comprobar no cambia nada</b>: solo abre las copias para leerlas.</p>
+        <p id="copias-aviso" class="copias-aviso" role="status" hidden></p>
+        <div class="scroll"><table id="copias-tabla" class="tabla"><thead><tr><th>Base</th><th>Última copia</th><th class="num">Antigüedad</th><th class="num">Tamaño</th><th class="num">Copias guardadas</th><th>Comprobación</th></tr></thead><tbody></tbody></table></div>
+        <div class="acciones"><button type="button" class="main" id="copias-comprobar">Comprobar copias ahora</button><span class="muted" id="copias-hora"></span></div>
       </div>
       <div class="panel" id="act-panel">
         <h2>Versión del programa</h2>
@@ -1161,7 +1173,27 @@ async function avisos() {
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function copias(comprobar = false) {
+  const aviso = $("copias-aviso"), cuerpo = $("copias-tabla").querySelector("tbody"), b = $("copias-comprobar");
+  if (comprobar) { b.disabled = true; b.textContent = "Comprobando…"; }
+  try {
+    const d = await call(comprobar ? "/api/admin/copias/comprobar" : "/api/admin/copias", comprobar ? {} : null);
+    aviso.hidden = d.ok; aviso.textContent = d.ok ? "" : "Atención: " + d.problemas.join(" · ");
+    const mb = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
+    cuerpo.replaceChildren(...d.bases.map((x) => {
+      const tr = el("tr"), cel = (t, c) => tr.appendChild(el("td", t, c ? { className: c } : {}));
+      cel(x.nombre); cel(x.hay ? x.fecha : "—"); cel(x.hay ? (x.horas === null ? "?" : x.horas + " h") : "—", "num"); cel(x.hay ? mb(x.bytes) : "—", "num"); cel(String(x.cuantas), "num");
+      const t = el("td"), tag = (txt, cls) => t.appendChild(el("span", txt, { className: "badge " + cls }));
+      if (x.comprobada) { if (x.correcta) { tag("Correcta", "exportado"); t.appendChild(el("span", " " + Object.entries(x.datos ?? {}).map(([k, n]) => `${nf.format(n)} ${({ orders: "pedidos", order_lines: "líneas", accounts: "cuentas", registrations: "altas", customers: "clientes", purchases: "compras", products: "artículos", product_changes: "cambios de precio" })[k] ?? k}`).join(" · "), { className: "muted" })); } else tag(x.motivo || "Fallo", "retenido"); }
+      else if (!x.hay) tag("Sin copia", "retenido"); else if (x.vieja) tag("Antigua", "pendiente"); else t.appendChild(el("span", "Sin comprobar", { className: "muted" }));
+      tr.appendChild(t); return tr;
+    }));
+    if (comprobar) $("copias-hora").textContent = "Comprobado a las " + new Date(d.comprobadoEn).toLocaleTimeString("es-ES", { timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit" });
+  } catch (e) { aviso.hidden = false; aviso.textContent = e.message; }
+  finally { if (comprobar) { b.disabled = false; b.textContent = "Comprobar copias ahora"; } }
+}
+$("copias-comprobar").onclick = () => copias(true);
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 // ═════════ Estadísticas y patrones ═════════
 const est = { rango: "30d", d0: "", d1: "", datos: null, modo: "uds", mas: false, timerVivo: 0, timerDatos: 0, cliente: null };
@@ -1285,6 +1317,15 @@ async function estCargar(conEsqueleto = true) {
     estBanda(d); estKpis(d); estRanking(d); estCategorias(d); estHoras(d); estCalor(d); estAtrasados(d);
   } catch (e) { P.classList.remove("cargando"); for (const s of P.querySelectorAll(".refresca")) s.classList.remove("refresca"); $("est-sub").textContent = e.message; }
 }
+async function estDescargar(formato) {
+  const qs = new URLSearchParams({ rango: est.rango, formato }); if (est.rango === "custom") { qs.set("desde", est.d0); qs.set("hasta", est.d1); }
+  const b = $(formato === "csv" ? "est-csv" : "est-xlsx"), txt = b.textContent; b.disabled = true; b.textContent = "Preparando…";
+  try {
+    const r = await call("/api/admin/estadisticas/exportar?" + qs, null, true);
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "No se ha podido preparar el archivo.");
+    const url = URL.createObjectURL(await r.blob()), a = el("a", "", { href: url, download: `estadisticas-${new Date().toISOString().slice(0, 10)}.${formato}` }); a.click(); setTimeout(() => URL.revokeObjectURL(url), 1500);
+  } catch (e) { alert(e.message); } finally { b.disabled = false; b.textContent = txt; }
+}
 async function estVivo() {
   if (!activo(1)) return;
   try {
@@ -1326,6 +1367,7 @@ $("est-custom").onsubmit = (e) => { e.preventDefault(); est.d0 = $("est-d0").val
 for (const b of document.querySelectorAll("#p-estadisticas .seg button[data-m]")) b.onclick = () => { est.modo = b.dataset.m; for (const x of document.querySelectorAll("#p-estadisticas .seg button[data-m]")) x.classList.toggle("on", x === b); if (est.datos) { estRanking(est.datos); estCategorias(est.datos); } };
 $("est-mas").onclick = () => { est.mas = !est.mas; if (est.datos) estRanking(est.datos); };
 $("est-reiniciar").onclick = () => $("est-dlg").showModal();
+$("est-xlsx").onclick = () => estDescargar("xlsx"); $("est-csv").onclick = () => estDescargar("csv");
 $("est-dlg-no").onclick = () => $("est-dlg").close();
 $("est-dlg-si").onclick = async () => { $("est-dlg-si").disabled = true; try { await call("/api/admin/estadisticas/reiniciar", { confirmo: true }); $("est-dlg").close(); est.datos = null; await estCargar(true); } catch (e) { alert(e.message); } $("est-dlg-si").disabled = false; };
 $("est-deshacer").onclick = async () => { try { await call("/api/admin/estadisticas/deshacer", {}); est.datos = null; await estCargar(true); } catch (e) { alert(e.message); } };

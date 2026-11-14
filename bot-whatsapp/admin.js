@@ -2,6 +2,7 @@
 // clientes y cuentas. Es una aplicación aparte de la del cliente: todo va bajo /api/admin y exige la clave de la empresa.
 import { deliveryInfo, madridDay } from "./delivery.js";
 import { leerExcluidos, resolverExcluidos, excluidosValidos, prepararPedidos, rangoDe, calcular, atrasados, patronesCliente } from "./estadisticas.js";
+import { xlsxDeEstadisticas, csvDeEstadisticas } from "./estadisticas-export.js";
 import { opcionesInvitacion, plantillaValida, textoWhatsapp, PLANTILLA_DEFECTO, PLANTILLA_ALTA, PLANTILLA_VER } from "./invitaciones.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -12,6 +13,7 @@ import { totals, round2, promoVigente, precioEfectivo, hoyMadrid } from "./prici
 import { categorizar } from "./categorias.js";
 import { runExport } from "./exporter.js";
 import { backupDb } from "./backup.js";
+import { estadoCopias, comprobarCopias } from "./copias.js";
 import { detectarTipo } from "./actualizar-datos.js";
 import { crearAvisos } from "./avisos.js";
 import { execFile } from "node:child_process";
@@ -341,6 +343,9 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       accounts.ajusteGuardar("plantilla_enlace", v.texto);
       return send(res, 200, { ok: true, plantilla: v.texto || PLANTILLA_DEFECTO }), true;
     }
+    // ---- Copias de seguridad: solo se LEEN (estado de la última copia y comprobación de que se podría restaurar); nada se restaura ni se borra desde aquí ----
+    if (p === "/api/admin/copias" && get) return send(res, 200, estadoCopias(process.env.BACKUP_DIR ?? "respaldos")), true;
+    if (p === "/api/admin/copias/comprobar" && post) return send(res, 200, comprobarCopias(process.env.BACKUP_DIR ?? "respaldos")), true;
     // ---- Estadísticas y patrones: se calcula aquí, se guarda unos segundos y solo LEE los pedidos (nunca cambia ni borra nada) ----
     if (p.startsWith("/api/admin/estadisticas")) {
       const ahora = new Date().toISOString(), hoy = madridDay(ahora), recuento = () => accounts.ajuste("stats_desde") || null;
@@ -368,6 +373,16 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
           if (calcCache.size > 30) calcCache.clear(); calcCache.set(k, v);
         }
         return send(res, 200, { ...v, desdeRecuento: b.rec, sePuedeDeshacer: accounts.ajuste("stats_desde_prev") !== null, excluidosConfig: exCfg, totalPedidosContados: b.validos.length }), true;
+      }
+      if (p === "/api/admin/estadisticas/exportar" && get) { // descarga el periodo elegido (sin pedidos de prueba, desde el último reinicio); solo lee
+        const q = Object.fromEntries(url.searchParams), b = base(), r = rangoDe(q, ahora, b.rec), formato = q.formato === "csv" ? "csv" : "xlsx";
+        if (r.error) return send(res, 400, { error: r.error }), true;
+        if (q.formato && !["csv", "xlsx"].includes(q.formato)) return send(res, 400, { error: "Formato no válido (xlsx o csv)." }), true;
+        const v = { ...calcular(b.validos, b.excluidos, r, (id) => { try { return catalogDb?.get(id) ?? null; } catch { return null; } }, 100000), atrasados: atrasados(b.validos, ahora, 200) };
+        const op = { hechoEl: madrid(ahora), contandoDesde: b.rec }, nombre = `estadisticas-${hoy}.${formato}`;
+        const cuerpo = formato === "csv" ? Buffer.from(csvDeEstadisticas(v, op), "utf8") : xlsxDeEstadisticas(v, op);
+        res.writeHead(200, { "Content-Type": formato === "csv" ? "text/csv; charset=utf-8" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": `attachment; filename="${nombre}"`, "Cache-Control": "no-store", "Content-Length": cuerpo.length }).end(cuerpo);
+        return true;
       }
       if (p === "/api/admin/estadisticas/vivo" && get) {
         const filas = accounts.presenciaAhora();

@@ -106,7 +106,7 @@ function resumen(lista) {
 const dentro = (o, desde, hasta) => (!desde || o.created_at >= desde) && o.created_at < hasta;
 
 /** Todo lo de la página principal para un rango. `producto(id)`: ficha del artículo (para la categoría) o null. */
-export function calcular(validos, excluidos, r, producto = () => null) {
+export function calcular(validos, excluidos, r, producto = () => null, limite = 30) {
   const actuales = validos.filter((o) => dentro(o, r.desde, r.hasta));
   const nExcl = excluidos.filter((o) => dentro(o, r.desde, r.hasta)).length;
   const act = resumen(actuales), prev = r.previo ? resumen(validos.filter((o) => dentro(o, r.previo.desde, r.previo.hasta))) : null;
@@ -130,7 +130,7 @@ export function calcular(validos, excluidos, r, producto = () => null) {
   }
   const r2 = (n) => Math.round(n * 100) / 100;
   const lista = [...arts.values()].map((a) => ({ ...a, importe: r2(a.importe) }));
-  const top = (cmp) => [...lista].sort(cmp).slice(0, 30);
+  const top = (cmp) => [...lista].sort(cmp).slice(0, limite);
   const categorias = [...cats.values()].map((c) => ({ nombre: c.nombre, unidades: c.unidades, importe: r2(c.importe), subs: [...c.subs.values()].map((s) => ({ ...s, importe: r2(s.importe) })).sort((a, b) => b.unidades - a.unidades) })).sort((a, b) => b.unidades - a.unidades);
   const pico = (() => { let m = 0, h = null; horas.forEach((n, i) => { if (n > m) { m = n; h = i; } }); return h; })();
   return {

@@ -2,6 +2,7 @@
 // Lo usan: GET /api/admin/estado (para Claude u otra herramienta), el informe diario por correo y los avisos de problemas nuevos.
 import fs from "node:fs";
 import path from "node:path";
+import { estadoCopias } from "./copias.js";
 
 const horas = (desde, ahora) => Math.round(((ahora - new Date(desde).getTime()) / 3_600_000) * 10) / 10;
 
@@ -43,6 +44,12 @@ export function estadoSistema(deps, umbrales = {}) {
   if (!copia) problemas.push({ clave: "sin-copias", gravedad: "alta", texto: "No hay ninguna copia de seguridad todavía." });
   else if (copia.hace > u.copiaHoras) problemas.push({ clave: "copia-antigua", gravedad: "alta", texto: `La última copia de seguridad tiene ${copia.hace} h.` });
 
+  if (copia) { // una base sin copia reciente aunque las demás sí la tengan (solo si hay copias con el nombre de siempre)
+    try {
+      const ec = estadoCopias(deps.copiasDir, { ahora: new Date(ahora).getTime() });
+      if (ec.bases.some((b) => b.hay)) for (const b of ec.bases) if (!b.hay || (b.vieja && !problemas.some((x) => x.clave === "copia-antigua"))) problemas.push({ clave: "copia-base-" + b.base, gravedad: "alta", texto: `Copia de seguridad de «${b.nombre}»: ${b.aviso}` });
+    } catch { /* no se puede leer la carpeta */ }
+  }
   let discoLibreMB = null;
   try { const s = fs.statfsSync(deps.dataDir); discoLibreMB = Math.round((s.bavail * s.bsize) / 1048576); } catch { /* no disponible */ }
   if (discoLibreMB !== null && discoLibreMB < u.discoMB) problemas.push({ clave: "disco-lleno", gravedad: "alta", texto: `Quedan solo ${discoLibreMB} MB libres en el disco.` });
