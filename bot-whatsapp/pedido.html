@@ -481,7 +481,7 @@
     header { grid-column:1 / -1; padding:4px 14px; border-radius:0 0 14px 14px; max-height:72px; flex-wrap:nowrap; }
     header img { height:28px; } .ttl b { font-size:calc(15px / var(--k,1)); -webkit-line-clamp:1; } .cartbtn { min-height:44px; padding:0 14px; margin-left:auto; }
     #letraBox { flex:none; } .ayudabtn { padding:0; width:48px; font-size:0; } .ayudabtn::before { content:"?"; font-size:calc(22px / var(--k,1)); font-weight:700; } .ttl { min-width:0; flex:1 1 0; } .cartbtn { margin-left:auto; } /* apaisado: el control de letra cabe en la misma fila de la cabecera, sin salirse */
-    .paso, .guia { display:none; }
+    .paso, .guia, .titulo-bloque { display:none; } /* apaisado: el título grande quitaba 80-115 px de los 360 que hay y la lista se quedaba sin sitio (la cabecera ya lleva el nombre) */
     .tabs { grid-column:1; grid-row:3; margin:4px 6px 4px 14px; } .buscar { grid-column:2; grid-row:3; padding:4px 14px 4px 6px; } .buscar input { min-height:44px; } .buscar::before { top:14px; left:calc(6px + 14px); }
     .filbar { grid-column:1 / -1; grid-row:4; padding:0 14px 4px; } main { grid-column:1 / -1; grid-row:5; min-height:0; padding-bottom:78px; }
     .app.compacto header, .app.compacto .tabs, .app.compacto .buscar { max-height:0; opacity:0; overflow:hidden; padding-top:0; padding-bottom:0; margin-top:0; margin-bottom:0; pointer-events:none; } /* al bajar por la lista se pliega todo lo de arriba */
@@ -987,6 +987,10 @@
     .app > footer { max-width:720px; left:50%; right:auto; width:calc(100% - 2 * var(--gutter)); transform:translateX(-50%); }
     #cart { align-items:center; } #cart > * { width:100%; max-width:720px; }
   }
+  @media (min-width:768px) and (max-width:1023px) and (orientation:landscape) and (max-height:520px) { /* móvil apaisado (p. ej. 780×360): aquí .app es una cuadrícula y «align-items:center» dejaba la lista con la altura de TODO su contenido: no se podía bajar y la navegación cortaba lo último */
+    .app { align-items:stretch; justify-items:stretch; }
+    .app > .filbar, .app > #list, .app > .aviso { justify-self:center; align-self:stretch; }
+  }
   @media (min-width:1024px) { /* ordenador: menú a la izquierda, catálogo en cuadrícula y «Tu pedido» fijo a la derecha */
     .app { display:grid; grid-template-columns:220px minmax(0, 1fr) clamp(340px, 24vw, 420px); grid-template-rows:auto auto auto auto auto minmax(0, 1fr); overflow:hidden; }
     .app > header { grid-column:1 / -1; grid-row:1; }
@@ -1246,6 +1250,7 @@
   .ficha-dl { display:grid; grid-template-columns:auto minmax(0, 1fr); gap:var(--s2) var(--s3); margin:0; } .ficha-dl dt { color:var(--text-2); font-size:calc(var(--t-sec) / var(--k,1)); } .ficha-dl dd { margin:0; font-weight:600; font-size:calc(var(--t-sec) / var(--k,1)); text-align:right; overflow-wrap:anywhere; } .ficha-dl s { color:var(--text-2); font-weight:400; }
   .ficha-add { min-height:48px; border:0; border-radius:var(--r-pill, 999px); background:var(--accent-soft, #fdecee); color:var(--accent, #C8102E); font:inherit; font-weight:700; cursor:pointer; }
   .cab-ord { display:flex; gap:var(--s3); flex-wrap:wrap; padding:var(--s2) var(--gutter, 14px) var(--s2); } .cab-ord label { display:flex; flex-direction:column; gap:2px; font-size:calc(var(--t-micro) / var(--k,1)); color:var(--text-2); font-weight:600; flex:1 1 140px; min-width:0; } .cab-ord select { min-height:44px; border:.5px solid var(--line); border-radius:var(--r-field, 12px); background:var(--surface); color:var(--text); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); padding:0 var(--s3); max-width:100%; }
+  @media (orientation:landscape) and (max-height:520px) { .cab-cat { position:static; } .cab-ord { padding-top:0; padding-bottom:0; } } /* apaisado: la cabecera de la categoría (migas, subcategorías y «Ordenar») no se queda fija: ocupaba casi toda la pantalla y no se veía ningún artículo */
   .sin-red { position:fixed; top:0; left:0; right:0; z-index:500; background:#5a1a00; color:#fff; padding:calc(var(--s2, 8px) + env(safe-area-inset-top)) var(--gutter, 14px) var(--s2, 8px); font-size:calc(14px / var(--k,1)); font-weight:600; text-align:center; } .sin-red[hidden] { display:none; }
   .carga-lenta { margin:var(--s3) var(--gutter, 14px); color:var(--text-2); font-size:calc(var(--t-sec) / var(--k,1)); text-align:center; }
   .elige-fila { display:flex; justify-content:space-between; gap:var(--s3); margin:0; } .elige-fila b { font-variant-numeric:tabular-nums; text-align:right; } .elige-det { margin:0; color:var(--text-2); font-size:calc(var(--t-cap) / var(--k,1)); } .elige-aviso { margin:0; color:var(--accent); font-weight:700; }

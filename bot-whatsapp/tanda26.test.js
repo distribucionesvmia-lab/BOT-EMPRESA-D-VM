@@ -34,3 +34,19 @@ test("el enlace entra por la ruta /entrar (GET enseña botón, POST gasta), con 
   assert.match(e, /Crear enlace de acceso/); assert.match(e, /Abrir en WhatsApp/); assert.match(e, /Copiar enlace/); assert.match(e, /Lo mandas tú/); assert.doesNotMatch(ad.slice(ad.indexOf("/invitacion$/"), ad.indexOf("// ---- Clientes (la lista")), /sendMail|enviarPush|fetch\(/); // el sistema no envía nada
   assert.match(c, /location\.hash === "#invitacion"/); assert.match(c, /id="c-nota" hidden/); assert.match(c, /location\.hash === "#enlace-caducado"/); assert.match(c, /Ese enlace ya no sirve/);
 });
+
+import { investigar, resumen } from "./investigar-fijo.js";
+test("investigar-fijo: dice en qué copia desapareció un pedido fijo y quién lo tocó (solo lee, no cambia nada)", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-resp-")), a = openAccountsDb(path.join(dir, "viva.sqlite"));
+  a.setStanding("T818181", { lines: [{ id: "1", qty: 3, unit: "ud" }, { id: "2", qty: 2, unit: "caja" }], days: [2, 4] });
+  a.backupTo(path.join(dir, "cuentas-20261110-0300.sqlite")); a.backupTo(path.join(dir, "cuentas-20261111-0300.sqlite"));
+  a.deleteStanding("T818181"); a.hideUsual("T818181");
+  a.backupTo(path.join(dir, "cuentas-20261112-0300.sqlite")); a.backupTo(path.join(dir, "cuentas-20261113-0300.sqlite"));
+  const antes = fs.readdirSync(dir).map((f) => [f, fs.statSync(path.join(dir, f)).mtimeMs]);
+  const r = investigar(dir, "T818181"); assert.equal(r.length, 4);
+  assert.deepEqual(r.map((x) => x.fijos.length), [1, 1, 0, 0]); assert.equal(r[0].fijos[0].lineas, 2); assert.equal(r[0].fijos[0].unidades, 5); assert.deepEqual(r[0].fijos[0].dias, [2, 4]);
+  assert.deepEqual(r.map((x) => x.siempre.length), [0, 0, 1, 1]); assert.equal(r[2].siempre[0].borrado, true);
+  const t = resumen(r); assert.match(t, /Última copia CON pedido fijo: cuentas-20261111-0300\.sqlite · primera copia SIN él: cuentas-20261112-0300\.sqlite/); assert.match(t, /BORRADO de la portada/);
+  assert.equal(investigar(dir, "OTRO")[0].fijos.length, 0); // filtra por cliente
+  assert.deepEqual(fs.readdirSync(dir).map((f) => [f, fs.statSync(path.join(dir, f)).mtimeMs]), antes); // no ha tocado ni un archivo
+});

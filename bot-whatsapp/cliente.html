@@ -403,6 +403,7 @@
   .vm-inicio .in-ult { color:var(--text-2); font-size:calc(var(--t-cap) / var(--k,1)); line-height:1.25; }
   .vm-inicio .in-fijo-ret { background:var(--fill); border-radius:var(--r-field); padding:var(--s3); display:flex; flex-direction:column; gap:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); } .vm-inicio .in-fijo-ret ul { margin:0; padding-left:1.1em; } .vm-inicio .in-fijo-ret small { color:var(--text-2); }
   .cu-pasos { list-style:none; margin:var(--s2) 0 0; padding:0; display:flex; gap:2px; } .cu-pasos li { flex:1; text-align:center; font-size:calc(11.5px / var(--k,1)); line-height:1.2; color:var(--text-2); padding-top:10px; border-top:4px solid var(--fill); } .cu-pasos li.hecho { border-top-color:var(--accent); } .cu-pasos li.ahora { border-top-color:var(--accent); color:var(--text); font-weight:700; }
+  .cu-filtros { display:grid; grid-template-columns:1fr; gap:var(--s2); margin:var(--s2) 0 var(--s3); } .cu-filtros select, .cu-filtros input { width:100%; min-height:48px; }
   .cu-total { margin:var(--s2) 0 0; font-weight:600; font-variant-numeric:tabular-nums; }
   #p-cuerpo label { margin-top:var(--s2); } #m-problema { z-index:75; }
   .pw { position:relative; display:block; } .pw input { width:100%; padding-right:52px !important; }
@@ -1185,34 +1186,55 @@ async function abrirCuenta(irAPedidos, mas) {
   // Mis pedidos, por meses
   const tp = nodo("h3", "Histórico de pedidos", "cu-tit"); tp.id = "cu-pedidos"; B.appendChild(tp);
   if (!j.pedidos.length) B.appendChild(estadoVacio({ icono: "reloj", titulo: "Aún no tienes pedidos", texto: "Cuando hagas uno, aparecerá aquí para repetirlo cuando quieras.", boton: "Hacer pedido", onclick: () => { $("m-cuenta").hidden = true; enviar("h:open", "Hacer pedido"); } })); 
-  let mesActual = "";
-  const proximos = j.pedidos.filter((o) => o.proximo);
-  if (proximos.length) B.appendChild(nodo("h4", "Próximos", "cu-mes")); // los que aún no se han entregado, arriba, con «Modificar» si todavía se puede
-  for (const o of [...proximos, ...j.pedidos.filter((o) => !o.proximo)]) {
-    const mes = String(o.fecha).slice(0, 7);
-    if (!o.proximo && mes !== mesActual) { mesActual = mes; const [y, m] = mes.split("-"); const txt = new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("es-ES", { month: "long", year: "numeric" }); B.appendChild(nodo("h4", txt.charAt(0).toUpperCase() + txt.slice(1), "cu-mes")); }
-    const c = nodo("div", null, "cu-ped"), cab = nodo("div", null, "cab");
-    const f = new Date(o.fecha + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long" });
-    cab.append(nodo("b", o.doc ? `${f} · pedido ${o.doc}` : f), nodo("span", o.estado, "est" + (o.editable ? " vivo" : "")));
-    c.appendChild(cab);
-    if (o.origen === "app") { // estado en 4 pasos (deducido de la exportación y del día de entrega)
-      const PASOS = ["Recibido", "En preparación", "En reparto", "Entregado"], ol = nodo("ol", null, "cu-pasos"); ol.setAttribute("aria-label", "Estado del pedido: " + PASOS[o.paso - 1] + " (paso " + o.paso + " de 4)");
-      PASOS.forEach((t, i) => { const li = nodo("li", t); if (i + 1 < o.paso) li.className = "hecho"; else if (i + 1 === o.paso) { li.className = "ahora"; li.setAttribute("aria-current", "step"); } ol.appendChild(li); }); c.appendChild(ol);
-    }
-    if (o.total != null) c.appendChild(nodo("p", (o.totalOrientativo ? "Total con IVA aprox.: " : "Total con IVA: ") + eur(o.total) + (o.totalOrientativo ? " (con los precios de hoy)" : ""), "cu-total"));
-    const n = o.lineas.length;
-    c.appendChild(nodo("p", o.lineas.slice(0, 3).map((l) => `${l.cant || l.uds} ${l.nombre}`).join(" · ") + (n > 3 ? ` y ${n - 3} más` : "") + (o.entrega ? ` · entrega ${o.entregaTexto || o.entrega.split("-").reverse().join("/")}` : ""), "res"));
-    if (n > 3) { const d = nodo("details"), ul = nodo("ul"); d.appendChild(nodo("summary", `Ver los ${n} artículos`)); for (const l of o.lineas) ul.appendChild(nodo("li", `${l.cant || l.uds} · ${l.nombre}`)); d.appendChild(ul); c.appendChild(d); }
-    const acc = nodo("div", null, "cu-acc");
-    const rep = nodo("button", "Repetir pedido", "vm-btn primary"); rep.type = "button"; rep.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&r=1&x=1"; };
-    const add = nodo("button", "Añadir al carrito", "vm-btn ghost"); add.type = "button"; add.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&a=1"; };
-    acc.append(rep, add);
-    if (o.pdf !== false && o.doc) { const pdf = nodo("button", "Ver / imprimir PDF", "vm-btn ghost"); pdf.type = "button"; pdf.setAttribute("aria-label", "Ver o imprimir el pedido " + o.doc + " en PDF (con botón para cerrarlo)"); pdf.onclick = () => abrirPdf(urlPdfDe(o.doc), "Pedido " + o.doc); acc.appendChild(pdf); } // los de la aplicación llevan los precios de ese día; los de a3ERP, los de hoy (se dice en el PDF)
-    { const pb = nodo("button", "¿Algún problema con este pedido?", "vm-btn ghost cu-prob"); pb.type = "button"; pb.onclick = () => abrirProblema(o); if (AYUDA && (AYUDA.whatsappHref || AYUDA.telHref)) acc.appendChild(pb); } // primera versión: abre WhatsApp con el mensaje ya escrito
-    if (o.editable) { const m = nodo("button", "Modificar pedido", "vm-btn ghost"); m.type = "button"; m.onclick = () => { location.href = "/catalogo#m=" + encodeURIComponent(o.doc); }; acc.appendChild(m); }
-    c.appendChild(acc); if (o.editable && o.hasta) c.appendChild(nodo("small", o.hasta));
-    B.appendChild(c);
+  // Filtros del histórico: por mes y por producto (se aplican sobre los pedidos ya cargados)
+  const sinTildes = (t) => String(t ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const L = nodo("div", null, "cu-lista"); let selMes = null, buscaP = null;
+  if (j.pedidos.length > 1) {
+    const meses = [...new Set(j.pedidos.map((o) => String(o.fecha).slice(0, 7)))].sort().reverse(), fil = nodo("div", null, "cu-filtros");
+    selMes = document.createElement("select"); selMes.setAttribute("aria-label", "Filtrar los pedidos por mes"); selMes.appendChild(Object.assign(nodo("option", "Todos los meses"), { value: "" }));
+    for (const m of meses) { const [y, mm] = m.split("-"), t = new Date(Number(y), Number(mm) - 1, 1).toLocaleDateString("es-ES", { month: "long", year: "numeric" }); selMes.appendChild(Object.assign(nodo("option", t.charAt(0).toUpperCase() + t.slice(1)), { value: m })); }
+    buscaP = document.createElement("input"); buscaP.type = "search"; buscaP.placeholder = "Buscar un producto en tus pedidos"; buscaP.setAttribute("aria-label", "Buscar un producto en tus pedidos"); buscaP.autocomplete = "off";
+    fil.append(selMes, buscaP); B.appendChild(fil);
+    if (j.hayMas) B.appendChild(nodo("p", "Busca entre los pedidos que se ven; con «Ver más pedidos» (abajo) se amplía.", "res"));
   }
+  B.appendChild(L);
+  const pintaPedidos = () => {
+    L.textContent = "";
+    const mesF = selMes?.value ?? "", palabras = sinTildes(buscaP?.value ?? "").split(/\s+/).filter(Boolean);
+    const lista = j.pedidos.filter((o) => (!mesF || String(o.fecha).slice(0, 7) === mesF) && palabras.every((w) => o.lineas.some((l) => sinTildes(l.nombre).includes(w))));
+    if (!lista.length) { if (j.pedidos.length) L.appendChild(nodo("p", "Ningún pedido coincide con lo que has elegido. Prueba con otro mes o con menos palabras.", "res")); return; }
+    if (mesF || palabras.length) L.appendChild(nodo("p", lista.length === 1 ? "1 pedido" : lista.length + " pedidos", "res"));
+  let mesActual = "";
+    const proximos = lista.filter((o) => o.proximo);
+    if (proximos.length) L.appendChild(nodo("h4", "Próximos", "cu-mes")); // los que aún no se han entregado, arriba, con «Modificar» si todavía se puede
+    for (const o of [...proximos, ...lista.filter((o) => !o.proximo)]) {
+      const mes = String(o.fecha).slice(0, 7);
+      if (!o.proximo && mes !== mesActual) { mesActual = mes; const [y, m] = mes.split("-"); const txt = new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("es-ES", { month: "long", year: "numeric" }); L.appendChild(nodo("h4", txt.charAt(0).toUpperCase() + txt.slice(1), "cu-mes")); }
+      const c = nodo("div", null, "cu-ped"), cab = nodo("div", null, "cab");
+      const f = new Date(o.fecha + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long" });
+      cab.append(nodo("b", o.doc ? `${f} · pedido ${o.doc}` : f), nodo("span", o.estado, "est" + (o.editable ? " vivo" : "")));
+      c.appendChild(cab);
+      if (o.origen === "app") { // estado en 4 pasos (deducido de la exportación y del día de entrega)
+        const PASOS = ["Recibido", "En preparación", "En reparto", "Entregado"], ol = nodo("ol", null, "cu-pasos"); ol.setAttribute("aria-label", "Estado del pedido: " + PASOS[o.paso - 1] + " (paso " + o.paso + " de 4)");
+        PASOS.forEach((t, i) => { const li = nodo("li", t); if (i + 1 < o.paso) li.className = "hecho"; else if (i + 1 === o.paso) { li.className = "ahora"; li.setAttribute("aria-current", "step"); } ol.appendChild(li); }); c.appendChild(ol);
+      }
+      if (o.total != null) c.appendChild(nodo("p", (o.totalOrientativo ? "Total con IVA aprox.: " : "Total con IVA: ") + eur(o.total) + (o.totalOrientativo ? " (con los precios de hoy)" : ""), "cu-total"));
+      const n = o.lineas.length;
+      c.appendChild(nodo("p", o.lineas.slice(0, 3).map((l) => `${l.cant || l.uds} ${l.nombre}`).join(" · ") + (n > 3 ? ` y ${n - 3} más` : "") + (o.entrega ? ` · entrega ${o.entregaTexto || o.entrega.split("-").reverse().join("/")}` : ""), "res"));
+      if (n > 3) { const d = nodo("details"), ul = nodo("ul"); d.appendChild(nodo("summary", `Ver los ${n} artículos`)); for (const l of o.lineas) ul.appendChild(nodo("li", `${l.cant || l.uds} · ${l.nombre}`)); d.appendChild(ul); c.appendChild(d); }
+      const acc = nodo("div", null, "cu-acc");
+      const rep = nodo("button", "Repetir pedido", "vm-btn primary"); rep.type = "button"; rep.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&r=1&x=1"; };
+      const add = nodo("button", "Añadir al carrito", "vm-btn ghost"); add.type = "button"; add.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&a=1"; };
+      acc.append(rep, add);
+      if (o.pdf !== false && o.doc) { const pdf = nodo("button", "Ver / imprimir PDF", "vm-btn ghost"); pdf.type = "button"; pdf.setAttribute("aria-label", "Ver o imprimir el pedido " + o.doc + " en PDF (con botón para cerrarlo)"); pdf.onclick = () => abrirPdf(urlPdfDe(o.doc), "Pedido " + o.doc); acc.appendChild(pdf); } // los de la aplicación llevan los precios de ese día; los de a3ERP, los de hoy (se dice en el PDF)
+      { const pb = nodo("button", "¿Algún problema con este pedido?", "vm-btn ghost cu-prob"); pb.type = "button"; pb.onclick = () => abrirProblema(o); if (AYUDA && (AYUDA.whatsappHref || AYUDA.telHref)) acc.appendChild(pb); } // primera versión: abre WhatsApp con el mensaje ya escrito
+      if (o.editable) { const m = nodo("button", "Modificar pedido", "vm-btn ghost"); m.type = "button"; m.onclick = () => { location.href = "/catalogo#m=" + encodeURIComponent(o.doc); }; acc.appendChild(m); }
+      c.appendChild(acc); if (o.editable && o.hasta) c.appendChild(nodo("small", o.hasta));
+      L.appendChild(c);
+    }
+  };
+  if (selMes) { selMes.onchange = pintaPedidos; buscaP.oninput = pintaPedidos; }
+  pintaPedidos();
   if (j.hayMas) { const vm = nodo("button", "Ver más pedidos", "vm-btn ghost"); vm.type = "button"; vm.setAttribute("aria-label", "Ver más pedidos (hasta 30)"); vm.onclick = () => abrirCuenta(true, true); B.appendChild(vm); }
   if (irAPedidos) setTimeout(() => $("cu-pedidos").scrollIntoView({ block: "start" }), 50);
 }
