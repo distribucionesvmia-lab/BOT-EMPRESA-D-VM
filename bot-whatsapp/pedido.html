@@ -1353,6 +1353,7 @@
   </header>
   <div class="titulo-bloque"><h1 class="titulo-grande">Catálogo</h1><p class="titulo-sub" id="ttl">Cargando…</p><small id="sub" hidden></small></div>
   <div class="aviso" id="avisoHoy" role="status" aria-live="polite" hidden>Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
+  <div class="aviso" id="soloVer" role="status" hidden>Has entrado con un enlace de solo consulta: puedes mirar el catálogo, pero no enviar pedidos. Para pedir, llama a la oficina o entra con tu código.</div>
   <div class="aviso" id="copiaPrecios" role="status" aria-live="polite" hidden></div>
   <div class="aviso abierto" id="pendiente" role="status" aria-live="polite" hidden></div>
   <div class="aviso abierto" id="recuperado" role="status" aria-live="polite" hidden></div>
@@ -2756,6 +2757,7 @@ function pintarPasoResumen() {
   box.hidden = !box.children.length;
 }
 $("revisar").onclick = () => {
+  if (data && data.soloVer) { $("err").textContent = "Enlace de solo consulta: no se pueden enviar pedidos."; return; }
   $("err").textContent = ""; if (!validaCierre($("err"))) return;
   pintarPasoResumen(); pintaRed(); $("errRes").textContent = ""; $("resumen").hidden = false; $("resumen").querySelector(".body").scrollTop = 0; $("confirm").focus({ preventScroll: true });
 };
@@ -3025,7 +3027,8 @@ let huboCorte = false; // se perdió la cobertura en algún momento: los precios
 const clavePend = () => "vm_pend_" + clave();
 const pendienteGuardado = () => { try { return JSON.parse(localStorage.getItem(clavePend()) || "null"); } catch { return null; } };
 const guardarCopia = () => { try { const { __copia, ...resto } = data; copiaCat.guardar({ guardado: Date.now(), data: resto }).catch(() => {}); } catch {} };
-function pintarCopia() { for (const id of ["copiaPrecios", "copiaPrecios2"]) { const b = $(id); b.hidden = !data.__copia; b.textContent = data.__copia ? `Precios de ${new Date(data.__copia).toLocaleString("es-ES", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}; se actualizarán al enviar.` : ""; } }
+function pintarSoloVer() { const v = !!(data && data.soloVer); $("soloVer").hidden = !v; const r = $("revisar"); r.disabled = v; r.textContent = v ? "Solo consulta: no se puede pedir" : "Revisar pedido"; if (v) $("confirm").disabled = true; } // enlace de «solo ver» (el servidor tampoco deja enviar)
+function pintarCopia() { pintarSoloVer(); for (const id of ["copiaPrecios", "copiaPrecios2"]) { const b = $(id); b.hidden = !data.__copia; b.textContent = data.__copia ? `Precios de ${new Date(data.__copia).toLocaleString("es-ES", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}; se actualizarán al enviar.` : ""; } }
 // Mete en pantalla unos datos nuevos del servidor sin perder el pedido: lo que ya no existe se quita (y se dice)
 function aplicarDatos(nuevo) {
   const antes = qty.size ? calc().total : null;

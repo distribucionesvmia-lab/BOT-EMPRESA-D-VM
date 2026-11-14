@@ -217,7 +217,7 @@ test("«¿Te falta algo?» con foto del artículo y entrega: dirección de siemp
   assert.match(ped, /className = "falta-av"/); assert.match(ped, /\.falta-fila \.falta-av \{ flex:none; width:56px; height:56px/);
   assert.match(ped, /name="addrmode" value="otra"/); assert.match(ped, /deliveryAddress: dirEntrega\(\)/);
   assert.match(ped, /const sinDireccion = \(\) => !String\(data\.customer\.address/);
-  assert.match(ped, /function validaCierre\(errBox\) \{[^}]*if \(!direccionOk\(errBox\)\) return false/); assert.match(ped, /\$\("revisar"\)\.onclick = \(\) => \{\s*\$\("err"\)\.textContent = ""; if \(!validaCierre/); // sin dirección válida no se pasa al resumen ni se envía
+  assert.match(ped, /function validaCierre\(errBox\) \{[^}]*if \(!direccionOk\(errBox\)\) return false/); assert.match(ped, /\$\("revisar"\)\.onclick = \(\) => \{\s*(?:if \(data && data\.soloVer\)[^\n]*\n\s*)?\$\("err"\)\.textContent = ""; if \(!validaCierre/); // sin dirección válida no se pasa al resumen ni se envía
 });
 
 test("ACTUALIZACIÓN AUTOMÁTICA: cada 10 minutos, con pruebas, comprobación de arranque, vuelta atrás y botón «Actualizar ahora»", async () => {

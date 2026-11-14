@@ -1482,7 +1482,14 @@ function inicio(ui) {
   esq.innerHTML = '<div class="sk in-esq-t"></div><div class="in-esq-f">' + '<div class="sk in-esq-c"></div>'.repeat(3) + '</div>'; secciones.appendChild(esq);
   const quitaEsq = () => esq.remove();
   Promise.all([cargaYo(), fetch("/api/bienvenida").then((r) => (r.ok ? r.json() : null)).catch(() => null)]).then(([y, bv]) => {
-    if (bv?.mostrar && !c.querySelector(".in-bienvenida")) { // primera vez: tarjeta de 3 pasos (se cierra para siempre con «Entendido», guardado por cliente); si entró con el NIF y aún no tiene código, se le ofrece ahí mismo
+    let visto = false; try { visto = sessionStorage.getItem("vm:msg-enlace") === "1"; } catch {}
+    if ((y?.mensajeEnlace || y?.soloVer) && !visto && !c.querySelector(".in-enlace")) { // entró con un enlace de la oficina: su mensaje de bienvenida (una vez por visita) y, si es de solo consulta, se le dice
+      const k = el("section", "in-bienvenida in-enlace"); k.setAttribute("aria-label", "Mensaje de la oficina");
+      if (y.mensajeEnlace) k.appendChild(el("h3", null, y.mensajeEnlace));
+      if (y.soloVer) k.appendChild(el("p", null, "Este enlace es solo de consulta: puedes ver el catálogo, pero no enviar pedidos. Para pedir, llama a la oficina."));
+      const ok = el("button", "vm-btn primary", "Entendido"); ok.type = "button"; ok.onclick = () => { try { sessionStorage.setItem("vm:msg-enlace", "1"); } catch {} k.remove(); }; k.appendChild(ok); c.prepend(k);
+    }
+    if (bv?.mostrar && !c.querySelector(".in-bienvenida:not(.in-enlace)")) { // primera vez: tarjeta de 3 pasos (se cierra para siempre con «Entendido», guardado por cliente); si entró con el NIF y aún no tiene código, se le ofrece ahí mismo
       const k = el("section", "in-bienvenida"); k.setAttribute("aria-label", "Bienvenida");
       k.appendChild(el("h3", null, "Así se hace un pedido"));
       const ol = el("ol"); for (const t of ["Busca un artículo o mira «Lo que sueles pedir».", "Marca las cantidades con el «+».", "Pulsa «Revisar pedido», elige el día de entrega y envíalo."]) ol.appendChild(el("li", null, t)); k.appendChild(ol);
@@ -1720,7 +1727,7 @@ async function revisarFijoDesdeAviso() {
   const j = await fetch("/api/pedido-fijo").then((r) => (r.ok ? r.json() : null)).catch(() => null);
   if (j?.fijo?.lineas?.length) location.href = (window.__catUrl || "/catalogo") + "#c=" + j.fijo.lineas.map((l) => encodeURIComponent(l.id) + "." + l.uds).join(",") + "&r=1";
 }
-function entrar(nombre) { yoCache = null; $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (location.hash === "#revisar-fijo") { revisarFijoDesdeAviso(); } if (location.hash === "#invitacion") { try { history.replaceState(null, "", location.pathname); } catch {} setTimeout(() => { $("c-nota").hidden = false; $("cambiar").click(); }, 700); } if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
+function entrar(nombre) { yoCache = null; $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (location.hash === "#revisar-fijo") { revisarFijoDesdeAviso(); } if (location.hash === "#enlace") { try { history.replaceState(null, "", location.pathname); } catch {} } if (location.hash === "#invitacion") { try { history.replaceState(null, "", location.pathname); } catch {} setTimeout(() => { $("c-nota").hidden = false; $("cambiar").click(); }, 700); } if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
 
 (async () => {
   const r = await fetch("/api/yo").catch(() => null);

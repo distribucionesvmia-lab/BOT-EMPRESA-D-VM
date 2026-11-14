@@ -1077,13 +1077,42 @@ test("BENCH 9: el correo del alta es opcional (si se escribe, tiene que ser vál
   assert.equal(typeof antesA, "boolean");
 });
 
+test("ENLACES CONFIGURABLES: varios usos con tope, solo ver (el servidor no deja pedir), mensaje de bienvenida, sin pedir código, plantilla, lista y «Anular»", async () => {
+  const id = (await call("GET", "/api/admin/clientes?q=ejemplo", { admin: true })).json[0].id;
+  const crea = async (body) => (await call("POST", `/api/admin/clientes/${id}/invitacion`, { admin: true, body })).json;
+  for (const malo of [{ dias: 99 }, { usos: 50 }, { hora: "99:99" }, { fecha: "2020-01-01" }, { mensaje: "x".repeat(400) }]) assert.equal((await call("POST", `/api/admin/clientes/${id}/invitacion`, { admin: true, body: malo })).status, 400, JSON.stringify(malo));
+  const inv = await crea({ dias: 3, usos: 2, modo: "ver", pedirCodigo: false, mensaje: "Hola, aquí tienes tu enlace" });
+  assert.equal(inv.ok, true); assert.equal(inv.soloVer, true); assert.equal(inv.usos, 2); assert.match(inv.texto, /hasta 2 veces/);
+  const ruta = new URL(inv.url).pathname;
+  const g = await (await fetch(BASE + ruta)).text(); assert.match(g, /ver el catálogo/); assert.equal(g.includes("Hola, aquí tienes tu enlace"), false); // el mensaje solo se ve ya dentro
+  const p1 = await fetch(BASE + ruta, { method: "POST", redirect: "manual" }); assert.equal(p1.status, 303); assert.equal(p1.headers.get("location"), "/cliente#enlace"); // sin pedir código
+  const ck = (p1.headers.get("set-cookie") ?? "").split(";")[0];
+  const yo = (await call("GET", "/api/yo", { cookie: ck })).json.cliente; assert.equal(yo.soloVer, true); assert.equal(yo.mensajeEnlace, "Hola, aquí tienes tu enlace");
+  assert.equal((await call("GET", "/catalogo/datos", { cookie: ck })).json.soloVer, true);
+  const ped = await call("POST", "/catalogo", { cookie: ck, body: { key: "solover-0001", items: [], delivery: "2026-12-01" } }); assert.equal(ped.status, 403); assert.equal(ped.json.soloVer, true); // nada se envía
+  assert.equal((await fetch(BASE + ruta, { method: "POST", redirect: "manual" })).status, 303); // segundo uso
+  assert.equal((await fetch(BASE + ruta, { method: "POST", redirect: "manual" })).status, 410); // el tercero, no
+  // lista y anular
+  const b = await crea({ usos: 5 }); const lista = (await call("GET", "/api/admin/invitaciones", { admin: true })).json;
+  const mia = lista.enlaces.find((x) => x.estado === "activo"); assert.ok(mia); assert.equal(mia.usosMax, 5); assert.equal(JSON.stringify(lista).includes(new URL(b.url).pathname.slice(8)), false);
+  assert.ok([401, 403].includes((await call("POST", `/api/admin/invitaciones/${mia.id}/anular`, { body: {} })).status)); // sin la clave de la oficina, no se anula nada
+  assert.equal((await call("POST", `/api/admin/invitaciones/${mia.id}/anular`, { admin: true, body: {} })).status, 200);
+  assert.equal((await call("POST", `/api/admin/invitaciones/${mia.id}/anular`, { admin: true, body: {} })).status, 409);
+  assert.equal((await fetch(BASE + new URL(b.url).pathname)).status, 410); // anulado = ya no sirve
+  // plantilla editable
+  assert.equal((await call("POST", "/api/admin/invitaciones/plantilla", { admin: true, body: { texto: "sin enlace" } })).status, 400);
+  assert.equal((await call("POST", "/api/admin/invitaciones/plantilla", { admin: true, body: { texto: "Buenas {nombre}: {enlace}" } })).status, 200);
+  assert.match((await crea({})).texto, /^Buenas .*: http/);
+  await call("POST", "/api/admin/invitaciones/plantilla", { admin: true, body: { restaurar: true } });
+});
+
 test("BENCH 10: enlace de invitación de la oficina: un solo uso, caduca, se guarda solo su huella y entra como ESE cliente", async () => {
   const lista = (await call("GET", "/api/admin/clientes?q=ejemplo", { admin: true })).json; assert.ok(lista.length >= 1);
   const id = lista[0].id;
   assert.ok([401, 403].includes((await call("POST", `/api/admin/clientes/${id}/invitacion`, { body: {} })).status)); // sin la clave de la oficina, nada
   assert.equal((await call("POST", "/api/admin/clientes/NOEXISTE/invitacion", { admin: true, body: {} })).status, 404);
   const inv = (await call("POST", `/api/admin/clientes/${id}/invitacion`, { admin: true, body: {} })).json;
-  assert.equal(inv.ok, true); assert.match(inv.url, /\/entrar\/[\w-]{43}$/); assert.match(inv.texto, /^Hola, este es tu enlace para pedir a Distribuciones Valentín Martín: http/); assert.match(inv.whatsapp, /^https:\/\/wa\.me\/\d*\?text=/); assert.ok(inv.caduca > new Date().toISOString());
+  assert.equal(inv.ok, true); assert.match(inv.url, /\/entrar\/[\w-]{43}$/); assert.match(inv.texto, /^Hola .*este es tu enlace para pedir a Distribuciones Valentín Martín: http/); assert.match(inv.whatsapp, /^https:\/\/wa\.me\/\d*\?text=/); assert.ok(inv.caduca > new Date().toISOString());
   const ruta = new URL(inv.url).pathname;
   // GET (lo que hace la vista previa de WhatsApp) NO lo gasta: solo enseña un botón
   const g1 = await fetch(BASE + ruta); const h1 = await g1.text(); assert.equal(g1.status, 200); assert.match(h1, /<button type="submit">Entrar<\/button>/); assert.equal(g1.headers.get("cache-control"), "no-store"); assert.equal(g1.headers.get("referrer-policy"), "no-referrer"); assert.equal(h1.includes(inv.cliente), false); // ni siquiera dice de quién es

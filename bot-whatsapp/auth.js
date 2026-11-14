@@ -107,13 +107,13 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       const token = decodeURIComponent(p.slice(8)), fin = (code, t, x, b) => (res.writeHead(code, ya).end(paginaEntrar(t, x, b)), true);
       if (!loginLimit(ip(req))) return fin(429, "Demasiados intentos", "Espera unos minutos y vuelve a abrir el enlace.", "");
       const v = accounts.invitacionVer(token);
-      if (!v.ok) return fin(410, "Este enlace ya no sirve", v.motivo === "caducada" ? "Ha caducado." : v.motivo === "usada" ? "Ya se ha usado (sirve una sola vez)." : "No lo reconocemos.", '<a class="b" href="/cliente">Entrar de la forma normal</a><a class="s" href="/cliente#enlace-caducado">¿Necesitas otro enlace? Pídeselo a la oficina</a>');
-      if (req.method === "GET") return fin(200, "Bienvenido", "Pulsa para entrar y hacer tu pedido. Este enlace sirve una sola vez.", `<form method="POST" action="/entrar/${encodeURIComponent(token)}"><button type="submit">Entrar</button></form>`);
+      if (!v.ok) return fin(410, "Este enlace ya no sirve", v.motivo === "caducada" ? "Ha caducado." : v.motivo === "usada" ? "Ya se ha usado o la oficina lo ha anulado." : "No lo reconocemos.", '<a class="b" href="/cliente">Entrar de la forma normal</a><a class="s" href="/cliente#enlace-caducado">¿Necesitas otro enlace? Pídeselo a la oficina</a>');
+      if (req.method === "GET") return fin(200, "Bienvenido", (v.soloVer ? "Pulsa para entrar y ver el catálogo." : "Pulsa para entrar y hacer tu pedido.") + (v.usosMax === 1 ? " Este enlace sirve una sola vez." : ""), `<form method="POST" action="/entrar/${encodeURIComponent(token)}"><button type="submit">Entrar</button></form>`);
       const u = accounts.invitacionUsar(token); // se gasta aquí: una sola vez
-      if (!u.ok) return fin(410, "Este enlace ya no sirve", "Ya se ha usado (sirve una sola vez).", '<a class="b" href="/cliente">Entrar de la forma normal</a>');
-      const r = accounts.entrarPorInvitacion(u.customerId);
+      if (!u.ok) return fin(410, "Este enlace ya no sirve", "Ya se ha usado o la oficina lo ha anulado.", '<a class="b" href="/cliente">Entrar de la forma normal</a>');
+      const r = accounts.entrarPorInvitacion(u.customerId, { soloVer: u.soloVer, mensaje: u.mensaje, pedirCodigo: u.pedirCodigo });
       if (!r.ok) return fin(403, "No hemos podido entrar", "Tu cuenta está bloqueada ahora mismo. Llama a la oficina y lo solucionan.", '<a class="b" href="/cliente">Volver</a>');
-      return res.writeHead(303, { "Set-Cookie": cookie(r.token, 30 * 86400), Location: "/cliente#invitacion", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).end(), true;
+      return res.writeHead(303, { "Set-Cookie": cookie(r.token, 30 * 86400), Location: u.pedirCodigo ? "/cliente#invitacion" : "/cliente#enlace", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).end(), true;
     }
     if (!p.startsWith("/api/")) return false;
 
@@ -202,7 +202,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (p === "/api/yo" && req.method === "GET") {
       const acc = sessionOf(req);
       if (!acc) return send(res, 200, { cliente: null }), true; // invitado: sin sesión no es un error (la consola del navegador queda limpia)
-      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode, carrito: "vm_carrito_c_" + String(acc.customerId) } }), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
+      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode, soloVer: !!acc.soloVer, mensajeEnlace: acc.mensajeEnlace || "", carrito: "vm_carrito_c_" + String(acc.customerId) } }), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
     }
 
     // El cliente cambia el código de entrada (los 6 del NIF) por uno personal de 6 letras o números

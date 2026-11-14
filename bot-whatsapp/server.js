@@ -73,6 +73,7 @@ async function refreshCatalog() {
 
 const { PORT = 3000, VERIFY_TOKEN, WHATSAPP_TOKEN, PHONE_NUMBER_ID, APP_SECRET, OWNER_PHONE } = process.env;
 const API = process.env.WHATSAPP_API_URL ?? `https://graph.facebook.com/v21.0/${PHONE_NUMBER_ID}/messages`; // la variable solo sirve para pruebas
+const SOLO_VER_TEXTO = "Has entrado con un enlace de solo consulta: puedes ver el catálogo, pero no enviar pedidos. Si quieres pedir, llama a la oficina o entra con tu código.";
 const SESSION_TTL = 24 * 60 * 60 * 1000;
 // Dirección pública del servidor (HTTPS) para el enlace a la mini-aplicación de pedido
 const PUBLIC_URL = (process.env.PUBLIC_URL ?? `http://localhost:${PORT}`).replace(/\/$/, "");
@@ -540,6 +541,7 @@ async function accountChat(account, text, msgId, carrito = null) {
   cur = { ...cur, customer }; // datos al día (precios especiales, historial)
   const out = handleMessage(cur, text, { carritoExterno: itemsDeCarrito(carrito) });
   chatSessions.set(account.id, { session: out.session, last: Date.now() });
+  if (out.order && account.soloVer) { out.order = null; out.reply = SOLO_VER_TEXTO; } // enlace de «solo ver»: nada se envía
   if (out.order) {
     const key = `chat:${account.id}:${msgId ?? crypto.randomUUID()}`; // el mismo mensaje reenviado no duplica el pedido
     const { order: guardado } = await createOrder(priceOrder({ at: new Date().toISOString(), phone: account.phone, key, ...holdIfUnconfirmed(account, out.order) }, customer, catalogNow()));
@@ -683,6 +685,7 @@ async function appRoutes(req, res, url) {
       business: BUSINESS.name,
       priceNote: BUSINESS.priceNote,
       condiciones: condicionesPedido(),
+      soloVer: !!account.soloVer, // enlace de «solo ver»: la página no deja enviar y el servidor tampoco
       customer: { name: customer.name, address: customer.address, codigo: String(customer.id ?? ""), re: !!customer.recargoEquivalencia },
       used: false,
       favs: getAccountsDb().favorites(account.customerId),
@@ -869,6 +872,7 @@ async function appRoutes(req, res, url) {
   if (p === "/catalogo" && req.method === "POST") {
     await refreshCatalog(); // el pedido se calcula con los precios y ofertas de ahora mismo
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (account.soloVer) return void sendJson(res, 403, { error: SOLO_VER_TEXTO, soloVer: true }); // enlace de «solo ver»: el servidor no deja enviar pedidos, se haga como se haga
     if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
     const body = await readJson(req);
     const key = typeof body?.key === "string" && /^[\w-]{8,64}$/.test(body.key) ? body.key : null;

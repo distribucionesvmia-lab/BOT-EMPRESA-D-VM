@@ -1,6 +1,7 @@
 // Rutas HTTP de la EMPRESA (el empresario): pedidos recibidos y su exportación a Excel, solicitudes de alta de
 // clientes y cuentas. Es una aplicación aparte de la del cliente: todo va bajo /api/admin y exige la clave de la empresa.
 import { deliveryInfo, madridDay } from "./delivery.js";
+import { opcionesInvitacion, plantillaValida, textoWhatsapp, PLANTILLA_DEFECTO } from "./invitaciones.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -276,18 +277,34 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
         return send(res, 200, { ok: true, ...r }), true;
       } catch (e) { return send(res, 400, { error: e.message, ...(e.existe ? { existe: true } : {}) }), true; }
     }
-    // ---- Enlace de invitación: la oficina lo crea para un cliente (un solo uso, 7 días) y lo manda ELLA por WhatsApp; el sistema no envía nada ----
+    // ---- Enlace de invitación: la oficina lo crea para un cliente y lo manda ELLA por WhatsApp; el sistema no envía nada ----
+    // Opciones por enlace (invitaciones.js): días o fecha (y hora) de caducidad, usos con tope, mensaje de bienvenida, solo ver o también pedir, y si se le pide poner su código.
     { const mi = /^\/api\/admin\/clientes\/([^/]+)\/invitacion$/.exec(p);
       if (mi && post) {
         const cli = customers.getById(decodeURIComponent(mi[1]));
         if (!cli) return send(res, 404, { error: "No encontramos ese cliente." }), true;
         const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/\/$/, "");
         if (!/^https?:\/\//.test(base)) return send(res, 409, { error: "Falta la dirección pública de la aplicación del cliente: ponla en CLIENTE_URL (en C:\\vm\\config) o abre una vez la aplicación del cliente desde su dirección pública." }), true;
-        const { token, caduca } = accounts.invitacionCrear(cli.id, { dias: 7 });
+        const op = opcionesInvitacion((await readJson(req)) ?? {});
+        if (op.error) return send(res, 400, { error: op.error }), true;
+        const { token, caduca } = accounts.invitacionCrear(cli.id, op);
         const url = `${base}/entrar/${token}`, tel = String(cli.phone ?? cli.phones?.[0] ?? "").replace(/\D/g, "").replace(/^(0034|34)/, "");
-        const texto = `Hola, este es tu enlace para pedir a Distribuciones Valentín Martín: ${url}\n(Sirve una sola vez y hasta el ${caduca.slice(0, 10).split("-").reverse().join("/")}.)`;
-        return send(res, 200, { ok: true, cliente: cli.name, url, caduca, texto, whatsapp: `https://wa.me/${/^\d{9}$/.test(tel) ? "34" + tel : ""}?text=${encodeURIComponent(texto)}`, tieneTelefono: /^\d{9}$/.test(tel) }), true;
+        const texto = textoWhatsapp(accounts.ajuste("plantilla_enlace"), { nombre: cli.name, url, usos: op.usos, expiresAt: caduca });
+        return send(res, 200, { ok: true, cliente: cli.name, url, caduca, usos: op.usos, soloVer: op.soloVer, pedirCodigo: op.pedirCodigo, texto, whatsapp: `https://wa.me/${/^\d{9}$/.test(tel) ? "34" + tel : ""}?text=${encodeURIComponent(texto)}`, tieneTelefono: /^\d{9}$/.test(tel) }), true;
       } }
+    // Lista de enlaces (sin el enlace en sí: no se guarda) y «Anular»
+    if (p === "/api/admin/invitaciones" && get) {
+      const nom = (id) => customers.getById(id)?.name ?? "Cliente " + id;
+      return send(res, 200, { enlaces: accounts.invitacionesLista().map((x) => ({ ...x, nombre: nom(x.cliente) })), plantilla: accounts.ajuste("plantilla_enlace") || PLANTILLA_DEFECTO, plantillaDefecto: PLANTILLA_DEFECTO }), true;
+    }
+    { const ma = /^\/api\/admin\/invitaciones\/(\d+)\/anular$/.exec(p);
+      if (ma && post) return accounts.invitacionAnular(ma[1]) ? send(res, 200, { ok: true }) : send(res, 409, { error: "Ese enlace ya estaba usado, caducado o anulado." }), true; }
+    if (p === "/api/admin/invitaciones/plantilla" && post) {
+      const b = (await readJson(req)) ?? {}, v = b?.restaurar ? { texto: PLANTILLA_DEFECTO } : plantillaValida(b?.texto);
+      if (v.error) return send(res, 400, { error: v.error }), true;
+      accounts.ajusteGuardar("plantilla_enlace", v.texto);
+      return send(res, 200, { ok: true, plantilla: v.texto }), true;
+    }
     // ---- Errores de la app del cliente (últimos 7 días): recuento por tipo, por cliente y por API ----
     if (p === "/api/admin/errores" && get) {
       const r = accounts.erroresResumen({ dias: Math.min(30, Math.max(1, Number(url.searchParams.get("dias") ?? 7) || 7)) });

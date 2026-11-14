@@ -95,6 +95,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   db.exec("CREATE INDEX IF NOT EXISTS idx_errores_at ON errores_app(at)");
   db.exec("CREATE TABLE IF NOT EXISTS invitaciones (id INTEGER PRIMARY KEY AUTOINCREMENT, token_hash TEXT NOT NULL UNIQUE, customer_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT, motivo TEXT)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_invitaciones_cliente ON invitaciones(customer_id)");
+  // Opciones del enlace (días y hora ya van en expires_at): cuántos usos, mensaje de bienvenida, solo ver o también pedir, y si se le pide poner su código
+  addCol("invitaciones", "max_uses", "INTEGER NOT NULL DEFAULT 1"); addCol("invitaciones", "uses", "INTEGER NOT NULL DEFAULT 0");
+  addCol("invitaciones", "welcome", "TEXT"); addCol("invitaciones", "solo_ver", "INTEGER NOT NULL DEFAULT 0"); addCol("invitaciones", "pedir_codigo", "INTEGER NOT NULL DEFAULT 1");
+  addCol("sessions", "solo_ver", "INTEGER NOT NULL DEFAULT 0"); addCol("sessions", "welcome", "TEXT"); addCol("sessions", "pedir_codigo", "INTEGER NOT NULL DEFAULT 1"); // la sesión abierta con un enlace recuerda con qué condiciones
   db.exec("CREATE TABLE IF NOT EXISTS bienvenida_vista (customer_id TEXT PRIMARY KEY, at TEXT NOT NULL)"); // la tarjeta de bienvenida ya cerrada («Entendido»), por cliente
   db.exec("CREATE TABLE IF NOT EXISTS corte_pref (customer_id TEXT PRIMARY KEY, activo INTEGER NOT NULL)"); // «Avisarme antes de la hora límite»: sin fila = activado (si tiene los avisos del móvil activados)
   db.exec("CREATE TABLE IF NOT EXISTS corte_avisos (customer_id TEXT NOT NULL, day TEXT NOT NULL, PRIMARY KEY (customer_id, day))"); // un aviso por día y cliente como máximo
@@ -260,33 +264,48 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         ultimos: q("SELECT at, customer_id AS cliente, tipo, pantalla, api, estado, mensaje, navegador FROM errores_app WHERE at >= ? ORDER BY id DESC LIMIT 25", desde),
       };
     },
-    /** Crea un enlace de invitación (32 bytes aleatorios) para un cliente. Los anteriores sin usar de ese cliente dejan de valer. Devuelve { token, caduca }; el token no se guarda. */
-    invitacionCrear(customerId, { dias = 7, now = new Date().toISOString() } = {}) {
-      const token = crypto.randomBytes(32).toString("base64url"), caduca = new Date(new Date(now).getTime() + dias * 86_400_000).toISOString();
+    /** Crea un enlace de invitación (32 bytes aleatorios) para un cliente. Los anteriores sin usar de ese cliente dejan de valer. Devuelve { token, caduca }; el token no se guarda.
+     *  Opciones ya validadas (invitaciones.js): expiresAt, usos (tope), mensaje, soloVer, pedirCodigo. */
+    invitacionCrear(customerId, { dias = 7, expiresAt = null, usos = 1, mensaje = "", soloVer = false, pedirCodigo = true, now = new Date().toISOString() } = {}) {
+      const token = crypto.randomBytes(32).toString("base64url"), caduca = expiresAt ?? new Date(new Date(now).getTime() + dias * 86_400_000).toISOString();
       db.exec("BEGIN IMMEDIATE");
       try {
         db.prepare("UPDATE invitaciones SET used_at = ?, motivo = 'sustituida' WHERE customer_id = ? AND used_at IS NULL").run(now, String(customerId));
-        db.prepare("INSERT INTO invitaciones (token_hash, customer_id, created_at, expires_at) VALUES (?, ?, ?, ?)").run(huellaInv(token), String(customerId), now, caduca);
+        db.prepare("INSERT INTO invitaciones (token_hash, customer_id, created_at, expires_at, max_uses, welcome, solo_ver, pedir_codigo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(huellaInv(token), String(customerId), now, caduca, usos, mensaje || null, soloVer ? 1 : 0, pedirCodigo ? 1 : 0);
         db.exec("COMMIT");
       } catch (e) { db.exec("ROLLBACK"); throw e; }
       return { token, caduca };
     },
-    /** Sin gastarlo: { ok:true, customerId } o { ok:false, motivo:'desconocida'|'usada'|'caducada' }. */
+    /** Sin gastarlo: { ok:true, customerId, soloVer, mensaje, pedirCodigo, usosMax } o { ok:false, motivo:'desconocida'|'usada'|'caducada' }. */
     invitacionVer(token, now = new Date().toISOString()) {
-      const r = db.prepare("SELECT customer_id, expires_at, used_at FROM invitaciones WHERE token_hash = ?").get(huellaInv(token));
+      const r = db.prepare("SELECT customer_id, expires_at, used_at, uses, max_uses, welcome, solo_ver, pedir_codigo FROM invitaciones WHERE token_hash = ?").get(huellaInv(token));
       if (!r) return { ok: false, motivo: "desconocida" };
-      if (r.used_at) return { ok: false, motivo: "usada" };
+      if (r.used_at || r.uses >= r.max_uses) return { ok: false, motivo: "usada" };
       if (r.expires_at <= now) return { ok: false, motivo: "caducada" };
-      return { ok: true, customerId: r.customer_id };
+      return { ok: true, customerId: r.customer_id, soloVer: !!r.solo_ver, mensaje: r.welcome ?? "", pedirCodigo: !!r.pedir_codigo, usosMax: r.max_uses };
     },
-    /** La gasta (una sola vez, atómico): dos personas con el mismo enlace no pueden entrar las dos. */
+    /** La gasta (atómico): con un solo uso, dos personas con el mismo enlace no pueden entrar las dos; con varios, nunca más del tope. */
     invitacionUsar(token, now = new Date().toISOString()) {
       const v = this.invitacionVer(token, now); if (!v.ok) return v;
-      const c = db.prepare("UPDATE invitaciones SET used_at = ?, motivo = 'usada' WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?").run(now, huellaInv(token), now).changes;
+      const c = db.prepare("UPDATE invitaciones SET uses = uses + 1, used_at = CASE WHEN uses + 1 >= max_uses THEN ? ELSE NULL END, motivo = CASE WHEN uses + 1 >= max_uses THEN 'usada' ELSE motivo END WHERE token_hash = ? AND used_at IS NULL AND uses < max_uses AND expires_at > ?").run(now, huellaInv(token), now).changes;
       return c === 1 ? v : { ok: false, motivo: "usada" };
     },
-    /** Entra como ese cliente con un enlace de invitación ya gastado (la oficina responde por él): abre sesión y deja la cuenta confirmada. */
-    entrarPorInvitacion(customerId, now = new Date().toISOString()) { return this.loginNif([String(customerId)], () => true, now); },
+    /** Lista para el panel (nunca el enlace): estado = activo | agotado | caducado | anulado | sustituido. */
+    invitacionesLista({ limite = 100, now = new Date().toISOString() } = {}) {
+      return db.prepare("SELECT id, customer_id, created_at, expires_at, used_at, motivo, uses, max_uses, solo_ver, pedir_codigo, welcome FROM invitaciones ORDER BY id DESC LIMIT ?").all(Math.min(300, limite)).map((r) => ({
+        id: r.id, cliente: r.customer_id, creado: r.created_at, caduca: r.expires_at, usos: r.uses, usosMax: r.max_uses, soloVer: !!r.solo_ver, pedirCodigo: !!r.pedir_codigo, conMensaje: !!r.welcome,
+        estado: r.motivo === "anulada" ? "anulado" : r.motivo === "sustituida" ? "sustituido" : r.used_at ? "agotado" : r.expires_at <= now ? "caducado" : "activo",
+      }));
+    },
+    /** «Anular»: el enlace deja de valer YA (si no estaba ya gastado o anulado). Las sesiones ya abiertas con él siguen (el cliente ya entró). */
+    invitacionAnular(id, now = new Date().toISOString()) { return db.prepare("UPDATE invitaciones SET used_at = ?, motivo = 'anulada' WHERE id = ? AND used_at IS NULL").run(now, Number(id)).changes === 1; },
+    /** Entra como ese cliente con un enlace de invitación ya gastado (la oficina responde por él): abre sesión y deja la cuenta confirmada.
+     *  La sesión recuerda si solo puede ver, el mensaje de bienvenida y si se le pide poner su código. */
+    entrarPorInvitacion(customerId, { soloVer = false, mensaje = "", pedirCodigo = true } = {}, now = new Date().toISOString()) {
+      const r = this.loginNif([String(customerId)], () => true, now);
+      if (r.ok && r.token) db.prepare("UPDATE sessions SET solo_ver = ?, welcome = ?, pedir_codigo = ? WHERE token_hash = ?").run(soloVer ? 1 : 0, mensaje || null, pedirCodigo ? 1 : 0, sha(r.token));
+      return r;
+    },
     /** Tarjeta de bienvenida: ¿ya la cerró este cliente con «Entendido»? */
     bienvenidaVista: (customerId) => !!db.prepare("SELECT 1 FROM bienvenida_vista WHERE customer_id = ?").get(String(customerId)),
     bienvenidaMarcar(customerId, now = new Date().toISOString()) { db.prepare("INSERT OR IGNORE INTO bienvenida_vista (customer_id, at) VALUES (?, ?)").run(String(customerId), now); return true; },
@@ -524,10 +543,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     /** Cuenta de una sesión válida (activa y sin caducar), o null. */
     sessionAccount(token, now = new Date().toISOString()) {
       if (!token || typeof token !== "string") return null;
-      const s = db.prepare("SELECT account_id, expires_at FROM sessions WHERE token_hash = ?").get(sha(token));
+      const s = db.prepare("SELECT account_id, expires_at, solo_ver, welcome, pedir_codigo FROM sessions WHERE token_hash = ?").get(sha(token));
       if (!s || s.expires_at < now) return null;
       const a = byId.get(s.account_id);
-      return a && a.status === "active" ? accountOut(a) : null;
+      return a && a.status === "active" ? { ...accountOut(a), soloVer: !!s.solo_ver, mensajeEnlace: s.welcome ?? "", pedirCodigo: !!s.pedir_codigo } : null;
     },
     logout: (token) => void db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(sha(String(token))),
 

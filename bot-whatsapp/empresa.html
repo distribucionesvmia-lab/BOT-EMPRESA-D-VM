@@ -187,9 +187,29 @@
       <p class="muted" id="cue-todas" hidden style="margin:0 0 10px"><button class="main" id="cue-todas-b" type="button"></button> <span>Confirma de golpe todas las cuentas que aún están sin confirmar.</span></p>
       <div class="card" id="inv-card" style="margin:0 0 14px">
         <h3 style="margin:0 0 4px">Enlace de acceso para un cliente</h3>
-        <p class="muted" style="margin:0 0 8px">Crea un enlace de un solo uso (vale 7 días) para que un cliente entre sin escribir nada y ponga su código de entrada. <b>Lo mandas tú</b>: el sistema no envía nada.</p>
-        <div style="display:grid;gap:6px"><input id="inv-q" type="search" placeholder="Busca el cliente por nombre o código" aria-label="Buscar cliente para el enlace"><select id="inv-sel" aria-label="Cliente"></select><button class="main" id="inv-crear" type="button">Crear enlace de acceso</button></div>
+        <p class="muted" style="margin:0 0 8px">Crea un enlace para que un cliente entre sin escribir nada. Tú eliges cuánto vale, cuántas veces se puede usar y si solo puede mirar o también pedir. <b>Lo mandas tú</b>: el sistema no envía nada.</p>
+        <div style="display:grid;gap:6px"><input id="inv-q" type="search" placeholder="Busca el cliente por nombre o código" aria-label="Buscar cliente para el enlace"><select id="inv-sel" aria-label="Cliente"></select></div>
+        <div class="inv-opc" style="display:grid;gap:8px;margin-top:10px">
+          <label>Cuánto vale el enlace
+            <select id="inv-dias" aria-label="Días que vale el enlace"><option value="1">1 día</option><option value="3">3 días</option><option value="7" selected>7 días</option><option value="30">30 días</option><option value="fecha">Hasta una fecha…</option></select></label>
+          <label id="inv-fecha-l" hidden>Fecha en la que caduca <input id="inv-fecha" type="date" aria-label="Fecha de caducidad"></label>
+          <label>Hora de caducidad (opcional, hora de Madrid) <input id="inv-hora" type="time" aria-label="Hora de caducidad"></label>
+          <label>Cuántas veces se puede usar (de 1 a 20) <input id="inv-usos" type="number" min="1" max="20" step="1" value="1" inputmode="numeric" aria-label="Usos del enlace"></label>
+          <label>Qué puede hacer el cliente
+            <select id="inv-modo" aria-label="Qué puede hacer"><option value="pedir" selected>Ver el catálogo y pedir</option><option value="ver">Solo ver el catálogo (no puede enviar pedidos)</option></select></label>
+          <label style="display:flex;gap:8px;align-items:center"><input id="inv-codigo" type="checkbox" checked> Pedirle que ponga su código de entrada al entrar</label>
+          <label>Mensaje de bienvenida (opcional; lo ve al entrar) <input id="inv-msg-b" type="text" maxlength="300" placeholder="Hola Pablo, aquí tienes tu enlace" aria-label="Mensaje de bienvenida"></label>
+          <button class="main" id="inv-crear" type="button">Crear enlace de acceso</button>
+        </div>
+        <details style="margin-top:10px"><summary>Texto del WhatsApp (editable)</summary>
+          <p class="muted" style="margin:6px 0">Escribe el mensaje que mandarás. Pon <b>{enlace}</b> donde va el enlace (obligatorio). También valen <b>{nombre}</b>, <b>{usos}</b> y <b>{caduca}</b>.</p>
+          <textarea id="inv-plantilla" rows="4" maxlength="500" style="width:100%" aria-label="Texto del WhatsApp"></textarea>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="main" id="inv-pl-g" type="button">Guardar texto</button><button id="inv-pl-r" type="button">Volver al texto de siempre</button></div><div class="muted" id="inv-pl-msg" role="status"></div>
+        </details>
         <div id="inv-res" hidden style="margin-top:10px;display:grid;gap:6px"><input id="inv-url" readonly aria-label="Enlace creado"><div class="muted" id="inv-info"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="main" id="inv-copiar" type="button">Copiar enlace</button><button id="inv-wa" type="button">Abrir en WhatsApp</button></div><div class="muted" id="inv-msg" role="status"></div></div>
+        <h4 style="margin:14px 0 6px">Enlaces creados</h4>
+        <p class="muted" id="inv-vacio" hidden style="margin:0">Todavía no has creado ningún enlace.</p>
+        <div class="scroll"><table><thead><tr><th>Cliente</th><th>Estado</th><th>Usos</th><th>Caduca</th><th>Qué puede hacer</th><th></th></tr></thead><tbody id="inv-lista"></tbody></table></div>
       </div>
       <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
       <h2 style="margin-top:22px">Uso de la aplicación (últimos 30 días)</h2>
@@ -730,12 +750,30 @@ $("av-destino").onchange = () => { $("av-uno").hidden = $("av-destino").value !=
 // Enlace de invitación (un solo uso, 7 días): lo crea la oficina y lo manda ella misma
 let tInv = 0, invActual = null;
 $("inv-q").oninput = () => { clearTimeout(tInv); tInv = setTimeout(async () => { const q = $("inv-q").value.trim(), sel = $("inv-sel"); sel.innerHTML = ""; if (q.length < 2) return; const r = await call("/api/admin/clientes?q=" + encodeURIComponent(q)).catch(() => []); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); if (!r.length) sel.appendChild(el("option", "Ningún cliente con ese nombre", { value: "" })); }, 300); };
+const fechaEs = (iso) => new Date(iso).toLocaleString("es-ES", { timeZone: "Europe/Madrid", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+$("inv-dias").onchange = () => { $("inv-fecha-l").hidden = $("inv-dias").value !== "fecha"; };
+async function invitaciones() {
+  const r = await call("/api/admin/invitaciones").catch(() => null); if (!r) return;
+  if (document.activeElement !== $("inv-plantilla")) $("inv-plantilla").value = r.plantilla;
+  const tb = $("inv-lista"); tb.innerHTML = ""; $("inv-vacio").hidden = r.enlaces.length > 0;
+  const ESTADO = { activo: "Activo", agotado: "Usado", caducado: "Caducado", anulado: "Anulado", sustituido: "Sustituido por otro" };
+  for (const x of r.enlaces) {
+    const tr = document.createElement("tr"), acc = el("td");
+    if (x.estado === "activo") { const b = el("button", "Anular"); b.type = "button"; b.onclick = async () => { if (!confirm(`¿Anular el enlace de ${x.nombre}? Dejará de funcionar ahora mismo.`)) return; const a = await call(`/api/admin/invitaciones/${x.id}/anular`, {}).catch((e) => ({ error: e.message })); if (a?.error) alert(a.error); invitaciones(); }; acc.append(b); }
+    tr.append(el("td", x.nombre), el("td", ESTADO[x.estado] ?? x.estado), el("td", `${x.usos} de ${x.usosMax}`), el("td", fechaEs(x.caduca)), el("td", (x.soloVer ? "Solo ver" : "Ver y pedir") + (x.pedirCodigo ? "" : " · sin pedir código") + (x.conMensaje ? " · con mensaje" : "")), acc); tb.appendChild(tr);
+  }
+}
+$("inv-pl-g").onclick = async () => { const r = await call("/api/admin/invitaciones/plantilla", { texto: $("inv-plantilla").value }).catch((e) => ({ error: e.message })); $("inv-pl-msg").textContent = r?.error || "Texto guardado."; };
+$("inv-pl-r").onclick = async () => { const r = await call("/api/admin/invitaciones/plantilla", { restaurar: true }).catch((e) => ({ error: e.message })); if (r?.plantilla) $("inv-plantilla").value = r.plantilla; $("inv-pl-msg").textContent = r?.error || "Vuelve a estar el texto de siempre."; };
 $("inv-crear").onclick = async () => {
   const id = $("inv-sel").value, m = $("inv-msg"); m.textContent = ""; if (!id) { m.textContent = "Busca y elige un cliente."; $("inv-res").hidden = false; return; }
-  const r = await call("/api/admin/clientes/" + encodeURIComponent(id) + "/invitacion", {}).catch((e) => ({ error: e.message }));
+  const dias = $("inv-dias").value, cuerpo = { hora: $("inv-hora").value || "", usos: Number($("inv-usos").value), modo: $("inv-modo").value, pedirCodigo: $("inv-codigo").checked, mensaje: $("inv-msg-b").value };
+  if (dias === "fecha") { cuerpo.fecha = $("inv-fecha").value; if (!cuerpo.fecha) { $("inv-res").hidden = false; $("inv-url").value = ""; $("inv-info").textContent = ""; m.textContent = "Elige la fecha en la que caduca."; return; } } else cuerpo.dias = Number(dias);
+  const r = await call("/api/admin/clientes/" + encodeURIComponent(id) + "/invitacion", cuerpo).catch((e) => ({ error: e.message }));
   if (!r || r.error) { $("inv-res").hidden = false; $("inv-url").value = ""; $("inv-info").textContent = ""; m.textContent = (r && r.error) || "No se ha podido crear el enlace."; return; }
-  invActual = r; $("inv-res").hidden = false; $("inv-url").value = r.url; $("inv-info").textContent = `Para ${r.cliente}. Un solo uso; caduca el ${r.caduca.slice(0, 10).split("-").reverse().join("/")}. Si creas otro para este cliente, este deja de valer.`;
+  invActual = r; $("inv-res").hidden = false; $("inv-url").value = r.url; $("inv-info").textContent = `Para ${r.cliente}. ${r.usos === 1 ? "Un solo uso" : "Hasta " + r.usos + " usos"}; caduca el ${fechaEs(r.caduca)}. ${r.soloVer ? "Solo puede ver el catálogo. " : ""}Si creas otro para este cliente, este deja de valer.`;
   $("inv-wa").disabled = !r.tieneTelefono; $("inv-wa").title = r.tieneTelefono ? "" : "Este cliente no tiene teléfono guardado: copia el enlace y mándalo tú";
+  invitaciones();
 };
 $("inv-copiar").onclick = async () => { const u = $("inv-url").value; if (!u) return; try { await navigator.clipboard.writeText(u); $("inv-msg").textContent = "Enlace copiado."; } catch { $("inv-url").select(); $("inv-msg").textContent = "Selecciónalo y cópialo (Ctrl+C)."; } };
 $("inv-wa").onclick = () => { if (invActual?.whatsapp) window.open(invActual.whatsapp, "_blank", "noopener"); };
@@ -795,7 +833,7 @@ async function avisos() {
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b))); if (b.dataset.t === "avisos") avisosClientes().catch(() => {});
