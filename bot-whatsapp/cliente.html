@@ -987,9 +987,17 @@ function burbuja(texto, clase) {
   if (clase === "in") { const av = document.createElement("div"); av.className = "av"; av.textContent = "VM"; av.setAttribute("aria-hidden", "true"); fila.appendChild(av); }
   const d = document.createElement("div"); d.className = "m " + clase;
   const esc = texto.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-  d.innerHTML = sinEmoji(esc).replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/_([^_\n]+)_/g, "<i>$1</i>");
+  d.innerHTML = (clase === "in" ? sinEmoji(esc) : esc).replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/_([^_\n]+)_/g, "<i>$1</i>");
   const t = document.createElement("time"); t.textContent = hora(); d.appendChild(t);
-  fila.appendChild(d); chat.appendChild(fila); chat.scrollTop = chat.scrollHeight;
+  fila.appendChild(d); chat.appendChild(fila);
+  // Una respuesta más alta que la pantalla se lee desde su PRINCIPIO (antes se saltaba al final y el comienzo quedaba oculto hasta hacer scroll)
+  ancla = clase === "in" && fila.offsetHeight > chat.clientHeight * 0.7 ? fila : null;
+  alFinal();
+}
+let ancla = null;
+function alFinal() {
+  if (ancla?.isConnected) { chat.scrollTop = Math.max(0, ancla.getBoundingClientRect().top - chat.getBoundingClientRect().top + chat.scrollTop - 8); return; }
+  chat.scrollTop = chat.scrollHeight;
 }
 function escribiendo(on) {
   document.getElementById("typing")?.remove();
@@ -997,7 +1005,7 @@ function escribiendo(on) {
   const fila = document.createElement("div"); fila.className = "mrow in"; fila.id = "typing"; fila.setAttribute("aria-hidden", "true");
   const av = document.createElement("div"); av.className = "av"; av.textContent = "VM";
   const d = document.createElement("div"); d.className = "m in typing"; d.innerHTML = "<i></i><i></i><i></i>";
-  fila.append(av, d); chat.appendChild(fila); chat.scrollTop = chat.scrollHeight;
+  fila.append(av, d); chat.appendChild(fila); if (!ancla?.isConnected) chat.scrollTop = chat.scrollHeight;
 }
 const eur = (n) => Number(n).toFixed(2).replace(".", ",") + " €";
 
@@ -1014,7 +1022,7 @@ function tarjetaTabla(card) {
   const ft = t.createTFoot().insertRow(); const a = ft.insertCell(); a.colSpan = 2; a.textContent = card.conIva ? "Total con IVA" : "Total"; const b = ft.insertCell(); b.className = "c-imp"; b.textContent = card.total == null ? "No disponible" : eur(card.total);
   c.append(h, t);
   if (card.doc) { const pb = el("button", "vm-btn ghost t-pdf", "Ver / imprimir PDF"); pb.type = "button"; pb.onclick = () => abrirPdf(urlPdfDe(card.doc), "Pedido " + card.doc); c.appendChild(pb); }
-  chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
+  chat.appendChild(c); alFinal();
 }
 // ── Estados vacíos y de error: icono de línea de 48 px, título, una frase y UN botón ──
 const ICONOS_ESTADO = { reloj: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', nube: '<path d="M7 18a4 4 0 0 1-.5-7.970A5.500 5.500 0 0 1 17 8.500a4.500 4.500 0 0 1 .5 9.500zM4 4l16 16"/>', repetir: '<path d="M4 12a8 8 0 0 1 14-5.300L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.300L4 15M4 20v-5h5"/>' };
@@ -1171,7 +1179,7 @@ function interactivo(ui) {
     ui.rows.forEach((r) => { const row = document.createElement("div"); row.className = "row"; const a = document.createElement("b"); a.textContent = r.title; const d = document.createElement("small"); d.textContent = r.description; row.append(a, d); row.onclick = () => enviar(r.id, r.title); sheet.appendChild(row); });
     sheet.hidden = false;
   }));
-  chat.appendChild(box); chat.scrollTop = chat.scrollHeight;
+  chat.appendChild(box); alFinal();
 }
 async function enviar(texto, etiqueta, silencioso) {
   document.querySelectorAll(".ui").forEach((u) => u.classList.add("usado")); sheet.hidden = true;

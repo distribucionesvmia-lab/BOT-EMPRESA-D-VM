@@ -128,3 +128,11 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - Cantidad, «−/+» y «Quitar» del carrito: mínimo 44 × 44 px.
 - Nombres: acceso de abajo = «Lo habitual» (página «Lo que sueles pedir»); menú de cuenta = «Histórico de pedidos».
 - Redondeo (2 × 151,29 = 302,57): NO es fallo; el IVA se redondea una vez por tipo sobre la base sumada, igual que a3ERP. No cambiar.
+
+## Tanda 6 de fallos (asistente de pedidos del chat)
+- **Pedido escrito con varios artículos** (`bot-whatsapp/pedidolibre.js`, `interpretarPedido`): el mensaje se parte en trozos (comas, «y», «;») y cada artículo se procesa por separado: lo claro se anota; lo ambiguo se pregunta UNO detrás de otro (`s.pendientes`, conserva la cantidad y las cajas: «2 cajas de X y 3 de Y» → las 3 de Y también son cajas); lo que no existe se dice y no se cambia por otra cosa. «Dime el total / pero no confirmes»: se da el total de lo anotado y NUNCA se confirma solo. Los mensajes con varias cosas se saltan el asistente de preguntas (`esPedidoMultiple`).
+- **Coincidencias**: deben encajar TODAS las palabras del artículo principal («café en grano 1kg» ya no sale «BORGES NUEZ GRANO 1KG»; «grano», «1kg» y «zero» solo afinan). Formato que no existe (`barril`, garrafa…): se dice y se ofrecen alternativas, no se añade otro formato. Medida (1 kg, 1,5 l) y matiz («sin alcohol», «normal» = sin zero/light) también. Erratas «de oído» (`fon`: k↔c/qu, ll↔y, v↔b, z↔s, sin h): se pide confirmar antes de añadir.
+- **Necesidades** («algo para limpiar la plancha», `recomendarPara` en `asistente.js`): solo artículos que sirven (desengrasantes…), nunca lejía; si no hay, pregunta o ofrece «persona». Añadir más necesidades en `NECESIDADES`.
+- Respuestas nuevas: «¿cuánto llevo?» (artículos y total con IVA), «¿hacéis factura?» (no inventa la política: llamar a la oficina o «persona»; recuerda que el PDF de Mi cuenta es informativo), emojis sueltos (🍺 = cerveza; los desconocidos tienen respuesta amable).
+- **Pantalla** (`cliente.html`): el mensaje propio conserva sus emojis; una respuesta más alta que la pantalla se lee desde su principio (`ancla`/`alFinal`).
+- Pruebas: `pedidolibre.test.js` (catálogo ficticio).

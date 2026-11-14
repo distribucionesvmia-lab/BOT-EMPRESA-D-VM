@@ -1,10 +1,11 @@
-import { BUSINESS, PRODUCTS } from "./config.js";
+import { BUSINESS, PRODUCTS, AYUDA } from "./config.js";
 import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRows, isYes, isNo, isDone, parseRemove, parseChangeQty, lev } from "./nlu.js";
 import { isTooGeneric } from "./identify.js";
 import { categorizar } from "./categorias.js";
 import { deliveryAllowed, longDate, puedeHoy, entregaHoyDisponible, AVISO_HOY } from "./delivery.js";
 import { priceLine, totals, soloCaja } from "./pricing.js";
 import { responder as responderAsistente } from "./asistente.js";
+import { interpretarPedido, esPedidoMultiple } from "./pedidolibre.js";
 
 const money = (n) => `${n.toFixed(2).replace(".", ",")} ${BUSINESS.currency}`; // «3,30 €», como en la web
 const moneyP = (n) => `${Number(n).toFixed(3).replace(".", ",")} ${BUSINESS.currency}`; // precio de un artículo: SIEMPRE con 3 decimales («1,665 €»)
@@ -308,6 +309,10 @@ const showList = (s, page = 0, lead = "Elige un artículo:") => {
 };
 
 const showCart = (s, lead = "") => {
+  if (s.pendientes?.length) { // quedan artículos por elegir (pedido con varias cosas): se sigue preguntando
+    const [n, ...resto] = s.pendientes; s.pendientes = resto;
+    return preguntarTipo(s, n, `${lead}${s.cart.length ? `🛒 *Hasta ahora:*\n${itemsText(s.cart)}\n\n` : ""}`, n.pregunta ?? null);
+  }
   s.state = "cart";
   return {
     reply: `${lead}🛒 *Tu pedido hasta ahora:*\n${itemsText(s.cart)}\n\n¿Qué quieres hacer?`,
@@ -326,7 +331,7 @@ function setCart(s, items) {
  * El cliente escribió algo genérico («agua», «2 cervezas», «vino») y hay varios artículos que encajan: no se elige ninguno,
  * se le pregunta qué tipo quiere y se le enseñan TODOS. Si existe una categoría con ese nombre (Aguas, Vinos…) se enseña esa.
  */
-function preguntarTipo(s, a, lead = "") {
+function preguntarTipo(s, a, lead = "", pregunta = null) {
   const compra = new Set((s.customer?.orders ?? []).flatMap((o) => o.lines.map((l) => String(l.productId))));
   const lista = a.productos.slice()
     .sort((x, y) => (compra.has(String(y.id)) ? 1 : 0) - (compra.has(String(x.id)) ? 1 : 0) || x.name.localeCompare(y.name, "es"));
@@ -334,7 +339,7 @@ function preguntarTipo(s, a, lead = "") {
   s.opciones = { query: a.query, qty: a.qty, unit: a.unit, unitStated: a.unitStated, ids: mostrados.map((p) => String(p.id)) };
   s.state = "menu";
   return {
-    reply: `${lead}¿Qué tipo de *${a.query}* quieres? Tenemos ${cuantos}${cuantos > mostrados.length ? ` (te enseño los primeros ${mostrados.length}; escribe el nombre para afinar)` : ""}. Elige uno de la lista:${a.qty ? `\n_Pediste ${a.qty}._` : ""}`,
+    reply: `${lead}${pregunta ?? `¿Qué tipo de *${a.query}* quieres? Tenemos ${cuantos}${cuantos > mostrados.length ? ` (te enseño los primeros ${mostrados.length}; escribe el nombre para afinar)` : ""}. Elige uno de la lista:`}${a.qty ? `\n_Pediste ${a.qty}._` : ""}`,
     session: s,
     ui: {
       type: "list", button: trunc(`Ver ${a.query}`, 20), section: trunc(a.query, 24),
@@ -343,6 +348,11 @@ function preguntarTipo(s, a, lead = "") {
   };
 }
 
+const SOLO_EMOJI = /^[\p{Extended_Pictographic}\uFE0F\u200D\s]+$/u;
+const EMOJI_PALABRA = { "🍺": "cerveza", "🍻": "cerveza", "💧": "agua", "🚰": "agua", "☕": "cafe", "🍷": "vino", "🍾": "cava", "🥂": "cava", "🥤": "refresco", "🧃": "zumo", "🥛": "leche", "🍞": "pan", "🧊": "hielo" };
+function noEntiendoEmoji(s) {
+  return { reply: "No sé qué producto es ese dibujo 🙂. Escríbeme lo que necesitas con palabras (por ejemplo _«2 cajas de cerveza»_) o pulsa *Hacer pedido*.", session: s, ui: s.link ? { type: "link", title: "Hacer pedido", url: s.link } : buttons(["h:open", "Hacer pedido"]) };
+}
 /** Todo lo que no sea pedir, último pedido, histórico o repetir: se dice claro y se ofrece hacer un pedido rápido. */
 function noEntiendo(s) {
   return {
@@ -381,7 +391,7 @@ function asistir(s, rawText, now, ctx) {
     catalogo: CATALOG, cliente: s.customer, habituales, ahora: now, ultimo: !!ultimo, recomendados: s.reco ?? [],
     precioOf: priceOf, upbOf,
     fmtPrecio: (p) => `${moneyP(priceOf(p))}${upbOf(p) ? ` · caja de ${upbOf(p)} (${money(priceOf(p) * upbOf(p))})` : ""}`,
-    caja: (p) => money(priceOf(p) * upbOf(p)), unidad: (p) => moneyP(priceOf(p)),
+    caja: (p) => money(priceOf(p) * upbOf(p)), unidad: (p) => moneyP(priceOf(p)), ayuda: AYUDA,
   });
   if (!r) return null;
   if (r.tipo === "pedido") return handleMessageInner(s, r.texto, ctx); // lo anota el intérprete de pedidos de siempre
@@ -396,6 +406,45 @@ function asistir(s, rawText, now, ctx) {
     ui = s.link ? { type: "link", title: "Hacer pedido", url: s.link } : buttons(["h:open", "Hacer pedido"]);
   }
   return { reply: r.reply, session: s, ...(ui ? { ui } : {}) };
+}
+
+// ── Pedido escrito con uno o varios artículos («ponme 2 cajas de coca cola y 3 de agua»): cada uno por separado (ver pedidolibre.js) ──
+const alt = (p) => `${p.name} (${upbOf(p) ? `${money(priceOf(p) * upbOf(p))} la caja de ${upbOf(p)}` : moneyP(priceOf(p))})`;
+function pedidoLibre(s, texto, lead = "") {
+  const compra = new Set((s.customer?.orders ?? []).flatMap((o) => o.lines.map((l) => String(l.productId))).concat((s.customer?.usual ?? []).map((u) => String(u.productId))));
+  const habituales = new Set(habitualProducts(s.customer).map((p) => String(p.id)));
+  const r = interpretarPedido(texto, { catalogo: CATALOG, habituales, bought: compra, precioOf: priceOf });
+  if (!r) return null;
+  const ask = [], pend = [], avisos = [];
+  let sugeridos = [];
+  for (const c of r.claros) { // lo que está claro se anota (si dice cajas o unidades; si no, se le pregunta como siempre)
+    const { unitStated, ...f } = mkItem(c.p, c.qty, c.unit, { unitStated: c.unitStated });
+    if (f.upb && !unitStated) ask.push(f); else addToCart(s, f);
+  }
+  const cuando = (d) => (d.qty != null ? `${d.texto}` : d.texto);
+  for (const d of r.dudas) {
+    const n = d.productos?.length ?? 0;
+    if (d.clase === "ambiguo") { pend.push({ query: d.query ?? d.texto, qty: d.qty, unit: d.unit, unitStated: d.unitStated, productos: d.productos }); avisos.push(`• *${cuando(d)}*: hay ${n} opciones parecidas, tienes que elegir cuál.`); }
+    else if (d.clase === "confirmar") { pend.push({ query: d.texto, qty: d.qty, unit: d.unit, unitStated: d.unitStated, productos: d.productos, pregunta: n === 1 ? `Has escrito «${d.texto}». ¿Te refieres a *${d.productos[0].name}*? Si es ese, tócalo en la lista; si no, escribe otra cosa.` : `Has escrito «${d.texto}», no estoy seguro de cuál es. ¿Cuál de estos quieres?` }); avisos.push(`• *${cuando(d)}*: no estoy seguro, necesito que me lo confirmes.`); }
+    else if (d.clase === "variante") { pend.push({ query: d.texto, qty: d.qty, unit: d.unit, unitStated: d.unitStated, productos: d.productos, pregunta: `No veo ningún artículo «${d.variante}» en el catálogo, así que no he añadido nada. Estos son los que tenemos de ese tipo: ¿de qué marca o cuál quieres?` }); avisos.push(`• *${cuando(d)}*: no encuentro «${d.variante}»; dime la marca o elige uno.`); }
+    else if (d.clase === "formato") { avisos.push(`• *${cuando(d)}*: no vendemos eso en ${d.formato.replace(/e?s$/, "")}, así que NO he añadido nada.${n ? ` Lo más parecido que tenemos: ${d.productos.slice(0, 3).map(alt).join("; ")}.` : ""}`); if (!sugeridos.length) sugeridos = d.productos; }
+    else if (d.clase === "medida") { avisos.push(`• *${cuando(d)}*: no tenemos ese tamaño (${d.medida}), no he añadido nada.${n ? ` Tenemos: ${d.productos.slice(0, 3).map(alt).join("; ")}.` : ""}`); if (!sugeridos.length) sugeridos = d.productos; }
+    else if (d.clase === "sin_coincidencia") { avisos.push(`• *${cuando(d)}*: no lo encuentro en el catálogo con seguridad, así que no he añadido nada.${n ? ` Por si te sirve: ${d.productos.slice(0, 3).map(alt).join("; ")}.` : " Prueba con la marca, o escribe *persona*."}`); if (!sugeridos.length) sugeridos = d.productos; }
+    else if (d.clase === "recomendar") { avisos.push(d.productos.length ? `• *${cuando(d)}*: te sirven ${d.productos.map(alt).join("; ")}.` : `• *${cuando(d)}*: ${d.mensaje ?? "dime un poco más."}`); if (!sugeridos.length) sugeridos = d.productos; }
+  }
+  s.pendientes = pend.slice(1);
+  s.reco = sugeridos.map((p) => String(p.id));
+  const cab = s.cart.length ? `✅ *Anotado.* Tu pedido hasta ahora:\n${itemsText(s.cart)}` : (r.pideTotal ? "Todavía no hay nada anotado con seguridad, así que no hay total." : "");
+  const soloUna = !s.cart.length && !r.claros.length && avisos.length === 1 && pend.length === 1; // una única pregunta: sin el resumen de dudas
+  const dudas = avisos.length && !soloUna ? `${cab ? "\n\n" : ""}❓ *Falta por decidir:*\n${avisos.join("\n")}` : "";
+  const fin = r.pideTotal || r.noConfirmar ? `\n\n_${r.pideTotal && avisos.length ? "El total es solo de lo que ya está anotado; falta lo pendiente. " : ""}No he confirmado nada: el pedido no se envía hasta que tú lo finalices._` : "";
+  const txt = `${lead}${cab}${dudas}${fin}`;
+  if (ask.length) { s.askUnit = ask; return askUnitReply(s, `${txt}\n\n`); }
+  if (pend.length) return preguntarTipo(s, pend[0], `${txt}\n\n`, pend[0].pregunta ?? null);
+  s.state = s.cart.length ? "cart" : "menu";
+  const multi = sugeridos.length ? { type: "multi", button: "Añadir al pedido", section: "Opciones", rows: sugeridos.slice(0, 8).map((p) => ({ id: `p:${p.id}`, title: trunc(p.name, 24), description: trunc(`${p.name} · ${moneyP(priceOf(p))}${upbOf(p) ? ` · caja de ${upbOf(p)}` : ""}`, 72) })) } : null;
+  const ui = multi ?? (s.cart.length ? buttons(["act:add", "Añadir otro"], ["act:done", "Finalizar"], ["act:clear", "Vaciar pedido"]) : undefined);
+  return { reply: `${txt}${s.cart.length && !multi ? "\n\n¿Qué quieres hacer?" : ""}`, session: s, ...(ui ? { ui } : {}) };
 }
 
 // Tabla de un pedido para la web (cantidad · producto · importe); el texto del mensaje sigue siendo el respaldo para WhatsApp
@@ -546,6 +595,11 @@ export function handleMessage(session, rawText, ctx = {}) {
 
 function handleMessageInner(session, rawText, ctx = {}) {
   const now = ctx.now ?? new Date().toISOString(); // el reloj se puede fijar en las pruebas
+  if (session?.customer && typeof rawText === "string" && SOLO_EMOJI.test(rawText)) { // «🍺» suelto: se entiende como la palabra que representa
+    const palabra = [...rawText].map((c) => EMOJI_PALABRA[c]).find(Boolean);
+    if (!palabra) return noEntiendoEmoji({ ...session, cart: [...(session.cart ?? [])] });
+    rawText = palabra;
+  }
   const text = norm(rawText || "");
   const s = { ...session, cart: [...(session.cart ?? [])] };
   const fresh = () => ({ ...newSession(s.customer, s.link, s.opts), byName: s.byName, unverified: s.unverified });
@@ -665,6 +719,14 @@ function handleMessageInner(session, rawText, ctx = {}) {
     return { ...greeting(s, true), session: s };
   }
 
+  // «¿cuánto llevo?»: lo que hay en el pedido y su total (nada se confirma)
+  if (s.customer && ["menu", "cart", "confirm", "items"].includes(s.state) && /^(?:y )?(?:cuanto|que) (?:llevo|va|tengo|hay)\b|^(?:y )?cuanto (?:es|son|sale|salen|va|suma|seria)\b.*\b(?:todo|total|ahora|ya|hasta ahora|llevo)\b|^(?:el )?total\b|^resumen\b|\bque llevo\b|\bcomo va (?:el|mi) (?:pedido|carrito|cesta)\b|^mi (?:pedido|carrito|cesta)\b/.test(limpia(text))) {
+    const items = (s.state === "confirm" || s.state === "items" ? getItems(s) : s.cart) ?? [];
+    if (!items.length) return { reply: "Todavía no has añadido nada a tu pedido. Escribe, por ejemplo, _\"2 cajas de agua\"_ o pulsa *Hacer pedido*.", session: s, ui: s.link ? { type: "link", title: "Hacer pedido", url: s.link } : buttons(["h:open", "Hacer pedido"]) };
+    return { reply: `🛒 *Tu pedido hasta ahora:*\n${itemsText(items)}\n\n_No he confirmado nada: el pedido no se envía hasta que tú lo finalices._`, session: s, ui: s.state === "confirm" ? buttons(["c:ok", "Confirmar"], ["c:more", "Añadir productos"], ["c:cancel", "Cancelar"]) : buttons(["act:add", "Añadir otro"], ["act:done", "Finalizar"], ["act:clear", "Vaciar pedido"]) };
+  }
+  // Si el cliente escribe otra cosa mientras quedaban artículos por elegir, esas preguntas ya no valen
+  if (s.pendientes?.length && !/^(?:p|ps|ui|u|q|more|act|c|h|d):/.test(text) && !["qty", "unitq"].includes(s.state)) s.pendientes = null;
   // Observaciones: "nota: servir el jueves" (todo el pedido) o "nota jamón: pieza grande" (un artículo)
   const noteCmd = /^\s*(?:nota|notas|observaci[oó]n|observaciones)\b[\s:]*(?:de[l]?\s+)?(.*)$/is.exec(rawText || "");
   if (noteCmd && ["menu", "cart", "items", "confirm"].includes(s.state)) {
@@ -834,30 +896,11 @@ function handleMessageInner(session, rawText, ctx = {}) {
         // Un número suelto («1.5», «5»): no es un artículo (antes «1.5» se tomaba por «AGUA MINERAL 1,5 L»)
         if (/^\s*\d+(?:[.,]\d+)?\s*$/.test(rawText) && !/^q:/.test(text)) return { reply: "Me falta el artículo 🙂. Escribe la cantidad y lo que quieres, por ejemplo _\"6 aguas\"_ o _\"2 cajas de cerveza\"_. Las cantidades son números enteros.", session: s };
         if (/(?:^|[\s,;+y])0+\s+[a-zñ]/i.test(norm(rawText))) return { reply: "La cantidad tiene que ser mayor que 0. Escribe, por ejemplo, _\"3 aguas\"_.", session: s };
-        if (!s.unverified) { const asistida = asistir(s, rawText, now, ctx); if (asistida) return asistida; } // dudas y recomendaciones en lenguaje natural
+        if (!s.unverified && !esPedidoMultiple(rawText)) { const asistida = asistir(s, rawText, now, ctx); if (asistida) return asistida; } // dudas y recomendaciones en lenguaje natural
         const dd = takeDate(s, rawText, now);
-        const amb = [];
-        const found = parseItems(dd.rest, s.customer, { ambiguos: amb });
         const lead = (dd.notice ? dd.notice + "\n\n" : "") + (dd.set ? `📅 Entrega apuntada: *${longDate(s.delivery)}*\n\n` : "");
-        // Solo se toma como pedido si dice cuántas quiere («6 aguas», «una cerveza»): «qué tal» o «agua» sueltos no se anotan
-        const conCantidad = /\d/.test(numberWords(dd.rest));
-        // Algo genérico («agua», «2 cervezas», «vino»): no se elige por él, se le pregunta el tipo y se le enseñan todos
-        if (amb.length) {
-          if (conCantidad) for (const { unitStated, ...f } of found) if (!(f.upb && !unitStated)) addToCart(s, f); // lo claro y con cantidad se anota
-          return preguntarTipo(s, amb[0], lead);
-        }
-        if (found.length && conCantidad) {
-          const ask = [];
-          for (const { unitStated, ...f } of found) {
-            if (f.upb && !unitStated) ask.push(f);
-            else addToCart(s, f);
-          }
-          if (ask.length) {
-            s.askUnit = ask;
-            return askUnitReply(s, lead + "Anotado ✅\n\n");
-          }
-          return showCart(s, lead + "Anotado ✅\n\n");
-        }
+        const libre = pedidoLibre(s, dd.rest, lead); // cada artículo por separado: lo claro se anota, lo dudoso se pregunta, lo que no existe se dice
+        if (libre) return libre;
         if (dd.set || dd.notice) return s.cart.length ? showCart(s, lead) : { reply: lead + "Ahora dime qué quieres pedir.", session: s };
         return noEntiendo(s);
       }

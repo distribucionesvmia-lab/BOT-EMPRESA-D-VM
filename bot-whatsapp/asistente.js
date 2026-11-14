@@ -123,6 +123,31 @@ export function buscar(texto, catalogo, { habituales = new Set(), max = 5, preci
   return filas.slice(0, max).map((f) => f.p);
 }
 
+
+// ───────────────────────── Necesidades concretas («algo para limpiar la plancha»): lo que sirve y lo que NO ─────────────────────────
+const NECESIDADES = [
+  { re: /\b(plancha|freidora|horno|campana|parrilla|barbacoa|grasa|cocina)\b/, nombre: "la plancha o la cocina", buenas: ["desengras", "antigras", "plancha", "grasa", "horno", "cocina", "campana", "alimentar"],
+    malas: ["lejia", "amoniaco", "salfuman", "wc", "inodoro", "fregasuelos", "suelo", "suelos", "cristal", "cristales", "ambientador"],
+    sin: "No tengo un desengrasante para superficies donde se cocina que vea claro en el catálogo, y no te voy a recomendar lejía para una plancha. Dime la marca que usas, o escribe «persona» y te ayuda alguien del equipo." },
+  { re: /\b(cristal|cristales|ventana|ventanas|espejo|espejos)\b/, nombre: "cristales", buenas: ["cristal", "cristales", "limpiacristales"], malas: ["lejia", "wc", "suelo"], sin: "No veo un limpiacristales en el catálogo. Escribe «persona» y te ayuda alguien del equipo." },
+  { re: /\b(suelo|suelos|fregar el suelo|fregona)\b/, nombre: "los suelos", buenas: ["fregasuelos", "suelo", "suelos", "fregona"], malas: ["wc", "inodoro", "cristal"], sin: "No veo un fregasuelos en el catálogo. Escribe «persona» y te ayuda alguien del equipo." },
+  { re: /\b(vajilla|platos|vasos|lavavajillas|friegaplatos)\b/, nombre: "la vajilla", buenas: ["lavavajillas", "friegaplatos", "vajilla", "lavaplatos"], malas: ["lejia", "wc", "suelo"], sin: "No veo un lavavajillas en el catálogo. Escribe «persona» y te ayuda alguien del equipo." },
+];
+const empieza = (toks, w) => toks.some((t) => t === w || t.startsWith(w));
+/** «algo para limpiar la plancha» → artículos que SIRVEN para eso (nunca los que no: lejía para una plancha). Sin ninguno, lo dice y ofrece hablar con una persona. */
+export function recomendarPara(texto, catalogo, { habituales = new Set(), precioOf = (p) => p.price, max = 4 } = {}) {
+  const t = limpio(texto);
+  const n = NECESIDADES.find((x) => x.re.test(t));
+  if (!n) {
+    const hits = buscar(texto, catalogo, { habituales, max, precioOf });
+    return hits.length ? { productos: hits } : { productos: [], mensaje: "Dime un poco más para qué lo necesitas, o escribe «persona»." };
+  }
+  const filas = catalogo.filter((p) => p.active !== false).map((p) => { const toks = tokensDe(p); return { p, toks, buenas: n.buenas.filter((w) => empieza(toks, w)).length, mala: n.malas.some((w) => toks.includes(w) || toks.some((x) => x.startsWith(w) && w.length >= 4)) }; })
+    .filter((f) => f.buenas && !f.mala);
+  filas.sort((a, b) => b.buenas - a.buenas || (habituales.has(String(b.p.id)) ? 1 : 0) - (habituales.has(String(a.p.id)) ? 1 : 0) || precioOf(a.p) - precioOf(b.p));
+  return filas.length ? { productos: filas.slice(0, max).map((f) => f.p), nombre: n.nombre } : { productos: [], mensaje: n.sin, nombre: n.nombre };
+}
+
 const PRECIO_MAX = /\b(?:menos de|menor de|menor que|por debajo de|hasta|maximo|max|no mas de|como mucho|a menos de|por menos de)\s*(\d+(?:[.,]\d+)?)\s*(?:€|euros?|eur)?/;
 /** «un vino por menos de 5 euros» → 5 (null si no dice precio máximo). */
 export const precioMaximoDe = (texto) => { const m = PRECIO_MAX.exec(` ${norm(texto).replace(/(\d),(\d)/g, "$1.$2")} `); return m ? Number(m[1]) : null; };
@@ -150,6 +175,8 @@ const FAQ = [
     texto: (c) => c.productoCaja
       ? `📦 «${c.productoCaja.name}» viene en *cajas de ${c.productoCaja.upb} unidades* (${c.productoCaja.caja} la caja, ${c.productoCaja.unidad} cada unidad).`
       : "📦 Muchos artículos se venden por *cajas* (cada caja trae varias unidades; lo ves en la ficha: «Caja de 12 uds»). Puedes pedirlos en *Cajas* o en *Uds* con el selector que hay en cada producto; en el carrito ves el importe exacto." },
+  { id: "factura", re: /\b(factura|facturas|facturar|facturacion|albaran|albaranes|justificante|ticket)\b/,
+    texto: (c) => `🧾 *Facturas:* desde aquí no puedo darte ni consultar tus facturas, y no tengo la política de facturación. Para pedir una factura o aclarar algo, llama a la oficina${c.ayuda?.telefono ? ` (${c.ayuda.telefono}${c.ayuda.horario ? `, ${c.ayuda.horario}` : ""})` : ""} o escribe *persona* y te atiende alguien del equipo.\n\nEn *Mi cuenta* (arriba) puedes ver y descargar un PDF de cada pedido; es informativo, no es una factura.` },
   { id: "iva", re: /\b(iva|impuestos?|recargo|recargo de equivalencia)\b/,
     texto: () => "🧾 Los precios del catálogo van *sin IVA*. En el carrito ves el total con IVA (y el recargo de equivalencia si lo tienes)." },
   { id: "entrar", re: /\b(no puedo|no me deja|no consigo|como)\b.*\b(entrar|acceder|iniciar sesion|loguear|loguearme)\b/,
@@ -220,6 +247,13 @@ export function responder(texto, ctx) {
     return { tipo: "respuesta", reply: f.texto(c), productos: [], accion: f.accion?.(c) ?? null };
   }
   // 4) recomendaciones y búsquedas de productos
+  // una necesidad concreta («algo para limpiar la plancha»): solo lo que sirve para eso, o preguntar
+  if (/\b(limpiar|limpieza|desengras\w*|fregar)\b/.test(t) && NECESIDADES.some((x) => x.re.test(t))) {
+    const r = recomendarPara(texto, cat, { habituales: ctx.habituales, precioOf });
+    if (!r.productos.length) return { tipo: "respuesta", reply: `🧽 ${r.mensaje}`, productos: [], accion: null };
+    const lp = (p, i) => `${i + 1}. ${p.name} — ${ctx.fmtPrecio ? ctx.fmtPrecio(p) : precioOf(p)}`;
+    return { tipo: "respuesta", reply: `Para limpiar ${r.nombre} te sirven estos (los he elegido por su uso; no te propongo lejía):\n\n${r.productos.map(lp).join("\n")}\n\nMarca los que quieras y pulsa «Añadir al pedido».`, productos: r.productos, accion: null };
+  }
   const usoDe = USOS.find((u) => u.re.test(` ${t} `));
   const pidePrecio = precioMaximoDe(texto);
   const quiereProducto = INTENCION_PRODUCTO.test(` ${t} `); // solo si pide o pregunta por productos de verdad («agua» suelto lo sigue llevando el chat de siempre)
