@@ -312,14 +312,14 @@ test("CÓDIGOS CON PUNTO (157.10, 151.21…): «repetir pedido» separa bien el 
 test("TU PEDIDO DE SIEMPRE en el móvil: el texto a todo el ancho y los botones debajo, sin una columna estrecha", async () => {
   const fs = await import("node:fs");
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
-  assert.match(cli, /\.vm-inicio \.fila\.siempre \{ flex-direction:column; align-items:stretch !important;/);
+  assert.match(cli, /\.vm-inicio \.fila\.siempre \{ flex-direction:column; align-items:stretch;/);
   assert.match(cli, /f\.append\(t, bt, sem\); c\.appendChild\(f\);/); assert.match(cli, /sem\.className = "sec"/);
 });
 
 test("MI CUENTA (app del cliente): botón arriba, datos del cliente y pedidos por meses con «Repetir» y «Añadir al carrito»", () => {
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
   const cat = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
-  assert.match(cli, /<button type="button" id="micuenta" class="cuenta"[^>]*>[\s\S]*?<span>Mi cuenta<\/span><\/button>/); // botón visible en la cabecera, sin emojis
+  assert.match(cli, /<button type="button" id="micuenta" class="ds-circ cuenta"[^>]*>[\s\S]*?<span>Mi cuenta<\/span><\/button>/); // botón visible en la cabecera, sin emojis
   assert.match(cli, /\/api\/mi-cuenta/);
   for (const t of ["Mis datos", "Dirección", "Repetir pedido", "Añadir al carrito", "Modificar pedido", "Algo no es correcto"]) assert.ok(cli.includes(t), t);
   assert.match(cli, /"&r=1&x=1"/); // repetir: empieza un carrito nuevo con ese pedido
