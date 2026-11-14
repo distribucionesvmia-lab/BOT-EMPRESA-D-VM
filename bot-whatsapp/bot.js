@@ -381,6 +381,15 @@ function openCatalog(s, now = new Date()) {
   return showList(s, 0, aviso + "🛒 Elige lo que quieres pedir:");
 }
 /** Lo que va detrás de la dirección del catálogo para abrirlo con un pedido anterior ya puesto («Repetir y revisar»). */
+/** El carrito del catálogo (que vive en el móvil) convertido en líneas de pedido con los datos de ahora: [{id, qty, unit?}] → items. Lo que no existe se ignora. */
+export function itemsDeCarrito(lineas) {
+  return (Array.isArray(lineas) ? lineas : []).slice(0, 80).map((l) => {
+    const p = CATALOG.find((x) => String(x.id) === String(l?.id)), q = Math.min(999, Math.floor(Number(l?.qty)));
+    if (!p || !(q > 0)) return null;
+    const unit = soloCaja(p) ? "caja" : l.unit === "ud" || l.unit === "caja" ? l.unit : upbOf(p) ? "caja" : "ud"; // por defecto, como en el catálogo: cajas si el artículo las tiene
+    return mkItem(p, q, unit, { unitStated: true });
+  }).filter(Boolean);
+}
 /** Líneas ({id, nombre, qty, unit, upb}) del último pedido del cliente que siguen en el catálogo: de ahí parte «Tu pedido de siempre» antes de editarlo. */
 export function lineasUltimoPedido(customer) {
   const ult = pedidosDe(customer).map((o) => ({ o, items: itemsFromLines(o.lines) })).find((x) => x.items.length);
@@ -732,7 +741,11 @@ function handleMessageInner(session, rawText, ctx = {}) {
 
   // «¿cuánto llevo?»: lo que hay en el pedido y su total (nada se confirma)
   if (s.customer && ["menu", "cart", "confirm", "items"].includes(s.state) && /^(?:y )?(?:cuanto|que) (?:llevo|va|tengo|hay)\b|^(?:y )?cuanto (?:es|son|sale|salen|va|suma|seria)\b.*\b(?:todo|total|ahora|ya|hasta ahora|llevo)\b|^(?:el )?total\b|^resumen\b|\bque llevo\b|\bcomo va (?:el|mi) (?:pedido|carrito|cesta)\b|^mi (?:pedido|carrito|cesta)\b/.test(limpia(text))) {
-    const items = (s.state === "confirm" || s.state === "items" ? getItems(s) : s.cart) ?? [];
+    let items = (s.state === "confirm" || s.state === "items" ? getItems(s) : s.cart) ?? [];
+    if (!items.length && ctx.carritoExterno?.length) { // lo que lleva en el catálogo (el carrito del móvil): se lee tal cual, sin pasarlo al chat ni confirmar nada
+      items = ctx.carritoExterno;
+      return { reply: `🛒 *Llevas esto en tu pedido del catálogo:*\n${itemsText(items)}\n\n_No he confirmado nada: se envía solo cuando tú pulses «Enviar pedido»._`, session: s, ui: s.link ? { type: "link", title: "Seguir con mi pedido", url: s.link } : undefined };
+    }
     if (!items.length) return { reply: "Todavía no has añadido nada a tu pedido. Escribe, por ejemplo, _\"2 cajas de agua\"_ o pulsa *Hacer pedido*.", session: s, ui: s.link ? { type: "link", title: "Hacer pedido", url: s.link } : buttons(["h:open", "Hacer pedido"]) };
     return { reply: `🛒 *Tu pedido hasta ahora:*\n${itemsText(items)}\n\n_No he confirmado nada: el pedido no se envía hasta que tú lo finalices._`, session: s, ui: s.state === "confirm" ? buttons(["c:ok", "Confirmar"], ["c:more", "Añadir productos"], ["c:cancel", "Cancelar"]) : buttons(["act:add", "Añadir otro"], ["act:done", "Finalizar"], ["act:clear", "Vaciar pedido"]) };
   }

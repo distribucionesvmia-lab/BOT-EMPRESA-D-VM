@@ -53,7 +53,9 @@
     if (modo === "boton") {
       pop = document.createElement("div"); pop.className = "letra-pop"; pop.hidden = true; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Tamaño de letra");
       var fila = document.createElement("div"); fila.className = "letra-fila"; fila.appendChild(menos); fila.appendChild(n); fila.appendChild(mas);
-      pop.appendChild(fila); pop.appendChild(auto);
+      var tit = document.createElement("b"); tit.className = "letra-t"; tit.textContent = "Tamaño de la letra";
+      var ayu = document.createElement("span"); ayu.className = "letra-h"; ayu.textContent = "Pulsa A+ para ver todo más grande, o A− para más pequeño.";
+      pop.appendChild(tit); pop.appendChild(ayu); pop.appendChild(fila); pop.appendChild(auto);
       bt = boton("", "Tamaño de letra", function () {
         if (pop.hidden) document.dispatchEvent(new CustomEvent("vm:abre-panel", { detail: "letra" })); // el menú ⋯ (u otro desplegable) se cierra
         pop.hidden = !pop.hidden; bt.setAttribute("aria-expanded", String(!pop.hidden));
@@ -68,9 +70,9 @@
     } else { caja.appendChild(menos); caja.appendChild(n); caja.appendChild(mas); caja.appendChild(auto); }
     function pintar() {
       var e = efectivo(), txt = Math.round(e * 100) + " %";
-      n.textContent = nivel ? "Letra " + txt : "Letra " + txt + " (auto)";
+      var nom = e < 1.07 ? "normal" : e < 1.22 ? "grande" : "muy grande"; n.textContent = "Letra " + nom + " (" + txt + ")" + (nivel ? "" : " · automático");
       if (bt) { bt.textContent = ""; var a = document.createElement("b"); a.textContent = "Aa"; var s = document.createElement("small"); s.textContent = txt; bt.appendChild(a); bt.appendChild(s); }
-      menos.disabled = e <= NIVELES[0] + 0.001; mas.disabled = e >= NIVELES[NIVELES.length - 1] - 0.001; auto.setAttribute("aria-pressed", String(!nivel));
+      menos.setAttribute("aria-label", "Letra más pequeña"); mas.setAttribute("aria-label", "Letra más grande"); menos.disabled = e <= NIVELES[0] + 0.001; mas.disabled = e >= NIVELES[NIVELES.length - 1] - 0.001; auto.setAttribute("aria-pressed", String(!nivel));
     }
     oyentes.push(pintar); pintar();
   }
@@ -336,6 +338,7 @@
   .letra-pop[hidden] { display:none; } @keyframes letrapop { from { opacity:0; transform:translateY(-6px); } }
   .letra-pop .letra-fila { display:flex; align-items:center; justify-content:space-between; gap:var(--s2); }
   .letra-pop .letra-n { flex:1; min-width:0; }
+  .letra-pop .letra-t { display:block; font-size:calc(var(--t-body) / var(--k,1)); font-weight:700; color:var(--text); margin-bottom:var(--s1); } .letra-pop .letra-h { display:block; font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); line-height:1.3; margin-bottom:var(--s3); }
   .letra-pop button { min-height:48px; }
   .letra-pop .letra-fila button { min-width:56px; font-size:calc(var(--t-md) / var(--k,1)); }
   .letra-pop button.letra-auto { width:100%; }
@@ -1508,11 +1511,19 @@ function interactivo(ui) {
   }));
   chat.appendChild(box); alFinal();
 }
+// El pedido que lleva en el catálogo (se guarda en el móvil): se manda con el mensaje para que «¿cuánto llevo?» lo lea. Solo lectura: no envía nada.
+async function carritoDelCatalogo() {
+  try {
+    const y = await cargaYo(); if (!y?.carrito) return undefined;
+    const g = JSON.parse(localStorage.getItem(y.carrito) || "null"); if (!g || Date.now() - g.t > 168 * 3600e3) return undefined;
+    const u = new Map(g.u || []); return (g.q || []).filter(([, n]) => n > 0).slice(0, 80).map(([id, n]) => ({ id, qty: n, unit: u.get(id) }));
+  } catch { return undefined; }
+}
 async function enviar(texto, etiqueta, silencioso) {
   document.querySelectorAll(".ui").forEach((u) => u.classList.add("usado")); sheet.hidden = true;
   if (!silencioso) burbuja(etiqueta ?? texto, "out");
   escribiendo(true); const t0 = Date.now();
-  const r = await post("/api/chat", { text: texto, id: uuid() });
+  const r = await post("/api/chat", { text: texto, id: uuid(), carrito: await carritoDelCatalogo() });
   await new Promise((ok) => setTimeout(ok, Math.max(0, 550 - (Date.now() - t0)))); escribiendo(false);
   if (r.status === 401) { chat.innerHTML = ""; ver("acceso"); $("a-err").textContent = "Tu sesión ha caducado. Entra de nuevo."; return; }
   const j = await r.json().catch(() => null);

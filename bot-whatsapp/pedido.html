@@ -53,7 +53,9 @@
     if (modo === "boton") {
       pop = document.createElement("div"); pop.className = "letra-pop"; pop.hidden = true; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Tamaño de letra");
       var fila = document.createElement("div"); fila.className = "letra-fila"; fila.appendChild(menos); fila.appendChild(n); fila.appendChild(mas);
-      pop.appendChild(fila); pop.appendChild(auto);
+      var tit = document.createElement("b"); tit.className = "letra-t"; tit.textContent = "Tamaño de la letra";
+      var ayu = document.createElement("span"); ayu.className = "letra-h"; ayu.textContent = "Pulsa A+ para ver todo más grande, o A− para más pequeño.";
+      pop.appendChild(tit); pop.appendChild(ayu); pop.appendChild(fila); pop.appendChild(auto);
       bt = boton("", "Tamaño de letra", function () {
         if (pop.hidden) document.dispatchEvent(new CustomEvent("vm:abre-panel", { detail: "letra" })); // el menú ⋯ (u otro desplegable) se cierra
         pop.hidden = !pop.hidden; bt.setAttribute("aria-expanded", String(!pop.hidden));
@@ -68,9 +70,9 @@
     } else { caja.appendChild(menos); caja.appendChild(n); caja.appendChild(mas); caja.appendChild(auto); }
     function pintar() {
       var e = efectivo(), txt = Math.round(e * 100) + " %";
-      n.textContent = nivel ? "Letra " + txt : "Letra " + txt + " (auto)";
+      var nom = e < 1.07 ? "normal" : e < 1.22 ? "grande" : "muy grande"; n.textContent = "Letra " + nom + " (" + txt + ")" + (nivel ? "" : " · automático");
       if (bt) { bt.textContent = ""; var a = document.createElement("b"); a.textContent = "Aa"; var s = document.createElement("small"); s.textContent = txt; bt.appendChild(a); bt.appendChild(s); }
-      menos.disabled = e <= NIVELES[0] + 0.001; mas.disabled = e >= NIVELES[NIVELES.length - 1] - 0.001; auto.setAttribute("aria-pressed", String(!nivel));
+      menos.setAttribute("aria-label", "Letra más pequeña"); mas.setAttribute("aria-label", "Letra más grande"); menos.disabled = e <= NIVELES[0] + 0.001; mas.disabled = e >= NIVELES[NIVELES.length - 1] - 0.001; auto.setAttribute("aria-pressed", String(!nivel));
     }
     oyentes.push(pintar); pintar();
   }
@@ -590,6 +592,7 @@
   .letra .letra-bt[aria-expanded="true"] { background:#fff1f1; box-shadow:0 0 0 3px rgba(255,255,255,.55), 0 3px 10px rgba(0,0,0,.22); }
   .letra-pop { position:fixed; z-index:95; width:min(300px, calc(100vw - 16px)); padding:12px; border-radius:18px; background:var(--surface); color:var(--text); box-shadow:0 14px 40px rgba(0,0,0,.35); display:flex; flex-direction:column; gap:10px; animation:letrapop .16s ease-out; }
   .letra-pop[hidden] { display:none; } @keyframes letrapop { from { opacity:0; transform:translateY(-6px); } } @media (prefers-reduced-motion: reduce) { .letra-pop { animation:none; } }
+  .letra-pop .letra-t { display:block; font-size:calc(var(--t-body) / var(--k,1)); font-weight:700; color:var(--text); margin-bottom:4px; } .letra-pop .letra-h { display:block; font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); line-height:1.3; margin-bottom:12px; }
   .letra-pop .letra-fila { display:flex; align-items:center; justify-content:space-between; gap:8px; }
   .letra-pop .letra-n { flex:1; min-width:0; color:var(--text) !important; font-size:calc(15px / var(--k,1)); }
   .letra-pop button { border:2px solid #f0c4c4; background:var(--surface); color:#a80000; border-radius:14px; min-height:52px; }
@@ -870,7 +873,7 @@
   .sug-im { position:relative; flex:none; width:40px; height:40px; border-radius:10px; overflow:hidden; display:grid; place-items:center; color:#fff; font-weight:700; font-size:calc(14px / var(--k,1)); }
   .sug-im img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:var(--fill); }
   .sug-tx { flex:1; min-width:0; display:flex; flex-direction:column; }
-  .sug-tx b { font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sug-tx b { font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; line-height:1.2; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
   .sug-tx small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); font-variant-numeric:tabular-nums; }
   .sug-mas { flex:none; width:44px; height:44px; border:0; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; padding:0; cursor:pointer; }
   .sug-mas svg { width:20px; height:20px; display:block; }
@@ -1369,6 +1372,7 @@
   <section class="screen" id="resumen" hidden aria-label="Resumen del pedido">
     <div class="ped-cab"><h2 class="ped-tit">Revisa tu pedido</h2><p class="ped-sub">Todavía no se ha enviado nada.</p></div>
     <div class="body cartbody">
+      <div class="aviso abierto" id="resAbierto" role="status" aria-live="polite" hidden></div>
       <h3 class="ped-h">Entrega</h3>
       <div class="card"><div class="ctit">Día</div><div class="cval" id="resDia"></div><div class="ctit" style="margin-top:10px">Dirección</div><div class="cval" id="resDir"></div><div class="ctit" id="resNotaT" style="margin-top:10px">Observaciones</div><div class="cval" id="resNota"></div></div>
       <h3 class="ped-h">Importe</h3>
@@ -2306,7 +2310,10 @@ function refresh() {
   $("pcN").textContent = `${n} artículo${n === 1 ? "" : "s"}`; $("pcT").textContent = n ? `${eur(calc().base)} sin IVA` : "";
   $("navCnt").textContent = n; $("navCnt").hidden = !n; marcaNav();
   $("guia").innerHTML = n ? `Llevas <b>${n} artículo${n === 1 ? "" : "s"}</b>. Cuando termines, pulsa el botón rojo de abajo.` : "Toca <b>«+»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.";
-  $("verCarrito").disabled = !n; document.querySelector("footer").hidden = !n; document.querySelector(".app").classList.toggle("sin-carrito", !n); // sin nada en el carrito no hay barra fija que tape la lista
+  { const l = $("list"), alFinal = l.scrollHeight - l.scrollTop - l.clientHeight < 60, aparece = n > 0 && !!document.querySelector("footer").hidden; // al salir la barra del pedido (primer artículo) con la lista abajo del todo, la lista baja lo que la barra ocupa: la última fila no queda tapada
+    $("verCarrito").disabled = !n; document.querySelector("footer").hidden = !n; document.querySelector(".app").classList.toggle("sin-carrito", !n);
+    if (aparece && alFinal) requestAnimationFrame(() => requestAnimationFrame(() => { l.scrollTop = l.scrollHeight; })); }
+   // sin nada en el carrito no hay barra fija que tape la lista
   const fila = bumpId && !bumpFav && !(tab === "hab" && soloCantidad) ? $("list").querySelector(`.pf[data-id="${CSS.escape(bumpId)}"]`) : null;
   const prod = fila && productoPorId.get(bumpId);
   if (fila && prod) { const tenia = fila.contains(document.activeElement), nueva = row(prod); fila.replaceWith(nueva); if (tenia && nueva.focus) nueva.focus({ preventScroll: true }); } // cambio de cantidad: solo se repinta ese producto (antes se repintaba toda la lista, fotos incluidas)
@@ -2558,7 +2565,9 @@ function pintarSugs() {
     const fila = document.createElement("div"); fila.className = "sug"; fila.setAttribute("role", "option"); fila.dataset.id = p.id; fila.id = "sug-" + p.id;
     const im = document.createElement("span"); im.className = "sug-im"; im.style.background = hue(p.name); im.textContent = initials(p.name);
     if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.width = 56; i.height = 56; i.onerror = () => i.remove(); im.appendChild(i); }
-    const tx = document.createElement("span"); tx.className = "sug-tx"; const n = document.createElement("b"); n.textContent = p.name; const pr = document.createElement("small"); pr.textContent = p.soloCaja && p.unitsPerBox ? `Solo cajas de ${p.unitsPerBox} · ${eur(precioCaja(p))} la caja` : eurp(p.price) + " /ud";
+    const tx = document.createElement("span"); tx.className = "sug-tx"; const n = document.createElement("b"); n.textContent = nombreVisible(p); n.title = p.name; const pr = document.createElement("small"); // nombre en hasta 2 líneas (no cortado en una) y, debajo, el formato (caja/pack/medidas) y el precio: así se distinguen las variantes
+    const pkS = /(\d+)\s*[xX×]\s*(\d+)/.exec(p.name), fmtS = p.unitsPerBox ? (p.soloCaja ? `Solo cajas de ${p.unitsPerBox}` : `Caja de ${p.unitsPerBox}`) : (/\bpack\b/i.test(p.name) || (pkS && Number(pkS[1]) * Number(pkS[2]) > 1) ? "Pack" : "Por unidades"), medS = medidasDeNombre(p.name);
+    pr.textContent = [fmtS, ...medS].join(" · ") + " · " + (p.soloCaja && p.unitsPerBox ? `${eur(precioCaja(p))} la caja` : eurp(p.price) + " /ud");
     tx.append(n, pr);
     const mas = document.createElement("button"); mas.type = "button"; mas.className = "sug-mas"; mas.setAttribute("aria-label", "Añadir " + p.name);
     mas.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round"/></svg>';
@@ -2690,6 +2699,7 @@ function validaCierre(errBox) { // dirección y día: lo mismo que se pedía ant
 }
 // Paso de resumen: día, dirección, observaciones, importes y condiciones, ANTES de enviar
 function pintarPasoResumen() {
+  pintarResAbierto();
   $("resDia").textContent = diaElegido ? largo(diaElegido).replace(/^./, c => c.toUpperCase()) : "Sin día elegido: te lo confirmaremos";
   $("resDir").textContent = dirFinal() || "La dirección que tenemos de tu negocio";
   const n = $("note").value.trim(); $("resNota").textContent = n || "Sin observaciones";
@@ -2776,6 +2786,16 @@ function pintarAbierto() {
     const b = document.createElement("button"); b.type = "button"; b.className = "vm-lnk"; b.textContent = "Añadir a ese pedido"; b.onclick = () => anadirAPedido(ab.ref);
     box.append(t, b); box.hidden = false;
   }
+}
+// En el resumen: si ya hay un pedido abierto para OTRO día, se explica la relación y se pregunta (añadir a ese o hacer uno nuevo); nada se envía por elegir
+let resNuevo = false; // el cliente ya dijo «hago uno nuevo»
+function pintarResAbierto() {
+  const box = $("resAbierto"), ab = !modificando && (data.abiertos || []).find(a => a.entrega !== diaElegido); box.textContent = "";
+  if (!ab || !diaElegido) { box.hidden = true; return; }
+  const corto = d => largo(d).replace(/ de [a-zé]+$/, ""), t = document.createElement("span"), btn = (txt, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "vm-lnk"; b.textContent = txt; b.onclick = fn; return b; };
+  if (resNuevo) { t.textContent = `Se enviará como pedido nuevo para el ${corto(diaElegido)}. El del ${corto(ab.entrega)} (${ab.ref}) se queda como está.`; box.append(t, btn(`En vez de eso, añadir al del ${corto(ab.entrega)}`, () => { resNuevo = false; anadirAPedido(ab.ref).then(() => { $("resumen").hidden = true; }); })); }
+  else { t.textContent = `Ya tienes un pedido el ${corto(ab.entrega)}. ¿Lo añado a ese o hago uno nuevo para el ${corto(diaElegido)}?`; box.append(t, btn(`Añadir al del ${corto(ab.entrega)}`, () => { anadirAPedido(ab.ref).then(() => { $("resumen").hidden = true; }); }), btn(`Hacer uno nuevo para el ${corto(diaElegido)}`, () => { resNuevo = true; pintarResAbierto(); })); }
+  box.hidden = false;
 }
 function pintarAvisoDia() {
   const box = $("diaAviso"), ab = !modificando && abiertosDeDia(diaElegido)[0]; box.textContent = "";

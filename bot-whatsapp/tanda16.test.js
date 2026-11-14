@@ -51,7 +51,7 @@ test("Bench 1.3-1.6: relevancia, categorías, nombres pegados, sin ruido de cód
   assert.ok(!q("33").includes("1330")); assert.ok(q("33").includes("4")); assert.deepEqual(buscador([P("3300", "VASO 25 CL", "hos", "menaje")], tree)("33"), ["3300"]); // «33»: lo que lleva «33» en el nombre; un código solo si EMPIEZA por 33, nunca si lo lleva en medio
   const s = q("sal"); assert.equal(s[0], "6"); // «sal»: la palabra «SAL» antes que «SALFUMANT»
   assert.match(ped, /grupo\("Tipo:", cuenta\(marcaDe\)/); assert.doesNotMatch(ped, /grupo\("Marca:"/);
-  assert.match(ped, /p\.soloCaja && p\.unitsPerBox \? `Solo cajas de \$\{p\.unitsPerBox\}/);
+  assert.match(ped, /\(p\.soloCaja \? `Solo cajas de \$\{p\.unitsPerBox\}`/); assert.match(ped, /p\.soloCaja && p\.unitsPerBox \? `\$\{eur\(precioCaja\(p\)\)\} la caja`/); // (Tanda 18: ahora con el formato delante y el nombre en 2 líneas)
 });
 
 test("Bench 1.8, 1.10 y T16 3: orderKey nuevo tras cada envío, carrito 7 días por código de cliente y sincronizado entre pestañas", () => {

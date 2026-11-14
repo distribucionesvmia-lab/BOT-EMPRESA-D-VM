@@ -187,7 +187,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (p === "/api/yo" && req.method === "GET") {
       const acc = sessionOf(req);
       if (!acc) return send(res, 200, { cliente: null }), true; // invitado: sin sesión no es un error (la consola del navegador queda limpia)
-      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode } }), true;
+      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode, carrito: "vm_carrito_c_" + String(acc.customerId) } }), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
     }
 
     // El cliente cambia el código de entrada (los 6 del NIF) por uno personal de 6 letras o números

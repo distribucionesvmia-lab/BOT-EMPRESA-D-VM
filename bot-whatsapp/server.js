@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import zlib from "node:zlib";
 import fs from "node:fs";
 import path from "node:path";
-import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog as catalogNow, habitualProducts, tarjetaSiempre, lineasUltimoPedido } from "./bot.js";
+import { handleMessage, newSession, setCatalog, setCustomerFinder, setLinkMaker, getCatalog as catalogNow, habitualProducts, tarjetaSiempre, lineasUltimoPedido, itemsDeCarrito } from "./bot.js";
 import { getCatalog, catalogVersion, getCustomerByPhone, getCustomerById, findCustomers, createOrder, getAccountsDb, customerDirectory, getDatabases, setOrderHook } from "./erp.js";
 import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
@@ -507,14 +507,14 @@ function aplicarSiempre(account, customer, ui) {
   return t ? { ...resto, last: t, siempre: "propio" } : { ...resto, siempre: "borrado" };
 }
 // Conversación de un cliente con sesión: el cliente sale SIEMPRE de la cuenta (nunca de lo que envíe el navegador)
-async function accountChat(account, text, msgId) {
+async function accountChat(account, text, msgId, carrito = null) {
   const customer = clienteConPedidos(account.customerId);
   if (!customer) throw new Error("La cuenta no tiene cliente asociado");
   await refreshCatalog();
   const entry = chatSessions.get(account.id);
   let cur = entry && Date.now() - entry.last < SESSION_TTL ? entry.session : newSession(customer, "/catalogo", { phone: account.phone, holdUnverified: false, showHabitual: true });
   cur = { ...cur, customer }; // datos al día (precios especiales, historial)
-  const out = handleMessage(cur, text);
+  const out = handleMessage(cur, text, { carritoExterno: itemsDeCarrito(carrito) });
   chatSessions.set(account.id, { session: out.session, last: Date.now() });
   if (out.order) {
     const key = `chat:${account.id}:${msgId ?? crypto.randomUUID()}`; // el mismo mensaje reenviado no duplica el pedido
@@ -575,7 +575,7 @@ async function appRoutes(req, res, url) {
     const body = await readJson(req);
     const text = typeof body?.text === "string" ? body.text.slice(0, 1000) : "";
     const msgId = typeof body?.id === "string" && /^[\w-]{8,64}$/.test(body.id) ? body.id : undefined;
-    const out = await accountChat(account, text, msgId);
+    const out = await accountChat(account, text, msgId, body?.carrito);
     return void sendJson(res, 200, { reply: out.reply, ui: out.ui ? aplicarSiempre(account, clienteConPedidos(account.customerId), out.ui) : null, handoff: !!out.handoff, cards: out.cards ?? null, short: out.short ?? null });
   }
 

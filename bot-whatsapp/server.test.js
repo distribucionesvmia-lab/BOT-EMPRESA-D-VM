@@ -1050,6 +1050,20 @@ test("BENCH 8: «Avisarme antes de la hora límite» se puede leer y cambiar (po
   await call("POST", "/api/avisos/corte", { cookie: A, body: { activo: true } }); assert.equal((await call("GET", "/api/avisos/corte", { cookie: A })).json.activo, true);
 });
 
+test("TANDA 18.1: «¿cuánto llevo?» lee el carrito real del catálogo (artículos, cantidades e importe) y no confirma nada", async () => {
+  const A = cookieOf(await entrarNif("111111"));
+  const antes = (await call("GET", "/api/admin/pedidos", { admin: true })).json.length;
+  const yo = (await call("GET", "/api/yo", { cookie: A })).json.cliente; assert.match(yo.carrito, /^vm_carrito_c_\S+$/); // dónde guarda el móvil el carrito (no se enseña)
+  const vacio = (await call("POST", "/api/chat", { cookie: A, body: { text: "cuánto llevo" } })).json; assert.match(vacio.reply, /Todavía no has añadido nada/); // sin carrito: como siempre
+  const ids = (await call("GET", "/catalogo/datos", { cookie: A })).json.products.map((p) => p.id); assert.ok(ids.length >= 2);
+  const r = (await call("POST", "/api/chat", { cookie: A, body: { text: "¿cuánto llevo?", carrito: [{ id: ids[0], qty: 3, unit: "ud" }, { id: ids[1], qty: 2, unit: "ud" }, { id: "NOEXISTE", qty: 9 }] } })).json;
+  assert.match(r.reply, /Llevas esto en tu pedido del catálogo/); assert.match(r.reply, /• 3 × /); assert.match(r.reply, /• 2 × /); assert.match(r.reply, /Total con IVA: \d+,\d{2} €/); assert.match(r.reply, /No he confirmado nada/); assert.equal(/NOEXISTE/.test(r.reply), false);
+  assert.equal((r.reply.match(/^• /gm) ?? []).length, 2); // los dos artículos que existen
+  // no se pasa al chat ni se confirma nada: después, el chat sigue sin pedido propio y no hay pedidos nuevos
+  assert.match((await call("POST", "/api/chat", { cookie: A, body: { text: "cuánto llevo" } })).json.reply, /Todavía no has añadido nada/);
+  assert.equal((await call("GET", "/api/admin/pedidos", { admin: true })).json.length, antes);
+});
+
 test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repetir o añadir), nunca los de otro ni su NIF", async () => {
   assert.equal((await call("GET", "/api/mi-cuenta")).status, 401);
   const A = cookieOf(await entrarNif("111111"));

@@ -266,3 +266,11 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **Interruptor en Mi cuenta** «Avisarme antes de la hora límite» (`corte_pref`; sin fila = activado; solo sale si los avisos del móvil están activados; `GET/POST /api/avisos/corte`).
 - **Al tocar el aviso** abre `/cliente#revisar-fijo` → `revisarFijoDesdeAviso`: carrito con el pedido fijo en «Revisar y enviar» (`&r=1`); NUNCA se envía. El service worker ahora también navega si la app ya estaba abierta.
 - Pruebas: `tanda24.test.js` (fecha forzada, cuenta ficticia T818181, `soloClientes`: jamás a clientes reales) y «BENCH 8» en `server.test.js`.
+
+## Tanda 18 de fallos (asistente, día de reparto, barra, nombres y texto grande)
+- **«¿Cuánto llevo?»** lee el carrito REAL del catálogo: `cliente.html` manda con cada mensaje el carrito guardado en el móvil (`carritoDelCatalogo`; la clave sale de `/api/yo` → `carrito`, que no se enseña) y `bot.js` (`itemsDeCarrito`, `ctx.carritoExterno`) contesta con artículos, cantidades y total con IVA. **Solo lectura**: no se pasa al chat ni se confirma nada.
+- **Resumen con un pedido abierto de otro día** (`pintarResAbierto`, `#resAbierto`): «Ya tienes un pedido el martes 17. ¿Lo añado a ese o hago uno nuevo para el lunes 16?» con «Añadir al del martes 17» y «Hacer uno nuevo…». Elegir no envía nada.
+- **Barra del pedido que tapaba la última fila**: el relleno ya era igual al alto de la barra; el fallo real era que al salir la barra (primer artículo) con la lista abajo del todo la última fila quedaba debajo. Ahora la lista baja lo que ocupa la barra. Comprobado antes (tapaba 50 px) y después (no tapa).
+- **Sugerencias de búsqueda**: nombre limpio en hasta 2 líneas y debajo formato + medidas + precio («Caja de 6 · 1,5 L · 1,02 €/ud»).
+- **Texto grande**: ya existía (A− / A+, 100/115/130 % y Automático); el panel «Aa» ahora tiene título, explica «Pulsa A+ para ver todo más grande» y dice «Letra normal/grande/muy grande».
+- Pruebas: `tanda25.test.js` y «TANDA 18.1» en `server.test.js`.
