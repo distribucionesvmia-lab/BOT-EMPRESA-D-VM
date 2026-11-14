@@ -114,7 +114,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (empresa.length < 2 || empresa.length > 80) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
       if (!normalizePhone(b.telefono)) return send(res, 400, { error: "El teléfono no es válido." }), true;
       if (!validEmail(correo)) return send(res, 400, { error: "El correo no es válido." }), true;
-      if (!pinValido(pin)) return send(res, 400, { error: "Elige una contraseña de 6 letras o números." }), true;
+      if (!pinValido(pin)) return send(res, 400, { error: "Elige un código de entrada de 6 letras o números." }), true;
       // El sistema comprueba la solicitud contra la base de clientes. Acceso automático si el nombre de la empresa coincide
       // con un cliente guardado Y su teléfono o su correo también; si no, queda pendiente para que la revise la empresa.
       const m = customers.matchRegistration({ phone: b.telefono, email: correo, business: empresa });
@@ -122,7 +122,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         const dato = [m.matched.phone ? "teléfono" : null, m.matched.email ? "correo" : null].filter(Boolean).join(" y ");
         const r = accounts.registerAuto({ phone: b.telefono, email: correo, business: empresa, pin, customerId: m.customer.id, matched: `nombre + ${dato}` });
         if (r.error) return send(res, 400, { error: r.error }), true;
-        return send(res, 200, { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono, el nombre de tu empresa y tu contraseña." }), true;
+        return send(res, 200, { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono, el nombre de tu empresa y tu código de entrada." }), true;
       }
       const r = accounts.requestRegistration({ phone: b.telefono, email: correo, business: empresa, pin, nif, address: b.direccion }); // el DNI/CIF solo se guarda aquí (cliente nuevo) y se borra al resolver la solicitud
       if (r.error) return send(res, 400, { error: r.error }), true;
@@ -154,7 +154,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         // Si nadie coincide no hay cuenta a la que anotar el fallo: se cuenta en conjunto y, si hay demasiados, se frena a todo el mundo un rato
         if (!ids.length) {
           if (!nifGlobalFails("fallos")) return demasiados(res, nifGlobalFails, "fallos", "Demasiados intentos. Si lo necesitas, llama a la empresa."), true;
-          return send(res, 401, { error: "No encontramos ese NIF ni esa contraseña entre los clientes habituales. Revisa los 6 primeros dígitos de tu DNI o CIF. Si eres cliente nuevo, solicita el alta (más abajo); si ya lo eres, llámanos." }), true;
+          return send(res, 401, { error: "No encontramos ese NIF ni ese código de entrada entre los clientes habituales. Revisa los 6 primeros dígitos de tu DNI o CIF. Si eres cliente nuevo, solicita el alta (más abajo); si ya lo eres, llámanos." }), true;
         }
         // Varios negocios con el mismo NIF (p. ej. un mismo titular con dos locales): se pide además el nombre, sin anotar fallo
         if (ids.length > 1 && !nombre) return send(res, 409, { necesitaNombre: true, error: "Hay varios negocios con ese NIF. Escribe también el nombre de tu empresa." }), true;
@@ -173,7 +173,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         const c = customers.getByPhone(b.telefono);
         if (c && customers.nameMatches(c, empresa)) r = accounts.loginCustomerCode(c.id, codeKey(b.pin));
       }
-      if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Teléfono, contraseña o nombre de la empresa incorrectos. Usa el teléfono con el que sueles contactar con nosotros." }), true;
+      if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Teléfono, código de entrada o nombre de la empresa incorrectos. Usa el teléfono con el que sueles contactar con nosotros." }), true;
       const customer = customers.getById(r.account.customerId);
       return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": cookie(r.token, 30 * 86400) }), true;
     }
@@ -196,7 +196,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (!loginLimit(ip(req))) return demasiados(res, loginLimit, ip(req)), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
-      if (!validCode(b.nuevo)) return send(res, 400, { error: "La contraseña debe tener exactamente 6 letras o números." }), true;
+      if (!validCode(b.nuevo)) return send(res, 400, { error: "El código de entrada debe tener exactamente 6 letras o números." }), true;
       if (customers.findByNif(b.nuevo).length) return send(res, 400, { error: "Ese código no está disponible. Elige otro." }), true; // no puede coincidir con el NIF de nadie
       const r = accounts.setCodeKey(acc.id, codeKey(b.nuevo));
       if (r.error) return send(res, 400, { error: r.error }), true;

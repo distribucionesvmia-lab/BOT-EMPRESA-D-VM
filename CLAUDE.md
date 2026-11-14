@@ -136,3 +136,11 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - Respuestas nuevas: «¿cuánto llevo?» (artículos y total con IVA), «¿hacéis factura?» (no inventa la política: llamar a la oficina o «persona»; recuerda que el PDF de Mi cuenta es informativo), emojis sueltos (🍺 = cerveza; los desconocidos tienen respuesta amable).
 - **Pantalla** (`cliente.html`): el mensaje propio conserva sus emojis; una respuesta más alta que la pantalla se lee desde su principio (`ancla`/`alFinal`).
 - Pruebas: `pedidolibre.test.js` (catálogo ficticio).
+
+## Tanda 7 de QA (Mi cuenta, código de entrada, pedido fijo, ayuda y legal)
+- **Un solo término: «código de entrada»** en `cliente.html`, `auth.js` (mensajes) y el asistente (ya no «contraseña»). Los mensajes internos de `db.js` y el panel de la empresa no se han tocado.
+- **Validación en español**: el formulario de cambio de código usa `novalidate` y mensajes propios por campo; el resto de campos obligatorios usan `setCustomValidity` (`MSG_FALTA`), así Chrome no muestra «Please fill out this field».
+- **Ventanas** (`.vm-modal`, salvo la pregunta de avisos): se cierran con X/«Cerrar», Escape, tocando fuera y «Atrás» del móvil (una sola entrada de historial mientras haya alguna abierta). «Mi pedido fijo» tiene X.
+- **Ayuda**: sin teléfono/WhatsApp configurados el título es «Ayuda y ajustes de pantalla»; siempre hay «Hablar con una persona (por el chat)». Para que salga el botón de llamar (tel:) hay que rellenar `AYUDA_TEL` (y `AYUDA_WHATSAPP`, `AYUDA_HORARIO`) en `C:\vm\config`.
+- **Privacidad y aviso legal**: ventana propia (menú ⋯, Ayuda y «Mis datos y privacidad»). El aviso legal (`avisoLegalHtml` en `privacidad.js`) usa `PRIVACY_TITULAR`, `PRIVACY_CIF`, `PRIVACY_DIRECCION` y `PRIVACY_EMAIL`: hay que rellenarlos y que la gestoría revise el texto.
+- Pruebas: `tanda7.test.js`.

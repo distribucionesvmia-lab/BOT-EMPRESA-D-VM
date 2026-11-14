@@ -565,6 +565,11 @@
   .pdf-marco { display:block; width:100%; height:100%; border:0; background:#fff; }
   .pdf-aviso { display:flex; flex-direction:column; align-items:center; gap:var(--s4); padding:var(--s10) var(--s6); text-align:center; color:#1d1d1f; background:var(--bg); min-height:100%; } .pdf-aviso p { margin:0; color:var(--text); } .pdf-abre { background:var(--accent); color:var(--on-accent); }
   @media (max-width:359px) { .pdf-tit { display:none; } .pdf-cab { justify-content:space-between; } }
+
+  /* Cabecera de ventana con X de 44 px */
+  .vm-modal .cab-modal { padding:0 0 var(--s2); border:0; }
+  .vm-x { flex:none; width:44px; height:44px; border:0; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:calc(26px / var(--k,1)); line-height:1; cursor:pointer; display:grid; place-items:center; }
+  .enlace-legal { display:inline; min-height:44px; padding:0; text-decoration:underline; font-size:inherit; }
 </style>
 </head>
 <body>
@@ -581,15 +586,15 @@
       <form class="vm-card" id="f-acceso" autocomplete="off" novalidate>
         <span class="tag">Cliente habitual</span>
         <h2>Inicia sesión</h2>
-        <div class="acc-modo" role="group" aria-label="Cómo quieres entrar"><button type="button" id="m-nif" aria-pressed="true">Entrar con mi NIF</button><button type="button" id="m-tel" aria-pressed="false">Teléfono y contraseña</button></div>
-        <p id="t-tel">Entra con el <b>teléfono que usas habitualmente para contactar con nosotros</b> y tu contraseña.</p>
-        <p id="t-nif" hidden>Solo para <b>clientes habituales</b>: entra con los <b>6 primeros dígitos de tu DNI o CIF</b> (en un CIF, los 6 primeros números, sin la letra). Una vez dentro podrás <b>poner una contraseña personal</b> y entrar después con tu teléfono.</p>
+        <div class="acc-modo" role="group" aria-label="Cómo quieres entrar"><button type="button" id="m-nif" aria-pressed="true">Entrar con mi NIF</button><button type="button" id="m-tel" aria-pressed="false">Teléfono y código</button></div>
+        <p id="t-tel">Entra con el <b>teléfono que usas habitualmente para contactar con nosotros</b> y tu código de entrada.</p>
+        <p id="t-nif" hidden>Solo para <b>clientes habituales</b>: entra con los <b>6 primeros dígitos de tu DNI o CIF</b> (en un CIF, los 6 primeros números, sin la letra). Una vez dentro podrás <b>poner un código de entrada personal</b> y entrar después con tu teléfono.</p>
         <label id="l-tel">Teléfono con el que sueles contactar con nosotros<input id="a-tel" type="tel" inputmode="tel" autocomplete="tel"></label>
-        <label id="l-pin">Contraseña de 6 letras o números<input id="a-pin" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="current-password"></label>
+        <label id="l-pin">Código de entrada de 6 letras o números<input id="a-pin" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="current-password"></label>
         <label id="l-emp">Nombre de tu empresa<input id="a-emp" maxlength="80" autocomplete="organization"></label>
-        <label id="l-nif" hidden>Primeros 6 dígitos del DNI o CIF (o tu contraseña)<input id="a-nif" type="text" inputmode="numeric" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 123456" aria-describedby="a-aviso a-err"></label>
+        <label id="l-nif" hidden>Primeros 6 dígitos del DNI o CIF (o tu código de entrada)<input id="a-nif" type="text" inputmode="numeric" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 123456" aria-describedby="a-aviso a-err"></label>
         <div class="pista" id="a-aviso" role="status" aria-live="polite"></div>
-        <button class="vm-link" type="button" id="nif-letras" hidden>Mi contraseña tiene letras: usar el teclado completo</button>
+        <button class="vm-link" type="button" id="nif-letras" hidden>Mi código tiene letras: usar el teclado completo</button>
         <div class="err" id="a-err" role="alert"></div><div class="okmsg" id="a-ok" role="status"></div>
         <button class="vm-btn primary">Entrar</button>
         <div data-privacidad></div>
@@ -625,14 +630,14 @@
         <h1>Hazte cliente</h1>
       </header>
       <form class="vm-card" id="f-registro" autocomplete="off">
-        <p>Cuéntanos quién eres y elige una contraseña. <b>En 24 a 48 horas te contactaremos y aceptaremos tu cuenta</b> para que puedas hacer pedidos; si tus datos ya constan, entras al momento.</p>
+        <p>Cuéntanos quién eres y elige un código de entrada. <b>En 24 a 48 horas te contactaremos y aceptaremos tu cuenta</b> para que puedas hacer pedidos; si tus datos ya constan, entras al momento.</p>
         <label>Nombre de tu empresa o negocio<input id="r-emp" maxlength="80" required></label>
         <label>Teléfono<input id="r-tel" type="tel" inputmode="tel" required></label>
         <label>DNI, NIE o CIF<input id="r-nif" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 12345678Z o B12345678" required></label>
         <label>Dirección de entrega (opcional)<input id="r-dir" maxlength="160" autocomplete="street-address" placeholder="Calle, número y localidad"></label>
         <label>Correo electrónico<input id="r-mail" type="email" autocomplete="email" required></label>
-        <label>Elige una contraseña de 6 letras o números<input id="r-pin" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
-        <label>Repite la contraseña<input id="r-pin2" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
+        <label>Elige un código de entrada de 6 letras o números<input id="r-pin" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
+        <label>Repite el código de entrada<input id="r-pin2" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
         <div class="err" id="r-err" role="alert"></div><div class="okmsg" id="r-ok" role="status"></div>
         <button class="vm-btn primary">Enviar solicitud</button>
         <p style="font-size:calc(13px / var(--k,1));color:#555">Al enviar la solicitud usaremos estos datos (incluido tu DNI/NIE/CIF, que solo sirve para darte de alta como cliente y se borra en cuanto se resuelve) para gestionar tu alta y tus pedidos.</p>
@@ -652,7 +657,7 @@
       <div class="bar-acciones">
         <button type="button" id="micuenta" class="ds-circ cuenta" aria-haspopup="dialog" aria-label="Mi cuenta: mis datos y mis pedidos"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Mi cuenta</span></button>
         <div id="letraChat"></div>
-        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar">Cambiar contraseña</button><button type="button" id="mispedidos">Histórico de pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><button type="button" id="salir">Salir</button></div></div>
+        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar">Cambiar código de entrada</button><button type="button" id="mispedidos">Histórico de pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><button type="button" id="legal-menu">Privacidad y aviso legal</button><button type="button" id="salir">Salir</button></div></div>
       </div>
     </div>
     <div class="titulo-bloque"><h1 class="titulo-grande">Asistente de pedidos</h1><p class="titulo-sub"><i class="dot"></i><span id="cli">Cliente</span></p></div>
@@ -669,7 +674,7 @@
   <!-- Mis datos y privacidad: los derechos que dice la política de privacidad, ejercidos aquí mismo -->
   <div class="vm-modal" id="m-fijo" hidden>
     <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-fijo" style="max-height:92vh;overflow:auto">
-      <h2 id="t-fijo">Mi pedido fijo</h2>
+      <div class="cu-cab cab-modal"><h2 id="t-fijo">Mi pedido fijo</h2><button class="vm-x" type="button" id="f-x" aria-label="Cerrar">×</button></div>
       <div id="f-cuerpo"></div>
       <p style="font-size:calc(13px / var(--k,1))">No se envía nada solo: los días que elijas te avisamos al abrir la aplicación para que lo revises y lo envíes tú.</p>
       <button class="vm-link" type="button" id="f-cerrar">Cerrar</button>
@@ -694,7 +699,7 @@
   <div class="vm-modal" id="m-datos" hidden>
     <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-datos" style="max-height:92vh;overflow:auto">
       <h2 id="t-datos">Mis datos y privacidad</h2>
-      <p>Puedes ejercer aquí tus derechos sobre tus datos.</p>
+      <p>Puedes ejercer aquí tus derechos sobre tus datos. <button class="vm-link enlace-legal" type="button" id="d-legal">Política de privacidad y aviso legal</button></p>
       <button class="vm-btn ghost" type="button" id="d-bajar">Descargar mis datos</button>
       <p style="font-size:calc(13px / var(--k,1))">Todo lo que guardamos de ti en un archivo (derecho de acceso y de portabilidad).</p>
       <form id="f-derechos" autocomplete="off">
@@ -715,15 +720,25 @@
     </div>
   </div>
 
+  <!-- Privacidad y aviso legal -->
+  <div class="vm-modal" id="m-legal" hidden>
+    <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-legal" style="max-height:92vh;overflow:auto">
+      <div class="cu-cab cab-modal"><h2 id="t-legal">Privacidad y aviso legal</h2><button class="vm-x" type="button" id="l-x" aria-label="Cerrar">×</button></div>
+      <div data-privacidad></div>
+      <div data-aviso-legal></div>
+      <button class="vm-link" type="button" id="l-cerrar">Cerrar</button>
+    </div>
+  </div>
+
   <!-- Cambiar el código de entrada -->
   <div class="vm-modal" id="m-codigo" hidden>
-    <form class="vm-card" id="f-codigo" role="dialog" aria-modal="true" aria-labelledby="t-codigo" autocomplete="off">
+    <form class="vm-card" id="f-codigo" role="dialog" aria-modal="true" aria-labelledby="t-codigo" autocomplete="off" novalidate>
       <h2 id="t-codigo">Cambiar mi código de entrada</h2>
-      <p>Elige una contraseña personal de <b>6 letras o números</b> (da igual mayúsculas o minúsculas). Con ella podrás entrar con el <b>teléfono que usas habitualmente para contactar con nosotros</b>, sin necesidad del DNI o CIF.</p>
-      <label>Nueva contraseña<input id="c-nuevo" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
-      <label>Repite la contraseña<input id="c-nuevo2" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
+      <p>Elige un código de entrada personal de <b>6 letras o números</b> (da igual mayúsculas o minúsculas). Con ella podrás entrar con el <b>teléfono que usas habitualmente para contactar con nosotros</b>, sin necesidad del DNI o CIF.</p>
+      <label>Nuevo código de entrada<input id="c-nuevo" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
+      <label>Repite el código de entrada<input id="c-nuevo2" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
       <div class="err" id="c-err" role="alert"></div><div class="okmsg" id="c-ok" role="status"></div>
-      <button class="vm-btn primary">Guardar contraseña</button>
+      <button class="vm-btn primary">Guardar código de entrada</button>
       <button class="vm-link" type="button" id="c-cerrar">Cerrar</button>
     </form>
   </div>
@@ -741,7 +756,7 @@ $("ir-acceso").onclick = () => ver("acceso");
 
 $("f-registro").onsubmit = async (e) => {
   e.preventDefault(); $("r-err").textContent = ""; $("r-ok").textContent = "";
-  if ($("r-pin").value.toUpperCase() !== $("r-pin2").value.toUpperCase()) { $("r-err").textContent = "Las dos contraseñas no coinciden."; return; }
+  if ($("r-pin").value.toUpperCase() !== $("r-pin2").value.toUpperCase()) { $("r-err").textContent = "Los dos códigos de entrada no coinciden."; return; }
   const r = await post("/api/registro", { empresa: $("r-emp").value, telefono: $("r-tel").value, correo: $("r-mail").value, nif: $("r-nif").value, pin: $("r-pin").value, direccion: $("r-dir").value });
   const j = await r.json().catch(() => ({}));
   if (r.ok) {
@@ -749,12 +764,12 @@ $("f-registro").onsubmit = async (e) => {
     if (j.estado === "activa") setTimeout(() => ver("acceso"), 1800); // ya tiene acceso: pasa a entrar
   } else $("r-err").textContent = j.error || "No se pudo enviar la solicitud.";
 };
-// Código de entrada y contraseña: solo letras y números (sin acentos ni símbolos) y como máximo 6, también si se pega
+// Código de entrada: solo letras y números (sin acentos ni símbolos) y como máximo 6, también si se pega
 for (const id of ["a-nif", "a-pin", "r-pin", "r-pin2", "c-nuevo", "c-nuevo2"]) {
   const e = document.getElementById(id);
   if (e) e.addEventListener("input", () => { const v = e.value.replace(/[^A-Za-z0-9]/g, "").slice(0, id === "a-nif" ? 12 : 6); if (v !== e.value) e.value = v; }); // el NIF no se corta a 6: si hay de más, se avisa (más abajo)
 }
-let conPin = false; // por defecto: NIF (los clientes habituales entran así); alternativa: teléfono + contraseña + empresa
+let conPin = false; // por defecto: NIF (los clientes habituales entran así); alternativa: teléfono + código + empresa
 const limpia = (id) => $(id).value.replace(/[^A-Za-z0-9]/g, "");
 function modoAcceso(pin) {
   conPin = pin;
@@ -783,13 +798,13 @@ function validaAcceso() {
   const fallo = (id, msg) => { $("a-err").textContent = msg; marcaError(id); return false; };
   if (!conPin) {
     const v = limpia("a-nif"), dig = v.replace(/\D/g, "");
-    if (!v) return fallo("a-nif", "Escribe los 6 primeros dígitos de tu DNI o CIF (o tu contraseña personal).");
+    if (!v) return fallo("a-nif", "Escribe los 6 primeros dígitos de tu DNI o CIF (o tu código de entrada personal).");
     if (v.length < 6) return fallo("a-nif", `${6 - v.length === 1 ? "Falta 1 carácter" : "Faltan " + (6 - v.length) + " caracteres"}: son los 6 primeros dígitos de tu DNI o CIF.`);
     if (v.length > 6 && dig.length < 6) return fallo("a-nif", "Formato incorrecto: escribe los 6 primeros dígitos de tu DNI o CIF, sin letras.");
     return true;
   }
   if (!$("a-tel").value.trim()) return fallo("a-tel", "Escribe el teléfono con el que sueles contactar con nosotros.");
-  if (limpia("a-pin").length !== 6) return fallo("a-pin", $("a-pin").value ? "La contraseña tiene 6 letras o números." : "Escribe tu contraseña de 6 letras o números.");
+  if (limpia("a-pin").length !== 6) return fallo("a-pin", $("a-pin").value ? "El código de entrada tiene 6 letras o números." : "Escribe tu código de entrada de 6 letras o números.");
   if ($("a-emp").value.trim().length < 2) return fallo("a-emp", "Escribe el nombre de tu empresa.");
   return true;
 }
@@ -807,13 +822,49 @@ $("cambiar").onclick = () => { $("c-err").textContent = ""; $("c-ok").textConten
 $("c-cerrar").onclick = () => ($("m-codigo").hidden = true);
 $("f-codigo").onsubmit = async (e) => {
   e.preventDefault(); $("c-err").textContent = ""; $("c-ok").textContent = "";
-  if ($("c-nuevo").value.toUpperCase() !== $("c-nuevo2").value.toUpperCase()) { $("c-err").textContent = "Las dos contraseñas no coinciden."; return; }
+  const mal = (id, msg) => { $("c-err").textContent = msg; $(id).focus(); };
+  const n1 = $("c-nuevo").value, n2 = $("c-nuevo2").value;
+  if (!n1) return mal("c-nuevo", "Escribe el nuevo código de entrada (6 letras o números).");
+  if (!/^[A-Za-z0-9]{6}$/.test(n1)) return mal("c-nuevo", "El código de entrada tiene que tener 6 letras o números, sin espacios ni símbolos.");
+  if (!n2) return mal("c-nuevo2", "Repite el código de entrada para comprobar que está bien escrito.");
+  if (n1.toUpperCase() !== n2.toUpperCase()) return mal("c-nuevo2", "Los dos códigos de entrada no coinciden.");
   const r = await post("/api/codigo", { nuevo: $("c-nuevo").value });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) { $("c-err").textContent = j.error || "No se pudo cambiar la contraseña."; return; }
-  $("c-ok").textContent = "Listo: desde ahora entras con tu nueva contraseña."; $("f-codigo").reset();
+  if (!r.ok) { $("c-err").textContent = j.error || "No se pudo cambiar el código de entrada."; return; }
+  $("c-ok").textContent = "Listo: desde ahora entras con tu nuevo código de entrada."; $("f-codigo").reset();
   setTimeout(() => ($("m-codigo").hidden = true), 1800);
 };
+
+// ── Mensajes de validación en español para los campos obligatorios (el navegador los da en inglés si el móvil lo está) ──
+const MSG_FALTA = { "r-nom": "Escribe el nombre de tu negocio.", "r-tel": "Escribe tu teléfono.", "r-mail": "Escribe tu correo electrónico.", "r-pin": "Elige un código de entrada de 6 letras o números.", "r-pin2": "Repite el código de entrada.", "d-texto": "Cuéntanos qué necesitas." };
+document.querySelectorAll("input[required], textarea[required], select[required]").forEach((el) => {
+  el.addEventListener("invalid", () => { const v = el.validity; el.setCustomValidity(v.valueMissing ? (MSG_FALTA[el.id] || "Rellena este campo.") : v.patternMismatch ? "Usa 6 letras o números, sin espacios ni símbolos." : v.typeMismatch ? (el.type === "email" ? "Escribe un correo electrónico válido, por ejemplo nombre@empresa.es." : "El valor no es válido.") : ""); });
+  el.addEventListener("input", () => el.setCustomValidity(""));
+});
+
+// ── Ventanas: se cierran con la X o «Cerrar», con Escape, tocando fuera y con «Atrás» del móvil ──
+(() => {
+  const todas = () => [...document.querySelectorAll(".vm-modal")].filter((m) => m.id !== "m-avisos"); // la pregunta de avisos pide una respuesta
+  const abiertas = () => todas().filter((m) => !m.hidden);
+  let empujada = false, t = 0;
+  const revisa = () => { clearTimeout(t); t = setTimeout(() => { // una sola entrada en el historial mientras haya alguna ventana abierta
+    const hay = abiertas().length > 0;
+    if (hay && !empujada) { try { history.pushState({ modal: 1 }, ""); empujada = true; } catch {} }
+    else if (!hay && empujada) { empujada = false; try { if (history.state?.modal) history.back(); } catch {} }
+  }, 0); };
+  todas().forEach((m) => {
+    new MutationObserver(revisa).observe(m, { attributes: true, attributeFilter: ["hidden"] });
+    m.addEventListener("click", (e) => { if (e.target === m) m.hidden = true; });
+  });
+  addEventListener("popstate", (e) => { if (e.state?.modal) return; if (abiertas().length) { empujada = false; abiertas().forEach((m) => (m.hidden = true)); } });
+  document.addEventListener("keydown", (e) => { if (e.key !== "Escape" || document.querySelector(".pdf-visor, #ayuda-fondo")) return; const a = abiertas(); if (a.length) a[a.length - 1].hidden = true; });
+  const abreLegal = () => { $("m-legal").querySelectorAll("details").forEach((d) => (d.open = true)); $("m-legal").hidden = false; };
+  window.vmAbreLegal = abreLegal;
+  $("legal-menu").onclick = () => { menu(false); abreLegal(); };
+  $("d-legal").onclick = () => { $("m-datos").hidden = true; abreLegal(); };
+  $("l-x").onclick = $("l-cerrar").onclick = () => ($("m-legal").hidden = true);
+  $("f-x").onclick = () => ($("m-fijo").hidden = true);
+})();
 
 // ── Mis datos y privacidad ──
 // ── Mi cuenta: mis datos y mis pedidos (agrupados por mes) con «Repetir» y «Añadir al carrito» ──
@@ -1198,11 +1249,14 @@ function abrirAyuda(a, nombre) {
   const viejo = document.getElementById("ayuda-fondo"); if (viejo) viejo.remove();
   const f = document.createElement("div"); f.id = "ayuda-fondo"; f.className = "ayuda-fondo"; f.setAttribute("role", "dialog"); f.setAttribute("aria-modal", "true"); f.setAttribute("aria-label", "¿Necesitas ayuda?");
   const c = document.createElement("div"); c.className = "ayuda-caja";
-  const h = document.createElement("h2"); h.textContent = "¿Necesitas ayuda?"; c.appendChild(h);
+  const hayContacto = !!(a.telHref || a.whatsappHref);
+  const h = document.createElement("h2"); h.textContent = hayContacto ? "¿Necesitas ayuda?" : "Ayuda y ajustes de pantalla"; c.appendChild(h);
   const enlace = (txt, href, ext) => { const l = document.createElement("a"); l.className = "ayuda-btn"; l.href = href; l.textContent = txt; if (ext) { l.target = "_blank"; l.rel = "noopener"; } c.appendChild(l); };
   if (a.telHref) enlace("Llamar" + (a.tel ? " · " + a.tel : ""), a.telHref);
   if (a.whatsappHref) enlace("WhatsApp", a.whatsappHref + "?text=" + encodeURIComponent("Hola, necesito ayuda con mi pedido" + (nombre ? ". Soy " + nombre : "")), true);
   if (a.horario) { const p = document.createElement("p"); p.textContent = "" + a.horario; c.appendChild(p); }
+  { const hp = document.createElement("button"); hp.type = "button"; hp.className = "ayuda-btn"; hp.textContent = "Hablar con una persona (por el chat)"; hp.onclick = () => { f.remove(); document.removeEventListener("keydown", esc); enviar("persona", "Hablar con una persona"); }; c.appendChild(hp); } // siempre hay una vía de contacto, haya o no teléfono configurado
+  { const lg = document.createElement("button"); lg.type = "button"; lg.className = "ayuda-cerrar"; lg.textContent = "Privacidad y aviso legal"; lg.onclick = () => { f.remove(); document.removeEventListener("keydown", esc); window.vmAbreLegal(); }; c.appendChild(lg); }
   // «Ajustes de pantalla»: Automático (como el móvil) / Claro / Oscuro; se recuerda en este móvil
   const aj = document.createElement("div"); aj.className = "ayuda-aj"; const ajt = document.createElement("h3"); ajt.textContent = "Ajustes de pantalla"; aj.appendChild(ajt);
   const grp = document.createElement("div"); grp.className = "ayuda-tema"; grp.setAttribute("role", "group"); grp.setAttribute("aria-label", "Aspecto de la pantalla");

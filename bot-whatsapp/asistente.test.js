@@ -57,7 +57,7 @@ test("«¿puedo repetir el último pedido?»: dice que sí, con el botón «Repe
 });
 
 test("contraseña y datos: dice dónde se cambia la contraseña y dónde se descargan o eliminan los datos", () => {
-  for (const t of ["¿Cómo puedo cambiar la contraseña?", "quiero cambiar mi clave", "he olvidado la contraseña", "como cambio el pin"]) assert.match(di(medina, t).reply, /menú ⋮.*Cambiar contraseña/s, t);
+  for (const t of ["¿Cómo puedo cambiar la contraseña?", "quiero cambiar mi clave", "he olvidado la contraseña", "como cambio el pin"]) assert.match(di(medina, t).reply, /menú ⋮.*Cambiar código de entrada/s, t);
   for (const t of ["como elimino mi cuenta", "quiero borrar mis datos", "puedo descargar mis datos", "quiero darme de baja"]) assert.match(di(medina, t).reply, /Mis datos y privacidad/, t);
 });
 

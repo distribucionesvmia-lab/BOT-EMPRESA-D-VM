@@ -13,7 +13,7 @@ import { createAuth } from "./auth.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
 import { estadoSistema, crearVigilante } from "./monitor.js";
-import { privacidadHtml } from "./privacidad.js";
+import { privacidadHtml, avisoLegalHtml } from "./privacidad.js";
 import { sendMail } from "./mailer.js";
 import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, accesosDe } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "./delivery.js";
@@ -500,7 +500,7 @@ async function appRoutes(req, res, url) {
   }
   // Aplicación del cliente
   if (!clientEnabled) return void res.writeHead(404).end();
-  if (p === "/cliente" && req.method === "GET") return void enviar(res, 200, HTML, (page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml({ titular: process.env.PRIVACY_TITULAR || undefined, cif: process.env.PRIVACY_CIF || "", direccion: process.env.PRIVACY_DIRECCION || undefined, email: process.env.PRIVACY_EMAIL || "" }))));
+  if (p === "/cliente" && req.method === "GET") return void enviar(res, 200, HTML, (() => { const dl = { titular: process.env.PRIVACY_TITULAR || undefined, cif: process.env.PRIVACY_CIF || "", direccion: process.env.PRIVACY_DIRECCION || undefined, email: process.env.PRIVACY_EMAIL || "" }; return page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml(dl)).replaceAll("<div data-aviso-legal></div>", avisoLegalHtml(dl)); })());
   if (await auth.route(req, res, url)) return;
 
   const account = auth.sessionOf(req);

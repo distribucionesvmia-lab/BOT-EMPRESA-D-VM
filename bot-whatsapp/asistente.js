@@ -156,7 +156,7 @@ export const precioMaximoDe = (texto) => { const m = PRECIO_MAX.exec(` ${norm(te
 const dia = (o) => (o ? (o.detail ? `${o.label.toLowerCase()} (${o.detail})` : o.label.toLowerCase()) : "");
 const FAQ = [
   { id: "contrasena", re: /\b(cambiar|cambio|cambiarla|cambiarlo|poner|modificar|olvide|olvido|olvidado|perdi|recuperar|restablecer|resetear|nueva|nuevo)\b.*\b(contrasena|clave|pin|password|codigo)\b|\b(contrasena|clave|pin|password)\b.*\b(cambiar|cambio|olvide|olvido|perdi|recuperar|restablecer|nueva)\b/,
-    texto: () => "🔑 *Cambiar la contraseña:* pulsa el menú ⋮ (arriba a la derecha) → *Cambiar contraseña* y elige 6 letras o números (da igual mayúsculas o minúsculas). Con ella podrás entrar con el teléfono con el que sueles contactar con nosotros.\n\nSi la has olvidado, llámanos y te damos una nueva." },
+    texto: () => "🔑 *Cambiar el código de entrada:* pulsa el menú ⋮ (arriba a la derecha) → *Cambiar código de entrada* y elige 6 letras o números (da igual mayúsculas o minúsculas). Con ella podrás entrar con el teléfono con el que sueles contactar con nosotros.\n\nSi lo has olvidado, llámanos y te damos uno nuevo." },
   { id: "datos", re: /\b(elimin\w*|borr\w*|suprim\w*|quit\w*|cancel\w*|anul\w*)\b.*\b(cuenta|datos|usuario|perfil)\b|\b(dar de baja|darme de baja|darnos de baja|darse de baja|de baja)\b|\b(descargar|bajar|ver|exportar|consultar)\b.*\b(mis datos|datos que|datos personales)\b|\b(privacidad|rgpd|proteccion de datos|derechos)\b/,
     texto: () => "🔒 *Tus datos:* pulsa el menú ⋮ → *Mis datos y privacidad*. Ahí puedes descargar todo lo que guardamos de ti, pedirnos que corrijamos o limitemos tus datos y *eliminar tu cuenta* cuando quieras." },
   { id: "repetir", re: /\b(repetir|repite|repetirlo|repetirme|repetimos|lo de siempre|lo mismo de siempre|el mismo pedido|mismo pedido|pedido de siempre|pedido anterior|repetir el ultimo)\b/,
@@ -180,7 +180,7 @@ const FAQ = [
   { id: "iva", re: /\b(iva|impuestos?|recargo|recargo de equivalencia)\b/,
     texto: () => "🧾 Los precios del catálogo van *sin IVA*. En el carrito ves el total con IVA (y el recargo de equivalencia si lo tienes)." },
   { id: "entrar", re: /\b(no puedo|no me deja|no consigo|como)\b.*\b(entrar|acceder|iniciar sesion|loguear|loguearme)\b/,
-    texto: () => "🔐 Entra con el *teléfono con el que sueles contactar con nosotros* y tu contraseña. Si todavía no tienes contraseña y eres cliente habitual, entra con los 6 primeros dígitos de tu DNI/CIF (botón «¿Sin contraseña?») y luego pon una contraseña en el menú ⋮. Si no te deja, llámanos." },
+    texto: () => "🔐 Entra con el *teléfono con el que sueles contactar con nosotros* y tu código de entrada. Si todavía no tienes código y eres cliente habitual, entra con los 6 primeros dígitos de tu DNI/CIF y luego pon un código de entrada en el menú ⋮. Si no te deja, llámanos." },
 ];
 
 // ¿Lleva cantidad? (cifras o números en palabras: «dos», «una»…)
