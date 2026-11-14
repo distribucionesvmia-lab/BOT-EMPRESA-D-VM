@@ -1230,6 +1230,7 @@
   .cab-ord { display:flex; gap:var(--s3); flex-wrap:wrap; padding:var(--s2) var(--gutter, 14px) var(--s2); } .cab-ord label { display:flex; flex-direction:column; gap:2px; font-size:calc(var(--t-micro) / var(--k,1)); color:var(--text-2); font-weight:600; flex:1 1 140px; min-width:0; } .cab-ord select { min-height:44px; border:.5px solid var(--line); border-radius:var(--r-field, 12px); background:var(--surface); color:var(--text); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); padding:0 var(--s3); max-width:100%; }
   .sin-red { position:fixed; top:0; left:0; right:0; z-index:500; background:#5a1a00; color:#fff; padding:calc(var(--s2, 8px) + env(safe-area-inset-top)) var(--gutter, 14px) var(--s2, 8px); font-size:calc(14px / var(--k,1)); font-weight:600; text-align:center; } .sin-red[hidden] { display:none; }
   .carga-lenta { margin:var(--s3) var(--gutter, 14px); color:var(--text-2); font-size:calc(var(--t-sec) / var(--k,1)); text-align:center; }
+  .elige-fila { display:flex; justify-content:space-between; gap:var(--s3); margin:0; } .elige-fila b { font-variant-numeric:tabular-nums; text-align:right; } .elige-det { margin:0; color:var(--text-2); font-size:calc(var(--t-cap) / var(--k,1)); } .elige-aviso { margin:0; color:var(--accent); font-weight:700; }
 </style>
 </head>
 <body>
@@ -2261,7 +2262,34 @@ function ofrecerParecidos(lista) {
   arrastrable(c, cerrar); f.onclick = e => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
   c.appendChild(x); f.appendChild(c); document.body.appendChild(f); (c.querySelector("button") || x).focus();
 }
-function precargar() {
+// Ya hay un pedido empezado y llega otro («Repetir y revisar», «Repetir pedido»): se enseña cómo cambia el total y se elige sustituir o añadir
+function elegirAnterior(ops, aplicar) {
+  return new Promise(res => {
+    const resumen = () => { const c = calc(), nUds = lines().reduce((t, l) => t + uds(l), 0); return { n: count(), uds: nUds, total: c.total }; };
+    const actual = resumen(), snap = { q: new Map(qty), u: new Map(unitOf) };
+    const restaura = () => { qty.clear(); unitOf.clear(); for (const [k, v] of snap.q) qty.set(k, v); for (const [k, v] of snap.u) unitOf.set(k, v); };
+    qty.clear(); unitOf.clear(); aplicar(false); const solo = resumen(), nombres = lines().map(l => `${l.qty} ${unit(l.id) === "caja" ? (l.qty === 1 ? "caja" : "cajas") : "ud"} · ${l.name}`); restaura();
+    aplicar(true); const junto = resumen(); restaura();
+    const viejo = document.getElementById("pregunta-fondo"); if (viejo) viejo.remove();
+    const f = document.createElement("div"); f.id = "pregunta-fondo"; f.className = "ayuda-fondo"; f.setAttribute("role", "alertdialog"); f.setAttribute("aria-modal", "true"); f.setAttribute("aria-label", "Ya tienes un pedido empezado");
+    const c = document.createElement("div"); c.className = "ayuda-caja"; c.style.maxHeight = "88vh"; c.style.overflow = "auto";
+    const h = document.createElement("h2"); h.textContent = "Ya tienes un pedido empezado"; c.appendChild(h);
+    const linea = (t, v) => { const p = document.createElement("p"); p.className = "elige-fila"; const a = document.createElement("span"); a.textContent = t; const b = document.createElement("b"); b.textContent = v; p.append(a, b); c.appendChild(p); };
+    linea("Tu pedido ahora", `${actual.n} artículo${actual.n === 1 ? "" : "s"} · ${eur(actual.total)}`);
+    linea("El pedido anterior", `${solo.n} artículo${solo.n === 1 ? "" : "s"} · ${eur(solo.total)}`);
+    const det = document.createElement("p"); det.className = "elige-det"; det.textContent = nombres.slice(0, 6).join(" · ") + (nombres.length > 6 ? ` · …y ${nombres.length - 6} más` : ""); c.appendChild(det);
+    linea("Si lo sustituyes", `${solo.n} artículo${solo.n === 1 ? "" : "s"} · ${eur(solo.total)}`);
+    linea("Si lo añades", `${junto.n} artículo${junto.n === 1 ? "" : "s"} · ${eur(junto.total)}`);
+    if (junto.total > LIM_IMPORTE) { const w = document.createElement("p"); w.className = "elige-aviso"; w.textContent = `Ojo: si lo añades, el pedido pasa de ${eur(LIM_IMPORTE).replace(",00", "")}.`; c.appendChild(w); }
+    const fin = r => { f.remove(); document.removeEventListener("keydown", esc); res(r); }; const esc = e => { if (e.key === "Escape") fin(null); };
+    const b1 = document.createElement("button"); b1.type = "button"; b1.className = "pregunta-si"; b1.textContent = "Sustituir el pedido actual"; b1.onclick = () => fin("sustituir");
+    const b2 = document.createElement("button"); b2.type = "button"; b2.className = "keepbtn"; b2.textContent = "Añadir al pedido actual"; b2.onclick = () => fin("sumar");
+    const b3 = document.createElement("button"); b3.type = "button"; b3.className = "ayuda-cerrar"; b3.textContent = "Cancelar"; b3.onclick = () => fin(null);
+    arrastrable(c, () => fin(null)); f.onclick = e => { if (e.target === f) fin(null); }; document.addEventListener("keydown", esc);
+    c.append(b1, b2, b3); f.appendChild(c); document.body.appendChild(f); b3.focus();
+  });
+}
+async function precargar() {
   const mod = /[#&]m=([\w-]+)/.exec(String(window.vmPrecarga ?? location.hash)); // «Modificar pedido» desde el chat
   if (mod) { setTimeout(() => modificar(mod[1]), 0); return; }
   if (/[#&]tab=hab(?:&|$)/.test(String(window.vmPrecarga ?? location.hash))) { tab = "hab"; try { history.replaceState({ vmTab: "hab" }, ""); } catch {} marcaNav(); return; } // «Ver todos» de «Lo que sueles pedir»
@@ -2271,19 +2299,35 @@ function precargar() {
   if (!m) return;
   const byId = new Set(data.products.map(p => p.id));
   const hashTxt = String(window.vmPrecarga ?? location.hash), sumar = /[#&]a=1(?:&|$)/.test(hashTxt), deCero = /[#&]x=1(?:&|$)/.test(hashTxt); // a=1: «Añadir al carrito» (suma a lo que ya hay) · x=1: «Repetir» (empieza un carrito nuevo con este pedido)
-  if (deCero && qty.size) { if (!confirm("Tienes un pedido sin terminar en el carrito. ¿Cambiarlo por este pedido?")) return; qty.clear(); unitOf.clear(); notes.clear(); }
-  let n = 0, faltan = 0; const sinStock = []; // sinStock: lo que ya no está, con la cantidad que se pedía, para ofrecer un parecido
+  try { if (window.vmPrecarga === undefined) history.replaceState(history.state, "", location.pathname + location.search); } catch {} // la orden del enlace se usa una sola vez: al recargar no se repite
+  let faltan = 0; const sinStock = [], ops = []; // sinStock: lo que ya no está, con la cantidad que se pedía, para ofrecer un parecido
   for (const par of m[1].split(",")) {
     const k = par.lastIndexOf("."), rawId = k < 0 ? par : par.slice(0, k), rawN = k < 0 ? "" : par.slice(k + 1), id = decodeURIComponent(rawId ?? ""), // el código puede llevar punto (157.10): el número va tras el ÚLTIMO punto
        u = Math.min(999, Math.floor(Number(rawN)));
     if (!(u > 0)) continue;
     if (!byId.has(id)) { faltan++; sinStock.push({ id, uds: u }); continue; } // ya no está en el catálogo
-    const pr = productoPorId.get(id), ya = sumar ? (qty.get(id) || 0) : 0;
-    if (sumar && ya && pr && pr.unitsPerBox > 1 && unit(id) === "caja") { qty.set(id, Math.min(999, ya + Math.ceil(u / pr.unitsPerBox))); } // ya estaba en cajas: se suman cajas
-    else if (pr && pr.soloCaja) { unitOf.set(id, "caja"); qty.set(id, Math.min(999, ya + Math.ceil(u / pr.unitsPerBox))); } // solo caja: las unidades se pasan a cajas enteras
-    else { unitOf.set(id, "ud"); qty.set(id, Math.min(999, ya + u)); }
-    n++;
+    ops.push({ id, u });
   }
+  const aplicar = (suma) => { // pone el pedido anterior en el carrito: sumando a lo que ya hay (suma) o dejando solo esas cantidades
+    let n = 0;
+    for (const { id, u } of ops) {
+      const pr = productoPorId.get(id), ya = suma ? (qty.get(id) || 0) : 0;
+      if (suma && ya && pr && pr.unitsPerBox > 1 && unit(id) === "caja") { qty.set(id, Math.min(999, ya + Math.ceil(u / pr.unitsPerBox))); } // ya estaba en cajas: se suman cajas
+      else if (pr && pr.soloCaja) { unitOf.set(id, "caja"); qty.set(id, Math.min(999, ya + Math.ceil(u / pr.unitsPerBox))); } // solo caja: las unidades se pasan a cajas enteras
+      else { unitOf.set(id, "ud"); qty.set(id, Math.min(999, ya + u)); }
+      n++;
+    }
+    return n;
+  };
+  let suma = sumar, n = 0;
+  if (ops.length && qty.size && !sumar) { // ya hay un pedido empezado: nunca se mezcla sin preguntar
+    const dec = await elegirAnterior(ops, aplicar);
+    if (!dec) { refresh(); return; }
+    if (dec === "sustituir") { qty.clear(); unitOf.clear(); notes.clear(); suma = false; } else suma = true;
+  }
+  const snap = { q: new Map(qty), u: new Map(unitOf), n: new Map(notes) };
+  n = aplicar(suma);
+  if (n && calc().total > LIM_IMPORTE && !(await preguntar({ titulo: "¿Seguro?", texto: `Con esto el pedido sube a ${eur(calc().total)}: es bastante más de lo habitual. Revisa las cantidades.`, si: "Sí, dejarlo así", no: "No, deshacer" }))) { qty.clear(); unitOf.clear(); notes.clear(); for (const [k, v] of snap.q) qty.set(k, v); for (const [k, v] of snap.u) unitOf.set(k, v); for (const [k, v] of snap.n) notes.set(k, v); n = 0; refresh(); return; }
   const conNombre = sinStock.filter(x => data.retirados && data.retirados[x.id]);
   if (conNombre.length) setTimeout(() => ofrecerParecidos(conNombre), 700);
   else if (faltan) setTimeout(() => aviso(faltan === 1 ? "1 artículo ya no está disponible." : faltan + " artículos ya no están disponibles."), 600);
@@ -2669,8 +2713,9 @@ obs.observe(document.body, { childList: true }); // ayuda y preguntas aparecen y
   (data.favs || []).forEach(id => favs.add(id));
   cargarDirs();
   recuperar();
-  precargar();
+  const pre = precargar(); // si hay que preguntar (ya hay un pedido empezado), la pantalla se pinta mientras tanto
   refresh();
+  await pre; refresh();
   if (estadoInicial && !/[#&](?:c|m|cat|tab)=/.test(String(window.vmPrecarga ?? location.hash))) setTimeout(() => { restaurando = true; try { tab = estadoInicial.vmTab === "hab" ? "hab" : "all"; restauraDe(estadoInicial); } finally { restaurando = false; } }, 0); // recargar o volver con «Adelante»: la búsqueda y el punto de la lista
 })();
 </script>
