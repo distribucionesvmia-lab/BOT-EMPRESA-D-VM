@@ -169,7 +169,7 @@ test("CATÁLOGO WEB: controles del carrito a 48 px, sin barra fija con el carrit
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
   assert.match(ped, /\.tl \.ud \{ min-width:112px; height:48px; \} \.tl \.ud button \{ min-height:48px; \}/);
   assert.match(ped, /\.tl \.hstep button \{ width:48px; height:100%;/);
-  assert.match(ped, /<footer hidden>/); // «Añade productos para empezar» solo existe cuando hay algo en el carrito
+  assert.match(ped, /<footer hidden role="status"/); // «Añade productos para empezar» solo existe cuando hay algo en el carrito
   assert.match(ped, /document\.querySelector\("footer"\)\.hidden = !n/);
   assert.match(ped, /"Caja de " \+ p\.unitsPerBox \+ " · " \+ eur\(precioCaja\(p\)\)/); // el precio de la caja, calculado como el importe de línea
   assert.match(ped, /\.app\.compacto \.buscar \{ max-height:0;/); // en apaisado se pliega también el buscador al bajar

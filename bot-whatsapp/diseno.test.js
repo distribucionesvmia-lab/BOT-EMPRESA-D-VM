@@ -48,3 +48,17 @@ test("botones redondos con icono: el icono va centrado y el globo del carrito no
   assert.match(pedido, /\.ayudabtn::before \{ content:none; \}/);
   assert.match(pedido, /minus\.innerHTML = '<svg/); assert.match(pedido, /plus\.innerHTML = '<svg/); // «−» y «+» del carrito son dibujos centrados, no letras
 });
+
+test("navegación inferior: 5 pestañas, aria-current, sin «Paso 1 de 3» ni pestañas de arriba, carrito flotante", () => {
+  const nav = (pedido.match(/<nav class="tabbar"[\s\S]*?<\/nav>/) || [""])[0];
+  assert.equal((nav.match(/<button /g) || []).length, 5);
+  for (const t of ["Inicio", "Catálogo", "Pedido", "Mis pedidos", "Ayuda"]) assert.match(nav, new RegExp(`class="tb-t">${t}<`));
+  assert.match(pedido, /setAttribute\("aria-current", "page"\)/);
+  assert.doesNotMatch(pedido, /<div class="paso">/); assert.doesNotMatch(pedido, /<nav class="tabs">/);
+  assert.match(pedido, /<footer hidden role="status" aria-live="polite"><button class="pill-cart"/);
+  assert.match(pedido, /\.pill-cart \{[^}]*min-height:54px/); assert.match(pedido, /\.tb \{[^}]*min-height:56px/);
+  assert.match(pedido, /Buscar en todo el catálogo/); assert.match(pedido, /slice\(0, 6\)/); // buscador con hasta 6 sugerencias
+  assert.match(pedido, /posTab\[tab\]\.scroll = \$\("list"\)\.scrollTop/); // cada pestaña recuerda su posición
+  assert.match(pedido, /history\.pushState\(\{ vmTab: t \}/); // «Atrás» del móvil vuelve a la pestaña anterior
+  assert.match(pedido, /aviso\("Quitado: "/); // «Quitado · Deshacer»
+});
