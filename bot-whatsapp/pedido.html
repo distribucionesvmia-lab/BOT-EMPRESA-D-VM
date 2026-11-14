@@ -2277,7 +2277,8 @@ function pintarResumen() {
   $("pieTotal").textContent = eur(c.total); $("revisar").disabled = !c.base; // el total siempre a la vista, en una línea, mientras cambias cantidades
   const bt = $("confirm"); if (!bt.disabled) { bt.textContent = "Enviar pedido a Distribuciones Valentín Martín"; if (c.base) { const sp = document.createElement("span"); sp.className = "nw"; sp.textContent = `Total ${eur(c.total)}`; bt.appendChild(sp); } } // el importe nunca se parte de línea
   const cd = data.condiciones || {}, falta = cd.minimo && c.base < cd.minimo ? cd.minimo - c.base : 0, am = $("avisoMin");
-  am.hidden = !falta; am.textContent = falta ? `El pedido mínimo es de ${eur(cd.minimo)} sin IVA. Te faltan ${eur(falta)} para llegar. Puedes enviarlo igualmente: la empresa lo revisará.` : "";
+  am.hidden = !cd.minimo; // si la empresa tiene pedido mínimo, se ve SIEMPRE en el carrito (antes solo mientras faltaba)
+  am.textContent = !cd.minimo ? "" : falta ? `El pedido mínimo es de ${eur(cd.minimo)} sin IVA. Te faltan ${eur(falta)} para llegar. Puedes enviarlo igualmente: la empresa lo revisará.` : `Pedido mínimo: ${eur(cd.minimo)} sin IVA. Ya lo has alcanzado.`;
 }
 function renderCart() {
   const box = $("cartLines"); box.innerHTML = "";

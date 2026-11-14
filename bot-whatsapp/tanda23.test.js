@@ -44,3 +44,9 @@ test("C. «Mis favoritos»: acceso destacado arriba del catálogo y vista con so
   assert.match(p, /fb\.className = "fav-acceso"/); assert.match(p, /fb\.onclick = \(\) => irA\(FAVS, "\*"\)/); assert.match(p, /data\.products\.filter\(p => favs\.has\(p\.id\)\)\.sort\(cmpNombre\)/);
   assert.match(p, /"Aún no tienes favoritos"/); assert.match(p, /\.fav-acceso \{[^}]*min-height:60px/);
 });
+
+test("D. pedido mínimo: si existe, se ve siempre en el carrito (faltan X, o «ya lo has alcanzado»); sin mínimo no sale nada", () => {
+  assert.match(p, /am\.hidden = !cd\.minimo;/); assert.match(p, /Pedido mínimo: \$\{eur\(cd\.minimo\)\} sin IVA\. Ya lo has alcanzado\./);
+  assert.match(p, /El pedido mínimo es de \$\{eur\(cd\.minimo\)\} sin IVA\. Te faltan/); assert.match(p, /fila\("Pedido mínimo"/); // y en el resumen, como antes
+  assert.match(leer("./config.js"), /minimo: Number\.isFinite\(min\) && min > 0 \? min : 0/); // sin PEDIDO_MINIMO, minimo = 0 → no se enseña
+});
