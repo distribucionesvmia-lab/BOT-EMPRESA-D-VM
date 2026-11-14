@@ -27,3 +27,25 @@ test("18.4 sugerencias de búsqueda: nombre en 2 líneas (no cortado en una) y e
 test("18.5 texto grande: el panel «Aa» se titula, explica A+ / A− y dice «normal / grande / muy grande»", () => {
   for (const h of [p, c]) { assert.match(h, /tit\.textContent = "Tamaño de la letra"/); assert.match(h, /Pulsa A\+ para ver todo más grande, o A− para más pequeño\./); assert.match(h, /e < 1\.07 \? "normal" : e < 1\.22 \? "grande" : "muy grande"/); assert.match(h, /"Letra más grande"/); }
 });
+
+import { openAccountsDb } from "./cuentas-db.js";
+test("Bench 9.1 alta: correo opcional en la solicitud y en el alta automática, menos texto y botón «Enviando…»", () => {
+  const a = openAccountsDb(":memory:");
+  const r = a.requestRegistration({ phone: "655121212", email: "", business: "Taberna Nueva", pin: "Ab12Cd", nif: "87654321X" }); assert.ok(r.id, JSON.stringify(r));
+  assert.equal(a.requestRegistration({ phone: "655121213", email: "mal", business: "Taberna", pin: "Ab12Cd", nif: "87654321X" }).error, "El correo no es válido."); // si se escribe, tiene que valer
+  assert.equal(a.registerAuto({ phone: "655121214", email: undefined, business: "Taberna Dos", pin: "Ab12Cd", customerId: "C1", matched: "x" }).error, undefined);
+  assert.match(c, /<label>Correo electrónico <small class="pista">\(opcional\)<\/small><input id="r-mail"/); assert.match(c, /<label>Dirección de entrega <small class="pista">\(opcional\)/);
+  assert.doesNotMatch(c, /Cuéntanos quién eres y elige un código de entrada/); assert.match(c, /Rellena estos datos y te damos de alta\./);
+  assert.match(c, /return enviando\(\$\("f-registro"\)/); assert.match(c, /Enviando…/);
+});
+test("Bench 9.2 tras enviar: «Recibido. Te llamamos en 24-48 h laborables» con teléfono y WhatsApp solo si la empresa los ha configurado", () => {
+  assert.match(c, /id="alta-ok" hidden role="status"/); assert.match(c, /"Te llamamos en 24-48 h laborables para darte de alta\."/); assert.match(c, /function altaHecha\(activa\)/);
+  assert.match(c, /if \(!activa && a && \(a\.telHref \|\| a\.whatsappHref\)\)/); assert.match(c, /if \(a\.telHref\) \{ const l = nodo\("a", "Llamar"/); assert.match(c, /if \(a\.whatsappHref\) \{ const l = nodo\("a", "WhatsApp"/); // sin datos, no se inventa ningún número
+  assert.doesNotMatch(c.slice(c.indexOf("function altaHecha"), c.indexOf('$("alta-ok-v").onclick')), /\b9\d{2} ?\d{3} ?\d{3}\b/);
+});
+test("Bench 9.3-4 bienvenida de 3 pasos con los textos reales, «Entendido» para siempre por cliente y la oferta de poner código dentro", () => {
+  for (const t of ["Busca un artículo o mira «Lo que sueles pedir».", "Marca las cantidades con el «+».", "Pulsa «Revisar pedido», elige el día de entrega y envíalo."]) assert.ok(c.includes(t), t);
+  assert.match(c, /post\("\/api\/bienvenida\/vista", \{\}\)/); assert.match(c, /y\?\.codigoPropio === false/); assert.match(c, /"Poner mi código"/); assert.match(c, /\$\("cambiar"\)\.click\(\)/); // abre el modal m-codigo que ya existe
+  assert.match(s, /\/api\/bienvenida/); assert.match(s, /ordersOf\(account\.customerId, 1\)\.length > 0/); // no se enseña a quien ya ha pedido por la app
+  assert.match(leer("./cuentas-db.js"), /DELETE FROM bienvenida_vista WHERE customer_id/); // se borra con la cuenta
+});

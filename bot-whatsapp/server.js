@@ -785,6 +785,15 @@ async function appRoutes(req, res, url) {
       pedidos, hayMas: !mas && todosH.length > HISTORIAL_MAX, ayuda: ayudaPublica(),
     });
   }
+  if (p === "/api/bienvenida" && req.method === "GET") { // tarjeta de bienvenida: solo la primera vez (hasta que pulse «Entendido»), y no a quien ya ha hecho pedidos con la aplicación
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const yaPidio = getDb().ordersOf(account.customerId, 1).length > 0;
+    return void sendJson(res, 200, { mostrar: !getAccountsDb().bienvenidaVista(account.customerId) && !yaPidio });
+  }
+  if (p === "/api/bienvenida/vista" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    return void sendJson(res, 200, { ok: getAccountsDb().bienvenidaMarcar(account.customerId) });
+  }
   if (p === "/api/avisos/corte" && req.method === "GET") { // «Avisarme antes de la hora límite»
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     const m = horaAviso(process.env.AVISO_CORTE_HORA);

@@ -88,6 +88,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   // Favoritos del cliente (privados, por cliente; no los toca la sincronización con a3ERP)
   // Pedido fijo semanal (F-16): la plantilla de líneas y los días de reparto; NUNCA se envía solo, el cliente la revisa cada día que toca
   db.exec("CREATE TABLE IF NOT EXISTS usual_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, hidden INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)"); // «Tu pedido de siempre» editado o borrado por el cliente (sin fila = el último pedido, como siempre)
+  db.exec("CREATE TABLE IF NOT EXISTS bienvenida_vista (customer_id TEXT PRIMARY KEY, at TEXT NOT NULL)"); // la tarjeta de bienvenida ya cerrada («Entendido»), por cliente
   db.exec("CREATE TABLE IF NOT EXISTS corte_pref (customer_id TEXT PRIMARY KEY, activo INTEGER NOT NULL)"); // «Avisarme antes de la hora límite»: sin fila = activado (si tiene los avisos del móvil activados)
   db.exec("CREATE TABLE IF NOT EXISTS corte_avisos (customer_id TEXT NOT NULL, day TEXT NOT NULL, PRIMARY KEY (customer_id, day))"); // un aviso por día y cliente como máximo
   db.exec("CREATE TABLE IF NOT EXISTS standing_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, days TEXT NOT NULL, paused INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)");
@@ -235,6 +236,9 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     hideUsual(customerId, now = new Date().toISOString()) { db.prepare("INSERT INTO usual_orders (customer_id, lines, hidden, updated_at) VALUES (?, '[]', 1, ?) ON CONFLICT(customer_id) DO UPDATE SET lines = '[]', hidden = 1, updated_at = excluded.updated_at").run(String(customerId), now); return true; },
     resetUsual: (customerId) => db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(String(customerId)).changes === 1,
     allStanding() { const m = new Map(); for (const r of db.prepare("SELECT customer_id, days, paused, skip_week FROM standing_orders").all()) m.set(r.customer_id, { days: JSON.parse(r.days), paused: !!r.paused, skipWeek: r.skip_week ?? null }); return m; },
+    /** Tarjeta de bienvenida: ¿ya la cerró este cliente con «Entendido»? */
+    bienvenidaVista: (customerId) => !!db.prepare("SELECT 1 FROM bienvenida_vista WHERE customer_id = ?").get(String(customerId)),
+    bienvenidaMarcar(customerId, now = new Date().toISOString()) { db.prepare("INSERT OR IGNORE INTO bienvenida_vista (customer_id, at) VALUES (?, ?)").run(String(customerId), now); return true; },
     /** «Avisarme antes de la hora límite» (por defecto sí). */
     corteActivo: (customerId) => (db.prepare("SELECT activo FROM corte_pref WHERE customer_id = ?").get(String(customerId))?.activo ?? 1) === 1,
     corteSet: (customerId, activo) => { db.prepare("INSERT INTO corte_pref (customer_id, activo) VALUES (?, ?) ON CONFLICT(customer_id) DO UPDATE SET activo = excluded.activo").run(String(customerId), activo ? 1 : 0); return true; },
@@ -269,10 +273,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       const p = normalizePhone(phone);
       const biz = String(business ?? "").trim().replace(/\s+/g, " ");
       if (!p) return { error: "El teléfono no es válido." };
-      if (!validEmail(String(email ?? "").trim())) return { error: "El correo no es válido." };
+      if (String(email ?? "").trim() && !validEmail(String(email).trim())) return { error: "El correo no es válido." }; // el correo es opcional
       if (biz.length < 2 || biz.length > 80) return { error: "Escribe el nombre de tu empresa." };
       if (pin !== undefined && !pinValido(pin)) return { error: "La contraseña debe tener 6 letras o números." };
-      const mail = String(email).trim();
+      const mail = String(email ?? "").trim();
       const dni = nif === undefined ? null : String(nif).toUpperCase().replace(/[^A-Z0-9]/g, "");
       if (dni !== null && !/^[A-Z0-9]{8,10}$/.test(dni)) return { error: "Escribe tu DNI, NIE o CIF." };
       const dir = String(address ?? "").trim().replace(/\s+/g, " ").slice(0, 160) || null;
@@ -303,9 +307,9 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         const pre = byCustomer.get(String(customerId));
         let accId;
         if (pre && !pre.phone) {
-          db.prepare("UPDATE accounts SET phone = ?, email = ?, pin_hash = ?, status = CASE WHEN status = 'deleted' THEN 'active' ELSE status END WHERE id = ?").run(r.phone, r.email, r.pin_hash ?? hashPin(pin), pre.id);
+          db.prepare("UPDATE accounts SET phone = ?, email = ?, pin_hash = ?, status = CASE WHEN status = 'deleted' THEN 'active' ELSE status END WHERE id = ?").run(r.phone, r.email || null, r.pin_hash ?? hashPin(pin), pre.id);
           accId = pre.id;
-        } else accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, created_at) VALUES (?, ?, ?, ?, ?)").run(String(customerId), r.phone, r.email, r.pin_hash ?? hashPin(pin), now).lastInsertRowid);
+        } else accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, created_at) VALUES (?, ?, ?, ?, ?)").run(String(customerId), r.phone, r.email || null, r.pin_hash ?? hashPin(pin), now).lastInsertRowid);
         db.prepare("UPDATE registrations SET status = 'approved', nif = NULL, address = NULL, customer_id = ?, decided_at = ? WHERE id = ?").run(String(customerId), now, id);
         db.exec("COMMIT");
         return { account: accountOut(byId.get(accId)), ...(pin ? { pin } : {}) };
@@ -321,18 +325,18 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     registerAuto({ phone, email, business, pin, customerId, matched }, now = new Date().toISOString()) {
       const p = normalizePhone(phone);
       if (!p) return { error: "El teléfono no es válido." };
-      if (!validEmail(String(email ?? "").trim())) return { error: "El correo no es válido." };
+      if (String(email ?? "").trim() && !validEmail(String(email).trim())) return { error: "El correo no es válido." }; // el correo es opcional
       if (!pinValido(pin)) return { error: "La contraseña debe tener 6 letras o números." };
       if (byPhone.get(p)) return { error: "Este teléfono ya tiene acceso. Entra con tu PIN, o pide uno nuevo a la empresa." };
       db.exec("BEGIN IMMEDIATE");
       try {
-        db.prepare("INSERT INTO registrations (phone, email, business, status, customer_id, pin_hash, matched, created_at, decided_at) VALUES (?, ?, ?, 'auto', ?, NULL, ?, ?, ?)").run(p, String(email).trim(), String(business).trim().slice(0, 80), String(customerId), matched ?? null, now, now);
+        db.prepare("INSERT INTO registrations (phone, email, business, status, customer_id, pin_hash, matched, created_at, decided_at) VALUES (?, ?, ?, 'auto', ?, NULL, ?, ?, ?)").run(p, String(email ?? "").trim(), String(business).trim().slice(0, 80), String(customerId), matched ?? null, now, now);
         const pre = byCustomer.get(String(customerId));
         let accId;
         if (pre && !pre.phone) {
-          db.prepare("UPDATE accounts SET phone = ?, email = ?, pin_hash = ?, status = CASE WHEN status = 'deleted' THEN 'active' ELSE status END WHERE id = ?").run(p, String(email).trim(), hashPin(normPin(pin)), pre.id);
+          db.prepare("UPDATE accounts SET phone = ?, email = ?, pin_hash = ?, status = CASE WHEN status = 'deleted' THEN 'active' ELSE status END WHERE id = ?").run(p, String(email ?? "").trim() || null, hashPin(normPin(pin)), pre.id);
           accId = pre.id;
-        } else accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, verified, created_at) VALUES (?, ?, ?, ?, 0, ?)").run(String(customerId), p, String(email).trim(), hashPin(normPin(pin)), now).lastInsertRowid);
+        } else accId = Number(db.prepare("INSERT INTO accounts (customer_id, phone, email, pin_hash, verified, created_at) VALUES (?, ?, ?, ?, 0, ?)").run(String(customerId), p, String(email ?? "").trim() || null, hashPin(normPin(pin)), now).lastInsertRowid);
         db.exec("COMMIT");
         return { account: accountOut(byId.get(accId)) };
       } catch (e) {
@@ -448,6 +452,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         db.prepare("DELETE FROM standing_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM corte_pref WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM bienvenida_vista WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM corte_avisos WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM push_subs WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM registrations WHERE customer_id = ? OR (phone = ? AND ? IS NOT NULL)").run(row.customer_id, row.phone, row.phone);

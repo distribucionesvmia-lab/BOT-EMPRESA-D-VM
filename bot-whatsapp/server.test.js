@@ -1064,6 +1064,19 @@ test("TANDA 18.1: «¿cuánto llevo?» lee el carrito real del catálogo (artíc
   assert.equal((await call("GET", "/api/admin/pedidos", { admin: true })).json.length, antes);
 });
 
+test("BENCH 9: el correo del alta es opcional (si se escribe, tiene que ser válido) y la tarjeta de bienvenida se cierra para siempre por cliente", async () => {
+  const ok = { telefono: "600000001", empresa: "Bar El Ejemplo", pin: "12", nif: "12345678Z" }; // pin malo a propósito: no se crea ninguna solicitud
+  assert.match((await call("POST", "/api/registro", { body: ok })).json.error, /código de entrada/); // sin correo: pasa esa comprobación y falla por el código
+  assert.match((await call("POST", "/api/registro", { body: { ...ok, correo: "mal" } })).json.error, /correo no es válido/);
+  assert.equal((await call("GET", "/api/bienvenida")).status, 401); assert.equal((await call("POST", "/api/bienvenida/vista", { body: {} })).status, 401);
+  const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar dos"));
+  const mostrar = async (c) => (await call("GET", "/api/bienvenida", { cookie: c })).json.mostrar;
+  const antesA = await mostrar(A), antesB = await mostrar(B);
+  assert.equal((await call("POST", "/api/bienvenida/vista", { cookie: A, body: {} })).json.ok, true);
+  assert.equal(await mostrar(A), false); assert.equal(await mostrar(B), antesB); // solo se cierra la de ese cliente
+  assert.equal(typeof antesA, "boolean");
+});
+
 test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repetir o añadir), nunca los de otro ni su NIF", async () => {
   assert.equal((await call("GET", "/api/mi-cuenta")).status, 401);
   const A = cookieOf(await entrarNif("111111"));

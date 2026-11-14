@@ -274,3 +274,10 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **Sugerencias de búsqueda**: nombre limpio en hasta 2 líneas y debajo formato + medidas + precio («Caja de 6 · 1,5 L · 1,02 €/ud»).
 - **Texto grande**: ya existía (A− / A+, 100/115/130 % y Automático); el panel «Aa» ahora tiene título, explica «Pulsa A+ para ver todo más grande» y dice «Letra normal/grande/muy grande».
 - Pruebas: `tanda25.test.js` y «TANDA 18.1» en `server.test.js`.
+
+## Bench 9 (alta más corta y bienvenida)
+- **Alta**: el correo es OPCIONAL (si se escribe, tiene que ser válido; vale en la solicitud y en el alta automática; en cuentas queda vacío), la dirección sigue opcional y hay menos texto. El botón ya se desactivaba con «Enviando…» (Tanda 16).
+- **Pantalla «Recibido»** (`altaHecha`, `#alta-ok`): «Te llamamos en 24-48 h laborables para darte de alta» con «Llamar» y «WhatsApp» (y horario) SOLO si la empresa los ha puesto (`AYUDA_TEL`, `AYUDA_WHATSAPP`, `AYUDA_HORARIO`); sin datos no sale ningún número. Si ya tenía acceso (alta automática): «Listo, ya tienes acceso».
+- **Bienvenida** (primera vez): tarjeta «Así se hace un pedido» con 3 pasos con los textos reales de la app y «Entendido», que la cierra para siempre POR CLIENTE (`bienvenida_vista` en la base de cuentas; `GET /api/bienvenida`, `POST /api/bienvenida/vista`). No sale a quien ya ha hecho pedidos con la aplicación (`ordersOf`), así que los clientes de antes no la ven.
+- **Código de entrada en la bienvenida**: el caso «entró con el NIF y no tiene código» SÍ puede darse (el NIF solo deja de valer cuando el cliente ya ha puesto su código). Si ocurre, la bienvenida ofrece «Poner mi código» (abre el modal `m-codigo`); cuando sale la bienvenida no sale la tarjeta suelta `.in-codigo` (así no hay dos). Se dice «código de entrada» (no «contraseña») como en toda la app.
+- Pruebas: `tanda25.test.js` y «BENCH 9» en `server.test.js`.

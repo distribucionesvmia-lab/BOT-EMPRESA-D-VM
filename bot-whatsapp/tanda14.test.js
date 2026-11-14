@@ -30,7 +30,7 @@ test("3. el campo «Entrar con mi NIF» solo admite números (las letras, solo c
 });
 test("4. alta: campos obligatorios con *, todos los errores a la vez y en español (sin avisos del navegador)", () => {
   assert.match(h, /id="f-registro" autocomplete="off" novalidate/); assert.match(h, /Los campos con <b class="req">\*<\/b> son obligatorios/);
-  for (const id of ["r-emp", "r-tel", "r-nif", "r-mail", "r-pin", "r-pin2"]) { assert.ok(h.includes(`id="e-${id}" role="alert"`), id); assert.match(h, new RegExp(`id="${id}"[^>]*aria-required="true"`), id); }
+  for (const id of ["r-emp", "r-tel", "r-nif", "r-mail", "r-pin", "r-pin2"]) { assert.ok(h.includes(`id="e-${id}" role="alert"`), id); if (id !== "r-mail") assert.match(h, new RegExp(`id="${id}"[^>]*aria-required="true"`), id); } // (Bench 9: el correo es opcional, ya no es obligatorio)
   assert.match(h, /for \(const id of Object\.keys\(reglasAlta\)\) \{ const m = reglasAlta\[id\]/); assert.match(h, /campos por corregir \(marcados en rojo\)/);
   assert.doesNotMatch(h, /id="r-(emp|tel|nif|mail|pin|pin2)"[^>]*\srequired[\s>]/); // nada de «required» del navegador
 });

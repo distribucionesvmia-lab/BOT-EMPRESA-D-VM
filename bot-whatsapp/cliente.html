@@ -414,6 +414,12 @@
   .cu-interruptor input:checked { background:var(--accent); } .cu-interruptor input:checked::after { transform:translateX(20px); }
   .cu-interruptor input:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
   @media (prefers-reduced-motion:reduce) { .cu-interruptor input::after { transition:none; } } .cu-interruptor b { display:block; font-weight:600; font-size:calc(var(--t-body) / var(--k,1)); } .cu-interruptor small { display:block; color:var(--text-2); font-size:calc(var(--t-cap) / var(--k,1)); line-height:1.3; }
+  .in-bienvenida { background:var(--surface); border-radius:var(--r-card); padding:var(--s4); display:flex; flex-direction:column; gap:var(--s3); min-width:0; max-width:100%; }
+  .in-bienvenida h3 { margin:0; font-size:calc(var(--t-lg) / var(--k,1)); } .in-bienvenida ol { margin:0; padding-left:1.4em; display:flex; flex-direction:column; gap:var(--s2); font-size:calc(var(--t-body) / var(--k,1)); line-height:1.35; }
+  .in-bienvenida .bv-codigo { background:var(--accent-soft); border-radius:var(--r-field); padding:var(--s3); display:flex; flex-direction:column; gap:var(--s2); } .in-bienvenida .bv-codigo p { margin:0; font-size:calc(var(--t-sec) / var(--k,1)); }
+  .in-bienvenida .vm-btn { width:100%; min-height:48px; }
+  .in-bienvenida .bv-codigo .vm-btn { background:var(--surface); color:var(--accent); }
+  #alta-ok { text-align:center; } #alta-ok .vm-btn { display:flex; align-items:center; justify-content:center; text-decoration:none; width:100%; }
   .carga-fallo { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s3); padding:var(--s3) var(--s4); border-radius:var(--r-field); background:var(--fill); color:var(--text); font-size:calc(var(--t-sec) / var(--k,1)); }
   .carga-fallo .vm-btn { width:auto; min-height:44px; padding:0 var(--s4); background:var(--surface); color:var(--accent); }
   .vm-inicio .in-total { color:var(--text) !important; font-weight:600; font-variant-numeric:tabular-nums; }
@@ -715,21 +721,27 @@
         <h1>Hazte cliente</h1>
       </header>
       <form class="vm-card" id="f-registro" autocomplete="off" novalidate>
-        <p>Cuéntanos quién eres y elige un código de entrada. <b>En 24 a 48 horas te contactaremos y aceptaremos tu cuenta</b> para que puedas hacer pedidos; si tus datos ya constan, entras al momento.</p>
+        <p>Rellena estos datos y te damos de alta. <b>Si ya eres cliente, entras al momento.</b></p>
         <p class="req-nota">Los campos con <b class="req">*</b> son obligatorios.</p>
         <label>Nombre de tu empresa o negocio <b class="req" aria-hidden="true">*</b><input id="r-emp" maxlength="80" aria-required="true" aria-describedby="e-r-emp"><small class="err-campo" id="e-r-emp" role="alert"></small></label>
         <label>Teléfono <b class="req" aria-hidden="true">*</b><input id="r-tel" type="tel" inputmode="tel" aria-required="true" aria-describedby="e-r-tel"><small class="err-campo" id="e-r-tel" role="alert"></small></label>
         <label>DNI, NIE o CIF <b class="req" aria-hidden="true">*</b><input id="r-nif" maxlength="9" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 12345678Z o B12345678" aria-required="true" aria-describedby="e-r-nif"><small class="err-campo" id="e-r-nif" role="alert"></small></label>
-        <label>Dirección de entrega (opcional)<input id="r-dir" maxlength="160" autocomplete="street-address" placeholder="Calle, número y localidad"></label>
-        <label>Correo electrónico <b class="req" aria-hidden="true">*</b><input id="r-mail" type="email" autocomplete="email" aria-required="true" aria-describedby="e-r-mail"><small class="err-campo" id="e-r-mail" role="alert"></small></label>
+        <label>Dirección de entrega <small class="pista">(opcional)</small><input id="r-dir" maxlength="160" autocomplete="street-address" placeholder="Calle, número y localidad"></label>
+        <label>Correo electrónico <small class="pista">(opcional)</small><input id="r-mail" type="email" autocomplete="email" aria-describedby="e-r-mail"><small class="err-campo" id="e-r-mail" role="alert"></small></label>
         <label>Elige un código de entrada de 6 letras o números <b class="req" aria-hidden="true">*</b><input id="r-pin" type="password" maxlength="6" autocapitalize="off" autocomplete="new-password" aria-required="true" aria-describedby="e-r-pin"><small class="err-campo" id="e-r-pin" role="alert"></small></label>
         <label>Repite el código de entrada <b class="req" aria-hidden="true">*</b><input id="r-pin2" type="password" maxlength="6" autocapitalize="off" autocomplete="new-password" aria-required="true" aria-describedby="e-r-pin2"><small class="err-campo" id="e-r-pin2" role="alert"></small></label>
         <div class="err" id="r-err" role="alert"></div><div class="okmsg" id="r-ok" role="status"></div>
         <button class="vm-btn primary">Enviar solicitud</button>
-        <p style="font-size:calc(13px / var(--k,1));color:var(--text-2,#555)">Al enviar la solicitud usaremos estos datos (incluido tu DNI/NIE/CIF, que solo sirve para darte de alta como cliente y se borra en cuanto se resuelve) para gestionar tu alta y tus pedidos.</p>
+        <p style="font-size:calc(13px / var(--k,1));color:var(--text-2,#555)">Usaremos estos datos solo para tu alta y tus pedidos. El DNI/NIE/CIF solo sirve para darte de alta y se borra al resolverla.</p>
         <div data-privacidad></div>
         <button class="vm-link" type="button" id="ir-acceso">← Ya soy cliente: entrar</button>
       </form>
+      <div class="vm-card" id="alta-ok" hidden role="status" aria-live="polite" tabindex="-1">
+        <h2 id="alta-ok-t">Recibido</h2>
+        <p id="alta-ok-p"></p>
+        <div id="alta-ok-c"></div>
+        <button class="vm-btn primary" type="button" id="alta-ok-v">Volver al inicio</button>
+      </div>
     </div>
   </section>
 
@@ -898,7 +910,7 @@ const reglasAlta = {
   "r-emp": (v) => (v.trim().length < 2 ? "Escribe el nombre de tu empresa o negocio." : ""),
   "r-tel": (v) => { const d = v.replace(/[\s.-]/g, "").replace(/^(\+34|0034)/, ""); return !d ? "Escribe tu teléfono." : /^[6-9]\d{8}$/.test(d) ? "" : "El teléfono debe tener 9 cifras, por ejemplo 600123456."; },
   "r-nif": (v) => (nifValido(v).ok ? "" : nifValido(v).msg),
-  "r-mail": (v) => (!v.trim() ? "Escribe tu correo electrónico." : /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? "" : "Escribe un correo válido, por ejemplo nombre@empresa.es."),
+  "r-mail": (v) => (!v.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? "" : "Escribe un correo válido, por ejemplo nombre@empresa.es."), // opcional
   "r-pin": (v) => (!v ? "Elige un código de entrada de 6 letras o números." : /^[A-Za-z0-9]{6}$/.test(v) ? "" : "Tiene que tener exactamente 6 letras o números, sin espacios ni símbolos."),
   "r-pin2": (v) => (!v ? "Repite el código de entrada." : v.toUpperCase() !== $("r-pin").value.toUpperCase() ? "No coincide con el código de arriba." : ""),
 };
@@ -914,12 +926,25 @@ $("f-registro").onsubmit = (e) => {
   const r = await post("/api/registro", { empresa: $("r-emp").value, telefono: $("r-tel").value, correo: $("r-mail").value, nif: $("r-nif").value, pin: $("r-pin").value, direccion: $("r-dir").value });
   const j = await r.json().catch(() => ({}));
   if (r.ok) {
-    $("r-ok").textContent = j.mensaje; $("f-registro").reset();
-    if (j.estado === "activa") setTimeout(() => ver("acceso"), 1800); // ya tiene acceso: pasa a entrar
+    $("f-registro").reset(); altaHecha(j.estado === "activa");
   } else $("r-err").textContent = j.error || "No se pudo enviar la solicitud.";
   }, "r-err");
 };
 
+// Pantalla de «Recibido» tras enviar la solicitud: qué pasa ahora y cómo contactar (teléfono y WhatsApp solo si la empresa los ha puesto en su configuración)
+function altaHecha(activa) {
+  $("f-registro").hidden = true; const ok = $("alta-ok"), c = $("alta-ok-c"); c.textContent = ""; ok.hidden = false;
+  $("alta-ok-t").textContent = activa ? "Listo, ya tienes acceso" : "Recibido";
+  $("alta-ok-p").textContent = activa ? "Entra con tu teléfono y tu código de entrada." : "Te llamamos en 24-48 h laborables para darte de alta.";
+  const a = AYUDA; if (!activa && a && (a.telHref || a.whatsappHref)) {
+    c.appendChild(nodo("p", "¿Prefieres hablar ya con nosotros?", "res"));
+    if (a.telHref) { const l = nodo("a", "Llamar" + (a.tel ? " · " + a.tel : ""), "vm-btn ghost"); l.href = a.telHref; c.appendChild(l); }
+    if (a.whatsappHref) { const l = nodo("a", "WhatsApp", "vm-btn ghost"); l.href = a.whatsappHref; l.target = "_blank"; l.rel = "noopener"; c.appendChild(l); }
+  }
+  if (a?.horario && !activa) c.appendChild(nodo("p", a.horario, "res"));
+  ok.focus();
+}
+$("alta-ok-v").onclick = () => { $("alta-ok").hidden = true; $("f-registro").hidden = false; ver("acceso"); };
 // Código de entrada: solo letras y números (sin acentos ni símbolos) y como máximo 6, también si se pega
 let avisoLetras = false; // en el campo del NIF (teclado numérico) se quitaron letras: se explica
 for (const id of ["a-nif", "a-pin", "r-pin", "r-pin2", "c-nuevo", "c-nuevo2"]) {
@@ -1369,7 +1394,15 @@ function inicio(ui) {
   const esq = el("div", "in-esq"); esq.setAttribute("aria-hidden", "true"); // esqueletos mientras llegan «Ofertas», «Lo que sueles pedir» y las categorías
   esq.innerHTML = '<div class="sk in-esq-t"></div><div class="in-esq-f">' + '<div class="sk in-esq-c"></div>'.repeat(3) + '</div>'; secciones.appendChild(esq);
   const quitaEsq = () => esq.remove();
-  cargaYo().then((y) => { // entró con el NIF y aún no tiene código personal: se le ofrece (una vez; «Ahora no» lo recuerda en este móvil)
+  Promise.all([cargaYo(), fetch("/api/bienvenida").then((r) => (r.ok ? r.json() : null)).catch(() => null)]).then(([y, bv]) => {
+    if (bv?.mostrar && !c.querySelector(".in-bienvenida")) { // primera vez: tarjeta de 3 pasos (se cierra para siempre con «Entendido», guardado por cliente); si entró con el NIF y aún no tiene código, se le ofrece ahí mismo
+      const k = el("section", "in-bienvenida"); k.setAttribute("aria-label", "Bienvenida");
+      k.appendChild(el("h3", null, "Así se hace un pedido"));
+      const ol = el("ol"); for (const t of ["Busca un artículo o mira «Lo que sueles pedir».", "Marca las cantidades con el «+».", "Pulsa «Revisar pedido», elige el día de entrega y envíalo."]) ol.appendChild(el("li", null, t)); k.appendChild(ol);
+      if (y?.codigoPropio === false) { const o = el("div", "bv-codigo"); o.appendChild(el("p", null, "Pon tu código de entrada para entrar con el teléfono, sin acordarte del DNI.")); const b2 = el("button", "vm-btn ghost", "Poner mi código"); b2.type = "button"; b2.onclick = () => $("cambiar").click(); o.appendChild(b2); k.appendChild(o); }
+      const ent = el("button", "vm-btn primary", "Entendido"); ent.type = "button"; ent.onclick = async () => { ent.disabled = true; const r = await post("/api/bienvenida/vista", {}).catch(() => null); if (r?.ok) k.remove(); else { ent.disabled = false; falloCarga(k, "No hemos podido guardarlo.", () => ent.click()); } };
+      k.appendChild(ent); c.insertBefore(k, sal.nextSibling); return;
+    }
     let no = false; try { no = localStorage.getItem("vm:codigo-no") === "1"; } catch {}
     if (!y || y.codigoPropio !== false || no || c.querySelector(".in-codigo")) return;
     const k = el("div", "in-codigo"); k.setAttribute("role", "region"); k.setAttribute("aria-label", "Pon tu código de entrada personal");

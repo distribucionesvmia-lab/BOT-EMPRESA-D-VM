@@ -113,7 +113,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (!/^[A-Z0-9]{8,10}$/.test(nif) || nif.replace(/\D/g, "").length < 6) return send(res, 400, { error: "Escribe tu DNI, NIE o CIF (por ejemplo 12345678Z o B12345678)." }), true;
       if (empresa.length < 2 || empresa.length > 80) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
       if (!normalizePhone(b.telefono)) return send(res, 400, { error: "El teléfono no es válido." }), true;
-      if (!validEmail(correo)) return send(res, 400, { error: "El correo no es válido." }), true;
+      if (correo && !validEmail(correo)) return send(res, 400, { error: "El correo no es válido." }), true; // el correo es opcional
       if (!pinValido(pin)) return send(res, 400, { error: "Elige un código de entrada de 6 letras o números." }), true;
       // El sistema comprueba la solicitud contra la base de clientes. Acceso automático si el nombre de la empresa coincide
       // con un cliente guardado Y su teléfono o su correo también; si no, queda pendiente para que la revise la empresa.
@@ -122,7 +122,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         const dato = [m.matched.phone ? "teléfono" : null, m.matched.email ? "correo" : null].filter(Boolean).join(" y ");
         const r = accounts.registerAuto({ phone: b.telefono, email: correo, business: empresa, pin, customerId: m.customer.id, matched: `nombre + ${dato}` });
         if (r.error) return send(res, 400, { error: r.error }), true;
-        return send(res, 200, { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono, el nombre de tu empresa y tu código de entrada." }), true;
+        return send(res, 200, { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono y tu código de entrada." }), true;
       }
       const r = accounts.requestRegistration({ phone: b.telefono, email: correo, business: empresa, pin, nif, address: b.direccion }); // el DNI/CIF solo se guarda aquí (cliente nuevo) y se borra al resolver la solicitud
       if (r.error) return send(res, 400, { error: r.error }), true;
