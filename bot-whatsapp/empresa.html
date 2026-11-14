@@ -175,6 +175,80 @@
   /* menos de 1100 px: pestañas en fila, deslizables */
   @media (max-width: 1099px) { #app > .tabs { flex-wrap:nowrap; overflow-x:auto; gap:6px; padding:12px 0; position:sticky; top:58px; z-index:20; background:var(--bg); } #app > .tabs .tab { white-space:nowrap; border-radius:999px; } #app > .tabs .tab::before { display:none; } #app { padding-top:0; } }
   @media (max-width: 640px) { .panel, .card { padding:16px; } .inv-grid { grid-template-columns:1fr; } }
+
+  /* ═════════ Sistema común de páginas, formularios, botones y tablas del panel ═════════ */
+  :root { --label:#334155; --focus:color-mix(in srgb, var(--accent) 24%, transparent); }
+  @media (prefers-color-scheme: dark) { :root { --label:#c3d0dc; } }
+  /* páginas: misma cabecera, mismo margen entre tarjetas y entrada suave */
+  #p-pedidos, #p-solicitudes, #p-cuentas, #p-articulos, #p-avisos, .datos-wrap { display:grid; gap:16px; align-content:start; grid-template-columns:minmax(0, 1fr); }
+  #app > div:not(.tabs):not(.pin):not([hidden]) { animation:pagIn .28s ease both; } @keyframes pagIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  .pag-cab h1 { margin:0 0 4px; font-size:22px; line-height:1.2; font-weight:800; letter-spacing:-.02em; } .pag-cab p { margin:0; color:var(--muted); max-width:80ch; font-size:14px; }
+  .panel > h2:first-child { margin-bottom:12px; }
+  .panel > p.muted { max-width:92ch; }
+  /* campos: etiqueta encima, misma altura, mismo estilo en todo el panel */
+  .campo, #app label:has(> input:not([type=checkbox]):not([type=radio]):not([type=hidden])), #app label:has(> select), #app label:has(> textarea) { display:grid; gap:6px; align-content:start; min-width:0; font-size:12.5px; font-weight:600; color:var(--label); }
+  .campo > span, label > .lab, label > span:first-child:not(.muted) { color:var(--label); font-weight:600; font-size:12.5px; line-height:16px; }
+  .campo small, label small, label .muted { color:var(--muted); font-weight:400; font-size:12px; line-height:1.35; }
+  label > input:not([type=checkbox]):not([type=radio]), label > select, .campo > input, .campo > select { width:100%; max-width:100%; min-width:0; height:40px; }
+  input:not([type=checkbox]):not([type=radio]), select { height:40px; padding:0 12px; } td input:not([type=checkbox]), td select { height:36px; } textarea { min-height:92px; padding:10px 12px; line-height:1.4; resize:vertical; width:100%; }
+  select { padding-right:30px; text-overflow:ellipsis; } input::placeholder, textarea::placeholder { color:color-mix(in srgb, var(--muted) 78%, transparent); }
+  input[type=date], input[type=time] { font-variant-numeric:tabular-nums; }
+  .chk, label:has(> input[type=checkbox]) { display:flex !important; align-items:center; gap:10px; min-height:40px; font-size:13.5px; font-weight:500; color:var(--fg); } .chk input, label > input[type=checkbox] { flex:none; }
+  .form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap:16px 20px; align-items:start; margin:12px 0; }
+  .campo-ancho { grid-column:1 / -1; } .f-avisos { margin:0; max-width:none; } .f-avisos #av-uno { margin:0; }
+  /* filtros en cuadrícula (Pedidos y Artículos) */
+  .filtros { display:grid; gap:14px 16px; align-items:end; margin:0 0 12px; }
+  #f-filtro { grid-template-columns:repeat(4, minmax(128px, 170px)) minmax(220px, 1fr) auto; } #f-articulos { grid-template-columns:minmax(240px, 1fr) minmax(170px, 220px) minmax(240px, 300px) auto; }
+  .filtros .campo > span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .filtros button { height:40px; white-space:nowrap; }
+  @media (max-width: 1099px) { #f-filtro { grid-template-columns:repeat(4, minmax(0, 1fr)); } #f-articulos { grid-template-columns:repeat(2, minmax(0, 1fr)); } .filtros .campo-cliente { grid-column:1 / -1; } .filtros button { grid-column:1 / -1; } }
+  @media (max-width: 640px) { #f-filtro { grid-template-columns:repeat(2, minmax(0, 1fr)); } #f-articulos { grid-template-columns:minmax(0, 1fr); } .filtros .campo > span { white-space:normal; } }
+  /* botones: principal destacado, secundarios discretos, peligrosos con su estilo; en filas alineadas */
+  .acciones, .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; } .acciones { margin:0 0 14px; } .paginacion { margin:14px 0 0; } .f-avisos .acciones { margin:4px 0 0; }
+  button, .btn-wa { min-height:40px; } td button, .lines button { min-height:34px; }
+  button.main { box-shadow:0 1px 2px rgba(200,16,46,.3); } button:not(.main):not(.peligro):not(.tab):not(.seg button) { color:var(--fg); }
+  button.peligro { border-color:var(--accent); color:var(--accent); background:transparent; } button.peligro:not(:disabled):hover { background:var(--accent); color:var(--accent-fg); border-color:var(--accent); }
+  .acciones > .peligro { margin-left:auto; } #expmsg:empty, .acciones > .muted:empty { display:none; } #expmsg { flex:1 1 100%; }
+  .btn-wa { display:inline-flex; align-items:center; padding:0 14px; border-radius:8px; border:1px solid var(--accent); color:var(--accent); font-weight:600; text-decoration:none; background:transparent; min-height:34px; transition:background .15s, color .15s; } .btn-wa:hover { background:var(--accent); color:var(--accent-fg); }
+  @media (max-width: 640px) { .acciones > .peligro { margin-left:0; } .acciones > button { flex:1 1 auto; } }
+  /* foco visible en todo */
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, a:focus-visible, .tab:focus-visible { outline:3px solid var(--accent); outline-offset:2px; } input:focus-visible, select:focus-visible, textarea:focus-visible { box-shadow:0 0 0 3px var(--focus); }
+  /* desplegables de alta a mano */
+  details.panel > summary.alta-sum { list-style:none; display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; font-size:15px; cursor:pointer; } details.panel > summary.alta-sum::-webkit-details-marker { display:none; }
+  details.panel > summary.alta-sum::after { content:"+"; width:28px; height:28px; border-radius:8px; background:var(--soft); color:var(--accent); display:grid; place-items:center; font-weight:700; transition:transform .2s; } details.panel[open] > summary.alta-sum::after { content:"–"; }
+  details.panel[open] > summary.alta-sum { margin-bottom:6px; } details.panel > :not(summary) { animation:pagIn .25s ease both; }
+  /* tablas: cabecera clara, scroll dentro de la tabla (no de la página), números a la derecha, estados con etiqueta */
+  .scroll { max-height:min(68vh, 720px); overflow:auto; overscroll-behavior:contain; } .scroll table { min-width:100%; } th { z-index:2; background:var(--th); box-shadow:inset 0 -1px 0 var(--line); } td { vertical-align:middle; } #ped td, #ar-lista td, #sol td { vertical-align:top; }
+  td.num, th.num { text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; } .ref { white-space:nowrap; } #ped td:nth-child(3) { white-space:nowrap; } #ped td:nth-child(4) { min-width:170px; } #ped td:nth-child(5) { min-width:300px; }
+  .lines { width:auto; } .lines td { white-space:nowrap; padding:3px 12px 3px 0; border:0; } .lines td:nth-child(2) { white-space:normal; min-width:150px; } .lines td:nth-child(3), .lines td:nth-child(4), .lines td:nth-child(5) { text-align:right; font-variant-numeric:tabular-nums; }
+  td:has(> button) { white-space:nowrap; } td:has(> button) > button, td:has(> .btn-wa) > .btn-wa { margin:2px 0 2px 6px; } td:has(> button) > button:first-child { margin-left:0; } td > .row { gap:8px; min-width:0; } #sol td > .row { display:grid; min-width:240px; } #sol td > .row > * { width:100%; }
+  .acc-col { display:grid; gap:8px; min-width:150px; } .acc-col button { width:100%; }
+  .badge { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; } .badge::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.8; }
+  .ar-editor .campos { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap:14px 16px; align-items:end; margin:8px 0; } .ar-editor label { display:grid; gap:6px; font-size:12.5px; }
+  /* estados vacíos explicados */
+  .vacio { display:grid; gap:4px; justify-items:center; text-align:center; margin:12px 0 0; padding:28px 20px; border:1px dashed var(--line); border-radius:12px; background:var(--th); color:var(--muted); } .vacio b { color:var(--fg); font-size:15px; } .vacio span { max-width:60ch; font-size:13.5px; } .vacio[hidden] { display:none; }
+  p[id$="-estado"]:empty, p[id$="-msg"]:empty { margin:0 !important; }
+  #f-filtro:has(#fl-quitar[hidden]) { grid-template-columns:repeat(4, minmax(128px, 170px)) minmax(220px, 1fr); } #f-articulos:has(#ar-quitar[hidden]) { grid-template-columns:minmax(240px, 1fr) minmax(170px, 220px) minmax(240px, 300px); }
+  @media (max-width: 1099px) { #f-filtro:has(#fl-quitar[hidden]) { grid-template-columns:repeat(4, minmax(0, 1fr)); } #f-articulos:has(#ar-quitar[hidden]) { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { #f-filtro:has(#fl-quitar[hidden]) { grid-template-columns:repeat(2, minmax(0, 1fr)); } #f-articulos:has(#ar-quitar[hidden]) { grid-template-columns:minmax(0, 1fr); } }
+  #ped summary { display:block; max-width:460px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; } #ped details[open] summary { white-space:normal; } #ped td:nth-child(5) { min-width:0; max-width:290px; }
+  .f-avisos > label.campo:first-child { grid-column:1 / -1; max-width:560px; }
+  .acciones .grupo { display:flex; flex-wrap:wrap; gap:10px; align-items:center; } .acciones .grupo.der { margin-left:auto; } .acciones .grupo.der > .peligro { margin-left:0; }
+  #ped summary { max-width:250px; } #ped td, #ped th { padding-left:8px; padding-right:8px; } .lines td { padding:3px 10px 3px 0; } .lines td:nth-child(2) { min-width:120px; }
+  @media (max-width: 640px) { .acciones .grupo, .acciones .grupo.der { width:100%; margin-left:0; } .acciones .grupo > button { flex:1 1 auto; } }
+  .inv-grid { align-items:start; }
+  td:has(> button) { white-space:normal; min-width:200px; } #sol td:has(> .acc-col) { min-width:150px; } .emp { font-weight:600; } td .muted { font-size:12.5px; }
+  #sol td > .row { min-width:210px; } .badge { white-space:nowrap; }
+  #sol td, #sol th { padding-left:10px; padding-right:10px; }
+  @media (max-width: 1099px) { #ped td:nth-child(5) { max-width:220px; } #ped td, #ped th { padding-left:8px; padding-right:8px; } }
+  @media (max-width: 900px) {
+    #ped td:nth-child(3) { white-space:normal; width:72px; } #ped .ref { white-space:normal; word-break:break-all; width:84px; } #ped td:nth-child(4) { min-width:130px; } #ped td:nth-child(5) { max-width:190px; } #ped summary { max-width:190px; }
+    #sol-tabla thead { display:none; } #sol-tabla, #sol-tabla tbody { display:block; } #sol tr:not([hidden]) { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px 16px; padding:14px 6px; border-bottom:1px solid var(--line-2); } #sol td { display:block; border:0 !important; padding:0 !important; min-width:0 !important; }
+    #sol td:nth-child(4) { display:none; } #sol td:nth-child(5), #sol td:nth-child(6) { grid-column:1 / -1; } #sol .acc-col { grid-template-columns:repeat(3, minmax(0, 1fr)); } #sol td > .row { min-width:0; grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 560px) { #sol tr:not([hidden]) { grid-template-columns:minmax(0, 1fr); } #sol .acc-col, #sol td > .row { grid-template-columns:minmax(0, 1fr); } }
+  .scroll:has(+ .vacio:not([hidden])), .vacio:not([hidden]) + .scroll { display:none; } #inv-card > label { max-width:420px; } #inv-card > details { margin-top:16px; }
+  @media (prefers-reduced-motion: reduce) { #app > div, details.panel > :not(summary) { animation:none !important; } }
+  @media (max-width: 640px) { .pag-cab h1 { font-size:19px; } .panel { padding:16px; } .panel > p.muted { font-size:13.5px; } }
 </style>
 </head>
 <body>
@@ -200,6 +274,7 @@
 
     <!-- Pedidos -->
     <div id="p-pedidos">
+      <div class="pag-cab"><h1>Pedidos</h1><p>Revisa los pedidos que llegan, expórtalos a Excel para a3ERP y busca cualquier pedido por día, hora o cliente.</p></div>
       <details class="panel rec-plegable" id="rec-panel" hidden>
         <summary><span>Recordatorios de hoy</span> <b id="rec-n"></b></summary>
         <p class="muted" style="margin:10px 0 8px">Clientes a los que les toca reponer (por su ciclo habitual de compra o porque hoy es su día de pedido fijo). Pulsa «Abrir WhatsApp»: se abre con el mensaje ya escrito, lo puedes cambiar y lo envías tú. No se manda nada solo.</p>
@@ -208,7 +283,7 @@
       <div class="panel">
         <h2>Pedidos recibidos</h2>
         <p class="muted" id="correo-estado" style="margin:0 0 8px"></p>
-        <div class="row" style="margin-bottom:10px"><button class="main" id="exportar-sel" disabled>Exportar seleccionados (0)</button><button id="exportar">Exportar todos los pendientes</button><button id="ver-excel" type="button" title="Enseña cómo quedará el Excel sin exportar nada">Ver cómo queda el Excel</button><button type="button" id="marcar-todos" title="Marca todos los pedidos que se ven ahora (sean del estado que sean)">Marcar todos los que se ven</button><button type="button" id="borrar-sel" class="peligro" disabled>Borrar seleccionados (0)</button><span class="muted" id="expmsg" role="status"></span></div>
+        <div class="acciones" id="ped-acciones"><div class="grupo"><button class="main" id="exportar-sel" disabled>Exportar seleccionados (0)</button><button id="exportar">Exportar todos los pendientes</button><button id="ver-excel" type="button" title="Enseña cómo quedará el Excel sin exportar nada">Ver cómo queda el Excel</button></div><div class="grupo der"><button type="button" id="marcar-todos" title="Marca todos los pedidos que se ven ahora (sean del estado que sean)">Marcar todos los que se ven</button><button type="button" id="borrar-sel" class="peligro" disabled>Borrar seleccionados (0)</button></div><span class="muted" id="expmsg" role="status"></span></div>
         <form class="filtros" id="f-filtro" aria-label="Filtrar pedidos">
           <label class="campo"><span>Día</span><input type="date" id="fl-dia"></label>
           <label class="campo"><span>hasta el día (opcional)</span><input type="date" id="fl-dia2"></label>
@@ -220,7 +295,7 @@
         <p class="muted" id="fl-estado" role="status" style="margin:0 0 8px"></p>
         <p class="muted" style="margin:0 0 8px">Marca los pedidos pendientes que quieras llevar al Excel; los que no marques siguen pendientes.</p>
         <div class="scroll"><table><thead><tr><th><input type="checkbox" id="sel-todos" aria-label="Seleccionar todos los pendientes"></th><th>Pedido</th><th>Recibido</th><th>Cliente</th><th>Artículos</th><th class="num">Total</th><th>Estado</th></tr></thead><tbody id="ped"></tbody></table></div>
-        <p class="muted" id="ped-vacio" hidden>Todavía no hay pedidos.</p>
+        <p class="vacio" id="ped-vacio" hidden><b>Todavía no hay pedidos.</b><span>Cuando un cliente envíe uno desde la aplicación, aparecerá aquí. Si has puesto filtros, prueba a quitarlos.</span></p>
       </div>
       <div class="panel" id="xl-panel" hidden style="margin-top:14px">
         <h2 id="xl-titulo">Vista del Excel</h2>
@@ -310,17 +385,21 @@
     </div>
 
     <!-- Solicitudes -->
-    <div class="panel" id="p-solicitudes" hidden>
+    <div id="p-solicitudes" hidden>
+      <div class="pag-cab"><h1>Solicitudes de alta</h1><p>Clientes nuevos que han pedido acceso y que el sistema no ha podido comprobar solo.</p></div>
+      <div class="panel">
       <h2>Solicitudes de alta pendientes</h2>
       <p class="muted">Aquí solo llegan las que el sistema <b>no ha podido comprobar solo</b> (el nombre, el teléfono o el correo no coinciden con la base de clientes, o el cliente está de baja). Las que coinciden entran automáticamente y aparecen en «Cuentas de clientes» por confirmar. Si apruebas, vale el PIN que eligió el cliente.</p>
-      <div class="scroll"><table><thead><tr><th>Empresa</th><th>Teléfono</th><th>Correo</th><th>DNI/CIF</th><th>Qué encajó</th><th>Cliente de la base de datos</th><th></th></tr></thead><tbody id="sol"></tbody></table></div>
-      <p class="muted" id="sol-vacio" hidden>No hay solicitudes pendientes.</p>
+      <div class="scroll"><table id="sol-tabla"><thead><tr><th>Empresa</th><th>Contacto</th><th>DNI/CIF</th><th>Qué encajó</th><th>Cliente de la base de datos</th><th></th></tr></thead><tbody id="sol"></tbody></table></div>
+      <p class="vacio" id="sol-vacio" hidden><b>No hay solicitudes pendientes.</b><span>Cuando alguien pida acceso y no se pueda comprobar solo, saldrá aquí para que lo revises.</span></p>
+      </div>
     </div>
 
     <!-- Clientes -->
     <!-- Cuentas -->
     <!-- Datos y Excel: todo lo de subir Excel en un solo sitio -->
     <div id="p-datos" class="datos-wrap" hidden>
+      <div class="pag-cab"><h1>Datos y Excel</h1><p>Altas a mano, importación de Excel de a3ERP, sincronización y actualizaciones del programa.</p></div>
       <details class="panel" id="alta-cli"><summary class="alta-sum">Añadir un cliente a mano</summary><div id="alta-cli-cuerpo"></div></details>
       <details class="panel" id="alta-prod"><summary class="alta-sum">Añadir un producto a mano</summary><div id="alta-prod-cuerpo"></div></details>
       <div class="panel" id="sync-panel">
@@ -348,44 +427,45 @@
       </div>
       <div id="dx-tarjetas" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px;align-items:start"></div>
     </div>
-    <div id="p-articulos" hidden style="display:grid;gap:14px">
+    <div id="p-articulos" hidden>
+      <div class="pag-cab"><h1>Artículos</h1><p>Precios y ofertas del catálogo: cambia un precio, pon una oferta y avisa a los clientes con la campana.</p></div>
       <div class="panel">
         <h2>Artículos</h2>
         <p class="muted" style="margin:0 0 10px">Cambia el precio de un artículo o ponle una <b>oferta</b> (en % o en euros por unidad, con fecha de fin si quieres). Si un artículo tiene una oferta o ha bajado de precio esta semana, a la derecha sale una <b>campana</b>: al pulsarla se avisa con una notificación a todos los clientes que tienen los avisos activados. Los cambios de precio que vengan después en el Excel de a3ERP pueden volver a cambiar el precio, pero no quitan las ofertas.</p>
-        <form class="row" id="f-articulos" style="gap:10px;align-items:flex-end;margin-bottom:8px" aria-label="Filtrar artículos">
-          <label style="display:flex;flex-direction:column;gap:3px;font-size:12px;flex:1;min-width:200px"><span class="muted">Buscar</span><input type="search" id="ar-q" autocomplete="off" placeholder="Nombre o código del artículo"></label>
-          <label style="display:flex;flex-direction:column;gap:3px;font-size:12px"><span class="muted">Categoría</span><select id="ar-cat"><option value="">Todas</option></select></label>
-          <label style="display:flex;flex-direction:column;gap:3px;font-size:12px"><span class="muted">Mostrar</span><select id="ar-filtro"><option value="">Todos</option><option value="oferta">Con oferta</option><option value="bajada">Con bajada de precio reciente</option><option value="campana">Con campana (oferta o bajada)</option><option value="retirados">Retirados (no se venden)</option></select></label>
+        <form class="filtros" id="f-articulos" aria-label="Filtrar artículos">
+          <label class="campo campo-cliente"><span>Buscar</span><input type="search" id="ar-q" autocomplete="off" placeholder="Nombre o código del artículo"></label>
+          <label class="campo"><span>Categoría</span><select id="ar-cat"><option value="">Todas</option></select></label>
+          <label class="campo"><span>Mostrar</span><select id="ar-filtro"><option value="">Todos</option><option value="oferta">Con oferta</option><option value="bajada">Con bajada de precio reciente</option><option value="campana">Con campana (oferta o bajada)</option><option value="retirados">Retirados (no se venden)</option></select></label>
           <button type="button" id="ar-quitar" hidden>Quitar filtros</button>
         </form>
         <p class="muted" id="ar-estado" role="status" style="margin:0 0 8px"></p>
         <div class="scroll"><table><thead><tr><th>Artículo</th><th class="num">Precio</th><th>Oferta</th><th></th><th></th></tr></thead><tbody id="ar-lista"></tbody></table></div>
-        <div class="row" style="margin-top:10px"><button id="ar-ant" type="button">← Anterior</button><button id="ar-sig" type="button">Siguiente →</button><span class="muted" id="ar-pag"></span></div>
+        <div class="acciones paginacion"><button id="ar-ant" type="button">← Anterior</button><button id="ar-sig" type="button">Siguiente →</button><span class="muted" id="ar-pag"></span></div>
         <p class="muted" id="ar-msg" role="status" style="margin:8px 0 0"></p>
       </div>
     </div>
-    <div id="p-avisos" hidden style="display:grid;gap:14px">
+    <div id="p-avisos" hidden>
+      <div class="pag-cab"><h1>Avisos a clientes</h1><p>Envía una notificación al móvil de los clientes que han activado los avisos.</p></div>
       <div class="panel">
-        <h2>Avisos a clientes</h2>
+        <h2>Nuevo aviso</h2>
         <p class="muted" id="av-estado" style="margin:0 0 10px"></p>
         <p class="muted" id="av-contacto" style="margin:0 0 10px;font-size:13px"></p>
         <p class="muted" style="margin:0 0 10px">Los avisos llegan como una notificación al móvil de los clientes que han abierto la aplicación, han pulsado «Activar avisos» en «Mi cuenta» y la tienen instalada en su pantalla de inicio. El aviso de «Pedido recibido» sale solo cada vez que un cliente hace un pedido.</p>
-        <form id="f-avisos" autocomplete="off" style="display:grid;gap:10px;max-width:560px">
-          <label style="display:flex;flex-direction:column;gap:4px"><span class="lab"><b>Para quién</b></span>
+        <form id="f-avisos" class="form-grid f-avisos" autocomplete="off">
+          <label class="campo"><span>Para quién</span>
             <select id="av-destino"><option value="todos">Todos los clientes que tienen los avisos activados</option><option value="cliente">Un solo cliente</option></select></label>
-          <div id="av-uno" hidden style="display:grid;gap:6px"><input id="av-q" type="search" placeholder="Busca el cliente por nombre o código" aria-label="Buscar cliente"><select id="av-sel" aria-label="Cliente"></select></div>
-          <label style="display:flex;flex-direction:column;gap:4px"><span class="lab"><b>Título</b> <span class="muted">(máximo 50 letras)</span></span><input id="av-titulo" maxlength="50" placeholder="Por ejemplo: Oferta de la semana" required></label>
-          <label style="display:flex;flex-direction:column;gap:4px"><span class="lab"><b>Mensaje</b> <span class="muted">(máximo 180 letras)</span></span><textarea id="av-texto" maxlength="180" rows="3" placeholder="Por ejemplo: Esta semana, cerveza al mejor precio. ¡Haz tu pedido antes de las 10:00 y te lo llevamos hoy!" required style="font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px"></textarea></label>
-          <div class="row"><button class="main" id="av-enviar">Enviar aviso</button><span class="muted" id="av-msg" role="status"></span></div>
+          <div id="av-uno" class="form-grid campo-ancho" hidden><label class="campo"><span>Buscar cliente</span><input id="av-q" type="search" placeholder="Nombre o código del cliente" aria-label="Buscar cliente"></label><label class="campo"><span>Cliente elegido</span><select id="av-sel" aria-label="Cliente"></select></label></div>
+          <label class="campo campo-ancho"><span>Título <small>(máximo 50 letras)</small></span><input id="av-titulo" maxlength="50" placeholder="Por ejemplo: Oferta de la semana" required></label>
+          <label class="campo campo-ancho"><span>Mensaje <small>(máximo 180 letras)</small></span><textarea id="av-texto" maxlength="180" rows="3" placeholder="Por ejemplo: Esta semana, cerveza al mejor precio. ¡Haz tu pedido antes de las 10:00 y te lo llevamos hoy!" required></textarea></label>
+          <div class="acciones campo-ancho"><button class="main" id="av-enviar">Enviar aviso</button><span class="muted" id="av-msg" role="status"></span></div>
         </form>
       </div>
-      <div class="panel"><h2>Últimos avisos enviados</h2><div class="scroll"><table><tbody id="av-hist"></tbody></table></div><p class="muted" id="av-vacio" hidden>Todavía no has enviado ningún aviso.</p></div>
+      <div class="panel"><h2>Últimos avisos enviados</h2><div class="scroll"><table><tbody id="av-hist"></tbody></table></div><p class="vacio" id="av-vacio" hidden><b>Todavía no has enviado ningún aviso.</b><span>Los avisos que mandes aparecerán aquí con cuántos móviles los han recibido.</span></p></div>
     </div>
-    <div class="panel" id="p-cuentas" hidden>
-      <h2>Cuentas de clientes</h2>
-      <p class="muted" id="cue-todas" hidden style="margin:0 0 10px"><button class="main" id="cue-todas-b" type="button"></button> <span>Confirma de golpe todas las cuentas que aún están sin confirmar.</span></p>
-      <div class="card" id="inv-card" style="margin:0 0 14px">
-        <h3 style="margin:0 0 4px">Enlace de acceso para un cliente</h3>
+    <div id="p-cuentas" hidden>
+      <div class="pag-cab"><h1>Cuentas de clientes</h1><p>Accesos de los clientes, enlaces de invitación, uso de la aplicación, errores y derechos de datos.</p></div>
+      <div class="panel" id="inv-card">
+        <h2>Enlaces de acceso para un cliente</h2>
         <p class="muted" style="margin:0 0 8px">Crea un enlace para que un cliente entre sin escribir nada. Tú eliges cuánto vale, cuántas veces se puede usar y si solo puede mirar o también pedir. <b>Lo mandas tú</b>: el sistema no envía nada.</p>
         <label>Para quién es
           <select id="inv-para" aria-label="Para quién es el enlace"><option value="cliente" selected>Un cliente que ya tengo</option><option value="nuevo">Una persona nueva (aún sin alta)</option></select></label>
@@ -425,16 +505,23 @@
         </details>
         <div id="inv-res" hidden style="margin-top:10px;display:grid;gap:6px"><input id="inv-url" readonly aria-label="Enlace creado"><div class="muted" id="inv-info"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="main" id="inv-copiar" type="button">Copiar enlace</button><button id="inv-wa" type="button">Abrir en WhatsApp</button></div><div class="muted" id="inv-msg" role="status"></div></div>
         <h4 style="margin:14px 0 6px">Enlaces creados</h4>
-        <p class="muted" id="inv-vacio" hidden style="margin:0">Todavía no has creado ningún enlace.</p>
+        <p class="vacio" id="inv-vacio" hidden><b>Todavía no has creado ningún enlace.</b><span>Cuando crees uno, aparecerá aquí con su estado, sus usos y cuándo caduca.</span></p>
         <div class="scroll"><table><thead><tr><th>Para</th><th>Estado</th><th>Usos</th><th>Caduca</th><th>Qué puede hacer</th><th></th></tr></thead><tbody id="inv-lista"></tbody></table></div>
       </div>
-      <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
-      <h2 style="margin-top:22px">Uso de la aplicación (últimos 30 días)</h2>
+      <div class="panel">
+        <h2>Cuentas de clientes</h2>
+        <p class="muted" id="cue-todas" hidden style="margin:0 0 10px"><button class="main" id="cue-todas-b" type="button"></button> <span>Confirma de golpe todas las cuentas que aún están sin confirmar.</span></p>
+        <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
+      </div>
+      <div class="panel">
+        <h2>Uso de la aplicación (últimos 30 días)</h2>
       <p class="muted" style="margin:0 0 8px">Solo contadores, sin datos personales: sirven para saber qué cambios funcionan.</p>
       <div class="scroll"><table><tbody id="uso"></tbody></table></div>
-      <h2 style="margin-top:22px">Errores de la app (últimos 7 días)</h2>
+      </div>
+      <div class="panel">
+        <h2>Errores de la app (últimos 7 días)</h2>
       <p class="muted" style="margin:0 0 8px">Lo que ha fallado en el móvil de los clientes (cargas que no han llegado y errores de la página). Sin datos personales: solo qué falló, dónde y en qué navegador.</p>
-      <p id="err-vacio" class="muted" hidden>Ningún error en los últimos 7 días. 👍</p>
+      <p id="err-vacio" class="vacio" hidden><b>Ningún error en los últimos 7 días.</b><span>Cuando falle algo en el móvil de un cliente, quedará anotado aquí sin datos personales.</span></p>
       <div id="err-caja" hidden>
         <div class="scroll"><table><thead><tr><th>Tipo</th><th>Veces</th></tr></thead><tbody id="err-tipo"></tbody></table></div>
         <div class="scroll" style="margin-top:8px"><table><thead><tr><th>Cliente</th><th>Veces</th></tr></thead><tbody id="err-cli"></tbody></table></div>
@@ -442,9 +529,13 @@
         <h3 style="margin:12px 0 4px">Los últimos</h3>
         <div class="scroll"><table><thead><tr><th>Cuándo</th><th>Cliente</th><th>Pantalla</th><th>Qué falló</th><th>Navegador</th></tr></thead><tbody id="err-ult"></tbody></table></div>
       </div>
-      <h2 style="margin-top:22px">Derechos de protección de datos</h2>
+      </div>
+      <div class="panel">
+        <h2>Derechos de protección de datos</h2>
       <p class="muted" style="margin:0 0 8px">Lo que piden los clientes desde la aplicación («Mis datos y privacidad»): corregir sus datos, limitar su uso u oponerse. <b>Hay que contestarles en un plazo máximo de un mes.</b> Cuando un cliente elimina su cuenta, aquí queda anotado (se borran su acceso, contactos y favoritos; los pedidos se conservan por obligación legal).</p>
       <div class="scroll"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Qué pide</th><th>Detalle</th><th>Estado</th><th></th></tr></thead><tbody id="der"></tbody></table></div>
+    </div>
+      </div>
     </div>
   </div>
 </main>
@@ -498,7 +589,7 @@ async function pedidos() {
   const list = await call("/api/admin/pedidos" + (qs ? "?" + qs : ""));
   $("fl-quitar").hidden = !hayFiltro();
   $("fl-estado").textContent = hayFiltro() ? (list.length ? `Se ven ${list.length} pedido${list.length === 1 ? "" : "s"} con estos filtros.${list.length >= 500 ? " (máximo 500: afina el filtro)" : ""}` : "Ningún pedido cumple estos filtros.") : (list.length >= 150 ? "Se ven los 150 últimos pedidos. Usa los filtros para buscar más atrás." : "");
-  $("ped-vacio").textContent = hayFiltro() ? "Ningún pedido cumple estos filtros." : "Todavía no hay pedidos.";
+  $("ped-vacio").replaceChildren(el("b", hayFiltro() ? "Ningún pedido cumple estos filtros." : "Todavía no hay pedidos."), el("span", hayFiltro() ? "Prueba con otro día u hora, o pulsa «Quitar filtros»." : "Cuando un cliente envíe uno desde la aplicación, aparecerá aquí."));
   estadoDe.clear(); for (const o of list) estadoDe.set(o.ref, o.estado);
   const first = seen === null; seen ??= new Set();
   const tb = $("ped"); tb.innerHTML = ""; $("ped-vacio").hidden = list.length > 0;
@@ -704,10 +795,10 @@ async function solicitudes() {
     const no = el("button", "Rechazar"); no.onclick = async () => { await call(`/api/admin/solicitudes/${s.id}/rechazar`, {}); refrescar(); };
     const td = el("td"); const box = el("div", "", { className: "row" }); box.append(sel, buscar); td.appendChild(box);
     const nuevo = el("button", "Es cliente nuevo: crear su ficha", { type: "button" });
-    const acc = el("td"); acc.append(ok, " ", nuevo, " ", no);
-    tr.append(el("td", s.business), el("td", s.phone), el("td", s.email), el("td", s.nif || "—"), el("td", s.matched || "—", { className: "muted" }), td, acc); tb.appendChild(tr);
+    const acc = el("td"); const accCol = el("div", "", { className: "acc-col" }); accCol.append(ok, nuevo, no); acc.append(accCol);
+    const contacto = el("td"); contacto.append(el("b", s.phone), el("div", s.email || "", { className: "muted" })); tr.append(el("td", s.business, { className: "emp" }), contacto, el("td", s.nif || "—", { className: "ref" }), el("td", s.matched || "—", { className: "muted" }), td, acc); tb.appendChild(tr);
     // Cliente nuevo: se crea su ficha en la base de clientes con todo lo que dio al registrarse y lo que completes aquí, y se acepta la solicitud
-    const fila = el("tr"); fila.hidden = true; const celda = el("td", "", { colSpan: 7 });
+    const fila = el("tr"); fila.hidden = true; const celda = el("td", "", { colSpan: 6 });
     const form = campos(DEF_CLIENTE({ nombre: s.business, nif: s.nif || "", direccion: s.address || "" }).filter((d) => !["telefono", "correo"].includes(d.k)));
     const msg = el("p", "", { className: "alta-msg err", role: "status" }), crear = el("button", "Crear cliente y aceptar la solicitud", { className: "main", type: "button" });
     celda.append(el("p", `Teléfono y correo (${s.phone} · ${s.email}) pasan solos a su ficha.`, { className: "muted" }), form.caja, crear, msg); fila.appendChild(celda); tb.appendChild(fila);
@@ -761,7 +852,7 @@ async function cuentas() {
     const td = el("td");
     if (!a.verified) { const cf = el("button", "Confirmar", { className: "main" }); cf.title = "Compruebo que es el cliente: sus pedidos dejan de retenerse"; cf.onclick = async () => { await call(`/api/admin/cuentas/${a.id}/confirmar`, {}); refrescar(); }; td.append(cf, " "); }
     if (a.status !== "deleted") td.append(pin, " ", blq);
-    tr.append(el("td", a.cliente || a.customerId), el("td", a.phone || "— (entra con NIF)"), el("td", a.email || ""), el("td", estado), el("td", a.lastLogin ? hora(a.lastLogin) : "—"), td); tc.appendChild(tr);
+    const etq = el("td"); etq.appendChild(el("span", estado, { className: "badge " + (a.status === "deleted" || a.status === "blocked" || a.locked ? "retenido" : a.verified ? "exportado" : "pendiente") })); tr.append(el("td", a.cliente || a.customerId, { className: "emp" }), el("td", a.phone || "— (entra con NIF)"), el("td", a.email || ""), etq, el("td", a.lastLogin ? hora(a.lastLogin) : "—"), td); tc.appendChild(tr);
   }
 }
 const hora2 = (iso) => new Date(iso).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
@@ -772,7 +863,7 @@ async function recordatorios() {
   for (const x of r.filas) {
     const tr = document.createElement("tr"), ult = x.ultimo ? x.ultimo.split("-").reverse().join("/") : "—";
     const acc = el("td"); const box = el("div", "", { className: "row" });
-    const wa = el("a", "Abrir WhatsApp", { href: `https://wa.me/${x.wa}?text=${encodeURIComponent(x.texto)}`, target: "_blank", rel: "noopener", className: "btn" }); wa.style.cssText = "display:inline-block;padding:8px 12px;border-radius:8px;background:#1a7f4b;color:#fff;font-weight:700;text-decoration:none";
+    const wa = el("a", "Abrir WhatsApp", { href: `https://wa.me/${x.wa}?text=${encodeURIComponent(x.texto)}`, target: "_blank", rel: "noopener", className: "btn" }); wa.classList.add("btn-wa");
     const ya = el("button", "Ya avisado", { type: "button" }); ya.onclick = async () => { await call("/api/admin/recordatorios/avisado", { id: x.id }); refrescar(); };
     const no = el("button", "No avisar más", { type: "button" }); no.onclick = async () => { if (confirm(`¿No volver a recordar nada a ${x.nombre}?`)) { await call("/api/admin/recordatorios/no-avisar", { id: x.id }); refrescar(); } };
     box.append(wa, ya, no); acc.appendChild(box);
