@@ -185,6 +185,12 @@
     <div class="panel" id="p-cuentas" hidden>
       <h2>Cuentas de clientes</h2>
       <p class="muted" id="cue-todas" hidden style="margin:0 0 10px"><button class="main" id="cue-todas-b" type="button"></button> <span>Confirma de golpe todas las cuentas que aún están sin confirmar.</span></p>
+      <div class="card" id="inv-card" style="margin:0 0 14px">
+        <h3 style="margin:0 0 4px">Enlace de acceso para un cliente</h3>
+        <p class="muted" style="margin:0 0 8px">Crea un enlace de un solo uso (vale 7 días) para que un cliente entre sin escribir nada y ponga su código de entrada. <b>Lo mandas tú</b>: el sistema no envía nada.</p>
+        <div style="display:grid;gap:6px"><input id="inv-q" type="search" placeholder="Busca el cliente por nombre o código" aria-label="Buscar cliente para el enlace"><select id="inv-sel" aria-label="Cliente"></select><button class="main" id="inv-crear" type="button">Crear enlace de acceso</button></div>
+        <div id="inv-res" hidden style="margin-top:10px;display:grid;gap:6px"><input id="inv-url" readonly aria-label="Enlace creado"><div class="muted" id="inv-info"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="main" id="inv-copiar" type="button">Copiar enlace</button><button id="inv-wa" type="button">Abrir en WhatsApp</button></div><div class="muted" id="inv-msg" role="status"></div></div>
+      </div>
       <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
       <h2 style="margin-top:22px">Uso de la aplicación (últimos 30 días)</h2>
       <p class="muted" style="margin:0 0 8px">Solo contadores, sin datos personales: sirven para saber qué cambios funcionan.</p>
@@ -703,6 +709,18 @@ async function avisosClientes() {
   for (const x of r.ultimos) { const tr = document.createElement("tr"), t = el("td"); t.append(el("b", x.titulo), el("div", x.texto, { className: "muted" })); tr.append(el("td", hora(x.at)), t, el("td", x.destino === "todos" ? "A todos" : "A " + x.destino), el("td", `${x.enviados} enviado${x.enviados === 1 ? "" : "s"}${x.fallidos ? ` · ${x.fallidos} sin entregar${x.detalle ? " (" + x.detalle + ")" : ""}` : ""}`)); tb.appendChild(tr); }
 }
 $("av-destino").onchange = () => { $("av-uno").hidden = $("av-destino").value !== "cliente"; };
+// Enlace de invitación (un solo uso, 7 días): lo crea la oficina y lo manda ella misma
+let tInv = 0, invActual = null;
+$("inv-q").oninput = () => { clearTimeout(tInv); tInv = setTimeout(async () => { const q = $("inv-q").value.trim(), sel = $("inv-sel"); sel.innerHTML = ""; if (q.length < 2) return; const r = await call("/api/admin/clientes?q=" + encodeURIComponent(q)).catch(() => []); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); if (!r.length) sel.appendChild(el("option", "Ningún cliente con ese nombre", { value: "" })); }, 300); };
+$("inv-crear").onclick = async () => {
+  const id = $("inv-sel").value, m = $("inv-msg"); m.textContent = ""; if (!id) { m.textContent = "Busca y elige un cliente."; $("inv-res").hidden = false; return; }
+  const r = await call("/api/admin/clientes/" + encodeURIComponent(id) + "/invitacion", {}).catch((e) => ({ error: e.message }));
+  if (!r || r.error) { $("inv-res").hidden = false; $("inv-url").value = ""; $("inv-info").textContent = ""; m.textContent = (r && r.error) || "No se ha podido crear el enlace."; return; }
+  invActual = r; $("inv-res").hidden = false; $("inv-url").value = r.url; $("inv-info").textContent = `Para ${r.cliente}. Un solo uso; caduca el ${r.caduca.slice(0, 10).split("-").reverse().join("/")}. Si creas otro para este cliente, este deja de valer.`;
+  $("inv-wa").disabled = !r.tieneTelefono; $("inv-wa").title = r.tieneTelefono ? "" : "Este cliente no tiene teléfono guardado: copia el enlace y mándalo tú";
+};
+$("inv-copiar").onclick = async () => { const u = $("inv-url").value; if (!u) return; try { await navigator.clipboard.writeText(u); $("inv-msg").textContent = "Enlace copiado."; } catch { $("inv-url").select(); $("inv-msg").textContent = "Selecciónalo y cópialo (Ctrl+C)."; } };
+$("inv-wa").onclick = () => { if (invActual?.whatsapp) window.open(invActual.whatsapp, "_blank", "noopener"); };
 let tAv = 0; $("av-q").oninput = () => { clearTimeout(tAv); tAv = setTimeout(async () => { const q = $("av-q").value.trim(); const sel = $("av-sel"); sel.innerHTML = ""; if (q.length < 2) return; const r = await call("/api/admin/clientes?q=" + encodeURIComponent(q)).catch(() => []); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); if (!r.length) sel.appendChild(el("option", "Ningún cliente con ese nombre", { value: "" })); }, 300); };
 $("f-avisos").onsubmit = async (e) => {
   e.preventDefault(); const msg = $("av-msg"), uno = $("av-destino").value === "cliente";

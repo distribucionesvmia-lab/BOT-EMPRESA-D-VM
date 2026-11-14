@@ -276,6 +276,18 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
         return send(res, 200, { ok: true, ...r }), true;
       } catch (e) { return send(res, 400, { error: e.message, ...(e.existe ? { existe: true } : {}) }), true; }
     }
+    // ---- Enlace de invitación: la oficina lo crea para un cliente (un solo uso, 7 días) y lo manda ELLA por WhatsApp; el sistema no envía nada ----
+    { const mi = /^\/api\/admin\/clientes\/([^/]+)\/invitacion$/.exec(p);
+      if (mi && post) {
+        const cli = customers.getById(decodeURIComponent(mi[1]));
+        if (!cli) return send(res, 404, { error: "No encontramos ese cliente." }), true;
+        const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/\/$/, "");
+        if (!/^https?:\/\//.test(base)) return send(res, 409, { error: "Falta la dirección pública de la aplicación del cliente: ponla en CLIENTE_URL (en C:\\vm\\config) o abre una vez la aplicación del cliente desde su dirección pública." }), true;
+        const { token, caduca } = accounts.invitacionCrear(cli.id, { dias: 7 });
+        const url = `${base}/entrar/${token}`, tel = String(cli.phone ?? cli.phones?.[0] ?? "").replace(/\D/g, "").replace(/^(0034|34)/, "");
+        const texto = `Hola, este es tu enlace para pedir a Distribuciones Valentín Martín: ${url}\n(Sirve una sola vez y hasta el ${caduca.slice(0, 10).split("-").reverse().join("/")}.)`;
+        return send(res, 200, { ok: true, cliente: cli.name, url, caduca, texto, whatsapp: `https://wa.me/${/^\d{9}$/.test(tel) ? "34" + tel : ""}?text=${encodeURIComponent(texto)}`, tieneTelefono: /^\d{9}$/.test(tel) }), true;
+      } }
     // ---- Clientes (la lista que viene de a3ERP) ----
     if (p === "/api/admin/clientes/lista" && get) {
       const pagina = Math.max(0, Number(url.searchParams.get("pagina") ?? 0) || 0);

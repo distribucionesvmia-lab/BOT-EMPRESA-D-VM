@@ -1077,6 +1077,30 @@ test("BENCH 9: el correo del alta es opcional (si se escribe, tiene que ser vál
   assert.equal(typeof antesA, "boolean");
 });
 
+test("BENCH 10: enlace de invitación de la oficina: un solo uso, caduca, se guarda solo su huella y entra como ESE cliente", async () => {
+  const lista = (await call("GET", "/api/admin/clientes?q=ejemplo", { admin: true })).json; assert.ok(lista.length >= 1);
+  const id = lista[0].id;
+  assert.ok([401, 403].includes((await call("POST", `/api/admin/clientes/${id}/invitacion`, { body: {} })).status)); // sin la clave de la oficina, nada
+  assert.equal((await call("POST", "/api/admin/clientes/NOEXISTE/invitacion", { admin: true, body: {} })).status, 404);
+  const inv = (await call("POST", `/api/admin/clientes/${id}/invitacion`, { admin: true, body: {} })).json;
+  assert.equal(inv.ok, true); assert.match(inv.url, /\/entrar\/[\w-]{43}$/); assert.match(inv.texto, /^Hola, este es tu enlace para pedir a Distribuciones Valentín Martín: http/); assert.match(inv.whatsapp, /^https:\/\/wa\.me\/\d*\?text=/); assert.ok(inv.caduca > new Date().toISOString());
+  const ruta = new URL(inv.url).pathname;
+  // GET (lo que hace la vista previa de WhatsApp) NO lo gasta: solo enseña un botón
+  const g1 = await fetch(BASE + ruta); const h1 = await g1.text(); assert.equal(g1.status, 200); assert.match(h1, /<button type="submit">Entrar<\/button>/); assert.equal(g1.headers.get("cache-control"), "no-store"); assert.equal(g1.headers.get("referrer-policy"), "no-referrer"); assert.equal(h1.includes(inv.cliente), false); // ni siquiera dice de quién es
+  assert.equal((await fetch(BASE + ruta)).status, 200);
+  // POST: entra como ese cliente y se gasta
+  const p1 = await fetch(BASE + ruta, { method: "POST", redirect: "manual" }); assert.equal(p1.status, 303); assert.equal(p1.headers.get("location"), "/cliente#invitacion");
+  const ck = (p1.headers.get("set-cookie") ?? "").split(";")[0]; assert.match(p1.headers.get("set-cookie"), /HttpOnly/); assert.match(p1.headers.get("set-cookie"), /SameSite=Strict/);
+  const yo = (await call("GET", "/api/yo", { cookie: ck })).json.cliente; assert.equal(yo.nombre, inv.cliente);
+  // ya gastado: mensaje claro y acceso normal, por GET y por POST
+  for (const m of ["GET", "POST"]) { const r = await fetch(BASE + ruta, { method: m, redirect: "manual" }), t = await r.text(); assert.equal(r.status, 410); assert.match(t, /Este enlace ya no sirve/); assert.match(t, /Ya se ha usado/); assert.match(t, /href="\/cliente"/); assert.equal(r.headers.get("set-cookie"), null); }
+  // uno inventado, y uno nuevo que anula al anterior sin usar
+  assert.match(await (await fetch(BASE + "/entrar/" + "a".repeat(43))).text(), /No lo reconocemos/);
+  const a = (await call("POST", `/api/admin/clientes/${id}/invitacion`, { admin: true, body: {} })).json, b = (await call("POST", `/api/admin/clientes/${id}/invitacion`, { admin: true, body: {} })).json;
+  assert.equal((await fetch(BASE + new URL(a.url).pathname)).status, 410); assert.equal((await fetch(BASE + new URL(b.url).pathname)).status, 200); // el nuevo sustituye al anterior
+  assert.equal((await fetch(BASE + new URL(b.url).pathname, { method: "POST", redirect: "manual" })).status, 303);
+});
+
 test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repetir o añadir), nunca los de otro ni su NIF", async () => {
   assert.equal((await call("GET", "/api/mi-cuenta")).status, 401);
   const A = cookieOf(await entrarNif("111111"));

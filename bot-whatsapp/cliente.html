@@ -855,6 +855,7 @@
   <div class="vm-modal" id="m-codigo" hidden>
     <form class="vm-card" id="f-codigo" role="dialog" aria-modal="true" aria-labelledby="t-codigo" autocomplete="off" novalidate>
       <h2 id="t-codigo">Cambiar mi código de entrada</h2>
+      <p id="c-nota" hidden><b>Ya estás dentro.</b> Pon ahora tu código de entrada y la próxima vez entrarás con tu teléfono, sin enlaces.</p>
       <p>Elige un código de entrada personal de <b>6 letras o números</b> (da igual mayúsculas o minúsculas). Con ella podrás entrar con el <b>teléfono que usas habitualmente para contactar con nosotros</b>, sin necesidad del DNI o CIF.</p>
       <label>Nuevo código de entrada<input id="c-nuevo" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
       <label>Repite el código de entrada<input id="c-nuevo2" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="new-password" required></label>
@@ -1017,7 +1018,7 @@ $("f-acceso").onsubmit = (e) => {
   }, "a-err");
 };
 $("cambiar").onclick = () => { $("c-err").textContent = ""; $("c-ok").textContent = ""; $("f-codigo").reset(); $("m-codigo").hidden = false; $("c-nuevo").focus(); };
-$("c-cerrar").onclick = () => ($("m-codigo").hidden = true);
+$("c-cerrar").onclick = () => { $("m-codigo").hidden = true; $("c-nota").hidden = true; };
 $("f-codigo").onsubmit = async (e) => {
   e.preventDefault(); $("c-err").textContent = ""; $("c-ok").textContent = "";
   const mal = (id, msg) => { $("c-err").textContent = msg; $(id).focus(); };
@@ -1633,12 +1634,12 @@ async function revisarFijoDesdeAviso() {
   const j = await fetch("/api/pedido-fijo").then((r) => (r.ok ? r.json() : null)).catch(() => null);
   if (j?.fijo?.lineas?.length) location.href = (window.__catUrl || "/catalogo") + "#c=" + j.fijo.lineas.map((l) => encodeURIComponent(l.id) + "." + l.uds).join(",") + "&r=1";
 }
-function entrar(nombre) { yoCache = null; $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (location.hash === "#revisar-fijo") { revisarFijoDesdeAviso(); } if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
+function entrar(nombre) { yoCache = null; $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (location.hash === "#revisar-fijo") { revisarFijoDesdeAviso(); } if (location.hash === "#invitacion") { try { history.replaceState(null, "", location.pathname); } catch {} setTimeout(() => { $("c-nota").hidden = false; $("cambiar").click(); }, 700); } if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
 
 (async () => {
   const r = await fetch("/api/yo").catch(() => null);
   const j = r && r.ok ? await r.json().catch(() => null) : null; // sin sesión responde 200 con cliente nulo (invitado)
-  if (j && j.cliente) entrar(j.cliente.nombre); else ver("acceso");
+  if (j && j.cliente) entrar(j.cliente.nombre); else { ver("acceso"); if (location.hash === "#enlace-caducado") { try { history.replaceState(null, "", location.pathname); } catch {} $("a-err").textContent = "Ese enlace ya no sirve (se usa una sola vez y caduca). Entra como siempre o pídele otro a la oficina."; } }
 })();
 </script>
 <script>

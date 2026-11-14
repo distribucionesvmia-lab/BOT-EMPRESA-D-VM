@@ -83,6 +83,7 @@ export { send, readJson };
  * accounts: base de cuentas · customers: { getById(id), matchRegistration(), nameMatches() }
  * secure: cookie solo por HTTPS · trustProxy: usar X-Forwarded-For para la IP
  */
+const paginaEntrar = (titulo, texto, boton) => `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${titulo} · Distribuciones Valentín Martín</title><style>:root{--bg:#F5F5F7;--card:#fff;--t:#1D1D1F;--t2:#5F5F65;--a:#C8102E;--on:#fff}@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1C1C1E;--t:#F5F5F7;--t2:#A8A8B0;--a:#FF6B7D;--on:#1D1D1F}}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--t);font:16px/1.45 system-ui,sans-serif}header{background:#C8102E;color:#fff;padding:20px 16px;text-align:center;font-weight:700;font-size:20px}main{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px}.c{background:var(--card);border-radius:20px;padding:28px 22px;max-width:420px;width:100%;text-align:center}h1{margin:0 0 8px;font-size:24px}p{margin:0 0 14px;color:var(--t2)}a.b,button{display:flex;align-items:center;justify-content:center;width:100%;min-height:52px;border:0;border-radius:26px;background:var(--a);color:var(--on);font:inherit;font-weight:700;font-size:17px;cursor:pointer;text-decoration:none}a.s{display:block;margin-top:8px;padding:12px 0;color:var(--a);font-weight:600;min-height:44px;line-height:1.35}</style><body><header>Distribuciones Valentín Martín</header><main><div class="c"><h1>${titulo}</h1><p>${texto}</p>${boton}</div></main></body></html>`;
 export function createAuth({ accounts, customers, misDatos = null, secure = false, trustProxy = false }) {
   // Límites por IP (configurables para las pruebas): accesos cada 10 minutos y solicitudes de alta cada hora
   const loginLimit = rateLimiter(Number(process.env.LOGIN_LIMIT ?? 20), 10 * 60_000);
@@ -100,6 +101,20 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   /** Atiende las rutas del cliente: /api/registro, /api/acceso, /api/salir y /api/yo. Devuelve true si la ruta era suya. */
   async function route(req, res, url) {
     const p = url.pathname;
+    // ── Enlace de invitación de la oficina: GET enseña una página con un botón (así las vistas previas de WhatsApp no lo gastan); solo el POST lo gasta y abre sesión ──
+    if (p.startsWith("/entrar/") && (req.method === "GET" || req.method === "POST")) {
+      const ya = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow", "X-Content-Type-Options": "nosniff" };
+      const token = decodeURIComponent(p.slice(8)), fin = (code, t, x, b) => (res.writeHead(code, ya).end(paginaEntrar(t, x, b)), true);
+      if (!loginLimit(ip(req))) return fin(429, "Demasiados intentos", "Espera unos minutos y vuelve a abrir el enlace.", "");
+      const v = accounts.invitacionVer(token);
+      if (!v.ok) return fin(410, "Este enlace ya no sirve", v.motivo === "caducada" ? "Ha caducado." : v.motivo === "usada" ? "Ya se ha usado (sirve una sola vez)." : "No lo reconocemos.", '<a class="b" href="/cliente">Entrar de la forma normal</a><a class="s" href="/cliente#enlace-caducado">¿Necesitas otro enlace? Pídeselo a la oficina</a>');
+      if (req.method === "GET") return fin(200, "Bienvenido", "Pulsa para entrar y hacer tu pedido. Este enlace sirve una sola vez.", `<form method="POST" action="/entrar/${encodeURIComponent(token)}"><button type="submit">Entrar</button></form>`);
+      const u = accounts.invitacionUsar(token); // se gasta aquí: una sola vez
+      if (!u.ok) return fin(410, "Este enlace ya no sirve", "Ya se ha usado (sirve una sola vez).", '<a class="b" href="/cliente">Entrar de la forma normal</a>');
+      const r = accounts.entrarPorInvitacion(u.customerId);
+      if (!r.ok) return fin(403, "No hemos podido entrar", "Tu cuenta está bloqueada ahora mismo. Llama a la oficina y lo solucionan.", '<a class="b" href="/cliente">Volver</a>');
+      return res.writeHead(303, { "Set-Cookie": cookie(r.token, 30 * 86400), Location: "/cliente#invitacion", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).end(), true;
+    }
     if (!p.startsWith("/api/")) return false;
 
     if (p === "/api/registro" && req.method === "POST") {

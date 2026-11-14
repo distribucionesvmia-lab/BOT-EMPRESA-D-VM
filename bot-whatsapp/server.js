@@ -869,7 +869,7 @@ async function appRoutes(req, res, url) {
 http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://x");
-    if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.png" || url.pathname.startsWith("/captura-") || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/estatico/") || url.pathname.startsWith("/img/")) {
+    if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.png" || url.pathname.startsWith("/captura-") || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/estatico/") || url.pathname.startsWith("/entrar/") || url.pathname.startsWith("/img/")) {
       appRoutes(req, res, url).catch((err) => {
         console.error(err);
         if (!res.headersSent) res.writeHead(500).end();

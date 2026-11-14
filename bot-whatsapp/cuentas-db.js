@@ -57,6 +57,7 @@ export function normalizePhone(p) {
   const d = String(p ?? "").replace(/\D/g, "");
   return d.length >= 9 && d.length <= 15 ? d.slice(-9) : null;
 }
+const huellaInv = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
 export const validEmail = (e) => typeof e === "string" && e.length <= 120 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
 
 const hashPin = (pin) => {
@@ -88,6 +89,9 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   // Favoritos del cliente (privados, por cliente; no los toca la sincronización con a3ERP)
   // Pedido fijo semanal (F-16): la plantilla de líneas y los días de reparto; NUNCA se envía solo, el cliente la revisa cada día que toca
   db.exec("CREATE TABLE IF NOT EXISTS usual_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, hidden INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)"); // «Tu pedido de siempre» editado o borrado por el cliente (sin fila = el último pedido, como siempre)
+  // Enlaces de invitación que crea la oficina: de UN solo uso y con caducidad. Solo se guarda la huella (hash) del enlace, nunca el enlace.
+  db.exec("CREATE TABLE IF NOT EXISTS invitaciones (id INTEGER PRIMARY KEY AUTOINCREMENT, token_hash TEXT NOT NULL UNIQUE, customer_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT, motivo TEXT)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_invitaciones_cliente ON invitaciones(customer_id)");
   db.exec("CREATE TABLE IF NOT EXISTS bienvenida_vista (customer_id TEXT PRIMARY KEY, at TEXT NOT NULL)"); // la tarjeta de bienvenida ya cerrada («Entendido»), por cliente
   db.exec("CREATE TABLE IF NOT EXISTS corte_pref (customer_id TEXT PRIMARY KEY, activo INTEGER NOT NULL)"); // «Avisarme antes de la hora límite»: sin fila = activado (si tiene los avisos del móvil activados)
   db.exec("CREATE TABLE IF NOT EXISTS corte_avisos (customer_id TEXT NOT NULL, day TEXT NOT NULL, PRIMARY KEY (customer_id, day))"); // un aviso por día y cliente como máximo
@@ -236,6 +240,33 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     hideUsual(customerId, now = new Date().toISOString()) { db.prepare("INSERT INTO usual_orders (customer_id, lines, hidden, updated_at) VALUES (?, '[]', 1, ?) ON CONFLICT(customer_id) DO UPDATE SET lines = '[]', hidden = 1, updated_at = excluded.updated_at").run(String(customerId), now); return true; },
     resetUsual: (customerId) => db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(String(customerId)).changes === 1,
     allStanding() { const m = new Map(); for (const r of db.prepare("SELECT customer_id, days, paused, skip_week FROM standing_orders").all()) m.set(r.customer_id, { days: JSON.parse(r.days), paused: !!r.paused, skipWeek: r.skip_week ?? null }); return m; },
+    /** Crea un enlace de invitación (32 bytes aleatorios) para un cliente. Los anteriores sin usar de ese cliente dejan de valer. Devuelve { token, caduca }; el token no se guarda. */
+    invitacionCrear(customerId, { dias = 7, now = new Date().toISOString() } = {}) {
+      const token = crypto.randomBytes(32).toString("base64url"), caduca = new Date(new Date(now).getTime() + dias * 86_400_000).toISOString();
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("UPDATE invitaciones SET used_at = ?, motivo = 'sustituida' WHERE customer_id = ? AND used_at IS NULL").run(now, String(customerId));
+        db.prepare("INSERT INTO invitaciones (token_hash, customer_id, created_at, expires_at) VALUES (?, ?, ?, ?)").run(huellaInv(token), String(customerId), now, caduca);
+        db.exec("COMMIT");
+      } catch (e) { db.exec("ROLLBACK"); throw e; }
+      return { token, caduca };
+    },
+    /** Sin gastarlo: { ok:true, customerId } o { ok:false, motivo:'desconocida'|'usada'|'caducada' }. */
+    invitacionVer(token, now = new Date().toISOString()) {
+      const r = db.prepare("SELECT customer_id, expires_at, used_at FROM invitaciones WHERE token_hash = ?").get(huellaInv(token));
+      if (!r) return { ok: false, motivo: "desconocida" };
+      if (r.used_at) return { ok: false, motivo: "usada" };
+      if (r.expires_at <= now) return { ok: false, motivo: "caducada" };
+      return { ok: true, customerId: r.customer_id };
+    },
+    /** La gasta (una sola vez, atómico): dos personas con el mismo enlace no pueden entrar las dos. */
+    invitacionUsar(token, now = new Date().toISOString()) {
+      const v = this.invitacionVer(token, now); if (!v.ok) return v;
+      const c = db.prepare("UPDATE invitaciones SET used_at = ?, motivo = 'usada' WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?").run(now, huellaInv(token), now).changes;
+      return c === 1 ? v : { ok: false, motivo: "usada" };
+    },
+    /** Entra como ese cliente con un enlace de invitación ya gastado (la oficina responde por él): abre sesión y deja la cuenta confirmada. */
+    entrarPorInvitacion(customerId, now = new Date().toISOString()) { return this.loginNif([String(customerId)], () => true, now); },
     /** Tarjeta de bienvenida: ¿ya la cerró este cliente con «Entendido»? */
     bienvenidaVista: (customerId) => !!db.prepare("SELECT 1 FROM bienvenida_vista WHERE customer_id = ?").get(String(customerId)),
     bienvenidaMarcar(customerId, now = new Date().toISOString()) { db.prepare("INSERT OR IGNORE INTO bienvenida_vista (customer_id, at) VALUES (?, ?)").run(String(customerId), now); return true; },
@@ -453,6 +484,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM corte_pref WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM bienvenida_vista WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM invitaciones WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM corte_avisos WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM push_subs WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM registrations WHERE customer_id = ? OR (phone = ? AND ? IS NOT NULL)").run(row.customer_id, row.phone, row.phone);
