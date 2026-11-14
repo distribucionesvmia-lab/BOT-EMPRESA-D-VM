@@ -1129,6 +1129,34 @@
     .cab-cat .migas, .subchips, .grp-tit, .cuenta-lista, .accesos { padding-left:0; padding-right:0; margin-left:0; margin-right:0; }
   }
   .accesos[hidden], .subchips[hidden] { display:none; }
+
+  /* ═══ Tanda 4: carrito y favoritos (probado a 360 px) ═══ */
+  .pregunta-si { min-height:50px; border:0; border-radius:var(--r-pill); background:var(--accent); color:var(--on-accent); font:inherit; font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; cursor:pointer; }
+  #confirm .nw { white-space:nowrap; }
+  @media (max-width:380px) { #cart .cartfoot .big { font-size:calc(16px / var(--k,1)); } }
+  .diasfijo { gap:var(--s2); } .diasfijo button { min-height:44px; min-width:56px; }
+  #sumIvaTipos .rr { padding-top:var(--s1); padding-bottom:var(--s1); }
+  /* Líneas del pedido: cantidad en una fila y, debajo, importe + «Quitar» (el botón ya no se corta) */
+  #cart .tl, #cart .tl tbody { display:block; } #cart .tl thead { display:none; }
+  #cart .tl tr.tl-fila { display:grid; grid-template-columns:minmax(0, 1fr); border-top:1px solid var(--line); }
+  #cart .tl tr.tl-fila:first-child { border-top:0; } #cart .tl tr.tl-fila td { border-top:0; padding:8px 10px; }
+  #cart .tl td.tl-art { grid-column:1; width:auto; padding-bottom:0; } #cart .tl-art .tl-av { display:inline-grid; margin:0 10px 0 0; }
+  #cart .tl td.tl-cant { grid-column:1; text-align:left; } #cart .tl-ctl { justify-content:flex-start; flex-wrap:wrap; gap:var(--s2); }
+  #cart .tl td.tl-imp { grid-column:1; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--s2); text-align:left; }
+  #cart .tl tr.tl-obs { display:block; } #cart .tl tr.tl-obs td { display:block; padding:0 10px 8px; }
+  #cart .tl .hstep input { width:52px; }
+  @media (max-width:1023px) { /* tarjeta del catálogo en móvil: foto · nombre (hasta 3 líneas) con el selector debajo · corazón arriba a la derecha y «+» abajo a la derecha */
+    .pf { grid-template-columns:72px minmax(0, 1fr) auto; grid-template-areas:"av info fav" "av seg slot"; align-items:start; row-gap:var(--s2); }
+    .pf-av { grid-area:av; } .pf-info { grid-area:info; align-self:start; }
+    .pf-ctl { display:contents; }
+    .pf-seg, .pf-fijo { grid-area:seg; justify-self:start; align-self:center; }
+    .pf-slot { grid-area:slot; align-self:center; justify-self:end; }
+    .pf-n { -webkit-line-clamp:3; }
+    .pf-fav { position:static; grid-area:fav; justify-self:end; align-self:start; width:44px; height:44px; margin:-6px -10px 0 0; }
+    .pf-fav::before { display:none; }
+    .pf-fav svg { width:24px; height:24px; left:0; top:0; }
+  }
+  @media (min-width:1024px) { .pf-fav { position:absolute; left:calc(var(--s3) + 2px); top:calc(var(--s3) + 2px); width:44px; height:44px; margin:0; } .pf-fav::before { width:34px; height:34px; } .pf-fav svg { width:20px; height:20px; left:0; top:0; } }
 </style>
 </head>
 <body>
@@ -1146,7 +1174,7 @@
   <div class="titulo-bloque"><h1 class="titulo-grande">Catálogo</h1><p class="titulo-sub" id="ttl">Cargando…</p><small id="sub" hidden></small></div>
   <div class="aviso" id="avisoHoy" role="status" aria-live="polite" hidden>Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
   <div class="guia" id="guia" aria-live="polite">Toca <b>«+»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.</div>
-  <div class="buscar"><svg class="lupa" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.500" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.500 4.500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="q" type="search" placeholder="Buscar en todo el catálogo" autocomplete="off" aria-label="Buscar un producto" aria-controls="sugs" aria-expanded="false"><button type="button" class="vozbtn" id="vozBtn" aria-label="Buscar con la voz" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.500 11a6.500 6.500 0 0 0 13 0M12 17.500V21"/></svg></button><div id="sugs" class="sugs" role="listbox" aria-label="Sugerencias" hidden></div></div>
+  <div class="buscar"><svg class="lupa" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.500" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.500 4.500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="q" type="search" placeholder="Buscar productos" autocomplete="off" aria-label="Buscar un producto" aria-controls="sugs" aria-expanded="false"><button type="button" class="vozbtn" id="vozBtn" aria-label="Buscar con la voz" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.500 11a6.500 6.500 0 0 0 13 0M12 17.500V21"/></svg></button><div id="sugs" class="sugs" role="listbox" aria-label="Sugerencias" hidden></div></div>
   <!-- Filtro de ida y vuelta, solo en la pestaña «Histórico» (data-t="hab") -->
   <div class="filbar" id="filbar" hidden><button class="fil" id="fil" type="button" aria-pressed="false">☑ Ver solo lo que he marcado</button><span id="filinfo"></span><div id="busqfil" class="busqfil"></div></div>
   <main id="list" aria-busy="true"><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div></main>
@@ -1185,7 +1213,7 @@
         <button class="big sec" id="fijoGuardar" type="button" style="margin-top:10px">Guardar como pedido fijo</button><div class="nota" id="fijoMsg" role="status" aria-live="polite"></div></div>
       <div class="card"><label for="note" class="ctit">Observaciones del pedido</label><textarea id="note" placeholder="Ej.: avísame por teléfono antes de entregar (opcional)" maxlength="200"></textarea></div>
       <h3 class="ped-h">Resumen</h3>
-      <div class="card ped-res" id="pedRes"><div class="rr"><span>Base imponible</span><b id="sumBase">0,00 €</b></div><div class="rr"><span>IVA</span><b id="sumIva">0,00 €</b></div><div class="rr" id="sumReFila" hidden><span>Recargo de equivalencia</span><b id="sumRe">0,00 €</b></div><div class="rr tt"><span>Total con IVA</span><b id="sumTotal">0,00 €</b></div></div>
+      <div class="card ped-res" id="pedRes"><div class="rr"><span>Base imponible</span><b id="sumBase">0,00 €</b></div><div class="rr" id="sumIvaFila"><span>IVA</span><b id="sumIva">0,00 €</b></div><div id="sumIvaTipos"></div><div class="rr" id="sumReFila" hidden><span>Recargo de equivalencia</span><b id="sumRe">0,00 €</b></div><div class="rr tt"><span>Total con IVA</span><b id="sumTotal">0,00 €</b></div></div>
       <div class="nota" id="priceNote"></div>
       <div class="err" id="err" role="alert"></div>
     </div>
@@ -1224,7 +1252,7 @@ const uds = l => l.qty * (unit(l.id) === "caja" ? (l.unitsPerBox || 1) : 1);
 const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const hue = s => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
 const initials = n => { const r = String(n ?? "").replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9 ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase(); return r || "•"; }; // siempre hay marcador, aunque el nombre empiece por comillas o símbolos
-const lines = () => data.products.filter(p => qty.get(p.id) > 0).map(p => ({ ...p, qty: qty.get(p.id) }));
+const lines = () => [...qty].filter(([id, n]) => n > 0 && productoPorId.has(id)).map(([id, n]) => ({ ...productoPorId.get(id), qty: n })); // en el orden en que se fueron añadiendo (lo nuevo, al final)
 const count = () => lines().length;
 // Importes EXACTOS (en céntimos, con enteros): el mismo cálculo que el servidor (pricing.js), sin errores de coma flotante
 const escala = (x, dec) => BigInt(Math.round(Number(x) * 10 ** dec));
@@ -1241,7 +1269,8 @@ function calc() {
   const pct = (cent, rate) => Number(mitadArriba(BigInt(cent) * escala(rate, 2), 10000n));
   let base = 0, iva = 0, re = 0;
   for (const [v, b] of g) { base += b; iva += pct(b, v); if (data.customer.re) re += pct(b, RE_TIPO[v] ?? 0); }
-  return { base: base / 100, iva: iva / 100, re: re / 100, total: (base + iva + re) / 100 };
+  const grupos = [...g].sort((a, b) => b[0] - a[0]).map(([v, b]) => ({ v, base: b / 100, iva: pct(b, v) / 100 }));
+  return { base: base / 100, iva: iva / 100, re: re / 100, total: (base + iva + re) / 100, grupos };
 }
 const total = () => calc().total;
 const desgloseIva = () => { const c = calc(); return c.base ? `base ${eur(c.base)} + IVA ${eur(c.iva)}${c.re ? " + R.E. " + eur(c.re) : ""}` : ""; };
@@ -1314,14 +1343,14 @@ function setQty(id, n) {
   refresh();
 }
 // Cambiar entre unidades y cajas conservando lo que se está pidiendo (nunca 24 uds → 24 cajas sin avisar)
-function cambiarUnidad(p, nueva) {
+async function cambiarUnidad(p, nueva) {
   if (p.soloCaja) return; // solo se vende por cajas enteras
   const q = qty.get(p.id) || 0, ant = unit(p.id);
   if (!q || ant === nueva) { unitOf.set(p.id, nueva); bumpId = p.id; return refresh(); }
   const k = p.unitsPerBox || 1;
   if (nueva === "ud") { unitOf.set(p.id, "ud"); return setQty(p.id, q * k); }
   const cajas = Math.ceil(q / k);
-  if (q % k && !confirm(`${q} uds no son cajas completas (caja de ${k}). ¿Pedir ${cajas} ${cajas === 1 ? "caja" : "cajas"} (${cajas * k} uds)?`)) return;
+  if (q % k && !(await preguntar({ titulo: "No son cajas completas", texto: `${q} uds no son cajas completas (caja de ${k}). ¿Pedir ${cajas} ${cajas === 1 ? "caja" : "cajas"} (${cajas * k} uds)?`, si: `Sí, pedir ${cajas} ${cajas === 1 ? "caja" : "cajas"}`, no: "Dejarlo en unidades" }))) return;
   unitOf.set(p.id, "caja"); setQty(p.id, cajas);
 }
 // Carrito guardado en este navegador (24 h) para no perderlo al recargar
@@ -1346,10 +1375,47 @@ function recuperar() {
     for (const [id, n] of g.q) if (ids.has(id) && n > 0) qty.set(id, Math.min(999, n));
     for (const [id, u] of g.u) if (qty.has(id) && (u === "ud" || u === "caja")) unitOf.set(id, u);
     for (const [id, t] of g.n) if (qty.has(id)) notes.set(id, String(t).slice(0, 120));
-    if (qty.size) aviso("Hemos recuperado tu pedido sin terminar.");
+    if (qty.size && !sessionStorage.getItem("vm:recuperado")) { sessionStorage.setItem("vm:recuperado", "1"); aviso("Hemos recuperado tu pedido sin terminar."); } // una vez por sesión, no cada vez que se entra
   } catch {}
 }
 
+// Pregunta con el estilo de la app (en lugar del confirm() del navegador): devuelve una promesa true/false
+const LIM_CANTIDAD = 200, LIM_IMPORTE = 3000; // a partir de aquí se pregunta «¿Seguro?»
+function preguntar({ titulo, texto, si = "Sí, continuar", no = "Cambiar" }) {
+  return new Promise(res => {
+    const viejo = document.getElementById("pregunta-fondo"); if (viejo) viejo.remove();
+    const f = document.createElement("div"); f.id = "pregunta-fondo"; f.className = "ayuda-fondo"; f.setAttribute("role", "alertdialog"); f.setAttribute("aria-modal", "true"); f.setAttribute("aria-label", titulo);
+    const c = document.createElement("div"); c.className = "ayuda-caja";
+    const h = document.createElement("h2"); h.textContent = titulo; const p = document.createElement("p"); p.textContent = texto; c.append(h, p);
+    const cierra = ok => { f.remove(); document.removeEventListener("keydown", esc); res(ok); }; const esc = e => { if (e.key === "Escape") cierra(false); };
+    const bs = document.createElement("button"); bs.type = "button"; bs.className = "pregunta-si"; bs.textContent = si; bs.onclick = () => cierra(true);
+    const bn = document.createElement("button"); bn.type = "button"; bn.className = "ayuda-cerrar"; bn.textContent = no; bn.onclick = () => cierra(false);
+    arrastrable(c, () => cierra(false)); f.onclick = e => { if (e.target === f) cierra(false); }; document.addEventListener("keydown", esc);
+    c.append(bs, bn); f.appendChild(c); document.body.appendChild(f); bn.focus();
+  });
+}
+// Campo de cantidad (catálogo y carrito): solo números enteros, selecciona todo al tocarlo, vuelve al último valor válido y pregunta «¿Seguro?» si la cantidad es enorme
+function campoCantidad(id, q, nombre) {
+  const inp = document.createElement("input"); inp.type = "text"; inp.inputMode = "numeric"; inp.autocomplete = "off"; inp.value = q; inp.setAttribute("aria-label", "Cantidad de " + nombre); inp.setAttribute("maxlength", "3");
+  const sel = () => setTimeout(() => { try { inp.select(); } catch {} }, 0);
+  inp.onfocus = () => { sep = false; antes = inp.value; sel(); }; inp.onclick = sel; inp.addEventListener("mouseup", e => e.preventDefault()); // al tocar, se selecciona el número: escribir 999 sobre un 2 da 999 (el ratón no recoloca el cursor)
+  let antes = String(q), sep = false; // tras un punto o una coma se ignora lo que siga: «2.5» se queda en 2 (no pasa a 25) y se avisa
+  inp.oninput = () => {
+    let v = inp.value;
+    if (sep) { inp.value = antes; return; }
+    if (/[.,]/.test(v)) { sep = true; aviso("Solo cantidades enteras."); v = v.split(/[.,]/)[0]; }
+    const l = v.replace(/\D/g, "").slice(0, 3); if (l !== inp.value) inp.value = l; antes = l;
+  };
+  inp.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } };
+  inp.onblur = async () => {
+    if (inp.value === "") { inp.value = q; return; } // vacío: vuelve al valor de antes (sin borrar la línea)
+    const v = Math.min(999, parseInt(inp.value, 10) || 0);
+    if (v === q) { inp.value = q; return; }
+    if (v >= LIM_CANTIDAD && v > q && !(await preguntar({ titulo: "¿Seguro?", texto: `Vas a pedir ${v} de «${nombre}». Es una cantidad muy alta.`, si: "Sí, pedir " + v, no: "Cambiar" }))) { inp.value = q; return; }
+    setQty(id, v);
+  };
+  return inp;
+}
 function control(p) {
   const q = qty.get(p.id) || 0, box = document.createElement("div");
   box.className = "pf-ctl";
@@ -1378,8 +1444,7 @@ function control(p) {
   st.setAttribute("aria-label", enCajas ? `${q} ${q === 1 ? "caja" : "cajas"} · ${q * p.unitsPerBox} uds` : `${q} ${q === 1 ? "unidad" : "unidades"}`); // lo que lleva pedido, dicho en voz alta
   const minus = document.createElement("button"); minus.type = "button"; minus.setAttribute("aria-label", "Quitar uno de " + p.name); minus.onclick = () => setQty(p.id, q - 1);
   minus.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
-  const inp = document.createElement("input"); inp.type = "number"; inp.inputMode = "numeric"; inp.pattern = "[0-9]*"; inp.min = 0; inp.max = 999; inp.onfocus = () => inp.select(); inp.value = q; inp.setAttribute("aria-label", "Cantidad de " + p.name);
-  inp.onchange = () => setQty(p.id, inp.value);
+  const inp = campoCantidad(p.id, q, p.name);
   const plus = document.createElement("button"); plus.type = "button"; plus.setAttribute("aria-label", "Añadir uno de " + p.name); plus.onclick = () => setQty(p.id, q + 1);
   plus.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
   st.append(minus, inp, plus); hueco.appendChild(st);
@@ -1442,7 +1507,7 @@ function row(p) {
     f.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 0 1 19.4 13z" fill="${on ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`; f.setAttribute("aria-pressed", String(on)); f.setAttribute("aria-label", (on ? "Quitar de favoritos " : "Marcar como favorito ") + p.name);
     f.onclick = () => marcarFav(p.id, !on);
     if (bumpFav === p.id) f.classList.add("bump");
-    av.appendChild(f); // el corazón va sobre la esquina de la foto
+    el.appendChild(f); // el corazón es un hijo de la tarjeta (zona táctil de 44 px), no va dentro de la foto
   }
   el.append(av, info, control(p));
   return el;
@@ -1796,7 +1861,7 @@ function tablaLineas(ls) {
     }
     const st = document.createElement("div"); st.className = "hstep";
     const minus = document.createElement("button"); minus.type = "button"; minus.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'; minus.setAttribute("aria-label", "Quitar uno de " + l.name); minus.onclick = () => setQty(l.id, l.qty - 1);
-    const inp = document.createElement("input"); inp.type = "number"; inp.inputMode = "numeric"; inp.pattern = "[0-9]*"; inp.min = 0; inp.max = 999; inp.onfocus = () => inp.select(); inp.value = l.qty; inp.setAttribute("aria-label", "Cantidad de " + l.name); inp.onchange = () => setQty(l.id, inp.value);
+    const inp = campoCantidad(l.id, l.qty, l.name);
     const plus = document.createElement("button"); plus.type = "button"; plus.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'; plus.setAttribute("aria-label", "Añadir uno de " + l.name); plus.onclick = () => setQty(l.id, l.qty + 1);
     st.append(minus, inp, plus); box.appendChild(st); q.appendChild(box);
     // Importe + unidades + quitar
@@ -1847,8 +1912,10 @@ function pintarFalta(box) {
 function pintarResumen() {
   const c = calc();
   $("sumBase").textContent = eur(c.base); $("sumIva").textContent = eur(c.iva);
+  const varios = c.grupos.length > 1; $("sumIvaFila").hidden = varios; $("sumIvaTipos").innerHTML = ""; // con productos a distintos tipos, una línea de IVA por tipo
+  if (varios) for (const g of c.grupos) { const f = document.createElement("div"); f.className = "rr"; const a = document.createElement("span"), b = document.createElement("b"); a.textContent = `IVA ${String(g.v).replace(".", ",")} % (sobre ${eur(g.base)})`; b.textContent = eur(g.iva); f.append(a, b); $("sumIvaTipos").appendChild(f); }
   $("sumReFila").hidden = !data.customer.re; $("sumRe").textContent = eur(c.re); $("sumTotal").textContent = eur(c.total);
-  $("confirm").textContent = c.base ? `Confirmar pedido · ${eur(c.total)}` : "Confirmar pedido";
+  const bt = $("confirm"); bt.textContent = "Confirmar pedido"; if (c.base) { const sp = document.createElement("span"); sp.className = "nw"; sp.textContent = ` · ${eur(c.total)}`; bt.appendChild(sp); } // el importe nunca se parte de línea
 }
 function renderCart() {
   const box = $("cartLines"); box.innerHTML = "";
@@ -2163,9 +2230,11 @@ function direccionOk(errBox) {
   if (modoDir() === "otra" && dirEntrega().length < 5) { $("errDir").textContent = sinDireccion() ? "Escribe a dónde te lo llevamos." : "Escribe la otra dirección de entrega, o elige «En la dirección de siempre»."; $("addrOtra").setAttribute("aria-invalid", "true"); errBox.textContent = ""; $("addrOtra").hidden = false; $("addrOtra").focus(); return false; }
   return true;
 }
-$("confirm").onclick = () => {
+$("confirm").onclick = async () => {
   $("err").textContent = ""; if (!direccionOk($("err"))) return;
   if ((data.delivery || []).length && !diaElegido) { $("err").textContent = "Elige el día de entrega."; $("pedDias").scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+  const c = calc(), mayor = Math.max(0, ...lines().map(l => l.qty));
+  if ((c.total > LIM_IMPORTE || mayor >= LIM_CANTIDAD) && !(await preguntar({ titulo: "¿Seguro que quieres enviarlo?", texto: `El pedido es de ${eur(c.total)}${mayor >= LIM_CANTIDAD ? " y lleva una cantidad muy alta de un artículo" : ""}: es bastante más de lo habitual. Revisa las cantidades antes de enviarlo.`, si: "Sí, enviar", no: "Revisar el pedido" }))) return;
   enviarPedido(diaElegido, $("err"));
 };
 // Día de entrega: fichas de 64 px (Hoy solo si toca, Mañana, los siguientes días de servicio y «Otro día» con calendario)

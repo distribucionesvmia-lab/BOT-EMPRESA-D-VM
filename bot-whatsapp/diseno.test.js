@@ -36,8 +36,8 @@ test("fila compacta: precio con 2 decimales (3 solo si <1 € y el tercero no es
   assert.ok(fn, "eurp");
   const eurp = vm.runInNewContext("(" + fn + ")");
   assert.equal(eurp(0.5), "0,50 €"); assert.equal(eurp(0.625), "0,625 €"); assert.equal(eurp(1.6), "1,60 €"); assert.equal(eurp(21), "21,00 €"); assert.equal(eurp(0.62), "0,62 €");
-  assert.match(pedido, /"Añadir " \+ p\.name/); assert.match(pedido, /"Quitar uno de " \+ p\.name/); assert.match(pedido, /"Cantidad de " \+ p\.name/);
-  assert.match(pedido, /inp\.inputMode = "numeric"[^\n]*inp\.max = 999/);
+  assert.match(pedido, /"Añadir " \+ p\.name/); assert.match(pedido, /"Quitar uno de " \+ p\.name/); assert.match(pedido, /"Cantidad de " \+ nombre/);
+  assert.match(pedido, /inp\.inputMode = "numeric"[^\n]*/); assert.match(pedido, /replace\(\/\\D\/g, ""\)\.slice\(0, 3\)/); // solo enteros, máximo 999
   assert.match(pedido, /\.pf-step \{[^}]*height:44px/); assert.match(pedido, /\.pf-add \{ width:44px; height:44px; border:0; border-radius:50%/);
   assert.match(pedido, /\.pf-n \{[^}]*-webkit-line-clamp:2/); assert.match(pedido, /prefers-reduced-motion: reduce\) \{ \.pf-step \{ animation:none/);
 });
@@ -57,7 +57,7 @@ test("navegación inferior: 5 pestañas, aria-current, sin «Paso 1 de 3» ni pe
   assert.doesNotMatch(pedido, /<div class="paso">/); assert.doesNotMatch(pedido, /<nav class="tabs">/);
   assert.match(pedido, /<footer hidden role="status" aria-live="polite"><button class="pill-cart"/);
   assert.match(pedido, /\.pill-cart \{[^}]*min-height:54px/); assert.match(pedido, /\.tb \{[^}]*min-height:56px/);
-  assert.match(pedido, /Buscar en todo el catálogo/); assert.match(pedido, /slice\(0, 6\)/); // buscador con hasta 6 sugerencias
+  assert.match(pedido, /Buscar productos/); assert.match(pedido, /slice\(0, 6\)/); // buscador con hasta 6 sugerencias
   assert.match(pedido, /posTab\[tab\]\.scroll = \$\("list"\)\.scrollTop/); // cada pestaña recuerda su posición
   assert.match(pedido, /history\.pushState\(\{ vmTab: t \}/); // «Atrás» del móvil vuelve a la pestaña anterior
   assert.match(pedido, /aviso\("Quitado: "/); // «Quitado · Deshacer»
@@ -236,4 +236,20 @@ test("tanda 3 (catálogo): barra de categoría con fondo, subcategorías como ch
   assert.match(pedido, /return r \|\| "•"/); assert.match(pedido, /sin nombre no hay tarjeta/); // 8
   assert.match(pedido, /esPack \? " \/pack" : " \/ud"/); assert.match(pedido, /"Pack de "/); assert.match(pedido, /sp\.textContent = "Por unidades"/); // 9
   assert.match(pedido, /className = "acceso"/); assert.match(pedido, /\[#&\]sub=/); // 11
+});
+
+test("tanda 4 (carrito y favoritos): cantidad solo entera y seleccionada al tocar, «¿Seguro?», aviso con el estilo de la app, líneas al final, recuperado una vez, IVA por tipo, botón sin partir", () => {
+  assert.match(pedido, /function campoCantidad\(id, q, nombre\)/); assert.match(pedido, /inp\.onfocus = \(\) => \{ sep = false; antes = inp\.value; sel\(\); \}/); assert.match(pedido, /Solo cantidades enteras\./); // 1, 2, 3
+  assert.match(pedido, /if \(inp\.value === ""\) \{ inp\.value = q; return; \}/); assert.match(pedido, /v\.split\(\/\[\.,\]\/\)\[0\]/);
+  assert.match(pedido, /const LIM_CANTIDAD = 200, LIM_IMPORTE = 3000/); assert.match(pedido, /titulo: "¿Seguro\?"/); assert.match(pedido, /¿Seguro que quieres enviarlo\?/); // 4
+  assert.match(pedido, /#cart \.tl td\.tl-imp \{ grid-column:1; display:flex; flex-wrap:wrap;/); // 5
+  assert.match(pedido, /#confirm \.nw \{ white-space:nowrap; \}/); assert.match(pedido, /sp\.className = "nw"/); // 6
+  assert.match(pedido, /grid-template-areas:"av info fav" "av seg slot"/); assert.match(pedido, /\.pf-n \{ -webkit-line-clamp:3; \}/); // 7
+  assert.match(pedido, /el\.appendChild\(f\); \/\/ el corazón es un hijo de la tarjeta/); assert.match(pedido, /\.pf-fav \{ position:static; grid-area:fav;[^}]*width:44px; height:44px;/); // 8
+  assert.match(pedido, /\.diasfijo button \{ min-height:44px; min-width:56px; \}/); // 9
+  assert.match(pedido, /async function cambiarUnidad/); assert.match(pedido, /titulo: "No son cajas completas"/); assert.doesNotMatch(pedido.slice(pedido.indexOf("async function cambiarUnidad"), pedido.indexOf("async function cambiarUnidad") + 900), /\bconfirm\(/); // 10
+  assert.match(pedido, /const lines = \(\) => \[\.\.\.qty\]/); // 11
+  assert.match(pedido, /sessionStorage\.getItem\("vm:recuperado"\)/); // 12
+  assert.match(pedido, /IVA \$\{String\(g\.v\)\.replace\("\.", ","\)\} % \(sobre/); // 13
+  assert.match(pedido, /placeholder="Buscar productos"/); // 14
 });

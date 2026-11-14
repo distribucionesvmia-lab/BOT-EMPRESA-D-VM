@@ -217,7 +217,7 @@ test("«¿Te falta algo?» con foto del artículo y entrega: dirección de siemp
   assert.match(ped, /className = "falta-av"/); assert.match(ped, /\.falta-fila \.falta-av \{ flex:none; width:56px; height:56px/);
   assert.match(ped, /name="addrmode" value="otra"/); assert.match(ped, /deliveryAddress: dirEntrega\(\)/);
   assert.match(ped, /const sinDireccion = \(\) => !String\(data\.customer\.address/);
-  assert.match(ped, /\$\("confirm"\)\.onclick = \(\) => \{\s*\$\("err"\)\.textContent = ""; if \(!direccionOk/); // sin dirección válida no se pasa a elegir el día
+  assert.match(ped, /\$\("confirm"\)\.onclick = async \(\) => \{\s*\$\("err"\)\.textContent = ""; if \(!direccionOk/); // sin dirección válida no se pasa a elegir el día
 });
 
 test("ACTUALIZACIÓN AUTOMÁTICA: cada 10 minutos, con pruebas, comprobación de arranque, vuelta atrás y botón «Actualizar ahora»", async () => {
@@ -240,7 +240,7 @@ test("PAQUETE «COMPRAR MÁS FÁCIL» A+B: lo que ya compra arriba, «Lo más pe
   assert.match(ped, /"Lo compras"/); assert.match(ped, /else if \(arbol\) items = \[\.\.\.items\.filter\(p => p\.count > 0\)/);
   assert.match(ped, /Lo más pedido/); assert.match(ped, /data\.top/);
   // F-22
-  assert.doesNotMatch(ped, /atajos/); assert.match(ped, /inp\.pattern = "\[0-9\]\*"/); // sin botones «+1 caja / +6 cajas»
+  assert.doesNotMatch(ped, /atajos/); assert.match(ped, /inp\.inputMode = "numeric"/); // sin botones «+1 caja / +6 cajas»
   // F-23
   assert.match(ped, /"Quitado: " \+/); assert.match(ped, /deshacer \? 8000 : 4000/); assert.match(ped, /t\.onpointerenter = t\.onfocusin/); assert.match(ped, /#toast\.arriba \{ bottom:auto/);
   assert.match(ped, /id="vaciar"/); assert.match(ped, /aria-label", "Quitar " \+ l\.name/);
@@ -301,7 +301,7 @@ test("TOTALES EN EL CATÁLOGO: la barra flotante va SIN IVA; la pantalla Pedido 
   assert.match(ped, /\$\("pcT"\)\.textContent = n \? `\$\{eur\(calc\(\)\.base\)\} sin IVA`/); // carrito flotante: sin IVA
   assert.match(ped, /\$\("sumBase"\)\.textContent = eur\(c\.base\); \$\("sumIva"\)\.textContent = eur\(c\.iva\)/); // resumen: base + IVA
   assert.match(ped, /\$\("sumRe"\)\.textContent = eur\(c\.re\); \$\("sumTotal"\)\.textContent = eur\(c\.total\)/); // recargo de equivalencia y total
-  assert.match(ped, /`Confirmar pedido · \$\{eur\(c\.total\)\}`/); // «Confirmar pedido · 169,91 €»
+  assert.match(ped, /sp\.textContent = ` · \$\{eur\(c\.total\)\}`/); // «Confirmar pedido · 169,91 €»
   assert.doesNotMatch(ped, /id="when"/); assert.doesNotMatch(ped, /id="resumen"/); // ya no hay pasos 2 y 3 aparte
 });
 
