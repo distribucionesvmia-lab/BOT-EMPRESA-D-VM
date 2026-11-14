@@ -1007,7 +1007,7 @@ document.addEventListener("touchstart", () => {}, { passive: true }); // Safari 
 const COLORS = ["#2f8f6b", "#c0763a", "#5b7bd5", "#a1507c", "#8a8f2b", "#3c8fa6", "#b8523f", "#6c5ba8"];
 const eur = n => n.toFixed(2).replace(".", ",") + " €";
 const eurp = n => { n = Number(n); const t = Math.round(n * 1000); return (n < 1 && t % 10 !== 0 ? n.toFixed(3) : n.toFixed(2)).replace(".", ",") + " €"; }; // precio de un artículo: 2 decimales (3 solo si cuesta menos de 1 € y el tercer decimal no es cero)
-let data = null, tab = "hab", query = "";
+let data = null, tab = "all", query = "";
 const favs = new Set(); // favoritos del cliente (solo con sesión; en el enlace de pedido del chat no hay)
 // Clave de este pedido: si se reenvía (doble clic, fallo de red), el servidor no lo duplica
 const orderKey = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
@@ -1614,7 +1614,7 @@ document.querySelectorAll(".tabbar .tb").forEach(b => b.onclick = () => {
 // La altura real de la barra (letra grande, 2 líneas) manda: todo lo que va encima se coloca según ella
 try { const barra = document.querySelector(".tabbar"), app = document.querySelector(".app"); const med = () => app.style.setProperty("--tb-h", barra.offsetHeight + "px"); med(); new ResizeObserver(med).observe(barra); } catch {}
 addEventListener("popstate", ev => { if (prof > 0 || silencio) return; const t = ev.state && ev.state.vmTab; if (t && t !== tab) cambiarTab(t, { historia: false }); });
-try { history.replaceState({ vmTab: "hab" }, ""); } catch {}
+try { history.replaceState({ vmTab: "all" }, ""); } catch {}
 // Pedido en marcha que viene del chat (#c=código.unidades,…): lo que ya había pedido se queda en el carrito y se le suma lo nuevo
 // ── Modificar un pedido ya enviado (F-18): se reabre con sus líneas, pasa por los pasos 2 y 3 y, al confirmar, sustituye al anterior ──
 let modificando = null;
