@@ -38,6 +38,7 @@ import { sourceFromEnv } from "./drive.js";
 import nodePath from "node:path";
 import { BUSINESS, ayudaPublica } from "./config.js";
 import { pdfPedido, datosPdf } from "./pdf.js";
+import { categorizar } from "./categorias.js";
 import { puedeEditarPedido, weekday } from "./delivery.js";
 const DIAS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
@@ -414,6 +415,18 @@ const admin = createAdmin({ sync, mail: notificador, actualizador, estado: estad
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
 const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));
+// Artículos que este cliente compró y ya no están en el catálogo (retirados o bloqueados): para ofrecerle uno parecido al repetir un pedido
+function retiradosDe(customer) {
+  const activos = new Set(catalogNow().map((p) => String(p.id))), out = {};
+  try {
+    const cdb = getDatabases().catalogDb;
+    for (const o of customer.orders ?? []) for (const l of o.lines ?? []) {
+      const id = String(l.productId); if (activos.has(id) || out[id] !== undefined || Object.keys(out).length >= 40) continue;
+      const r = cdb.get(id); out[id] = r?.name ? { name: r.name, ...(({ cat, sub }) => ({ cat, sub }))(categorizar(r)) } : null;
+    }
+  } catch { /* sin catálogo de consulta: no se ofrecen parecidos */ }
+  return out;
+}
 // Avisos al móvil (Web Push) de los clientes que los han activado. Nunca bloquean ni hacen fallar un pedido.
 let _avisos = null, _origenAt = 0;
 const avisosPush = () => (_avisos ??= crearAvisos({ accountsDb: getAccountsDb() }));
@@ -568,6 +581,7 @@ async function appRoutes(req, res, url) {
       history: webHistory(customer, catalogNow()),
       tree: webTree(catalogNow()),
       top: topIds(),
+      retirados: retiradosDe(customer),
       ...avisoEntrega(customer),
     });
   }

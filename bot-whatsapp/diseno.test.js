@@ -147,3 +147,11 @@ test("Inicio: fila «Ofertas» con la etiqueta de % o € y la fecha de fin, ant
   assert.ok(cli.indexOf('"Ofertas"') < cli.indexOf('"Lo que sueles pedir"'));
   assert.match(cli, /\.vm-inicio \.in-oferta \{ position:absolute;/);
 });
+
+test("sustitutos: al repetir o añadir un pedido con artículos retirados se ofrecen hasta 3 parecidos y se añaden con la misma cantidad", () => {
+  assert.match(pedido, /function parecidos\(r, max = 3\)/); assert.match(pedido, /function ofrecerParecidos\(lista\)/);
+  assert.match(pedido, /ya no está disponible\./); assert.match(pedido, /¿Te sirve alguno de estos\?/); assert.match(pedido, /añadirComoSustituto\(p, x\.uds\)/);
+  assert.match(pedido, /sinStock\.push\(\{ id, uds: u \}\)/);
+  const srv = leer("./server.js"); assert.match(srv, /retirados: retiradosDe\(customer\)/); assert.match(srv, /function retiradosDe\(customer\)/);
+  assert.doesNotMatch(srv.slice(srv.indexOf("function retiradosDe"), srv.indexOf("function retiradosDe") + 900), /nif/i); // solo ids y nombres de artículos de SU historial
+});

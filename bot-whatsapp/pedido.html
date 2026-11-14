@@ -1029,6 +1029,17 @@
   .dirchk { display:flex; align-items:center; gap:var(--s3); min-height:44px; margin-top:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); color:var(--text); }
   .dirchk input { width:22px; height:22px; accent-color:var(--accent); }
   .dirguard[hidden], .dirchk[hidden] { display:none; }
+
+  .sust-caja { max-height:85dvh; overflow-y:auto; }
+  .sust { padding-top:var(--s3); border-top:.5px solid var(--line); }
+  .sust-t { margin:0; font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; color:var(--text) !important; }
+  .sust-n { margin:var(--s1) 0 var(--s2) !important; }
+  .sust-fila { display:flex; align-items:center; gap:var(--s3); padding:var(--s2) 0; }
+  .sust-tx { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .sust-tx b { font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; line-height:1.25; overflow-wrap:anywhere; }
+  .sust-tx small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .sust-bt { flex:none; min-height:44px; padding:0 var(--s4); border:0; border-radius:var(--r-pill); background:var(--accent); color:var(--on-accent); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; }
+  .sust-bt:disabled { background:var(--fill); color:var(--text-2); }
 </style>
 </head>
 <body>
@@ -1764,6 +1775,47 @@ $("fijoGuardar").onclick = async () => {
   if (r && r.ok) { m.textContent = `Guardado: se repite los ${[...fijoDias].sort().map(d => DIA_LARGO[d]).join(", ")}. Puedes verlo, cambiarlo, pausarlo o borrarlo en el menú del chat, en «Mi pedido fijo».`; fijoInfo = { fijo: { dias: [...fijoDias], pausado: false } }; pintarFijoCard(); }
   else m.textContent = (j && j.error) || "No se ha podido guardar. Inténtalo de nuevo.";
 };
+// ── Un artículo ya no está: se ofrecen hasta 3 parecidos (mismas palabras, mismo tipo y mismo formato) ──
+const PALABRAS_VACIAS = new Set(["con", "sin", "del", "las", "los", "una", "uno", "para", "caja", "pack", "lata", "botella", "uds", "und"]);
+const palabrasDe = t => norm(String(t)).split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !/^\d+$/.test(w) && !PALABRAS_VACIAS.has(w));
+function parecidos(r, max = 3) {
+  const mias = new Set(palabrasDe(r.name)), fmt = formatoDe({ name: r.name });
+  return data.products.map(p => {
+    const comunes = palabrasDe(p.name).filter(w => mias.has(w)).length, mismaSub = !!r.sub && p.sub === r.sub, mismoFmt = !!fmt && formatoDe(p) === fmt;
+    if (!comunes && !(mismaSub && mismoFmt)) return null;
+    return { p, puntos: comunes * 3 + (mismaSub ? 2 : 0) + (mismoFmt ? 2 : 0) + (r.cat && p.cat === r.cat ? 1 : 0) + (p.count > 0 ? 1 : 0) };
+  }).filter(Boolean).sort((a, b) => b.puntos - a.puntos || a.p.name.localeCompare(b.p.name)).slice(0, max).map(x => x.p);
+}
+function añadirComoSustituto(p, uds) {
+  if (p.soloCaja) { unitOf.set(p.id, "caja"); qty.set(p.id, Math.min(999, (qty.get(p.id) || 0) + Math.max(1, Math.ceil(uds / p.unitsPerBox)))); }
+  else { unitOf.set(p.id, unit(p.id) === "caja" && qty.get(p.id) ? "caja" : "ud"); qty.set(p.id, Math.min(999, (qty.get(p.id) || 0) + Math.max(1, uds))); }
+  guardar(); bumpId = p.id; refresh();
+}
+function ofrecerParecidos(lista) {
+  const viejo = document.getElementById("ayuda-fondo"); if (viejo) viejo.remove();
+  const f = document.createElement("div"); f.id = "ayuda-fondo"; f.className = "ayuda-fondo"; f.setAttribute("role", "dialog"); f.setAttribute("aria-modal", "true"); f.setAttribute("aria-label", "Artículos que ya no están");
+  const c = document.createElement("div"); c.className = "ayuda-caja sust-caja";
+  const h = document.createElement("h2"); h.textContent = lista.length === 1 ? "Un artículo ya no está" : "Algunos artículos ya no están"; c.appendChild(h);
+  for (const x of lista) {
+    const r = data.retirados[x.id], bloque = document.createElement("section"); bloque.className = "sust";
+    const t = document.createElement("p"); t.className = "sust-t"; t.textContent = `«${r.name}» ya no está disponible.`; bloque.appendChild(t);
+    const op = parecidos(r);
+    if (!op.length) { const n = document.createElement("p"); n.className = "sust-n"; n.textContent = "No encontramos uno parecido. Si lo necesitas, pregúntanos."; bloque.appendChild(n); }
+    else { const n = document.createElement("p"); n.className = "sust-n"; n.textContent = "¿Te sirve alguno de estos?"; bloque.appendChild(n); }
+    for (const p of op) {
+      const fila = document.createElement("div"); fila.className = "sust-fila";
+      const tx = document.createElement("span"); tx.className = "sust-tx"; const b = document.createElement("b"); b.textContent = p.name; const sm = document.createElement("small"); sm.textContent = eurp(p.price) + " /ud" + (p.soloCaja && p.unitsPerBox ? " · solo cajas" : ""); tx.append(b, sm);
+      const bt = document.createElement("button"); bt.type = "button"; bt.className = "sust-bt"; bt.textContent = "Añadir"; bt.setAttribute("aria-label", `Añadir ${p.name} en lugar de ${r.name}`);
+      bt.onclick = () => { añadirComoSustituto(p, x.uds); bt.textContent = "Añadido ✓"; bt.disabled = true; vibra(); };
+      fila.append(tx, bt); bloque.appendChild(fila);
+    }
+    c.appendChild(bloque);
+  }
+  const cerrar = () => { f.remove(); document.removeEventListener("keydown", esc); }; const esc = e => { if (e.key === "Escape") cerrar(); };
+  const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Seguir con mi pedido"; x.onclick = cerrar;
+  arrastrable(c, cerrar); f.onclick = e => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
+  c.appendChild(x); f.appendChild(c); document.body.appendChild(f); (c.querySelector("button") || x).focus();
+}
 function precargar() {
   const mod = /[#&]m=([\w-]+)/.exec(String(window.vmPrecarga ?? location.hash)); // «Modificar pedido» desde el chat
   if (mod) { setTimeout(() => modificar(mod[1]), 0); return; }
@@ -1774,19 +1826,21 @@ function precargar() {
   const byId = new Set(data.products.map(p => p.id));
   const hashTxt = String(window.vmPrecarga ?? location.hash), sumar = /[#&]a=1(?:&|$)/.test(hashTxt), deCero = /[#&]x=1(?:&|$)/.test(hashTxt); // a=1: «Añadir al carrito» (suma a lo que ya hay) · x=1: «Repetir» (empieza un carrito nuevo con este pedido)
   if (deCero && qty.size) { if (!confirm("Tienes un pedido sin terminar en el carrito. ¿Cambiarlo por este pedido?")) return; qty.clear(); unitOf.clear(); notes.clear(); }
-  let n = 0, faltan = 0;
+  let n = 0, faltan = 0; const sinStock = []; // sinStock: lo que ya no está, con la cantidad que se pedía, para ofrecer un parecido
   for (const par of m[1].split(",")) {
     const k = par.lastIndexOf("."), rawId = k < 0 ? par : par.slice(0, k), rawN = k < 0 ? "" : par.slice(k + 1), id = decodeURIComponent(rawId ?? ""), // el código puede llevar punto (157.10): el número va tras el ÚLTIMO punto
        u = Math.min(999, Math.floor(Number(rawN)));
     if (!(u > 0)) continue;
-    if (!byId.has(id)) { faltan++; continue; } // ya no está en el catálogo
+    if (!byId.has(id)) { faltan++; sinStock.push({ id, uds: u }); continue; } // ya no está en el catálogo
     const pr = productoPorId.get(id), ya = sumar ? (qty.get(id) || 0) : 0;
     if (sumar && ya && pr && pr.unitsPerBox > 1 && unit(id) === "caja") { qty.set(id, Math.min(999, ya + Math.ceil(u / pr.unitsPerBox))); } // ya estaba en cajas: se suman cajas
     else if (pr && pr.soloCaja) { unitOf.set(id, "caja"); qty.set(id, Math.min(999, ya + Math.ceil(u / pr.unitsPerBox))); } // solo caja: las unidades se pasan a cajas enteras
     else { unitOf.set(id, "ud"); qty.set(id, Math.min(999, ya + u)); }
     n++;
   }
-  if (faltan) setTimeout(() => aviso(faltan === 1 ? "1 artículo ya no está disponible." : faltan + " artículos ya no están disponibles."), 600);
+  const conNombre = sinStock.filter(x => data.retirados && data.retirados[x.id]);
+  if (conNombre.length) setTimeout(() => ofrecerParecidos(conNombre), 700);
+  else if (faltan) setTimeout(() => aviso(faltan === 1 ? "1 artículo ya no está disponible." : faltan + " artículos ya no están disponibles."), 600);
   if (n && /[#&]f=1(?:&|$)/.test(String(window.vmPrecarga ?? location.hash))) setTimeout(() => { const c = $("fijoCard"); if (!c.hidden) c.scrollIntoView({ block: "center" }); }, 700); // «Repetir cada semana»: se lleva a la opción del pedido fijo
   if (n && /[#&]r=1(?:&|$)/.test(String(window.vmPrecarga ?? location.hash))) { uso("repetir"); setTimeout(() => showCart(true), 0); } // «Repetir y revisar»: se cuenta y se abre el carrito para revisarlo
   if (n) { tab = "all"; marcaNav(); aviso(sumar ? `Hemos añadido ${n} artículo${n === 1 ? "" : "s"} de tu pedido al carrito. Sigue comprando o finaliza.` : `Tu pedido anterior ya está en el carrito (${n} artículo${n === 1 ? "" : "s"}). Añade lo que quieras del catálogo y finaliza.`); }
