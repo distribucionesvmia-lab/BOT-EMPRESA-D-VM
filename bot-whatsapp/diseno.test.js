@@ -88,7 +88,7 @@ test("Inicio: saludo por hora de Madrid, «hoy» solo con la regla de siempre, p
 test("fotos y estados: baldosa con foto al 82 % sin agrandar, fundido de 200 ms, aviso «Imagen orientativa» y estados con un solo botón", () => {
   const cli = leer("./cliente.html");
   assert.match(pedido, /\.av img, \.pf-av img[^{]*\{[^}]*max-width:82%; max-height:82%;[^}]*opacity:0; transition:opacity 200ms/);
-  assert.match(pedido, /nat < 160 \? nat/); assert.match(pedido, /"Imagen orientativa"/);
+  assert.match(pedido, /Math\.min\(Math\.max\(nat \* 2\.5, 240\)/); // el zoom se ve grande: las fotos pequeñas se amplían hasta 2,5 veces assert.match(pedido, /"Imagen orientativa"/);
   assert.match(cli, /max-width:82%; max-height:82%/); assert.equal((cli.match(/data:image\/png;base64,/g) || []).length, 1); // el logo, una sola vez
   for (const t of ["Aún no tienes histórico", "Sin resultados", "Tu pedido está vacío", "Sin conexión", "No se ha podido enviar"]) assert.ok(pedido.includes(t), t);
   assert.match(pedido, /\.estado svg \{ width:48px; height:48px/); assert.match(pedido, /boton: "Reintentar"/);
@@ -117,9 +117,10 @@ test("modo oscuro: mismos colores en las dos páginas, contraste AA, tema guarda
 });
 
 test("ordenador y tablet: panel «Tu pedido» fijo de 340 px, menú lateral de 220 px, cuadrícula de 2 y 3 columnas, sin carrito flotante; teclado y accesibilidad", () => {
-  assert.match(pedido, /@media \(min-width:1024px\) \{[\s\S]*grid-template-columns:220px minmax\(0, 1fr\) 340px/);
+  assert.match(pedido, /@media \(min-width:1024px\) \{[\s\S]*grid-template-columns:220px minmax\(0, 1fr\) clamp\(340px, 24vw, 420px\)/);
   assert.match(pedido, /\.app > footer \{ display:none !important; \}/); assert.match(pedido, /\.tb\[data-nav="pedido"\] \{ display:none; \}/);
-  assert.match(pedido, /@media \(min-width:1440px\) \{ \.app > main#list \{ grid-template-columns:repeat\(3/); assert.match(pedido, /@media \(min-width:768px\) and \(max-width:1023px\)[\s\S]*max-width:720px/);
+  assert.match(pedido, /grid-template-columns:repeat\(auto-fill, minmax\(clamp\(170px, 14vw, 250px\), 1fr\)\)/); // las columnas se reparten solas según el ancho
+  assert.match(pedido, /@media \(min-width:768px\) and \(max-width:1023px\)[\s\S]*max-width:720px/);
   assert.match(pedido, /e\.key === "\/" && !escribiendo/); assert.match(pedido, /e\.key === "ArrowDown" \|\| e\.key === "ArrowUp"/); assert.match(pedido, /e\.key === "\+" \|\| e\.key === "="/); assert.match(pedido, /sugActiva >= 0/);
   assert.match(pedido, /id="anuncio" class="solo-lector" role="status"/); assert.match(pedido, /aria-describedby="errDir"/); assert.match(pedido, /:focus-visible \{ outline:3px solid var\(--accent\)/);
   assert.match(pedido, /@media \(prefers-contrast: more\) \{\s*\.pf, \.card/);
@@ -202,4 +203,11 @@ test("acceso (tanda 1): NIF primero, validación propia en español, aviso de lo
   assert.match(cli, /nodo\("button", "Cerrar sesión", "vm-btn ghost cu-salir"\)/); assert.match(cli, /async function cerrarSesion\(\)/);
   assert.match(cli, /sin sesión responde 200 con cliente nulo/);
   assert.doesNotMatch(cli, /id="ir-pin"/);
+});
+
+test("ordenador: la página se adapta al ancho (hasta 1240 px), el Inicio en dos columnas y las fotos llenan su baldosa", () => {
+  const cli = leer("./cliente.html");
+  assert.match(cli, /:root \{ --ancho:860px; \}/); assert.match(cli, /:root \{ --ancho:1240px; \}/); assert.doesNotMatch(cli, /calc\(\(100% - 860px\) \/ 2\)/);
+  assert.match(cli, /\.vm-inicio > \.in-secs \{ grid-column:2;/); assert.match(cli, /\.vm-inicio \.in-pim img, \.vm-inicio \.in-foto img \{ width:82%; height:82%; \}/);
+  assert.match(pedido, /\.pf-av img \{ width:82%; height:82%; max-width:none; max-height:none; \}/);
 });

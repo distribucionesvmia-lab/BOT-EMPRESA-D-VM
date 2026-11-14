@@ -968,7 +968,7 @@
     #cart { align-items:center; } #cart > * { width:100%; max-width:720px; }
   }
   @media (min-width:1024px) { /* ordenador: menú a la izquierda, catálogo en cuadrícula y «Tu pedido» fijo a la derecha */
-    .app { display:grid; grid-template-columns:220px minmax(0, 1fr) 340px; grid-template-rows:auto auto auto auto auto minmax(0, 1fr); overflow:hidden; }
+    .app { display:grid; grid-template-columns:220px minmax(0, 1fr) clamp(340px, 24vw, 420px); grid-template-rows:auto auto auto auto auto minmax(0, 1fr); overflow:hidden; }
     .app > header { grid-column:1 / -1; grid-row:1; }
     .app > .tabbar { position:static; grid-column:1; grid-row:2 / -1; display:flex; flex-direction:column; align-items:stretch; gap:var(--s1); padding:var(--s4) var(--s3); border-top:0; border-right:.5px solid var(--line); background:var(--surface); -webkit-backdrop-filter:none; backdrop-filter:none; }
     .tb { flex-direction:row; justify-content:flex-start; gap:var(--s3); min-height:48px; padding:0 var(--s4); border-radius:var(--r-field); }
@@ -982,7 +982,7 @@
     .sugs { left:var(--s6); right:var(--s6); }
     .app > .filbar { grid-column:2; grid-row:5; padding-left:var(--s6); padding-right:var(--s6); }
     .app > .guia { grid-column:2; }
-    .app > main#list { grid-column:2; grid-row:6; padding:var(--s3) var(--s6) var(--s10); background:var(--bg); display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:var(--s4); align-content:start; }
+    .app > main#list { grid-column:2; grid-row:6; padding:var(--s3) var(--s6) var(--s10); background:var(--bg); display:grid; grid-template-columns:repeat(auto-fill, minmax(clamp(170px, 14vw, 250px), 1fr)); gap:var(--s4); align-content:start; }
     .app > main#list > :not(.pf) { grid-column:1 / -1; }
     .app > header { padding-left:var(--s5); padding-right:var(--s5); } .bar-titulo { display:none; }
     .app > footer { display:none !important; }
@@ -993,7 +993,7 @@
     /* tarjeta cuadrada de producto */
     .pf { grid-template-columns:minmax(0, 1fr); grid-template-rows:auto auto auto; row-gap:var(--s2); align-items:start; padding:var(--s3); background:var(--surface); border:0; border-radius:var(--r-card); content-visibility:visible; contain-intrinsic-size:auto; }
     .pf-av { width:100%; height:auto; aspect-ratio:1 / 1; align-self:start; }
-    .pf-av img { max-width:82%; max-height:82%; }
+    .pf-av img { width:82%; height:82%; max-width:none; max-height:none; } /* en ordenador la foto llena su baldosa (las pequeñas se amplían un poco) */
     .pf-info { align-self:start; }
     .pf-n { font-size:calc(var(--t-prod) / var(--k,1)); }
     .pf-ctl { width:100%; flex-direction:row; align-items:center; justify-content:space-between; }
@@ -1011,9 +1011,9 @@
     #cart .cartbody { padding-left:var(--s4); padding-right:var(--s4); }
     #cart .keepbtn { display:none; }
     .estado { padding-top:var(--s8); }
-    .app > #toast { left:calc(220px + var(--s6)); right:calc(340px + var(--s6)); bottom:var(--s6); }
+    .app > #toast { left:calc(220px + var(--s6)); right:calc(clamp(340px, 24vw, 420px) + var(--s6)); bottom:var(--s6); }
   }
-  @media (min-width:1440px) { .app > main#list { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
+  /* las columnas del catálogo se reparten solas según el ancho (tarjetas de unos 230–300 px) */
 
   /* Las tarjetas del Pedido (entrega, pedido fijo, observaciones, resumen) ocupan todo el ancho, alineadas con las fichas de día */
   #cart .cartbody > .card, #cart .cartbody > .ped-res, #cart .cartbody > .tl-wrap, #cart #cartLines > .tl-wrap, #cart #cartLines > .falta { margin-left:0; margin-right:0; width:100%; box-sizing:border-box; }
@@ -1089,6 +1089,8 @@
   header .ds-circ.cuenta { width:auto; min-width:44px; padding:0 var(--s4) 0 var(--s3); border-radius:var(--r-pill); gap:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; line-height:1.2; color:var(--accent); }
   header .ds-circ.cuenta span { white-space:nowrap; }
   @media (max-width:439px) { header .ds-circ.cuenta { width:44px; padding:0; } header .ds-circ.cuenta span { display:none; } }
+
+  @media (min-width:768px) and (max-width:1023px) { .pf-av img { width:82%; height:82%; max-width:none; max-height:none; } }
 </style>
 </head>
 <body>
@@ -1364,7 +1366,7 @@ function verFoto(p) {
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && z.style.display !== "none") { z.style.display = "none"; e.stopImmediatePropagation(); } }, true);
   }
   const im = z.querySelector("img");
-  im.style.width = "auto"; im.onload = () => { const nat = im.naturalWidth; if (nat > 0) im.style.width = (nat < 160 ? nat : Math.min(nat * 1.6, innerWidth * 0.9, 720)) + "px"; }; // una foto de menos de 160 px nunca se agranda
+  im.style.width = "auto"; im.onload = () => { const nat = im.naturalWidth; if (nat > 0) im.style.width = Math.min(Math.max(nat * 2.5, 240), nat < 160 ? 480 : 720, innerWidth * 0.9) + "px"; }; // se ve grande: las pequeñas se amplían hasta 2,5 veces (máx. 480 px)
   im.src = p.img;
   z.querySelector(".znom").textContent = p.name;
   z.querySelector(".zinfo").textContent = [p.price != null ? eurp(p.price) : "", p.unitsPerBox ? "caja de " + p.unitsPerBox + " uds" : ""].filter(Boolean).join(" · ");
