@@ -12,9 +12,12 @@ test("1. empaquetar saca CSS, JS grande y logo a estáticos con huella; las pág
     assert.ok(Buffer.byteLength(out) < 40 * 1024, f + " empaquetada < 40 KB: " + Buffer.byteLength(out));
     assert.equal(/<style>/.test(out), false); assert.equal(/base64,[A-Za-z0-9+/=]{400,}/.test(out), false);
     assert.equal(empaquetar(src, n), out, "misma entrada, misma salida (con huella estable)");
-    // lo que se saca vuelve a juntarse igual: nada se pierde ni se cambia
-    const css = [...out.matchAll(/href="(\/estatico\/[^"]+\.css)"/g)].map((m) => estatico(m[1]).cuerpo.toString()).join("");
+    // sin limpiar, lo que se saca vuelve a juntarse EXACTAMENTE igual (nada se pierde ni se cambia); limpiado, es más corto y sin comentarios
+    const crudo = empaquetar(src, n, { minificar: false });
+    const css = [...crudo.matchAll(/href="(\/estatico\/[^"]+\.css)"/g)].map((m) => estatico(m[1]).cuerpo.toString()).join("");
     assert.equal(css, [...src.matchAll(/<style>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join(""));
+    const limpio = [...out.matchAll(/href="(\/estatico\/[^"]+\.css)"/g)].map((m) => estatico(m[1]).cuerpo.toString()).join("");
+    assert.ok(limpio.length < css.length * 0.95 && !limpio.includes("/*"), "CSS servido más corto y sin comentarios");
     for (const m of out.matchAll(/<script src="(\/estatico\/[^"]+)"/g)) assert.ok(estatico(m[1]), m[1]);
     assert.ok(src.includes("<style>") && src.includes("base64,")); // el fuente sigue siendo un solo archivo (las pruebas y la edición no cambian)
   }

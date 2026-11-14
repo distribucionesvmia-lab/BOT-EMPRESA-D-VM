@@ -251,3 +251,11 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **Ojo** para ver el código en todos los campos de contraseña (`.pw-ojo`, 44 px; vuelve a ocultarse al enviar).
 - **Letra 100/115/130 % a 360 px** comprobada: nombres de 2 a 4 líneas, botones dentro de su tarjeta, sin scroll horizontal; la barra inferior deja de crecer a partir del 115 % para que «Catálogo» no se parta.
 - Pruebas: `tanda22.test.js`.
+
+## Pendientes cerrados (búsqueda, favoritos, mínimo y CSS)
+- **«Sin resultados» útil** (`parecidosBusqueda` en `pedido.html`): los 3 artículos más parecidos (distancia de edición ≤ 2 palabra a palabra) y «¿Buscabas Refrescos y tés fríos?» (secciones de nombre parecido; lleva a esa sección). Se mantiene «¿No lo encuentras? Habla con una persona».
+- **Sinónimos y abreviaturas** (`ABREV`, `EXPANDE_CONSULTA`): psc/pasc → pascual, cj → caja, und/uds/unid/ud → unidades, birra → cerveza, descafe → descafeinado, coca → coca cola; valen igual al escribirlas que al leerlas en el nombre del artículo. «un» NO se traduce (es el artículo, «un vino»). El nombre de categoría y subcategoría ya se buscaba (`ct`); la versión compacta sin espacios ni guiones (cocacola, colacao) también. Lista y sugerencias usan el mismo motor (`buscarOrden`).
+- **«Mis favoritos»**: acceso destacado arriba del catálogo (`.fav-acceso`) y vista con solo ellos (`nav.cat === FAVS`; entra en el historial como una sección).
+- **Pedido mínimo**: si hay `PEDIDO_MINIMO`, se ve SIEMPRE en el carrito («faltan X» o «ya lo has alcanzado»).
+- **CSS/JS servidos más limpios** (`minificar.js`, usado por `estaticos.js`; los archivos fuente NO cambian): se quitan comentarios y espacios sobrantes y el CSS junta reglas repetidas (mismo selector o mismo `@media`) SOLO si nada de lo que queda entre medias toca ninguna propiedad de las que se mueven (la cascada no cambia). Si algo no se entiende o el JS no compila, se sirve el original. Se comprobó comparando los estilos calculados de TODOS los elementos y la captura, con y sin limpiar, en 360 y 1280 px, claro/oscuro/contraste alto/reducir movimiento/transparencia.
+- Pruebas: `tanda23.test.js`.

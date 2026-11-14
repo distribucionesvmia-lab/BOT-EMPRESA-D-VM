@@ -50,3 +50,30 @@ test("D. pedido mínimo: si existe, se ve siempre en el carrito (faltan X, o «y
   assert.match(p, /El pedido mínimo es de \$\{eur\(cd\.minimo\)\} sin IVA\. Te faltan/); assert.match(p, /fila\("Pedido mínimo"/); // y en el resumen, como antes
   assert.match(leer("./config.js"), /minimo: Number\.isFinite\(min\) && min > 0 \? min : 0/); // sin PEDIDO_MINIMO, minimo = 0 → no se enseña
 });
+
+import { limpiaCss, limpiaJs } from "./minificar.js";
+test("E. minificar: quita comentarios y junta reglas repetidas SOLO cuando es seguro (la cascada no cambia)", () => {
+  const css = limpiaCss("/* c */ .a { color: red; } .b { margin: 0 } .a { padding: 1px; } @media (prefers-reduced-motion: reduce) { .a { transition: none } } .c { color: blue } @media (prefers-reduced-motion: reduce) { .c { animation: none } }");
+  assert.equal(css.includes("/*"), false);
+  assert.equal((css.match(/^\.a\{/gm) ?? []).length, 1); assert.ok(css.includes(".a{color: red;padding: 1px}")); // juntas: nada entre medias toca color ni padding
+  assert.equal((css.match(/@media \(prefers-reduced-motion: reduce\)\{/g) ?? []).length, 1); // los dos @media iguales se juntan (entre medias solo hay «color»)
+  // NO se juntan si entre medias hay otra regla con la misma propiedad (el orden decidiría el color)
+  const no = limpiaCss(".a{color:red} .b{color:blue} .a{color:green;margin:0}");
+  assert.equal((no.match(/^\.a\{/gm) ?? []).length, 2);
+  // propiedades «parientes» (margin / margin-top) también cuentan
+  const par = limpiaCss(".a{margin:0} .x{margin-top:5px} .a{padding:0}"); assert.equal((par.match(/^\.a\{/gm) ?? []).length, 2);
+  // los respaldos «height:100vh; height:100dvh» se quedan los dos, en orden
+  assert.ok(limpiaCss(".a{height:100vh;height:100dvh}").includes("height:100vh;height:100dvh"));
+  // cadenas con /* dentro, url(data:...;...) y @keyframes no se rompen
+  assert.ok(limpiaCss('.a{content:"/* no */";background:url(data:image/png;base64,AAAA)}').includes('"/* no */"')); assert.ok(limpiaCss("@keyframes k{from{opacity:0}to{opacity:1}}").includes("@keyframes k{from{opacity:0}to{opacity:1}}"));
+  assert.equal(limpiaCss(".a{color:red"), ".a{color:red"); // CSS roto: se devuelve tal cual
+});
+test("E. minificar JavaScript: quita comentarios sin tocar cadenas, plantillas ni expresiones regulares; si algo no cuadra, devuelve el original", () => {
+  const js = limpiaJs('// hola\nconst a = "http://x.com/*no*/"; /* c */ const b = `l1\n\n  // no es comentario ${a /* sí */ + 1}\n`; // fin\nconst r = /\\/\\//.test(a) ? 1 : 2; const d = 4 / 2; // 4/2\n');
+  assert.equal(js.includes("hola"), false); assert.equal(js.includes("// fin"), false); assert.equal(js.includes("sí"), false);
+  assert.ok(js.includes('"http://x.com/*no*/"')); assert.ok(js.includes("l1\n\n  // no es comentario")); assert.ok(js.includes("/\\/\\//.test(a)")); assert.ok(js.includes("4 / 2"));
+  assert.doesNotThrow(() => new Function(js));
+  const roto = "const a = 'sin cerrar;\n// x"; assert.equal(limpiaJs(roto), roto);
+  // los scripts REALES de las dos páginas siguen compilando después de limpiarlos
+  for (const f of ["./pedido.html", "./cliente.html"]) for (const m of leer(f).matchAll(/<script>([\s\S]*?)<\/script>/g)) { const o = limpiaJs(m[1]); assert.ok(o.length <= m[1].length); assert.doesNotThrow(() => new Function(o), f); }
+});

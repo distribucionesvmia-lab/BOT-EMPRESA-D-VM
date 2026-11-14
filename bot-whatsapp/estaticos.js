@@ -3,6 +3,7 @@
 // que sigue siendo «no-store», pese solo unos pocos KB. Los ficheros fuente (pedido.html, cliente.html) NO cambian:
 // esto se hace al servirlos, y si cambia una sola letra sale otra huella (y por tanto otra ruta).
 import crypto from "node:crypto";
+import { limpiaCss, limpiaJs } from "./minificar.js";
 
 const huella = (x) => crypto.createHash("sha256").update(x).digest("hex").slice(0, 12);
 const REGISTRO = new Map(); // ruta → { tipo, cuerpo }
@@ -17,8 +18,8 @@ const registra = (nombre, tipo, cuerpo) => {
 };
 
 /** Devuelve el HTML con sus <style>, <script> grandes y el logo sacados a ficheros estáticos. `nombre`: prefijo de los ficheros (p. ej. «pedido»). */
-export function empaquetar(html, nombre) {
-  const k = nombre + ":" + huella(html);
+export function empaquetar(html, nombre, { minificar = true } = {}) {
+  const k = nombre + (minificar ? ":" : ":crudo:") + huella(html);
   const hecho = PAGINAS.get(k);
   if (hecho) return hecho;
   let out = String(html);
@@ -30,9 +31,10 @@ export function empaquetar(html, nombre) {
   });
   // 2. Hojas de estilo y scripts en línea (sin atributos)
   let n = 0;
-  out = out.replace(/<style>([\s\S]*?)<\/style>/g, (m, css) => `<link rel="stylesheet" href="${registra(`${nombre}${++n > 1 ? "-" + n : ""}.css`, "text/css; charset=utf-8", css)}">`);
+  out = out.replace(/<style>([\s\S]*?)<\/style>/g, (m, css) => `<link rel="stylesheet" href="${registra(`${nombre}${++n > 1 ? "-" + n : ""}.css`, "text/css; charset=utf-8", minificar ? limpiaCss(css) : css)}">`);
   n = 0;
-  out = out.replace(/<script>([\s\S]*?)<\/script>/g, (m, js) => (js.length < MIN_JS ? m : `<script src="${registra(`${nombre}-${++n}.js`, "text/javascript; charset=utf-8", js)}"></script>`));
+  out = out.replace(/<script>([\s\S]*?)<\/script>/g, (m, js) => (js.length < MIN_JS ? m : `<script src="${registra(`${nombre}-${++n}.js`, "text/javascript; charset=utf-8", minificar ? limpiaJs(js) : js)}"></script>`));
+  if (minificar) out = out.replace(/<!--(?!\[if)[\s\S]*?-->/g, ""); // comentarios del HTML
   PAGINAS.set(k, out);
   if (PAGINAS.size > 20) PAGINAS.delete(PAGINAS.keys().next().value); // la web cambia poco: no hace falta guardar más
   return out;
