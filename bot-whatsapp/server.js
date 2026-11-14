@@ -9,7 +9,7 @@ import { getCatalog, catalogVersion, getCustomerByPhone, getCustomerById, findCu
 import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder, totals } from "./pricing.js";
-import { createAuth } from "./auth.js";
+import { createAuth, rateLimiter } from "./auth.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
 import { estadoSistema, crearVigilante } from "./monitor.js";
@@ -45,6 +45,8 @@ import { categorizar } from "./categorias.js";
 import { empaquetar, estatico } from "./estaticos.js";
 import { avisarCortes, horaAviso } from "./avisocorte.js";
 import { zip as zipNode } from "./zip.js";
+import { limpiaError, navegadorCorto } from "./errores.js";
+const errLimitCliente = rateLimiter(Number(process.env.ERR_LIMIT ?? 30), 3600e3), errLimitIp = rateLimiter(Number(process.env.ERR_LIMIT_IP ?? 60), 3600e3); // avisos de error por hora: por cliente y, sin sesión, por dirección
 import { puedeEditarPedido, plazoModificacion, longDate, weekday, addDays } from "./delivery.js";
 const DIAS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
@@ -814,6 +816,15 @@ async function appRoutes(req, res, url) {
   if (p === "/api/bienvenida/vista" && req.method === "POST") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     return void sendJson(res, 200, { ok: getAccountsDb().bienvenidaMarcar(account.customerId) });
+  }
+  // Registro de errores de la app: el navegador avisa de lo que falla. Responde siempre rápido y sin cuerpo; si el aviso no vale, se ignora (nunca estorba a la app).
+  if (p === "/api/log-error" && req.method === "POST") {
+    if (Number(req.headers["content-length"] ?? 0) > 4096) { req.resume(); return void res.writeHead(413).end(); }
+    try {
+      const e = limpiaError(await readJson(req)), cid = account ? String(account.customerId) : null;
+      if (e && (cid ? errLimitCliente(cid) : errLimitIp(req.socket.remoteAddress ?? "?"))) getAccountsDb().errorRegistrar(e, { customerId: cid, navegador: navegadorCorto(req.headers["user-agent"]) });
+    } catch { /* un fallo al apuntar un fallo no se cuenta a nadie */ }
+    return void res.writeHead(204).end();
   }
   if (p === "/api/avisos/corte" && req.method === "GET") { // «Avisarme antes de la hora límite»
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });

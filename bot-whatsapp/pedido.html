@@ -81,6 +81,41 @@
   medir(); addEventListener("resize", medir); addEventListener("pageshow", medir);
 })();
 </script>
+<script>
+/* Registro de errores: avisa a la oficina (sin datos personales) cuando falla una carga o salta un error de la página. Nunca estorba: va aparte, con un máximo por sesión, y se ignora si no hay red. */
+(function () {
+  var N = 0, MAX = 8, vistos = {}, saliendo = false, original = window.fetch;
+  try { N = Number(sessionStorage.getItem("vm:err-n")) || 0; } catch (e) {}
+  addEventListener("pagehide", function () { saliendo = true; });
+  function pantalla() { var p = location.pathname; if (p.indexOf("/catalogo") === 0 || p.indexOf("/pedido/") === 0) return "catalogo"; var a = document.getElementById("acceso"); return a && !a.hidden ? "acceso" : "cliente"; }
+  function envia(tipo, api, estado, mensaje) {
+    try {
+      if (saliendo || navigator.onLine === false || N >= MAX) return;
+      var k = tipo + "|" + api + "|" + estado + "|" + String(mensaje).slice(0, 60); if (vistos[k]) return; vistos[k] = 1; N++;
+      try { sessionStorage.setItem("vm:err-n", String(N)); } catch (e) {}
+      setTimeout(function () {
+        try {
+          var cuerpo = JSON.stringify({ tipo: tipo, pantalla: pantalla(), api: api || "", estado: estado || 0, mensaje: String(mensaje || "").slice(0, 200) });
+          if (navigator.sendBeacon) navigator.sendBeacon("/api/log-error", new Blob([cuerpo], { type: "application/json" }));
+          else if (original) original.call(window, "/api/log-error", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body: cuerpo }).catch(function () {});
+        } catch (e) {}
+      }, 0);
+    } catch (e) {}
+  }
+  if (original) window.fetch = function (a) {
+    var u = typeof a === "string" ? a : (a && a.url) || "", r = original.apply(this, arguments);
+    if (u.indexOf("/api/log-error") >= 0) return r;
+    return r.then(function (res) { if (res && res.status >= 500) envia("fetch", u, res.status, "Respuesta " + res.status); return res; }, function (err) { if (!(err && err.name === "AbortError")) envia("fetch", u, 0, (err && err.message) || "Fallo de red"); throw err; });
+  };
+  addEventListener("error", function (e) {
+    if (e.target && e.target !== window) return; var m = e.message || "Error";
+    if (/ResizeObserver loop/.test(m)) return;
+    envia("js", "", 0, m + (e.filename ? " (" + String(e.filename).replace(/^https?:\/\/[^/]+/, "").split("?")[0].slice(-40) + ":" + e.lineno + ")" : ""));
+  });
+  addEventListener("unhandledrejection", function (e) { var r = e.reason; if (r && r.name === "AbortError") return; envia("promesa", "", 0, (r && r.message) || String(r)); });
+  window.vmLogError = envia;
+})();
+</script>
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

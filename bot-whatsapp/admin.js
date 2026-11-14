@@ -288,6 +288,12 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
         const texto = `Hola, este es tu enlace para pedir a Distribuciones Valentín Martín: ${url}\n(Sirve una sola vez y hasta el ${caduca.slice(0, 10).split("-").reverse().join("/")}.)`;
         return send(res, 200, { ok: true, cliente: cli.name, url, caduca, texto, whatsapp: `https://wa.me/${/^\d{9}$/.test(tel) ? "34" + tel : ""}?text=${encodeURIComponent(texto)}`, tieneTelefono: /^\d{9}$/.test(tel) }), true;
       } }
+    // ---- Errores de la app del cliente (últimos 7 días): recuento por tipo, por cliente y por API ----
+    if (p === "/api/admin/errores" && get) {
+      const r = accounts.erroresResumen({ dias: Math.min(30, Math.max(1, Number(url.searchParams.get("dias") ?? 7) || 7)) });
+      const nom = (id) => (id == null ? "Sin sesión (pantalla de acceso)" : customers.getById(id)?.name ?? "Cliente " + id);
+      return send(res, 200, { ...r, porCliente: r.porCliente.map((x) => ({ ...x, nombre: nom(x.cliente) })), ultimos: r.ultimos.map((x) => ({ ...x, nombre: nom(x.cliente) })) }), true;
+    }
     // ---- Clientes (la lista que viene de a3ERP) ----
     if (p === "/api/admin/clientes/lista" && get) {
       const pagina = Math.max(0, Number(url.searchParams.get("pagina") ?? 0) || 0);

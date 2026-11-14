@@ -1118,6 +1118,26 @@ test("BENCH 11: «Descargar todo el mes» da un ZIP con los PDF de SUS pedidos d
   assert.equal((await call("GET", "/api/documentos/mes/2026-1x", { cookie: A })).status, 404);
 });
 
+test("BENCH 12: registro de errores: se limpia lo que llega (sin datos personales), tiene límites y la oficina lo ve por tipo y por cliente", async () => {
+  const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar dos"));
+  const mando = (cookie, body, extra = {}) => fetch(`${BASE}/api/log-error`, { method: "POST", headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}), "User-Agent": "Mozilla/5.0 (Linux; Android 14; SM-A556B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36", ...extra }, body: typeof body === "string" ? body : JSON.stringify(body) });
+  const ver = async () => (await call("GET", "/api/admin/errores?dias=7", { admin: true })).json;
+  const antes = (await ver()).total;
+  assert.equal((await mando(A, { tipo: "fetch", pantalla: "catalogo", api: "https://x.es/api/pedido-fijo?token=SECRETO", estado: 503, mensaje: "Respuesta 503 de pepe@mail.com tel 600123456 clave AbCdEfGhIjKlMnOpQrStUvWxYz" })).status, 204);
+  assert.equal((await mando(B, { tipo: "js", pantalla: "cliente", mensaje: "x is not a function (/estatico/abc/cliente-2.js:10)" })).status, 204);
+  assert.equal((await mando(null, { tipo: "fetch", pantalla: "acceso", api: "/api/ayuda", estado: 0, mensaje: "Failed to fetch" })).status, 204); // sin sesión también (pantalla de acceso)
+  for (const malo of [{ tipo: "otro", mensaje: "x" }, { tipo: "js" }, "no es json", { tipo: "fetch", estado: "mil", mensaje: "ok", pantalla: "<script>" }]) assert.equal((await mando(A, malo)).status, 204); // lo raro se ignora, nunca da error
+  const r = await ver(); assert.equal(r.total, antes + 4); // los 3 buenos + el de pantalla rara (que se guarda como «otra»)
+  const u = r.ultimos.find((x) => x.estado === 503); assert.equal(u.api, "/api/pedido-fijo"); // sin dirección ni «?token=…»
+  assert.equal(/pepe@|600123456|AbCdEfGhIjKlMnOpQrStUvWxYz|SECRETO/.test(JSON.stringify(r)), false); assert.match(u.mensaje, /\[correo\]/); assert.match(u.mensaje, /\[cifras\]/); assert.match(u.mensaje, /\[clave\]/);
+  assert.equal(u.navegador, "Chrome 126 · Android"); assert.equal(JSON.stringify(r).includes("SM-A556B"), false); // nunca la cadena completa del navegador
+  assert.ok(r.porTipo.some((x) => x.tipo === "fetch" && x.n >= 2) && r.porTipo.some((x) => x.tipo === "js")); assert.ok(r.porCliente.some((x) => x.cliente == null && /Sin sesión/.test(x.nombre))); assert.ok(r.porCliente.some((x) => x.cliente && x.nombre));
+  // límites: demasiado grande → 413; demasiados avisos de un mismo cliente → se ignoran en silencio
+  assert.equal((await mando(A, { tipo: "js", mensaje: "x".repeat(5000) })).status, 413);
+  const n0 = (await ver()).total; for (let i = 0; i < 45; i++) await mando(B, { tipo: "js", mensaje: "otro fallo " + i }); const n1 = (await ver()).total; assert.ok(n1 - n0 <= 30, "tope por cliente y hora: " + (n1 - n0));
+  assert.ok([401, 403].includes((await call("GET", "/api/admin/errores")).status)); // la oficina, con su clave
+});
+
 test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repetir o añadir), nunca los de otro ni su NIF", async () => {
   assert.equal((await call("GET", "/api/mi-cuenta")).status, 401);
   const A = cookieOf(await entrarNif("111111"));

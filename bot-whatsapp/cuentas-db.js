@@ -90,6 +90,9 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   // Pedido fijo semanal (F-16): la plantilla de líneas y los días de reparto; NUNCA se envía solo, el cliente la revisa cada día que toca
   db.exec("CREATE TABLE IF NOT EXISTS usual_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, hidden INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)"); // «Tu pedido de siempre» editado o borrado por el cliente (sin fila = el último pedido, como siempre)
   // Enlaces de invitación que crea la oficina: de UN solo uso y con caducidad. Solo se guarda la huella (hash) del enlace, nunca el enlace.
+  // Errores de la app del cliente (qué falló y dónde, sin datos personales). Se guardan 30 días.
+  db.exec("CREATE TABLE IF NOT EXISTS errores_app (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, customer_id TEXT, tipo TEXT NOT NULL, pantalla TEXT NOT NULL, api TEXT, estado INTEGER NOT NULL DEFAULT 0, mensaje TEXT, navegador TEXT)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_errores_at ON errores_app(at)");
   db.exec("CREATE TABLE IF NOT EXISTS invitaciones (id INTEGER PRIMARY KEY AUTOINCREMENT, token_hash TEXT NOT NULL UNIQUE, customer_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT, motivo TEXT)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_invitaciones_cliente ON invitaciones(customer_id)");
   db.exec("CREATE TABLE IF NOT EXISTS bienvenida_vista (customer_id TEXT PRIMARY KEY, at TEXT NOT NULL)"); // la tarjeta de bienvenida ya cerrada («Entendido»), por cliente
@@ -240,6 +243,23 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     hideUsual(customerId, now = new Date().toISOString()) { db.prepare("INSERT INTO usual_orders (customer_id, lines, hidden, updated_at) VALUES (?, '[]', 1, ?) ON CONFLICT(customer_id) DO UPDATE SET lines = '[]', hidden = 1, updated_at = excluded.updated_at").run(String(customerId), now); return true; },
     resetUsual: (customerId) => db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(String(customerId)).changes === 1,
     allStanding() { const m = new Map(); for (const r of db.prepare("SELECT customer_id, days, paused, skip_week FROM standing_orders").all()) m.set(r.customer_id, { days: JSON.parse(r.days), paused: !!r.paused, skipWeek: r.skip_week ?? null }); return m; },
+    /** Apunta un error ya limpio (ver errores.js). Borra los de más de 30 días. */
+    errorRegistrar(e, { customerId = null, navegador = "", now = new Date().toISOString() } = {}) {
+      db.prepare("INSERT INTO errores_app (at, customer_id, tipo, pantalla, api, estado, mensaje, navegador) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(now, customerId == null ? null : String(customerId), e.tipo, e.pantalla, e.api || null, e.estado || 0, e.mensaje || null, String(navegador).slice(0, 60));
+      db.prepare("DELETE FROM errores_app WHERE at < ?").run(new Date(new Date(now).getTime() - 30 * 86_400_000).toISOString());
+    },
+    /** Resumen de los últimos `dias` días: total, por tipo, por cliente, por API y los últimos. */
+    erroresResumen({ dias = 7, now = new Date().toISOString() } = {}) {
+      const desde = new Date(new Date(now).getTime() - dias * 86_400_000).toISOString();
+      const q = (sql, ...a) => db.prepare(sql).all(...a);
+      return {
+        desde, total: db.prepare("SELECT COUNT(*) AS n FROM errores_app WHERE at >= ?").get(desde).n,
+        porTipo: q("SELECT tipo, COUNT(*) AS n FROM errores_app WHERE at >= ? GROUP BY tipo ORDER BY n DESC", desde),
+        porCliente: q("SELECT customer_id AS cliente, COUNT(*) AS n FROM errores_app WHERE at >= ? GROUP BY customer_id ORDER BY n DESC LIMIT 20", desde),
+        porApi: q("SELECT api, estado, COUNT(*) AS n FROM errores_app WHERE at >= ? AND api IS NOT NULL GROUP BY api, estado ORDER BY n DESC LIMIT 20", desde),
+        ultimos: q("SELECT at, customer_id AS cliente, tipo, pantalla, api, estado, mensaje, navegador FROM errores_app WHERE at >= ? ORDER BY id DESC LIMIT 25", desde),
+      };
+    },
     /** Crea un enlace de invitación (32 bytes aleatorios) para un cliente. Los anteriores sin usar de ese cliente dejan de valer. Devuelve { token, caduca }; el token no se guarda. */
     invitacionCrear(customerId, { dias = 7, now = new Date().toISOString() } = {}) {
       const token = crypto.randomBytes(32).toString("base64url"), caduca = new Date(new Date(now).getTime() + dias * 86_400_000).toISOString();

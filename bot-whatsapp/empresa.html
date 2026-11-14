@@ -195,6 +195,16 @@
       <h2 style="margin-top:22px">Uso de la aplicación (últimos 30 días)</h2>
       <p class="muted" style="margin:0 0 8px">Solo contadores, sin datos personales: sirven para saber qué cambios funcionan.</p>
       <div class="scroll"><table><tbody id="uso"></tbody></table></div>
+      <h2 style="margin-top:22px">Errores de la app (últimos 7 días)</h2>
+      <p class="muted" style="margin:0 0 8px">Lo que ha fallado en el móvil de los clientes (cargas que no han llegado y errores de la página). Sin datos personales: solo qué falló, dónde y en qué navegador.</p>
+      <p id="err-vacio" class="muted" hidden>Ningún error en los últimos 7 días. 👍</p>
+      <div id="err-caja" hidden>
+        <div class="scroll"><table><thead><tr><th>Tipo</th><th>Veces</th></tr></thead><tbody id="err-tipo"></tbody></table></div>
+        <div class="scroll" style="margin-top:8px"><table><thead><tr><th>Cliente</th><th>Veces</th></tr></thead><tbody id="err-cli"></tbody></table></div>
+        <div class="scroll" style="margin-top:8px"><table><thead><tr><th>Dirección que falló</th><th>Código</th><th>Veces</th></tr></thead><tbody id="err-api"></tbody></table></div>
+        <h3 style="margin:12px 0 4px">Los últimos</h3>
+        <div class="scroll"><table><thead><tr><th>Cuándo</th><th>Cliente</th><th>Pantalla</th><th>Qué falló</th><th>Navegador</th></tr></thead><tbody id="err-ult"></tbody></table></div>
+      </div>
       <h2 style="margin-top:22px">Derechos de protección de datos</h2>
       <p class="muted" style="margin:0 0 8px">Lo que piden los clientes desde la aplicación («Mis datos y privacidad»): corregir sus datos, limitar su uso u oponerse. <b>Hay que contestarles en un plazo máximo de un mes.</b> Cuando un cliente elimina su cuenta, aquí queda anotado (se borran su acceso, contactos y favoritos; los pedidos se conservan por obligación legal).</p>
       <div class="scroll"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Qué pide</th><th>Detalle</th><th>Estado</th><th></th></tr></thead><tbody id="der"></tbody></table></div>
@@ -484,6 +494,14 @@ async function derechos() {
     if (d.estado === "pendiente") { const ok = el("button", "Marcar atendida", { className: "main" }); ok.onclick = async () => { await call(`/api/admin/derechos/${d.id}/atender`, {}); refrescar(); }; td.append(ok); }
     tr.append(el("td", hora2(d.creada)), el("td", d.cliente), el("td", TIPO_DERECHO[d.tipo] ?? d.tipo), el("td", d.texto || ""), el("td", d.estado === "pendiente" ? "Pendiente" : "Atendida"), td); tb.appendChild(tr);
   }
+}
+const TIPO_ERROR = { fetch: "Carga que no llegó", js: "Error de la página", promesa: "Error sin atender" };
+async function erroresApp() {
+  const r = await call("/api/admin/errores?dias=7");
+  $("err-vacio").hidden = r.total > 0; $("err-caja").hidden = r.total === 0; if (!r.total) return;
+  const llena = (id, filas) => { const tb = $(id); tb.innerHTML = ""; for (const f of filas) { const tr = document.createElement("tr"); for (const v of f) tr.appendChild(el("td", String(v ?? "—"))); tb.appendChild(tr); } };
+  llena("err-tipo", r.porTipo.map((x) => [TIPO_ERROR[x.tipo] ?? x.tipo, x.n])); llena("err-cli", r.porCliente.map((x) => [x.nombre, x.n])); llena("err-api", r.porApi.map((x) => [x.api, x.estado || "sin respuesta", x.n]));
+  llena("err-ult", r.ultimos.map((x) => [hora(x.at), x.nombre, x.pantalla, (x.api ? x.api + " " : "") + (x.estado ? "(" + x.estado + ") " : "") + (x.mensaje || ""), x.navegador]));
 }
 async function usoApp() {
   const u = await call("/api/admin/uso?dias=30"), tb = $("uso"); tb.innerHTML = "";
@@ -777,7 +795,7 @@ async function avisos() {
   document.title = (r.pedidosPendientes + r.solicitudes ? `(${r.pedidosPendientes + r.solicitudes}) ` : "") + "Empresa · Pedidos y altas de clientes";
   $("act").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
 }
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x === b))); if (b.dataset.t === "avisos") avisosClientes().catch(() => {});
