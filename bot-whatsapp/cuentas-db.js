@@ -104,6 +104,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   db.exec("CREATE TABLE IF NOT EXISTS rights (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, tipo TEXT NOT NULL, texto TEXT, estado TEXT NOT NULL DEFAULT 'pendiente', created_at TEXT NOT NULL, resolved_at TEXT)");
   addCol("accounts", "deleted_at", "TEXT");
   addCol("push_log", "detalle", "TEXT");
+  addCol("standing_orders", "skip_week", "TEXT"); // lunes de la semana que el cliente ha saltado («Saltar esta semana»)
   addCol("registrations", "pin_hash", "TEXT");
   addCol("registrations", "address", "TEXT"); // dirección (calle y localidad) que escribe un cliente nuevo: pasa a su ficha al aceptarlo
   addCol("registrations", "nif", "TEXT"); // DNI/NIE/CIF que escribe un cliente nuevo: la empresa lo necesita para darlo de alta; se borra al resolver la solicitud
@@ -207,8 +208,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     /** Pedido fijo del cliente: { lines:[{id,qty,unit,note}], days:[1..5], paused } o null. */
     getStanding(customerId) {
       const r = db.prepare("SELECT * FROM standing_orders WHERE customer_id = ?").get(String(customerId));
-      return r ? { lines: JSON.parse(r.lines), days: JSON.parse(r.days), paused: !!r.paused, updatedAt: r.updated_at } : null;
+      return r ? { lines: JSON.parse(r.lines), days: JSON.parse(r.days), paused: !!r.paused, skipWeek: r.skip_week ?? null, updatedAt: r.updated_at } : null;
     },
+    /** «Saltar esta semana»: week = lunes (AAAA-MM-DD) de la semana saltada, o null para volver a activarla. No borra ni cambia el pedido fijo. */
+    skipStanding: (customerId, week) => db.prepare("UPDATE standing_orders SET skip_week = ? WHERE customer_id = ?").run(week ? String(week) : null, String(customerId)).changes === 1,
     setStanding(customerId, { lines, days }, now = new Date().toISOString()) {
       const ls = (Array.isArray(lines) ? lines : []).slice(0, 80).map((l) => ({ id: String(l.id), qty: Math.min(999, Math.max(1, Math.floor(Number(l.qty)))), unit: l.unit === "caja" ? "caja" : "ud", note: String(l.note ?? "").slice(0, 120) })).filter((l) => l.id && Number.isFinite(l.qty));
       const ds = [...new Set((Array.isArray(days) ? days : []).map(Number).filter((d) => Number.isInteger(d) && d >= 1 && d <= 5))].sort();

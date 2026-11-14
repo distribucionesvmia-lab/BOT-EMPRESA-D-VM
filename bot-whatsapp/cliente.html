@@ -397,6 +397,11 @@
   #s-cuerpo .s-ctl button { min-width:44px; min-height:44px; border:0; border-radius:var(--r-field); background:var(--fill); color:var(--text); font-size:calc(20px / var(--k,1)); font-weight:600; }
   #s-cuerpo .s-ctl output { min-width:2.4em; text-align:center; font-weight:600; font-variant-numeric:tabular-nums; }
   #s-cuerpo .s-quitar { grid-column:1 / -1; justify-self:start; min-height:44px; background:none; border:0; color:var(--accent); font-weight:600; font-size:calc(var(--t-sec) / var(--k,1)); }
+  .vm-inicio .in-ult { color:var(--text-2); font-size:calc(var(--t-cap) / var(--k,1)); line-height:1.25; }
+  .vm-inicio .in-fijo-ret { background:var(--fill); border-radius:var(--r-field); padding:var(--s3); display:flex; flex-direction:column; gap:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); } .vm-inicio .in-fijo-ret ul { margin:0; padding-left:1.1em; } .vm-inicio .in-fijo-ret small { color:var(--text-2); }
+  .cu-pasos { list-style:none; margin:var(--s2) 0 0; padding:0; display:flex; gap:2px; } .cu-pasos li { flex:1; text-align:center; font-size:calc(11.5px / var(--k,1)); line-height:1.2; color:var(--text-2); padding-top:10px; border-top:4px solid var(--fill); } .cu-pasos li.hecho { border-top-color:var(--accent); } .cu-pasos li.ahora { border-top-color:var(--accent); color:var(--text); font-weight:700; }
+  .cu-total { margin:var(--s2) 0 0; font-weight:600; font-variant-numeric:tabular-nums; }
+  #p-cuerpo label { margin-top:var(--s2); } #m-problema { z-index:75; }
   .vm-inicio .in-total { color:var(--text) !important; font-weight:600; font-variant-numeric:tabular-nums; }
   .vm-inicio .in-fotos { display:flex; padding-left:var(--s3); min-height:44px; }
   .vm-inicio .in-foto { width:44px; height:44px; margin-left:calc(-1 * var(--s3)); border-radius:50%; border:2px solid var(--surface); background:var(--fill); overflow:hidden; display:grid; place-items:center; color:var(--text-2); }
@@ -756,6 +761,20 @@
       <button class="vm-link" type="button" id="s-cerrar">Cerrar</button>
     </div>
   </div>
+  <div class="vm-modal" id="m-problema" hidden>
+    <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-problema" style="max-height:92vh;overflow:auto">
+      <div class="cu-cab cab-modal"><h2 id="t-problema">¿Algún problema con este pedido?</h2><button class="vm-x" type="button" id="p-x" aria-label="Cerrar">×</button></div>
+      <p id="p-ped"></p>
+      <div id="p-cuerpo">
+        <label>¿Qué ha pasado?<select id="p-tipo"><option>Falta un artículo</option><option>Un artículo llegó en mal estado</option><option>La cantidad o el precio no son los que pedí</option><option>No ha llegado el pedido</option><option>Otro problema</option></select></label>
+        <label>¿Con qué artículo? <small>(opcional)</small><select id="p-art"></select></label>
+      </div>
+      <a class="vm-btn primary" id="p-wa" target="_blank" rel="noopener">Escribir por WhatsApp</a>
+      <a class="vm-btn ghost" id="p-tel">Llamar</a>
+      <p style="font-size:calc(13px / var(--k,1))">Se abre WhatsApp con el mensaje ya escrito (número de pedido, problema y artículo). No se envía nada hasta que tú lo mandes.</p>
+      <button class="vm-link" type="button" id="p-cerrar">Cerrar</button>
+    </div>
+  </div>
   <div class="vm-modal" id="m-avisos" hidden>
     <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-avisos">
       <h2 id="t-avisos">¿Quieres recibir avisos?</h2>
@@ -1075,6 +1094,16 @@ function abrirPdf(url, nombre) {
   try { history.pushState({ pdf: 1 }, ""); empujado = true; addEventListener("popstate", atras); } catch {} // «Atrás» del móvil también cierra el PDF
   document.body.appendChild(v); x.focus();
 }
+// «¿Algún problema con este pedido?»: abre WhatsApp con el mensaje escrito (no se envía solo)
+function abrirProblema(o) {
+  const a = AYUDA || {}; $("p-ped").textContent = "Pedido " + o.doc + (o.fecha ? " del " + new Date(o.fecha + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long" }) : "");
+  const sel = $("p-art"); sel.textContent = ""; { const x = document.createElement("option"); x.value = ""; x.textContent = "Todo el pedido / ninguno en concreto"; sel.appendChild(x); for (const l of o.lineas) { const e = document.createElement("option"); e.value = l.nombre; e.textContent = l.nombre; sel.appendChild(e); } }
+  const msg = () => `Hola, tengo un problema con mi pedido ${o.doc}: ${$("p-tipo").value}.` + ($("p-art").value ? ` Artículo: ${$("p-art").value}.` : "") + ($("cli").textContent ? ` Soy ${$("cli").textContent.trim()}.` : "");
+  const wa = $("p-wa"), tel = $("p-tel"); wa.hidden = !a.whatsappHref; tel.hidden = !a.telHref; if (a.telHref) { tel.href = a.telHref; tel.textContent = "Llamar" + (a.tel ? " · " + a.tel : ""); }
+  const pon = () => { if (a.whatsappHref) wa.href = a.whatsappHref + "?text=" + encodeURIComponent(msg()); }; $("p-tipo").onchange = $("p-art").onchange = pon; pon();
+  $("m-problema").hidden = false;
+}
+$("p-x").onclick = $("p-cerrar").onclick = () => ($("m-problema").hidden = true);
 async function abrirCuenta(irAPedidos) {
   menu(false); const B = $("cu-cuerpo"); B.innerHTML = '<div class="cu-esq" aria-hidden="true"><div class="sk" style="height:96px"></div><div class="sk" style="height:20px;width:40%"></div><div class="sk" style="height:76px"></div><div class="sk" style="height:76px"></div></div><span class="solo-lector" role="status">Un momento…</span>'; $("m-cuenta").hidden = false;
   const j = await fetch("/api/mi-cuenta").then((r) => (r.ok ? r.json() : null)).catch(() => null); B.innerHTML = "";
@@ -1090,26 +1119,35 @@ async function abrirCuenta(irAPedidos) {
   B.appendChild(corr);
   // Avisos en este móvil (notificaciones)
   const avisosCaja = nodo("div"); B.appendChild(avisosCaja); pintarAvisos(avisosCaja).catch(() => { avisosCaja.textContent = ""; });
+  const pf = nodo("button", "Mi pedido fijo", "vm-btn ghost"); pf.type = "button"; pf.onclick = () => { $("m-cuenta").hidden = true; $("mifijo").click(); }; B.appendChild(pf);
   const cs = nodo("button", "Cerrar sesión", "vm-btn ghost cu-salir"); cs.type = "button"; cs.onclick = () => { $("m-cuenta").hidden = true; cerrarSesion(); }; B.appendChild(cs);
   // Mis pedidos, por meses
   const tp = nodo("h3", "Histórico de pedidos", "cu-tit"); tp.id = "cu-pedidos"; B.appendChild(tp);
   if (!j.pedidos.length) B.appendChild(estadoVacio({ icono: "reloj", titulo: "Aún no tienes pedidos", texto: "Cuando hagas uno, aparecerá aquí para repetirlo cuando quieras.", boton: "Hacer pedido", onclick: () => { $("m-cuenta").hidden = true; enviar("h:open", "Hacer pedido"); } })); 
   let mesActual = "";
-  for (const o of j.pedidos) {
+  const proximos = j.pedidos.filter((o) => o.proximo);
+  if (proximos.length) B.appendChild(nodo("h4", "Próximos", "cu-mes")); // los que aún no se han entregado, arriba, con «Modificar» si todavía se puede
+  for (const o of [...proximos, ...j.pedidos.filter((o) => !o.proximo)]) {
     const mes = String(o.fecha).slice(0, 7);
-    if (mes !== mesActual) { mesActual = mes; const [y, m] = mes.split("-"); const txt = new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("es-ES", { month: "long", year: "numeric" }); B.appendChild(nodo("h4", txt.charAt(0).toUpperCase() + txt.slice(1), "cu-mes")); }
+    if (!o.proximo && mes !== mesActual) { mesActual = mes; const [y, m] = mes.split("-"); const txt = new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("es-ES", { month: "long", year: "numeric" }); B.appendChild(nodo("h4", txt.charAt(0).toUpperCase() + txt.slice(1), "cu-mes")); }
     const c = nodo("div", null, "cu-ped"), cab = nodo("div", null, "cab");
     const f = new Date(o.fecha + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long" });
     cab.append(nodo("b", `${f} · pedido ${o.doc}`), nodo("span", o.estado, "est" + (o.editable ? " vivo" : "")));
     c.appendChild(cab);
+    if (o.origen === "app") { // estado en 4 pasos (deducido de la exportación y del día de entrega)
+      const PASOS = ["Recibido", "En preparación", "En reparto", "Entregado"], ol = nodo("ol", null, "cu-pasos"); ol.setAttribute("aria-label", "Estado del pedido: " + PASOS[o.paso - 1] + " (paso " + o.paso + " de 4)");
+      PASOS.forEach((t, i) => { const li = nodo("li", t); if (i + 1 < o.paso) li.className = "hecho"; else if (i + 1 === o.paso) { li.className = "ahora"; li.setAttribute("aria-current", "step"); } ol.appendChild(li); }); c.appendChild(ol);
+    }
+    if (o.total != null) c.appendChild(nodo("p", (o.totalOrientativo ? "Total con IVA aprox.: " : "Total con IVA: ") + eur(o.total) + (o.totalOrientativo ? " (con los precios de hoy)" : ""), "cu-total"));
     const n = o.lineas.length;
-    c.appendChild(nodo("p", o.lineas.slice(0, 3).map((l) => `${l.cant || l.uds} ${l.nombre}`).join(" · ") + (n > 3 ? ` y ${n - 3} más` : "") + (o.entrega ? ` · entrega ${o.entrega.split("-").reverse().join("/")}` : ""), "res"));
+    c.appendChild(nodo("p", o.lineas.slice(0, 3).map((l) => `${l.cant || l.uds} ${l.nombre}`).join(" · ") + (n > 3 ? ` y ${n - 3} más` : "") + (o.entrega ? ` · entrega ${o.entregaTexto || o.entrega.split("-").reverse().join("/")}` : ""), "res"));
     if (n > 3) { const d = nodo("details"), ul = nodo("ul"); d.appendChild(nodo("summary", `Ver los ${n} artículos`)); for (const l of o.lineas) ul.appendChild(nodo("li", `${l.cant || l.uds} · ${l.nombre}`)); d.appendChild(ul); c.appendChild(d); }
     const acc = nodo("div", null, "cu-acc");
     const rep = nodo("button", "Repetir pedido", "vm-btn primary"); rep.type = "button"; rep.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&r=1&x=1"; };
     const add = nodo("button", "Añadir al carrito", "vm-btn ghost"); add.type = "button"; add.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&a=1"; };
     acc.append(rep, add);
     { const pdf = nodo("button", "Ver / imprimir PDF", "vm-btn ghost"); pdf.type = "button"; pdf.setAttribute("aria-label", "Ver o imprimir el pedido " + o.doc + " en PDF (con botón para cerrarlo)"); pdf.onclick = () => abrirPdf(urlPdfDe(o.doc), "Pedido " + o.doc); acc.appendChild(pdf); } // los de la aplicación llevan los precios de ese día; los de a3ERP, los de hoy (se dice en el PDF)
+    { const pb = nodo("button", "¿Algún problema con este pedido?", "vm-btn ghost cu-prob"); pb.type = "button"; pb.onclick = () => abrirProblema(o); if (AYUDA && (AYUDA.whatsappHref || AYUDA.telHref)) acc.appendChild(pb); } // primera versión: abre WhatsApp con el mensaje ya escrito
     if (o.editable) { const m = nodo("button", "Modificar pedido", "vm-btn ghost"); m.type = "button"; m.onclick = () => { location.href = "/catalogo#m=" + encodeURIComponent(o.doc); }; acc.appendChild(m); }
     c.appendChild(acc); if (o.editable && o.hasta) c.appendChild(nodo("small", o.hasta));
     B.appendChild(c);
@@ -1131,6 +1169,7 @@ async function pintarFijo() {
   if (f.faltan) { const w = document.createElement("p"); w.textContent = `${f.faltan} artículo${f.faltan === 1 ? "" : "s"} ya no está${f.faltan === 1 ? "" : "n"} disponible${f.faltan === 1 ? "" : "s"}.`; B.appendChild(w); }
   const btn = (txt, cls, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "vm-btn " + cls; b.textContent = txt; b.onclick = fn; B.appendChild(b); };
   btn("Cambiar (abrir y editar)", "primary", () => { location.href = (window.__catUrl || "/catalogo") + "#c=" + f.lineas.map((l) => encodeURIComponent(l.id) + "." + l.uds).join(",") + "&r=1&f=1"; });
+  if (f.saltada) btn("Reactivar esta semana (la tienes saltada)", "ghost", async () => { await post("/api/pedido-fijo/saltar", { saltar: false }); pintarFijo(); });
   btn(f.pausado ? "Reanudar" : "Pausar", "ghost", async () => { await post("/api/pedido-fijo/pausa", { pausado: !f.pausado }); pintarFijo(); });
   btn("Borrar mi pedido fijo", "ghost", async () => { if (!confirm("¿Borrar tu pedido fijo?")) return; await post("/api/pedido-fijo/borrar", {}); pintarFijo(); });
 }
@@ -1274,6 +1313,7 @@ const diaSemanaDe = (iso) => { try { return new Intl.DateTimeFormat("es-ES", { t
 document.addEventListener("load", (e) => { if (e.target && e.target.tagName === "IMG") e.target.classList.add("cargada"); }, true); // fundido de las fotos
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 const flecha = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ultimaTxt = (p) => { const L = p.ultima, k = p.unitsPerBox; if (k && (p.soloCaja || L % k === 0)) { const c = p.soloCaja ? Math.max(1, Math.ceil(L / k)) : L / k; return `${c} ${c === 1 ? "caja" : "cajas"}`; } return `${L} ${L === 1 ? "ud" : "uds"}`; };
 let yoCache = null; const cargaYo = () => (yoCache ??= fetch("/api/yo").then((r) => (r.ok ? r.json() : null)).then((j) => j?.cliente ?? null).catch(() => null));
 function inicio(ui) {
   window.__saludo = null;
@@ -1334,12 +1374,12 @@ function inicio(ui) {
     const fotos = principal.querySelector(".in-fotos");
     if (fotos) for (const id of ids) { const t = el("span", "in-foto"); const f = j.fotos?.[id]; if (f) { const im = document.createElement("img"); im.src = f; im.alt = ""; im.loading = "lazy"; im.onerror = () => im.remove(); t.appendChild(im); } else t.textContent = "·"; fotos.appendChild(t); }
     const tarjeta = (p, etiqueta) => {
-      const t = el("a", "in-prod"); t.href = cat + "#c=" + encodeURIComponent(p.id) + ".1&a=1"; t.title = p.name; t.setAttribute("aria-label", `${p.name}${etiqueta ? ", " + etiqueta : ""}, ${eur(p.price)} la unidad. Añadir al pedido`);
+      const t = el("a", "in-prod"); t.href = cat + "#c=" + encodeURIComponent(p.id) + "." + (p.ultima > 0 ? Math.min(999, p.ultima) : 1) + "&a=1"; // el «+» pone lo de la última vez t.title = p.name; t.setAttribute("aria-label", `${p.name}${etiqueta ? ", " + etiqueta : ""}, ${p.soloCaja && p.unitsPerBox ? eur(Math.round(p.price * p.unitsPerBox * 100) / 100) + " la caja" : eur(p.price) + " la unidad"}${p.ultima ? ". La última vez: " + ultimaTxt(p) : ""}. Añadir al pedido`);
       const im = el("span", "in-pim"); if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.onerror = () => i.remove(); im.appendChild(i); } else im.textContent = p.name.slice(0, 2).toUpperCase();
       if (etiqueta) im.appendChild(el("span", "in-oferta", etiqueta));
       const mas = el("span", "in-mas"); mas.setAttribute("aria-hidden", "true"); mas.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
-      const pie = el("span", "in-pie"); pie.append(el("small", null, eur(p.price) + " /ud"), mas);
-      t.append(im, el("b", "in-pn", p.name), ...(p.unitsPerBox ? [el("small", "in-fmt", "Caja de " + p.unitsPerBox)] : []), pie); return t; // nombre entero (hasta 4 líneas) y el formato
+      const pie = el("span", "in-pie"); pie.append(el("small", null, p.soloCaja && p.unitsPerBox ? eur(Math.round(p.price * p.unitsPerBox * 100) / 100) + " /caja" : eur(p.price) + " /ud"), mas);
+      t.append(im, el("b", "in-pn", p.name), ...(p.unitsPerBox ? [el("small", "in-fmt", "Caja de " + p.unitsPerBox)] : []), ...(p.ultima ? [el("small", "in-ult", "La última vez: " + ultimaTxt(p))] : []), pie); return t; // nombre entero (hasta 4 líneas) y el formato
     };
     if (j.ofertas?.length) { // ofertas vigentes que le cambian el precio (la empresa las pone desde el panel)
       const sec = el("section", "in-sec"); sec.setAttribute("aria-label", "Ofertas"); sec.appendChild(el("h3", null, "Ofertas"));
@@ -1385,7 +1425,15 @@ function inicio(ui) {
     f.append(el("small", "in-peq", "Tu pedido fijo"), el("h3", null, `Hoy toca tu pedido de los ${j.hoy.nombre}`));
     const bt = el("button", "vm-btn primary", "Revisar y enviar"); bt.type = "button";
     bt.onclick = () => { location.href = cat + "#c=" + j.fijo.lineas.map((l) => encodeURIComponent(l.id) + "." + l.uds).join(",") + "&r=1"; };
-    f.appendChild(bt); sitioFijo.appendChild(f);
+    const sk = el("button", "vm-btn ghost", "Saltar esta semana"); sk.type = "button"; sk.setAttribute("aria-label", "Saltar esta semana tu pedido fijo");
+    sk.onclick = async () => { sk.disabled = true; const r = await post("/api/pedido-fijo/saltar", {}).catch(() => null); if (r?.ok) { f.remove(); } else { sk.disabled = false; } };
+    f.append(bt, sk); sitioFijo.appendChild(f);
+    if (j.fijo.retirados?.length) { // antes de abrirlo: qué artículos ya no están y por cuáles se pueden cambiar
+      const av = el("div", "in-fijo-ret"); av.setAttribute("role", "note"); av.appendChild(el("b", null, j.fijo.retirados.length === 1 ? "Hay 1 artículo de tu pedido fijo que ya no está:" : `Hay ${j.fijo.retirados.length} artículos de tu pedido fijo que ya no están:`));
+      const ul = el("ul"); for (const r of j.fijo.retirados) ul.appendChild(el("li", null, r.nombre + (r.parecidos.length ? " · parecidos: " + r.parecidos.map((x) => x.nombre).join("; ") : " · no hay parecidos"))); av.appendChild(ul);
+      av.appendChild(el("small", null, "Al abrir el pedido te dejamos cambiarlos por uno parecido."));
+      f.insertBefore(av, bt);
+    }
   }).catch(() => {});
 }
 const sinEmoji = (t) => String(t ?? "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim();

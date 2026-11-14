@@ -8,6 +8,8 @@ const esc = (b) => Buffer.from([...b].flatMap((x) => (x === 0x28 || x === 0x29 |
 const ancho = (t, pt) => [...String(t)].reduce((s, c) => s + (/[0-9€]/.test(c) ? 556 : /[ .,:]/.test(c) ? 278 : c === "-" ? 333 : /[A-Z]/.test(c) ? 667 : 520), 0) * pt / 1000;
 const fmt = (n) => Number(n ?? 0).toFixed(2).replace(".", ",") + " €";
 const fecha = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? "")); return m ? `${m[3]}/${m[2]}/${m[1]}` : ""; };
+const DIAS_L = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"], MESES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const fechaLarga = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? "")); return m ? `${DIAS_L[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()]} ${+m[3]} de ${MESES_L[+m[2] - 1]} de ${m[1]}` : ""; };
 const parte = (texto, max) => { const out = []; let l = ""; for (const w of String(texto ?? "").split(/\s+/).filter(Boolean)) { if (ancho(l + " " + w, 9) > max && l) { out.push(l); l = w; } else l = l ? l + " " + w : w; } if (l) out.push(l); return out.length ? out : [""]; };
 
 /** Construye el PDF (Buffer). `datos`: { empresa, cliente, ref, fecha, entrega, direccion, nota, lineas:[{cant, nombre, precio, importe}], totales:{base, iva, re, total}, conRe } */
@@ -20,7 +22,7 @@ export function pdfPedido(d) {
   txt(M, y, d.empresa || "Distribuciones", { b: true, pt: 16 }); y -= 18;
   for (const l of d.datosEmpresa ?? []) { if (l) { txt(M, y, l, { pt: 9, gris: true }); y -= 12; } } // nombre fiscal, CIF, dirección y teléfono de la empresa (los de la configuración)
   y -= 6; txt(M, y, "Resumen de tu pedido", { pt: 12 }); y -= 24;
-  const info = [["Pedido", d.ref], ["Fecha", fecha(d.fecha)], ["Cliente", d.cliente], ["Teléfono", d.telefonoCliente], ["Entrega", fecha(d.entrega) || "Por confirmar"], ["Dirección", d.direccion]];
+  const info = [["Pedido", d.ref], ["Fecha", fecha(d.fecha)], ["Cliente", d.cliente], ["Teléfono", d.telefonoCliente], ["Entrega", fechaLarga(d.entrega) || "Por confirmar"], ["Dirección", d.direccion]];
   for (const [k, v] of info) { if (!v) continue; txt(M, y, k, { b: true, pt: 10 }); for (const l of parte(v, W - 2 * M - 80)) { txt(M + 80, y, l, { pt: 10 }); y -= 14; } }
   y -= 8; linea(y); y -= 16; cabeceraTabla();
   for (const l of d.lineas) {

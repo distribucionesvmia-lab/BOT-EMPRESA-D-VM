@@ -42,7 +42,7 @@ import nodePath from "node:path";
 import { BUSINESS, AYUDA, ayudaPublica, condicionesPedido, envTexto } from "./config.js";
 import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
 import { categorizar } from "./categorias.js";
-import { puedeEditarPedido, plazoModificacion, longDate, weekday } from "./delivery.js";
+import { puedeEditarPedido, plazoModificacion, longDate, weekday, addDays } from "./delivery.js";
 const DIAS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
 if (process.env.DEMO === "1") {
@@ -424,6 +424,15 @@ function datosPdfComunes() {
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
 const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));
+const lunesDe = (day) => addDays(day, -((weekday(day) + 6) % 7)); // lunes de esa semana
+// Parecidos a un artículo retirado: mismas categoría y subcategoría y alguna palabra del nombre en común (hasta 3, solo del catálogo actual)
+const stopP = new Set(["con", "sin", "del", "las", "los", "una", "uno", "para", "caja", "pack", "lata", "botella", "uds", "und", "de", "la", "el", "en"]);
+const palabrasP = (s) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !stopP.has(w));
+function parecidosA(nombre, cs, catalogo) {
+  const w = new Set(palabrasP(nombre)); if (!w.size) return [];
+  return catalogo.filter((x) => { const c = categorizar(x); return c.cat === cs.cat && c.sub === cs.sub && palabrasP(x.name).some((t) => w.has(t)); })
+    .map((x) => ({ x, n: palabrasP(x.name).filter((t) => w.has(t)).length })).sort((a, b) => b.n - a.n).slice(0, 3).map(({ x }) => ({ id: String(x.id), nombre: x.name }));
+}
 // Pedidos de este cliente (y este teléfono) que todavía se pueden cambiar: para avisarle y dejarle AÑADIR en vez de duplicar
 function abiertosDe(account) {
   const hoy = madridDay(), out = [];
@@ -600,10 +609,10 @@ async function appRoutes(req, res, url) {
     await refreshCatalog(); // ve ya las ofertas y los precios que la empresa acaba de cambiar
     const customer = clienteConPedidos(account.customerId);
     const todos = webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa);
-    const corto = (x) => ({ id: x.id, name: x.name, price: x.price, ...(x.img ? { img: x.img } : {}), ...(x.unitsPerBox ? { unitsPerBox: x.unitsPerBox } : {}) });
+    const corto = (x) => ({ id: x.id, name: x.name, price: x.price, ...(x.img ? { img: x.img } : {}), ...(x.unitsPerBox ? { unitsPerBox: x.unitsPerBox } : {}), ...(x.soloCaja ? { soloCaja: true } : {}) });
     const ids = String(url.searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8);
     const porId = new Map(todos.map((x) => [x.id, x]));
-    const habituales = todos.filter((x) => x.count > 0).slice(0, 10).map(corto);
+    const habituales = todos.filter((x) => x.count > 0).slice(0, 10).map((x) => ({ ...corto(x), ...(x.lastQty > 0 ? { ultima: x.lastQty } : {}) })); // «La última vez»: unidades
     const ofertas = todos.filter((x) => x.oferta).slice(0, 10).map((x) => ({ ...corto(x), oferta: { tipo: x.oferta.tipo, valor: x.oferta.valor, ...(x.oferta.hasta ? { hasta: x.oferta.hasta } : {}) } })); // solo las que de verdad le cambian el precio a ESTE cliente
     const lo_mas = habituales.length ? [] : topIds().map((id) => porId.get(String(id))).filter(Boolean).slice(0, 8).map(corto);
     return void sendJson(res, 200, {
@@ -689,7 +698,10 @@ async function appRoutes(req, res, url) {
     const hoy = madridDay(), dow = weekday(hoy), cat = new Map(catalogNow().map((x) => [String(x.id), x]));
     const lineas = (f?.lines ?? []).map((l) => { const pr = cat.get(l.id); if (!pr) return null; const k = Number.isInteger(pr.unitsPerBox) && pr.unitsPerBox > 1 ? pr.unitsPerBox : 1; return { ...l, nombre: pr.name, uds: l.unit === "caja" ? l.qty * k : l.qty }; }).filter(Boolean);
     const yaPidio = getDb().recentOrders(account.customerId, 5).some((o) => madridDay(o.created_at) === hoy);
-    return void sendJson(res, 200, { fijo: f && { dias: f.days, pausado: f.paused, lineas, faltan: f.lines.length - lineas.length }, hoy: { dia: dow, nombre: DIAS_ES[dow], toca: !!f && !f.paused && f.days.includes(dow) && lineas.length > 0, yaPidio } });
+    const saltada = !!f && f.skipWeek === lunesDe(hoy);
+    const retirados = []; // artículos del fijo que ya no están, con parecidos: se avisa ANTES de abrirlo
+    if (f) for (const l of f.lines) { if (cat.has(l.id) || retirados.length >= 6) continue; try { const r = getDatabases().catalogDb.get(l.id); if (r?.name) retirados.push({ id: l.id, nombre: r.name, parecidos: parecidosA(r.name, categorizar(r), catalogNow()) }); } catch {} }
+    return void sendJson(res, 200, { fijo: f && { dias: f.days, pausado: f.paused, saltada, lineas, faltan: f.lines.length - lineas.length, retirados }, hoy: { dia: dow, nombre: DIAS_ES[dow], toca: !!f && !f.paused && !saltada && f.days.includes(dow) && lineas.length > 0, yaPidio } });
   }
   if (p === "/api/pedido-fijo" && req.method === "POST") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
@@ -697,6 +709,12 @@ async function appRoutes(req, res, url) {
     const body = await readJson(req), cat = new Set(catalogNow().map((x) => String(x.id)));
     const ok = getAccountsDb().setStanding(account.customerId, { lines: (body?.lineas ?? []).filter((l) => cat.has(String(l?.id))), days: body?.dias });
     return void sendJson(res, ok ? 200 : 400, ok ? { ok: true } : { error: "Elige al menos un artículo y un día de reparto." });
+  }
+  if (p === "/api/pedido-fijo/saltar" && req.method === "POST") { // «Saltar esta semana»: no se pide hoy ni el resto de la semana; el pedido fijo sigue guardado
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const body = await readJson(req);
+    return void sendJson(res, 200, { ok: getAccountsDb().skipStanding(account.customerId, body?.saltar === false ? null : lunesDe(madridDay())) });
   }
   if (p === "/api/pedido-fijo/pausa" && req.method === "POST") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
@@ -723,8 +741,15 @@ async function appRoutes(req, res, url) {
     const pedidos = hist.map((o) => {
       const propio = /^VM-\d{4}-\d{6}$/.test(o.doc) ? getDb().getOrderByRef(o.doc) : null; // un pedido hecho en la aplicación: se puede saber si aún se modifica
       const pe = propio && propio.customer_id === String(account.customerId) ? puedeEditarPedido(propio) : null;
+      const hoyD = madridDay(), ent = propio?.delivery_date ?? null;
+      // Estado en 4 pasos (1 Recibido · 2 En preparación · 3 En reparto · 4 Entregado), deducido de la exportación y del día de entrega: no hay seguimiento real del reparto
+      const paso = !propio || (ent && ent < hoyD) ? 4 : ent && ent === hoyD ? (propio.export_status === "exported" ? 3 : 2) : propio.export_status === "exported" ? 2 : 1;
+      let total = null, orientativo = false;
+      if (propio) { const t = propio.items?.length ? totals(propio.items, !!propio.re).total : null; total = Number.isFinite(t) && t > 0 ? t : (Number.isFinite(Number(propio.total)) ? Number(propio.total) : null); }
+      else { const cust = clienteConPedidos(account.customerId); const pr = priceOrder({ items: o.lines.map((l) => ({ id: l.id, qty: l.qty, unit: "ud" })) }, cust, catalogNow()); total = totals(pr.items, !!cust?.recargoEquivalencia).total; orientativo = true; }
       return {
-        doc: o.doc, fecha: o.date, entrega: propio?.delivery_date ?? null, origen: propio ? "app" : "a3erp",
+        total, totalOrientativo: orientativo, paso, proximo: !!propio && !!ent && ent >= hoyD, entregaTexto: ent ? longDate(ent) : "",
+        doc: o.doc, fecha: o.date, entrega: ent, origen: propio ? "app" : "a3erp",
         estado: !propio ? "Entregado" : propio.export_status === "exported" ? "En preparación" : pe?.ok ? "Recibido · puedes modificarlo" : "Recibido",
         editable: !!pe?.ok, hasta: pe?.ok ? pe.texto : "", modificado: propio?.modified_at ?? null,
         lineas: o.lines.map((l) => { // «1 caja (6 uds)» igual que en el PDF; sin dato de caja (pedidos de a3ERP), unidades

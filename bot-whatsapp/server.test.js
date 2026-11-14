@@ -991,6 +991,32 @@ test("BENCH 4: /catalogo/datos trae los pedidos abiertos (solo los suyos) y la h
   assert.equal((await call("GET", "/catalogo/plazo?dia=" + dia)).status, 401);
 });
 
+test("BENCH 5: «Saltar esta semana» del pedido fijo, estado en 4 pasos y total con IVA en Mi cuenta, «La última vez» en el Inicio", async () => {
+  const A = cookieOf(await entrarNif("111111"));
+  const antes = (await call("GET", "/api/admin/pedidos", { admin: true })).json.length;
+  // saltar la semana: el fijo sigue guardado pero hoy no toca; se puede reactivar
+  assert.equal((await call("POST", "/api/pedido-fijo/saltar", { cookie: A, body: {} })).json.ok, false); // sin pedido fijo no hay nada que saltar
+  await call("POST", "/api/pedido-fijo", { cookie: A, body: { lineas: [{ id: "1010", qty: 2, unit: "ud" }], dias: [1, 2, 3, 4, 5] } });
+  assert.equal((await call("POST", "/api/pedido-fijo/saltar", { cookie: A, body: {} })).json.ok, true);
+  const s1 = (await call("GET", "/api/pedido-fijo", { cookie: A })).json;
+  assert.equal(s1.fijo.saltada, true); assert.equal(s1.hoy.toca, false); assert.equal(s1.fijo.lineas.length, 1); assert.ok(Array.isArray(s1.fijo.retirados));
+  assert.equal((await call("POST", "/api/pedido-fijo/saltar", { cookie: A, body: { saltar: false } })).json.ok, true);
+  assert.equal((await call("GET", "/api/pedido-fijo", { cookie: A })).json.fijo.saltada, false);
+  assert.equal((await call("POST", "/api/pedido-fijo/saltar", { body: {} })).status, 401);
+  await call("POST", "/api/pedido-fijo/borrar", { cookie: A, body: {} });
+  // Mi cuenta: total con IVA, 4 pasos, «próximo»
+  const dia = (() => { let d = new Date(Date.now() + 25 * 86_400_000); while ([0, 6].includes(d.getUTCDay())) d = new Date(d.getTime() + 86_400_000); return d.toISOString().slice(0, 10); })();
+  const r = await call("POST", "/catalogo", { cookie: A, body: { key: "bench5-cuenta-1", lines: [{ id: "1010", qty: 2, unit: "ud" }], delivery: dia } });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  const mc = (await call("GET", "/api/mi-cuenta", { cookie: A })).json, o = mc.pedidos.find((x) => x.doc === r.json.ref);
+  assert.ok(o.total > 0 && o.totalOrientativo === false); assert.equal(o.paso, 1); assert.equal(o.proximo, true); assert.match(o.entregaTexto, /^\p{L}+ \d+ de \p{L}+$/u);
+  for (const x of mc.pedidos) { assert.ok([1, 2, 3, 4].includes(x.paso)); if (x.origen === "a3erp") { assert.equal(x.paso, 4); assert.equal(x.proximo, false); } }
+  // «La última vez» (unidades) en lo que sueles pedir
+  const ini = (await call("GET", "/api/inicio", { cookie: A })).json;
+  assert.ok(ini.habituales.some((h) => h.ultima > 0), "los habituales traen la cantidad de la última vez");
+  assert.equal((await call("GET", "/api/admin/pedidos", { admin: true })).json.length, antes + 1); // solo el pedido que hemos hecho a propósito: lo demás no envía nada
+});
+
 test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repetir o añadir), nunca los de otro ni su NIF", async () => {
   assert.equal((await call("GET", "/api/mi-cuenta")).status, 401);
   const A = cookieOf(await entrarNif("111111"));

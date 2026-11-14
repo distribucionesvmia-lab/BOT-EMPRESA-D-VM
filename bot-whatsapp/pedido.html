@@ -904,6 +904,7 @@
   .dchip:active { transform:scale(.97); }
   .dchip.on { background:var(--text); color:var(--surface); } .dchip.on small { color:var(--surface); opacity:.85; }
   #diaInfo:empty { display:none; }
+  .pf-ultima { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); line-height:1.25; }
   .aviso.abierto { border-radius:var(--r-card); display:flex; flex-direction:column; gap:var(--s2); align-items:flex-start; }
   .aviso.abierto[hidden], .dia-aviso[hidden] { display:none; }
   .aviso.abierto .vm-lnk, .dia-aviso .vm-lnk { min-height:44px; padding:0 var(--s4); border:0; border-radius:var(--r-pill); background:var(--accent); color:var(--on-accent); font:inherit; font-weight:600; }
@@ -1512,6 +1513,14 @@ function volarAlCarrito(id) {
     an.onfinish = an.oncancel = () => c.remove();
   } catch {}
 }
+// «La última vez»: lo que pidió, con su unidad (cajas si son cajas enteras; solo-cajas siempre en cajas). El primer «+» pone justo eso.
+function ultimaVez(p) {
+  const L = Math.floor(Number(p.lastQty)); if (!(L > 0)) return null;
+  const k = p.unitsPerBox;
+  if (k && (p.soloCaja || L % k === 0)) { const c = p.soloCaja ? Math.max(1, Math.ceil(L / k)) : L / k; return { qty: Math.min(999, c), unit: "caja", texto: `${c} ${c === 1 ? "caja" : "cajas"}` + (k > 1 ? ` (${c * k} uds)` : "") }; }
+  return { qty: Math.min(999, L), unit: "ud", texto: `${L} ${L === 1 ? "ud" : "uds"}` };
+}
+function primerMas(p) { const u = ultimaVez(p); if (!u) return setQty(p.id, 1); if (!p.soloCaja && p.unitsPerBox) unitOf.set(p.id, u.unit); setQty(p.id, u.qty); }
 function setQty(id, n) {
   const antes = qty.get(id) || 0, u = unitOf.get(id), nota = notes.get(id);
   bumpId = id; if (n > antes) { vibra(); const t = Date.now(); if (t - (setQty.ult || 0) < 900) aviso(`${productoPorId.get(id)?.name ?? "Artículo"}: ahora llevas ${Math.max(0, Math.floor(Number(n) || 0))}`); setQty.ult = t; } // dos toques seguidos no pasan en silencio
@@ -1637,7 +1646,7 @@ function control(p) {
   if (!q) {
     const b = document.createElement("button");
     b.className = "pf-add"; b.type = "button"; b.setAttribute("aria-label", "Añadir " + p.name); b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
-    b.onclick = () => setQty(p.id, 1);
+    b.onclick = () => primerMas(p); // la primera vez pone lo de la última vez (con su unidad); un artículo nuevo, 1
     hueco.appendChild(b);
     return box;
   }
@@ -1742,6 +1751,7 @@ function row(p) {
   if (p.oferta) { const of = document.createElement("span"); of.className = "pf-oferta"; of.textContent = "OFERTA" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().slice(0, 2).join("/") : ""); pr.appendChild(of); }
   if (tab === "all" && p.count > 0) { const lc = document.createElement("span"); lc.className = "pf-compras"; lc.textContent = "Lo compras"; pr.appendChild(lc); } // etiqueta aparte del nombre, junto al precio
   info.append(n, c, pr);
+  { const uv = tab === "hab" ? ultimaVez(p) : null; if (uv) { const ul = document.createElement("div"); ul.className = "pf-ultima"; ul.textContent = "La última vez: " + uv.texto; info.appendChild(ul); } }
   if (p.ia) { const ia = document.createElement("div"); ia.className = "pf-ia"; ia.textContent = "Imagen orientativa"; av.appendChild(ia); }
   if (data.favs) {
     const f = document.createElement("button"); f.type = "button"; f.className = "pf-fav"; const on = favs.has(p.id);
