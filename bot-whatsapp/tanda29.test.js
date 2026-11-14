@@ -78,3 +78,14 @@ test("panel de la empresa: ancho, menú lateral en pantalla grande, pestañas en
   assert.match(e, /\.inv-grid \{ display:grid;/); assert.match(e, /prefers-color-scheme: dark/);
   assert.doesNotMatch(e, /<link[^>]+href=|@import/); // sin recursos externos: el panel funciona sin internet
 });
+
+test("panel de la empresa: cabecera roja con el logo, rojo de la marca en vez de verde y filtros de Pedidos alineados", () => {
+  const e = leer("./empresa.html"), cli = leer("./cliente.html");
+  assert.match(e, /--accent:#C8102E/); assert.match(e, /--accent:#FF6B7D/); assert.match(e, /header \{[^}]*background:#C8102E/);
+  assert.match(e, /<header><h1><img class="marca"[^>]*alt="Distribuciones Valentín Martín"[^>]*src="data:image\/png;base64,/); // el logo (óvalo blanco) solo sobre rojo
+  const logoCliente = /var u="(data:image\/png;base64,[A-Za-z0-9+/=]+)"/.exec(cli)[1]; assert.ok(e.includes(logoCliente), "es el mismo logo que la app de clientes, sin modificar");
+  for (const verde of ["#0f7a4d", "#0b6b3a", "#0b6e4f", "#37c382", "#22c55e", "#2fae72", "#0b6140", "#e0f1e8", "#d7f0e0"]) assert.equal(e.includes(verde), false, verde); // ya no queda verde de marca (la hoja del Excel conserva su verde de entrega)
+  assert.match(e, /<form class="filtros" id="f-filtro"/); assert.equal((e.match(/class="campo( campo-cliente)?"><span>/g) ?? []).length, 5);
+  assert.match(e, /\.filtros \{ display:grid; grid-template-columns:repeat\(4, minmax\(128px, 170px\)\) minmax\(220px, 1fr\) auto;/); assert.match(e, /\.filtros input \{[^}]*height:40px/);
+  assert.match(e, /@media \(max-width: 640px\) \{ \.filtros \{ grid-template-columns:repeat\(2, minmax\(0, 1fr\)\)/);
+});
