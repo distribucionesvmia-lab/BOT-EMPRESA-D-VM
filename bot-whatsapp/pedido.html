@@ -88,6 +88,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="/icono-192.png">
 <meta name="color-scheme" content="light dark">
+<script>document.documentElement.classList.add("cargando");setTimeout(function(){document.documentElement.classList.remove("cargando")},2500);document.addEventListener("DOMContentLoaded",function(){document.documentElement.classList.remove("cargando")})</script>
 <script>try{var t=localStorage.getItem("vm:tema");if(t==="claro"||t==="oscuro")document.documentElement.setAttribute("data-tema",t)}catch(e){}</script>
 <title>Hacer pedido</title>
 <style>
@@ -1088,7 +1089,9 @@
   /* «Mi cuenta» arriba, como en el chat: con texto si hay sitio y solo el icono en pantallas estrechas */
   header .ds-circ.cuenta { width:auto; min-width:44px; padding:0 var(--s4) 0 var(--s3); border-radius:var(--r-pill); gap:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; line-height:1.2; color:var(--accent); }
   header .ds-circ.cuenta span { white-space:nowrap; }
-  @media (max-width:439px) { header .ds-circ.cuenta { width:44px; padding:0; } header .ds-circ.cuenta span { display:none; } }
+  header .ds-circ.cuenta.solo-icono { width:44px; padding:0; } header .ds-circ.cuenta.solo-icono span { display:none; }
+  html.cargando body { visibility:hidden; } html.cargando { background:var(--bg); } /* sin parpadeo de página sin estilos al recargar */
+  .app > main#list { scrollbar-width:thin; }
 
   @media (min-width:768px) and (max-width:1023px) { .pf-av img { width:82%; height:82%; max-width:none; max-height:none; } }
 </style>
@@ -1895,6 +1898,7 @@ function ofrecerParecidos(lista) {
 function precargar() {
   const mod = /[#&]m=([\w-]+)/.exec(String(window.vmPrecarga ?? location.hash)); // «Modificar pedido» desde el chat
   if (mod) { setTimeout(() => modificar(mod[1]), 0); return; }
+  if (/[#&]tab=hab(?:&|$)/.test(String(window.vmPrecarga ?? location.hash))) { tab = "hab"; try { history.replaceState({ vmTab: "hab" }, ""); } catch {} marcaNav(); return; } // «Ver todos» de «Lo que sueles pedir»
   const kat = /[#&]cat=([\w-]+)/.exec(String(window.vmPrecarga ?? location.hash)); // categoría elegida en el Inicio del chat
   if (kat && (data.tree || []).some(c => c.id === kat[1])) { const c = data.tree.find(x => x.id === kat[1]); tab = "all"; nav = { cat: c.id, sub: c.subs.length === 1 ? c.subs[0].id : null }; marcaNav(); return; }
   const m = /[#&]c=([^&]*)/.exec(String(window.vmPrecarga ?? location.hash));
@@ -2012,6 +2016,8 @@ $("q").addEventListener("keydown", e => { if (e.key === "Escape") { $("sugs").hi
 $("q").addEventListener("search", () => anotarBusqueda($("q").value)); // Enter o la X de borrar
 $("verCarrito").onclick = $("cartIcon").onclick = () => count() && showCart(true);
 $("keep").onclick = () => showCart(false);
+function ajustaCuenta() { const b = $("cuentaBtn"), h = document.querySelector("header"); if (!b || !h || !h.offsetWidth) return; b.classList.remove("solo-icono"); if (h.scrollWidth > h.clientWidth + 1) b.classList.add("solo-icono"); } // con texto si cabe; solo icono si no
+try { const h = document.querySelector("header"); new ResizeObserver(ajustaCuenta).observe(h); new MutationObserver(ajustaCuenta).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] }); } catch {}
 $("cuentaBtn").onclick = () => { location.href = "/cliente#cuenta"; }; // Mi cuenta (datos y pedidos) está en el chat: se abre sola con #cuenta
 $("vaciar").onclick = () => { // vacía todo el pedido, con «Deshacer» durante 8 segundos
   if (!count()) return;

@@ -184,7 +184,7 @@ test("chat: atajos «Último pedido» e «Histórico» como dos tarjetas con ico
 test("catálogo: botón «Mi cuenta» arriba (icono en móvil, con texto si hay sitio) que abre Mi cuenta en el chat", () => {
   assert.match(pedido, /id="cuentaBtn" class="ds-circ cuenta"[^>]*aria-label="Mi cuenta: mis datos y mis pedidos"/);
   assert.match(pedido, /\$\("cuentaBtn"\)\.onclick = \(\) => \{ location\.href = "\/cliente#cuenta"; \}/);
-  assert.match(pedido, /@media \(max-width:439px\) \{ header \.ds-circ\.cuenta \{ width:44px; padding:0; \}/);
+  assert.match(pedido, /header \.ds-circ\.cuenta\.solo-icono \{ width:44px; padding:0; \}/); assert.match(pedido, /function ajustaCuenta\(\)/); // con texto si cabe; solo icono si no
 });
 
 test("chat: los atajos son botones pequeños (44 px, ancho a su texto), sin línea de ayuda y con aire sobre la barra de escribir", () => {
@@ -210,4 +210,18 @@ test("ordenador: la página se adapta al ancho (hasta 1240 px), el Inicio en dos
   assert.match(cli, /:root \{ --ancho:860px; \}/); assert.match(cli, /:root \{ --ancho:1240px; \}/); assert.doesNotMatch(cli, /calc\(\(100% - 860px\) \/ 2\)/);
   assert.match(cli, /\.vm-inicio > \.in-secs \{ grid-column:2;/); assert.match(cli, /\.vm-inicio \.in-pim img, \.vm-inicio \.in-foto img \{ width:82%; height:82%; \}/);
   assert.match(pedido, /\.pf-av img \{ width:82%; height:82%; max-width:none; max-height:none; \}/);
+});
+
+test("tanda 2 (inicio y diseño general): atajos sin recorte, contenedor único, menú ordenado, título sin repetir, favoritos legibles, «Hacer pedido» arriba, sin parpadeo", () => {
+  const cli = leer("./cliente.html");
+  assert.match(cli, /\.quick button \{ flex:0 1 auto; min-width:0; max-width:100%; white-space:normal;/); assert.match(cli, /@media \(max-width:420px\) \{ \.quick button \{ flex:1 1 0;/);   // 1
+  assert.match(cli, /#chat \{ width:100%; max-width:calc\(var\(--ancho\) \+ 2 \* var\(--gutter\)\);[^}]*padding-bottom:calc\(var\(--s8\) \+ var\(--s2\)\);[^}]*scrollbar-width:thin;/); assert.match(cli, /mask-image:linear-gradient\(to bottom, #000 calc\(100% - 28px\), transparent\)/); // 2, 3, 9
+  assert.match(cli, /:root \{ --ancho:720px; \}/); // 3
+  assert.match(cli, /\.mpop \{ min-width:240px; \}/); assert.match(cli, /\.bar \.mpop #salir \{ margin-top:var\(--s1\); border-top:\.5px solid var\(--line\)/); assert.doesNotMatch(cli, /id="menu-letra"/); // 4 y 9 (letra solo en «Aa»)
+  assert.match(cli, /\.titulo-grande \{ font-size:calc\(clamp\(24px, 7\.4vw, 34px\) \/ var\(--k,1\)\); \}/); assert.match(cli, /\.titulo-sub \{ display:none; \}/); // 5
+  assert.match(cli, /\.vm-inicio \.in-pn \{ -webkit-line-clamp:3;/); assert.match(cli, /\.vm-inicio \.in-mas \{ position:static; width:44px; height:44px;/); assert.match(cli, /class", "in-vertodos"|"in-vertodos"/); assert.match(cli, /@media \(max-width:599px\) \{ \.vm-inicio \.in-hscroll \{ -webkit-mask-image/); // 6
+  assert.match(cli, /c\.insertBefore\(hacer, principal\)/); assert.match(cli, /Pedido recurrente: se guarda y tú lo revisas antes de enviar/); // 7
+  assert.match(cli, /html\.cargando body \{ visibility:hidden; \}/); assert.match(pedido, /html\.cargando body \{ visibility:hidden; \}/); assert.match(cli, /<img data-logo width="420" height="186"/); // 8
+  assert.match(cli, /function ajustaCuenta\(\)/); assert.match(cli, /\.letra button:disabled \{ opacity:1; color:var\(--text-2\);/); assert.match(cli, /class", "in-mas-lineas"|"in-mas-lineas"/); // 9
+  assert.match(pedido, /\[#&\]tab=hab/);
 });

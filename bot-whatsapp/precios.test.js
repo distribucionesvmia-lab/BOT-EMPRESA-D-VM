@@ -191,7 +191,7 @@ test("LETRA: nivel elegido 100/115/130 % con A− / A+ y «Automático» (tope +
   }
   assert.match(ped, /window\.vmLetra\.control\(\$\("letraBox"\), "boton"\)/); // en la cabecera: un solo botón «Aa» que abre el panelito
   assert.match(ped, /\.letra \.letra-bt \{[^}]*min-height:48px/); assert.match(ped, /\.letra-pop button \{[^}]*min-height:52px/);
-  assert.match(cli, /window\.vmLetra\.control\(\$\("menu-letra"\)\)/);
+  assert.match(cli, /window\.vmLetra\.control\(\$\("letraChat"\), "boton"\)/); assert.doesNotMatch(cli, /id="menu-letra"/); // el control de letra está solo en el botón «Aa» (ya no se repite en el menú ⋯)
   assert.match(ped, /\.letra button \{ min-width:48px; min-height:48px;/);
   assert.match(ped, /\.tl \.hstep \{[^}]*height:52px/); // −, cantidad y + del carrito: 48 reales dentro del borde
   assert.match(ped, /\.screen \.head button \{ width:48px; height:48px; \}/); // también en apaisado

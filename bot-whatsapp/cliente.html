@@ -88,6 +88,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="/icono-192.png">
 <meta name="color-scheme" content="light dark">
+<script>document.documentElement.classList.add("cargando");setTimeout(function(){document.documentElement.classList.remove("cargando")},2500);document.addEventListener("DOMContentLoaded",function(){document.documentElement.classList.remove("cargando")})</script>
 <script>try{var t=localStorage.getItem("vm:tema");if(t==="claro"||t==="oscuro")document.documentElement.setAttribute("data-tema",t)}catch(e){}</script>
 <title>Pedidos · Distribuciones VM</title>
 <style>
@@ -509,6 +510,48 @@
   @media (min-width:768px) { /* tablet y ordenador: las fotos llenan su baldosa (las pequeñas se amplían) */
     .vm-inicio .in-pim img, .vm-inicio .in-foto img { width:82%; height:82%; }
   }
+
+  /* ═══ Tanda 2: pantalla de inicio y diseño general ═══ */
+  html.cargando body { visibility:hidden; } html.cargando { background:var(--bg); } /* sin «parpadeo» de página sin estilos al recargar */
+  :root { --ancho:720px; }
+  @media (min-width:1024px) { :root { --ancho:1240px; } }
+  /* un único contenedor centrado para cabecera, contenido, atajos y caja de mensaje; la barra de scroll queda junto al contenido */
+  #chat { width:100%; max-width:calc(var(--ancho) + 2 * var(--gutter)); margin-left:auto; margin-right:auto; padding-left:var(--gutter); padding-right:var(--gutter); padding-bottom:calc(var(--s8) + var(--s2)); scrollbar-width:thin; scroll-padding-bottom:var(--s8);
+    -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 28px), transparent); mask-image:linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
+  .titulo-grande { font-size:calc(clamp(24px, 7.4vw, 34px) / var(--k,1)); }
+  .titulo-sub { display:none; } /* el nombre ya sale en el saludo: no se repite */
+  /* Atajos: dos botones que se reparten el ancho sin recortar la etiqueta (si hace falta, pasa a dos líneas) */
+  .quick { gap:var(--s2); }
+  .quick button { flex:0 1 auto; min-width:0; max-width:100%; white-space:normal; padding-top:var(--s1); padding-bottom:var(--s1); }
+  .quick .q-tx b { white-space:normal; overflow-wrap:anywhere; line-height:1.15; }
+  @media (max-width:420px) { .quick button { flex:1 1 0; justify-content:flex-start; padding-left:var(--s2); padding-right:var(--s3); } }
+  /* Menú ⋯ más ancho, sin textos partidos y con «Salir» aparte */
+  .mpop { min-width:240px; }
+  .bar .mpop button { white-space:nowrap; }
+  .bar .mpop #salir { margin-top:var(--s1); border-top:.5px solid var(--line); color:var(--text-2); font-weight:400; }
+  .bar .mpop #salir::before { display:none; }
+  /* «Mi cuenta» con texto siempre que quepa (solo icono si no cabe; lo decide ajustaCuenta) */
+  @media (max-width:439px) { .bar .cuenta:not(.solo-icono) { width:auto; padding:0 var(--s4) 0 var(--s3); justify-content:flex-start; } .bar .cuenta:not(.solo-icono) span { display:inline; } }
+  .bar .cuenta.solo-icono { width:44px; padding:0; justify-content:center; } .bar .cuenta.solo-icono span { display:none; }
+  /* Letra: A− / A+ desactivados siguen leyéndose */
+  .letra button:disabled { opacity:1; color:var(--text-2); background:var(--fill); border-color:transparent; }
+  /* Inicio */
+  .vm-inicio > .in-hacer { grid-column:1; }
+  .vm-inicio .in-sec-cab { display:flex; align-items:baseline; justify-content:space-between; gap:var(--s3); }
+  .vm-inicio .in-sec-cab h3 { margin:0 0 var(--s2); }
+  .vm-inicio .in-vertodos { min-height:44px; display:inline-flex; align-items:center; color:var(--accent); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; text-decoration:none; }
+  .vm-inicio .in-pn { -webkit-line-clamp:3; min-height:calc(3 * 1.2em); }
+  .vm-inicio .in-pie { display:flex; align-items:center; justify-content:space-between; gap:var(--s2); }
+  .vm-inicio .in-pie small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .vm-inicio .in-mas { position:static; width:44px; height:44px; flex:none; }
+  .vm-inicio .in-mas svg { width:22px; height:22px; }
+  .vm-inicio .in-rec { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; height:auto; padding-top:var(--s2); padding-bottom:var(--s2); }
+  .vm-inicio .in-rec-t { font-weight:600; } .vm-inicio .in-rec-s { font-size:calc(var(--t-cap) / var(--k,1)); font-weight:400; line-height:1.25; text-align:center; opacity:.85; }
+  .vm-inicio ul.lineas[hidden] { display:none; }
+  .vm-inicio .in-mas-lineas { align-self:flex-start; min-height:44px; padding:0; border:0; background:none; color:var(--accent); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; }
+  @media (max-width:599px) { .vm-inicio .in-hscroll { -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image:linear-gradient(to right, #000 calc(100% - 40px), transparent); } } /* el borde difuminado avisa de que hay más tarjetas */
+  @media (min-width:600px) { .mrow:has(.vm-inicio) { max-width:none; width:100%; } #chat .mrow .vm-inicio, .vm-inicio { max-width:none; } .vm-inicio .in-hscroll { flex-wrap:wrap; overflow:visible; margin:0; padding:0; } .vm-inicio .in-prod { width:176px; } .vm-inicio .in-hacer { max-width:none; } }
+  @media (min-width:1024px) { .vm-inicio .in-hacer { max-width:360px; } }
 </style>
 </head>
 <body>
@@ -517,7 +560,7 @@
   <section id="acceso" hidden>
     <div class="vm">
       <header class="hero">
-        <span class="ds-logo grande"><img data-logo alt="Distribuciones Valentín"></span>
+        <span class="ds-logo grande"><img data-logo width="420" height="186" alt="Distribuciones Valentín"></span>
         <h1>Bienvenido</h1>
         <p>Haz tu pedido en un momento, desde el móvil o el ordenador.</p>
       </header>
@@ -565,7 +608,7 @@
   <section id="registro" hidden>
     <div class="vm">
       <header class="hero">
-        <span class="ds-logo grande"><img data-logo alt="Distribuciones Valentín"></span>
+        <span class="ds-logo grande"><img data-logo width="420" height="186" alt="Distribuciones Valentín"></span>
         <h1>Hazte cliente</h1>
       </header>
       <form class="vm-card" id="f-registro" autocomplete="off">
@@ -596,7 +639,7 @@
       <div class="bar-acciones">
         <button type="button" id="micuenta" class="ds-circ cuenta" aria-haspopup="dialog" aria-label="Mi cuenta: mis datos y mis pedidos"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Mi cuenta</span></button>
         <div id="letraChat"></div>
-        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar">Cambiar contraseña</button><button type="button" id="mispedidos">Mis pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><div class="letra-titulo">Tamaño de letra</div><div id="menu-letra"></div><button type="button" id="salir">Salir</button></div></div>
+        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar">Cambiar contraseña</button><button type="button" id="mispedidos">Mis pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><button type="button" id="salir">Salir</button></div></div>
       </div>
     </div>
     <div class="titulo-bloque"><h1 class="titulo-grande">Asistente de pedidos</h1><p class="titulo-sub"><i class="dot"></i><span id="cli">Cliente</span></p></div>
@@ -984,16 +1027,22 @@ function inicio(ui) {
     const m = /(?:^|[#&])c=([^&]*)/.exec(ui.last.repetir || ""); for (const par of (m ? m[1].split(",") : []).slice(0, 4)) { const i = par.lastIndexOf("."); if (i > 0) ids.push(decodeURIComponent(par.slice(0, i))); }
     principal.append(el("small", "in-peq", "Tu pedido de siempre · " + ui.last.date));
     const fotos = el("div", "in-fotos"); fotos.setAttribute("aria-hidden", "true"); principal.appendChild(fotos);
-    const lin = el("ul", "lineas"); for (const l of ui.last.lineas) lin.appendChild(el("li", null, l)); if (ui.last.mas) lin.appendChild(el("li", null, "… y " + ui.last.mas + " más")); principal.appendChild(lin);
+    const lin = el("ul", "lineas"), todas = ui.last.lineas, resto = todas.slice(5), extra = el("ul", "lineas lineas-resto"), nResto = resto.length + (ui.last.mas || 0);
+    for (const l of todas.slice(0, 5)) lin.appendChild(el("li", null, l)); for (const l of resto) extra.appendChild(el("li", null, l)); extra.hidden = true; principal.appendChild(lin);
+    if (nResto > 0) { // «… y 3 más» se despliega con un toque
+      principal.appendChild(extra);
+      const mas = el("button", "in-mas-lineas", "… y " + nResto + " más"); mas.type = "button"; mas.setAttribute("aria-expanded", "false");
+      mas.onclick = () => { const ab = extra.hidden; extra.hidden = !ab; mas.setAttribute("aria-expanded", String(ab)); mas.textContent = ab ? "Ver menos" : "… y " + nResto + " más"; }; principal.appendChild(mas);
+    }
     principal.appendChild(el("p", "in-total", `${ui.last.articulos} artículo${ui.last.articulos === 1 ? "" : "s"} · ${eur(ui.last.total)} con IVA`));
     const rep = el("button", "vm-btn primary", "Repetir y revisar"); rep.type = "button"; rep.onclick = () => { location.href = ui.url + "#" + ui.last.repetir; }; // carga con los precios de hoy y abre «Pedido»; nunca se envía solo
     const dia = diaSemanaDe(ui.last.fecha);
-    const sem = el("button", "vm-btn ghost", dia ? "Repetir cada " + dia : "Repetir cada semana"); sem.type = "button"; sem.onclick = () => { location.href = ui.url + "#" + ui.last.repetir + "&f=1"; };
+    const sem = el("button", "vm-btn ghost in-rec"); sem.append(el("span", "in-rec-t", dia ? "Repetir cada " + dia : "Repetir cada semana"), el("small", "in-rec-s", "Pedido recurrente: se guarda y tú lo revisas antes de enviar")); sem.type = "button"; sem.onclick = () => { location.href = ui.url + "#" + ui.last.repetir + "&f=1"; };
     principal.append(rep, sem);
   } else {
     principal.classList.add("vacio"); principal.append(el("h3", null, "Empieza tu primer pedido"), el("p", null, "Elige lo que necesitas del catálogo y te lo llevamos."), hacer);
   }
-  if (ui.last?.lineas?.length) secciones.appendChild(hacer);
+  if (ui.last?.lineas?.length) c.insertBefore(hacer, principal); // «Hacer pedido» arriba del todo: lo primero que se alcanza (antes estaba tras la tarjeta del pedido anterior)
   // Datos que completan la pantalla
   fetch("/catalogo/aviso").then((r) => (r.ok ? r.json() : null)).then((j) => { if (j?.entregaHoy) hoy.hidden = false; }).catch(() => {});
   fetch("/api/inicio?ids=" + encodeURIComponent(ids.join(","))).then((r) => (r.ok ? r.json() : null)).then((j) => {
@@ -1002,11 +1051,12 @@ function inicio(ui) {
     const fotos = principal.querySelector(".in-fotos");
     if (fotos) for (const id of ids) { const t = el("span", "in-foto"); const f = j.fotos?.[id]; if (f) { const im = document.createElement("img"); im.src = f; im.alt = ""; im.loading = "lazy"; im.onerror = () => im.remove(); t.appendChild(im); } else t.textContent = "·"; fotos.appendChild(t); }
     const tarjeta = (p, etiqueta) => {
-      const t = el("a", "in-prod"); t.href = cat + "#c=" + encodeURIComponent(p.id) + ".1&a=1"; t.setAttribute("aria-label", `${p.name}${etiqueta ? ", " + etiqueta : ""}, ${eur(p.price)} la unidad. Añadir al pedido`);
+      const t = el("a", "in-prod"); t.href = cat + "#c=" + encodeURIComponent(p.id) + ".1&a=1"; t.title = p.name; t.setAttribute("aria-label", `${p.name}${etiqueta ? ", " + etiqueta : ""}, ${eur(p.price)} la unidad. Añadir al pedido`);
       const im = el("span", "in-pim"); if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.onerror = () => i.remove(); im.appendChild(i); } else im.textContent = p.name.slice(0, 2).toUpperCase();
       if (etiqueta) im.appendChild(el("span", "in-oferta", etiqueta));
-      const mas = el("span", "in-mas"); mas.setAttribute("aria-hidden", "true"); mas.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'; im.appendChild(mas);
-      t.append(im, el("b", "in-pn", p.name), el("small", null, eur(p.price) + " /ud")); return t;
+      const mas = el("span", "in-mas"); mas.setAttribute("aria-hidden", "true"); mas.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+      const pie = el("span", "in-pie"); pie.append(el("small", null, eur(p.price) + " /ud"), mas);
+      t.append(im, el("b", "in-pn", p.name), pie); return t;
     };
     if (j.ofertas?.length) { // ofertas vigentes que le cambian el precio (la empresa las pone desde el panel)
       const sec = el("section", "in-sec"); sec.setAttribute("aria-label", "Ofertas"); sec.appendChild(el("h3", null, "Ofertas"));
@@ -1017,14 +1067,11 @@ function inicio(ui) {
     const lista = j.tieneHistorial ? j.habituales : j.loMasPedido;
     if (lista?.length) {
       const sec = el("section", "in-sec"); sec.setAttribute("aria-label", j.tieneHistorial ? "Lo que sueles pedir" : "Lo más pedido");
-      sec.appendChild(el("h3", null, j.tieneHistorial ? "Lo que sueles pedir" : "Lo más pedido"));
+      const cab = el("div", "in-sec-cab"); cab.appendChild(el("h3", null, j.tieneHistorial ? "Lo que sueles pedir" : "Lo más pedido"));
+      if (j.tieneHistorial) { const todos = el("a", "in-vertodos", "Ver todos"); todos.href = cat + "#tab=hab"; todos.setAttribute("aria-label", "Ver todo lo que sueles pedir"); cab.appendChild(todos); }
+      sec.appendChild(cab);
       const fila = el("div", "in-hscroll");
-      for (const p of lista) {
-        const t = el("a", "in-prod"); t.href = cat + "#c=" + encodeURIComponent(p.id) + ".1&a=1"; t.setAttribute("aria-label", `${p.name}, ${eur(p.price)} la unidad. Añadir al pedido`);
-        const im = el("span", "in-pim"); if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.onerror = () => i.remove(); im.appendChild(i); } else im.textContent = p.name.slice(0, 2).toUpperCase();
-        const mas = el("span", "in-mas"); mas.setAttribute("aria-hidden", "true"); mas.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'; im.appendChild(mas);
-        t.append(im, el("b", "in-pn", p.name), el("small", null, eur(p.price) + " /ud")); fila.appendChild(t);
-      }
+      for (const p of lista) fila.appendChild(tarjeta(p, ""));
       sec.appendChild(fila); secciones.appendChild(sec);
     }
     if (j.ayuda && (j.ayuda.tel || j.ayuda.horario || j.ayuda.whatsappHref)) { // tarjeta comercial: solo con teléfono u horario configurados
@@ -1121,7 +1168,6 @@ function abrirAyuda(a, nombre) {
 }
 let AYUDA = null; fetch("/api/ayuda").then((r) => r.json()).then((j) => { AYUDA = j.ayuda; }).catch(() => {});
 $("ayuda-menu").onclick = () => { menu(false); abrirAyuda(AYUDA, $("hola")?.textContent || ""); };
-window.vmLetra.control($("menu-letra")); // «Tamaño de letra» en el menú ⋮
 window.vmLetra.control($("letraChat"), "boton"); // botón circular «Aa» en la cabecera: abre el control de letra directamente
 { // título grande → título pequeño centrado en la barra translúcida al bajar por la conversación (con histéresis para que no parpadee)
   const ch = $("chat"), ph = $("chatbox");
@@ -1134,6 +1180,12 @@ mbtn.onclick = (e) => { e.stopPropagation(); menu(mpop.hidden); };
 document.addEventListener("click", () => menu(false)); document.addEventListener("keydown", (e) => { if (e.key === "Escape") menu(false); });
 document.querySelectorAll("#quick button").forEach((b) => (b.onclick = () => enviar(b.dataset.q, b.querySelector("b")?.textContent ?? b.textContent)));
 $("f").onsubmit = (e) => { e.preventDefault(); const v = $("t").value.trim(); if (v) { $("t").value = ""; enviar(v); } };
+// «Mi cuenta» con texto si cabe; si con la letra grande o una pantalla estrecha no cabe, solo el icono
+function ajustaCuenta() {
+  const b = $("micuenta"), bar = b && b.closest(".bar"); if (!bar || !bar.offsetWidth) return;
+  b.classList.remove("solo-icono"); if (bar.scrollWidth > bar.clientWidth + 1) b.classList.add("solo-icono");
+}
+try { const bar = document.querySelector("#chatbox .bar"); if (bar) { new ResizeObserver(ajustaCuenta).observe(bar); new MutationObserver(ajustaCuenta).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] }); } } catch {}
 function entrar(nombre) { $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
 
 (async () => {
