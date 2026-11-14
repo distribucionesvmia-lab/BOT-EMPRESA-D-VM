@@ -412,6 +412,15 @@
   .vm-inicio .in-pim img.cargada, .vm-inicio .in-foto img.cargada { opacity:1; }
   .vm-inicio .in-pim:has(img.cargada), .vm-inicio .in-foto:has(img.cargada) { color:transparent; }
   @media (prefers-reduced-motion: reduce) { .vm-inicio .in-pim img, .vm-inicio .in-foto img { transition:none; } }
+
+  /* Estados vacíos y de error */
+  .estado { display:flex; flex-direction:column; align-items:center; text-align:center; gap:var(--s2); padding:var(--s8) var(--s5); }
+  .estado svg { width:48px; height:48px; color:var(--text-2); margin-bottom:var(--s2); }
+  .estado h3 { margin:0; font-size:calc(var(--t-md) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; color:var(--text); }
+  .estado p { margin:0; font-size:calc(var(--t-sec) / var(--k,1)); line-height:1.4; color:var(--text-2); }
+  .estado-bt { margin-top:var(--s4); min-height:50px; padding:0 var(--s8); border:0; border-radius:var(--r-pill); background:var(--accent); color:var(--on-accent); font:inherit; font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; cursor:pointer; transition:transform var(--t-press) var(--ease); }
+  .estado-bt:active { transform:scale(.97); }
+  @media (prefers-reduced-motion: reduce) { .estado-bt { transition:none; } .estado-bt:active { transform:none; } }
 </style>
 </head>
 <body>
@@ -687,7 +696,7 @@ async function pintarAvisos(box) {
 async function abrirCuenta(irAPedidos) {
   menu(false); const B = $("cu-cuerpo"); B.textContent = "Un momento…"; $("m-cuenta").hidden = false;
   const j = await fetch("/api/mi-cuenta").then((r) => (r.ok ? r.json() : null)).catch(() => null); B.innerHTML = "";
-  if (!j) { B.textContent = "No hemos podido cargar tu cuenta. Inténtalo de nuevo en un momento."; return; }
+  if (!j) { B.replaceChildren(estadoVacio({ icono: "nube", titulo: "No se ha podido cargar", texto: "No hemos podido cargar tu cuenta. Comprueba tu conexión e inténtalo de nuevo.", boton: "Reintentar", onclick: () => abrirCuenta(irAPedidos) })); return; }
   // Mis datos
   B.appendChild(nodo("h3", "Mis datos", "cu-tit"));
   const dl = nodo("dl", null, "cu-datos"), fila = (k, v) => { if (!v) return; dl.append(nodo("dt", k), nodo("dd", v)); };
@@ -701,7 +710,7 @@ async function abrirCuenta(irAPedidos) {
   const avisosCaja = nodo("div"); B.appendChild(avisosCaja); pintarAvisos(avisosCaja).catch(() => { avisosCaja.textContent = ""; });
   // Mis pedidos, por meses
   const tp = nodo("h3", "Mis pedidos", "cu-tit"); tp.id = "cu-pedidos"; B.appendChild(tp);
-  if (!j.pedidos.length) B.appendChild(nodo("p", "Todavía no tienes pedidos. Cuando hagas uno, aparecerá aquí para repetirlo cuando quieras.")); 
+  if (!j.pedidos.length) B.appendChild(estadoVacio({ icono: "reloj", titulo: "Aún no tienes pedidos", texto: "Cuando hagas uno, aparecerá aquí para repetirlo cuando quieras.", boton: "Hacer pedido", onclick: () => { $("m-cuenta").hidden = true; enviar("h:open", "Hacer pedido"); } })); 
   let mesActual = "";
   for (const o of j.pedidos) {
     const mes = String(o.fecha).slice(0, 7);
@@ -732,7 +741,7 @@ const DIAS_CORTO = { 1: "lunes", 2: "martes", 3: "miércoles", 4: "jueves", 5: "
 async function pintarFijo() {
   const B = $("f-cuerpo"); B.textContent = "Un momento…";
   const j = await fetch("/api/pedido-fijo").then((r) => (r.ok ? r.json() : null)).catch(() => null); B.innerHTML = "";
-  if (!j?.fijo) { B.textContent = "Todavía no tienes un pedido fijo. Haz un pedido y, en el carrito, elige «Repetir cada semana»."; return; }
+  if (!j?.fijo) { B.replaceChildren(estadoVacio({ icono: "repetir", titulo: "Aún no tienes pedido fijo", texto: "Haz un pedido y, en la pantalla de Pedido, elige «Repetir cada semana».", boton: "Hacer pedido", onclick: () => { $("m-fijo").hidden = true; enviar("h:open", "Hacer pedido"); } })); return; }
   const f = j.fijo, p = document.createElement("p"); p.innerHTML = ""; p.textContent = `Se repite los ${f.dias.map((d) => DIAS_CORTO[d]).join(", ")}${f.pausado ? " (en pausa)" : ""}.`; B.appendChild(p);
   const ul = document.createElement("ul"); for (const l of f.lineas) { const li = document.createElement("li"); li.textContent = `${l.qty} ${l.unit === "caja" ? (l.qty === 1 ? "caja" : "cajas") : "ud"} · ${l.nombre}`; ul.appendChild(li); } B.appendChild(ul);
   if (f.faltan) { const w = document.createElement("p"); w.textContent = `${f.faltan} artículo${f.faltan === 1 ? "" : "s"} ya no está${f.faltan === 1 ? "" : "n"} disponible${f.faltan === 1 ? "" : "s"}.`; B.appendChild(w); }
@@ -800,6 +809,31 @@ function tarjetaTabla(card) {
   card.filas.forEach((f) => { const r = tb.insertRow(); [[f.cant, "c-cant"], [f.nombre, ""], [eur(f.importe), "c-imp"]].forEach(([x, k]) => { const td = r.insertCell(); td.textContent = x; if (k) td.className = k; }); });
   const ft = t.createTFoot().insertRow(); const a = ft.insertCell(); a.colSpan = 2; a.textContent = card.conIva ? "Total con IVA" : "Total"; const b = ft.insertCell(); b.className = "c-imp"; b.textContent = eur(card.total);
   c.append(h, t); chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
+}
+// ── Estados vacíos y de error: icono de línea de 48 px, título, una frase y UN botón ──
+const ICONOS_ESTADO = { reloj: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', nube: '<path d="M7 18a4 4 0 0 1-.5-7.970A5.500 5.500 0 0 1 17 8.500a4.500 4.500 0 0 1 .5 9.500zM4 4l16 16"/>', repetir: '<path d="M4 12a8 8 0 0 1 14-5.300L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.300L4 15M4 20v-5h5"/>' };
+function estadoVacio({ icono = "reloj", titulo, texto, boton, onclick }) {
+  const d = document.createElement("div"); d.className = "estado";
+  d.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.700" stroke-linecap="round" stroke-linejoin="round">${ICONOS_ESTADO[icono] || ICONOS_ESTADO.reloj}</svg>`;
+  const h = document.createElement("h3"); h.textContent = titulo; const p = document.createElement("p"); p.textContent = texto; d.append(h, p);
+  if (boton) { const b = document.createElement("button"); b.type = "button"; b.className = "estado-bt"; b.textContent = boton; b.onclick = onclick; d.appendChild(b); }
+  return d;
+}
+// Paneles que bajan: el dedo los arrastra 1:1, se pueden volver a coger a mitad de camino y se cierran con 90 px o un gesto rápido
+function arrastrable(caja, cerrar) {
+  if (!caja || caja.dataset.arr) return; caja.dataset.arr = "1";
+  const sinMov = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let y0 = null, ty = 0, t0 = 0;
+  const actual = () => { const m = /matrix\(.*, (-?[\d.]+)\)$/.exec(getComputedStyle(caja).transform); return m ? Number(m[1]) : 0; };
+  caja.style.touchAction = "pan-x";
+  caja.addEventListener("pointerdown", (e) => { if (e.pointerType === "mouse" || e.target.closest("input, textarea, select, a, button")) return; ty = actual(); caja.style.transition = "none"; caja.style.transform = `translateY(${ty}px)`; y0 = e.clientY - ty; t0 = e.timeStamp; try { caja.setPointerCapture(e.pointerId); } catch {} });
+  caja.addEventListener("pointermove", (e) => { if (y0 == null) return; ty = Math.max(0, e.clientY - y0); caja.style.transform = `translateY(${ty}px)`; });
+  const suelta = (e) => {
+    if (y0 == null) return; const v = (e.clientY - y0) / Math.max(1, e.timeStamp - t0); y0 = null;
+    caja.style.transition = sinMov() ? "none" : "transform 250ms cubic-bezier(.2,.8,.2,1)";
+    if (ty > 90 || (v > 0.6 && ty > 20)) { caja.style.transform = "translateY(110%)"; setTimeout(() => { cerrar(); caja.style.transition = "none"; caja.style.transform = ""; }, sinMov() ? 0 : 250); } else caja.style.transform = "";
+  };
+  caja.addEventListener("pointerup", suelta); caja.addEventListener("pointercancel", suelta);
 }
 // ── Inicio: saludo, aviso de «hoy», tu pedido de siempre, lo que sueles pedir, ayuda y categorías ──
 const DIAS_LARGO = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -936,7 +970,7 @@ function abrirAyuda(a, nombre) {
   if (a.horario) { const p = document.createElement("p"); p.textContent = "" + a.horario; c.appendChild(p); }
   const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Cerrar";
   const cerrar = () => { f.remove(); document.removeEventListener("keydown", esc); }; const esc = (e) => { if (e.key === "Escape") cerrar(); };
-  x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
+  arrastrable(c, cerrar); x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
   c.appendChild(x); f.appendChild(c); document.body.appendChild(f); (c.querySelector("a") || x).focus();
 }
 let AYUDA = null; fetch("/api/ayuda").then((r) => r.json()).then((j) => { AYUDA = j.ayuda; if (AYUDA) $("ayuda-menu").hidden = false; }).catch(() => {});

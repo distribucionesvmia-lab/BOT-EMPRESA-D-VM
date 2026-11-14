@@ -95,3 +95,10 @@ test("fotos y estados: baldosa con foto al 82 % sin agrandar, fundido de 200 ms,
   assert.match(pedido, /navigator\.vibrate\(8\)/); assert.match(pedido, /sinMovimiento\(\)/); // vibración suave, nunca con «reducir movimiento»
   assert.match(pedido, /@keyframes pulso \{ 0% \{ transform:scale\(1\); \} 50% \{ transform:scale\(1\.15\)/);
 });
+
+test("chat: Mi cuenta y Mi pedido fijo usan estados con un solo botón; la hoja de Ayuda se arrastra", () => {
+  const cli = leer("./cliente.html");
+  for (const t of ["Aún no tienes pedidos", "No se ha podido cargar", "Aún no tienes pedido fijo"]) assert.ok(cli.includes(t), t);
+  assert.match(cli, /boton: "Reintentar", onclick: \(\) => abrirCuenta\(irAPedidos\)/);
+  assert.match(cli, /arrastrable\(c, cerrar\)/); assert.match(cli, /\.estado svg \{ width:48px; height:48px/);
+});
