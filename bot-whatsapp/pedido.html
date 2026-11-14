@@ -906,6 +906,8 @@
   #diaInfo:empty { display:none; }
   .carga-fallo { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:var(--s3); padding:var(--s3); border-radius:var(--r-field); background:var(--fill); color:var(--text); font-size:calc(var(--t-sec) / var(--k,1)); }
   .carga-fallo button { min-height:44px; padding:0 var(--s4); background:var(--surface); color:var(--accent); border:0; border-radius:var(--r-pill); font:inherit; font-weight:600; }
+  .sin-sug { padding:0 var(--gutter) var(--s5); display:flex; flex-direction:column; gap:var(--s2); }
+  .sin-sug .sin-sec { min-height:44px; text-align:left; }
   .pf-ultima { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); line-height:1.25; }
   .aviso.abierto { border-radius:var(--r-card); display:flex; flex-direction:column; gap:var(--s2); align-items:flex-start; }
   .aviso.abierto[hidden], .dia-aviso[hidden] { display:none; }
@@ -1954,6 +1956,24 @@ function buscarOrden(raw) {
   res.sort((a, b) => b[1] - a[1] || cmpNombre(a[0], b[0]));
   return new Map(res.map(([p, v]) => [p.id, v]));
 }
+/** «Sin resultados» útil: los 3 artículos más parecidos (distancia de edición ≤ 2 palabra a palabra) y las categorías/subcategorías con nombre parecido. */
+function parecidosBusqueda(raw) {
+  const qt = tokensB(raw).map(stemB).filter(w => w.length >= 3); if (!qt.length) return { articulos: [], secciones: [] };
+  const cerca = (a, b) => (a.length >= 4 && b.length >= 4 ? dist(a, b) <= 2 || (Math.min(a.length, b.length) >= 5 && (a.startsWith(b) || b.startsWith(a))) : dist(a, b) <= 1);
+  const articulos = [];
+  for (const e of indiceBusqueda()) {
+    let total = 0, aciertos = 0;
+    for (const w of qt) { let mejor = 9; for (const t of e.t) { const d = dist(w, t); if (d < mejor && cerca(w, t)) mejor = d; } if (mejor < 9) { aciertos++; total += mejor; } }
+    if (aciertos && aciertos * 2 >= qt.length) articulos.push([e.p, total - aciertos * 3 - (e.p.count > 0 ? 1 : 0)]);
+  }
+  articulos.sort((x, y) => x[1] - y[1] || cmpNombre(x[0], y[0]));
+  const secciones = [];
+  for (const c of data.tree || []) {
+    const pr = (n, cat, sub) => { const ts = tokensB(n).map(stemB); if (qt.some(w => w.length >= 4 && ts.some(t => t.length >= 4 && cerca(w, t)))) secciones.push({ cat, sub, nombre: n }); };
+    pr(c.nombre, c.id, "*"); for (const sb of c.subs || []) pr(sb.nombre, c.id, sb.id);
+  }
+  return { articulos: articulos.slice(0, 3).map(x => x[0]), secciones: secciones.slice(0, 3) };
+}
 // ── Búsqueda: filtros por marca (la subcategoría de la tarifa) y por formato (sacado del nombre: 33 cl, 1,5 l, 500 gr…) ──
 const FORMATO_RE = /(\d+(?:[.,]\d+)?)\s?(cl|ml|lt|l|kg|gr|g)\b/i;
 function formatoDe(p) {
@@ -2099,7 +2119,17 @@ function renderList() {
       if (data.ayuda) { extra = document.createElement("button"); extra.type = "button"; extra.className = "estado-lnk"; extra.textContent = "¿No lo encuentras? Habla con una persona"; extra.onclick = () => abrirAyuda(data.ayuda, data.customer.name); }
       d = estadoVacio({ icono: "buscar", titulo: "Sin resultados", texto: `No hemos encontrado «${query.trim()}». Prueba con menos palabras o revisa cómo está escrito. Si no lo ves, puede que no lo tengamos: pregunta a tu comercial.`, boton: "Borrar la búsqueda", onclick: () => { $("q").value = ""; query = ""; renderList(); $("q").focus(); }, extra });
     } else d = estadoVacio({ icono: "caja", titulo: "Aquí no hay artículos", texto: "Esta sección está vacía ahora mismo.", boton: "Volver al catálogo", onclick: () => irA(null, null) });
-    list.appendChild(d); return;
+    list.appendChild(d);
+    if (q && !filtra) { // «Sin resultados» útil: lo más parecido y las secciones con nombre parecido (el enlace a hablar con una persona se queda)
+      const pb = parecidosBusqueda(query.trim());
+      if (pb.secciones.length || pb.articulos.length) {
+        const caja = document.createElement("section"); caja.className = "sin-sug"; caja.setAttribute("aria-label", "Quizá buscabas");
+        for (const s of pb.secciones) { const b = document.createElement("button"); b.type = "button"; b.className = "estado-lnk sin-sec"; b.textContent = `¿Buscabas ${s.nombre}?`; b.onclick = () => { $("q").value = ""; query = ""; if (tab !== "all") cambiarTab("all"); irA(s.cat, s.sub); }; caja.appendChild(b); }
+        if (pb.articulos.length) { const h = document.createElement("h3"); h.className = "grp-tit"; h.textContent = "Lo más parecido"; caja.appendChild(h); for (const p of pb.articulos) caja.appendChild(row(p)); }
+        list.appendChild(caja); entrada(list, ".pf");
+      }
+    }
+    return;
   }
   if (tab === "hab" && !q) items = [...items.filter(p => favs.has(p.id)), ...items.filter(p => !favs.has(p.id))]; // los favoritos van primero
   else if (arbol && ordenCat === "nombre") items = items.slice().sort(cmpNombre);
