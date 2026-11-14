@@ -155,3 +155,10 @@ test("sustitutos: al repetir o añadir un pedido con artículos retirados se ofr
   const srv = leer("./server.js"); assert.match(srv, /retirados: retiradosDe\(customer\)/); assert.match(srv, /function retiradosDe\(customer\)/);
   assert.doesNotMatch(srv.slice(srv.indexOf("function retiradosDe"), srv.indexOf("function retiradosDe") + 900), /nif/i); // solo ids y nombres de artículos de SU historial
 });
+
+test("búsqueda por voz: botón de micrófono solo si el navegador sabe, se convierte en «borrar» con texto, y explica los fallos", () => {
+  assert.match(pedido, /window\.SpeechRecognition \|\| window\.webkitSpeechRecognition/); assert.match(pedido, /rec\.lang = "es-ES"/);
+  assert.match(pedido, /else btn\.hidden = true;/); assert.match(pedido, /"Borrar la búsqueda"/);
+  for (const m of ["Permite el micrófono", "No te hemos oído", "Sin conexión: la búsqueda por voz", "No encontramos el micrófono"]) assert.ok(pedido.includes(m), m);
+  assert.match(pedido, /\.vozbtn \{[^}]*width:44px; height:44px/); assert.match(pedido, /prefers-reduced-motion: reduce\) \{ \.vozbtn\.escucha \{ animation:none/);
+});

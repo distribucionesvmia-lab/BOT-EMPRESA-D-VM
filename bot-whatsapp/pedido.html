@@ -1040,6 +1040,17 @@
   .sust-tx small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); font-variant-numeric:tabular-nums; }
   .sust-bt { flex:none; min-height:44px; padding:0 var(--s4); border:0; border-radius:var(--r-pill); background:var(--accent); color:var(--on-accent); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; }
   .sust-bt:disabled { background:var(--fill); color:var(--text-2); }
+
+  /* Botón de voz / borrar dentro del buscador */
+  .buscar input[type="search"]::-webkit-search-cancel-button { -webkit-appearance:none; display:none; }
+  .buscar input { padding-right:calc(var(--s4) + 44px); }
+  .vozbtn { position:absolute; right:calc(max(var(--gutter), calc((100% - 860px) / 2)) + var(--s1)); top:2px; width:44px; height:44px; border:0; border-radius:50%; background:transparent; color:var(--text-2); display:grid; place-items:center; padding:0; cursor:pointer; }
+  .vozbtn svg { width:22px; height:22px; display:block; }
+  .vozbtn[hidden] { display:none; }
+  .vozbtn.escucha { background:var(--accent); color:var(--on-accent); animation:vozpulso 1s ease-in-out infinite; }
+  @keyframes vozpulso { 0%, 100% { transform:scale(1); } 50% { transform:scale(1.1); } }
+  @media (prefers-reduced-motion: reduce) { .vozbtn.escucha { animation:none; } }
+  @media (min-width:1024px) { .vozbtn { right:calc(var(--s6) + var(--s1)); } }
 </style>
 </head>
 <body>
@@ -1056,7 +1067,7 @@
   <div class="titulo-bloque"><h1 class="titulo-grande">Catálogo</h1><p class="titulo-sub" id="ttl">Cargando…</p><small id="sub" hidden></small></div>
   <div class="aviso" id="avisoHoy" role="status" aria-live="polite" hidden>Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
   <div class="guia" id="guia" aria-live="polite">Toca <b>«+»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.</div>
-  <div class="buscar"><svg class="lupa" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.500" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.500 4.500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="q" type="search" placeholder="Buscar en todo el catálogo" autocomplete="off" aria-label="Buscar un producto" aria-controls="sugs" aria-expanded="false"><div id="sugs" class="sugs" role="listbox" aria-label="Sugerencias" hidden></div></div>
+  <div class="buscar"><svg class="lupa" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.500" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.500 4.500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="q" type="search" placeholder="Buscar en todo el catálogo" autocomplete="off" aria-label="Buscar un producto" aria-controls="sugs" aria-expanded="false"><button type="button" class="vozbtn" id="vozBtn" aria-label="Buscar con la voz" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.500 11a6.500 6.500 0 0 0 13 0M12 17.500V21"/></svg></button><div id="sugs" class="sugs" role="listbox" aria-label="Sugerencias" hidden></div></div>
   <!-- Filtro de ida y vuelta, solo en la pestaña «Histórico» (data-t="hab") -->
   <div class="filbar" id="filbar" hidden><button class="fil" id="fil" type="button" aria-pressed="false">☑ Ver solo lo que he marcado</button><span id="filinfo"></span><div id="busqfil" class="busqfil"></div></div>
   <main id="list"></main>
@@ -1899,6 +1910,37 @@ document.addEventListener("keydown", e => {
   if (fila && (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "_")) { e.preventDefault(); const id = fila.dataset.id, q = qty.get(id) || 0; setQty(id, e.key === "+" || e.key === "=" ? q + 1 : q - 1); }
 }, true);
 $("q").addEventListener("input", () => { sugActiva = -1; pintarSugs(); });
+// ── Búsqueda por voz (el reconocimiento lo hace el navegador del móvil; si no puede, el botón de micrófono no sale) ──
+(() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition, btn = $("vozBtn"), q = $("q");
+  const ICO_X = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const ICO_MIC = btn.innerHTML;
+  let rec = null, escuchando = false;
+  const pinta = () => {
+    const hayTexto = !!q.value;
+    if (escuchando) { btn.hidden = false; btn.classList.add("escucha"); btn.setAttribute("aria-pressed", "true"); btn.setAttribute("aria-label", "Dejar de escuchar"); btn.innerHTML = ICO_MIC; return; }
+    btn.classList.remove("escucha"); btn.removeAttribute("aria-pressed");
+    if (hayTexto) { btn.hidden = false; btn.setAttribute("aria-label", "Borrar la búsqueda"); btn.innerHTML = ICO_X; }
+    else if (SR) { btn.hidden = false; btn.setAttribute("aria-label", "Buscar con la voz"); btn.innerHTML = ICO_MIC; }
+    else btn.hidden = true;
+  };
+  const poner = t => { q.value = t; q.dispatchEvent(new Event("input", { bubbles: true })); };
+  btn.onclick = () => {
+    if (escuchando) { try { rec.stop(); } catch {} return; }
+    if (q.value) { poner(""); q.focus(); pinta(); return; }
+    if (!SR) return;
+    try {
+      rec = new SR(); rec.lang = "es-ES"; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+      rec.onstart = () => { escuchando = true; $("anuncio").textContent = "Escuchando. Di el nombre del producto."; pinta(); };
+      rec.onresult = e => { let t = ""; for (const r of e.results) t += r[0].transcript; poner(t.trim()); };
+      rec.onerror = e => { const m = { "not-allowed": "Permite el micrófono en los ajustes del móvil para buscar con la voz.", "service-not-allowed": "Permite el micrófono en los ajustes del móvil para buscar con la voz.", "no-speech": "No te hemos oído. Inténtalo de nuevo.", "network": "Sin conexión: la búsqueda por voz necesita internet.", "audio-capture": "No encontramos el micrófono." }[e.error]; if (m && e.error !== "aborted") aviso(m); };
+      rec.onend = () => { escuchando = false; if (q.value.trim()) anotarBusqueda(q.value); pinta(); };
+      vibra(); rec.start();
+    } catch { escuchando = false; aviso("No se ha podido usar el micrófono."); pinta(); }
+  };
+  q.addEventListener("input", pinta); pinta();
+})();
+
 $("q").addEventListener("focus", pintarSugs);
 $("q").addEventListener("blur", () => setTimeout(() => { $("sugs").hidden = true; $("q").setAttribute("aria-expanded", "false"); }, 150));
 $("q").addEventListener("keydown", e => { if (e.key === "Escape") { $("sugs").hidden = true; } if (e.key === "Enter") { $("sugs").hidden = true; anotarBusqueda($("q").value); $("q").blur(); } });
