@@ -742,6 +742,15 @@ test("INICIO DEL CLIENTE: /api/inicio exige sesión, devuelve solo su catálogo 
   assert.equal(r.json.fotos.NOEXISTE ?? null, null);
   const txt = JSON.stringify(r.json);
   assert.doesNotMatch(txt, /ADMIN|token|nif|NIF/i);
+  // ofertas: solo salen las vigentes que le cambian el precio, con su % y fecha de fin
+  assert.deepEqual(r.json.ofertas, []);
+  const POST = (id, ruta, body) => call("POST", `/api/admin/articulos/${id}/${ruta}`, { admin: true, body });
+  try {
+    assert.equal((await POST("1010", "oferta", { tipo: "pct", valor: "15", hasta: "2099-12-31" })).status, 200);
+    const o = (await call("GET", "/api/inicio", { cookie: A })).json.ofertas;
+    assert.equal(o.length, 1); assert.equal(o[0].id, "1010"); assert.deepEqual(o[0].oferta, { tipo: "pct", valor: 15, hasta: "2099-12-31" }); assert.ok(o[0].price > 0);
+  } finally { await POST("1010", "oferta", { tipo: "ninguna" }); }
+  assert.deepEqual((await call("GET", "/api/inicio", { cookie: A })).json.ofertas, []);
 });
 
 test("PEDIDO FIJO SEMANAL: se guarda la plantilla y los días, se puede pausar y borrar, «toca hoy» solo en sus días y nunca se envía nada solo", async () => {

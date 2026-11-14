@@ -140,3 +140,10 @@ test("direcciones guardadas: lista con «Quitar», casilla para guardar una nuev
   assert.match(pedido, /fetch\("\/api\/direcciones"\)/); assert.match(pedido, /quitar: d\.id/); assert.match(pedido, /\$\("dirGuardar"\)\.checked && dirEntrega\(\)\.length >= 5/);
   assert.match(pedido, /\.dirop \{[^}]*min-height:48px/);
 });
+
+test("Inicio: fila «Ofertas» con la etiqueta de % o € y la fecha de fin, antes de «Lo que sueles pedir»", () => {
+  const cli = leer("./cliente.html");
+  assert.match(cli, /sec\.appendChild\(el\("h3", null, "Ofertas"\)\)/); assert.match(cli, /" · hasta el " \+ o\.hasta/);
+  assert.ok(cli.indexOf('"Ofertas"') < cli.indexOf('"Lo que sueles pedir"'));
+  assert.match(cli, /\.vm-inicio \.in-oferta \{ position:absolute;/);
+});

@@ -534,15 +534,17 @@ async function appRoutes(req, res, url) {
   // Datos de la pantalla de Inicio del cliente: lo que suele pedir, lo más pedido, categorías y fotos de su último pedido (todo de su catálogo; nada de otros clientes)
   if (p === "/api/inicio" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    await refreshCatalog(); // ve ya las ofertas y los precios que la empresa acaba de cambiar
     const customer = clienteConPedidos(account.customerId);
     const todos = webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa);
     const corto = (x) => ({ id: x.id, name: x.name, price: x.price, ...(x.img ? { img: x.img } : {}), ...(x.unitsPerBox ? { unitsPerBox: x.unitsPerBox } : {}) });
     const ids = String(url.searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8);
     const porId = new Map(todos.map((x) => [x.id, x]));
     const habituales = todos.filter((x) => x.count > 0).slice(0, 10).map(corto);
+    const ofertas = todos.filter((x) => x.oferta).slice(0, 10).map((x) => ({ ...corto(x), oferta: { tipo: x.oferta.tipo, valor: x.oferta.valor, ...(x.oferta.hasta ? { hasta: x.oferta.hasta } : {}) } })); // solo las que de verdad le cambian el precio a ESTE cliente
     const lo_mas = habituales.length ? [] : topIds().map((id) => porId.get(String(id))).filter(Boolean).slice(0, 8).map(corto);
     return void sendJson(res, 200, {
-      habituales, loMasPedido: lo_mas, tieneHistorial: todos.some((x) => x.count > 0),
+      habituales, ofertas, loMasPedido: lo_mas, tieneHistorial: todos.some((x) => x.count > 0),
       fotos: Object.fromEntries(ids.map((id) => [id, porId.get(id)?.img ?? null])),
       categorias: webTree(catalogNow()).map((c) => ({ id: c.id, nombre: c.nombre })),
       ayuda: ayudaPublica(),
