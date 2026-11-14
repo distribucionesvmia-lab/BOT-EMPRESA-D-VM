@@ -29,3 +29,15 @@ test("solo pesos de letra 400, 600 y 700", () => {
 test("respeta reducir movimiento, transparencia y contraste", () => {
   for (const h of [cliente, pedido]) { assert.match(h, /prefers-reduced-motion/); assert.match(h, /prefers-reduced-transparency/); }
 });
+
+test("fila compacta: precio con 2 decimales (3 solo si <1 € y el tercero no es cero), «+» y contador accesibles", async () => {
+  const vm = await import("node:vm");
+  const fn = (pedido.match(/const eurp = (n => \{[^\n]*?\});/) || [])[1];
+  assert.ok(fn, "eurp");
+  const eurp = vm.runInNewContext("(" + fn + ")");
+  assert.equal(eurp(0.5), "0,50 €"); assert.equal(eurp(0.625), "0,625 €"); assert.equal(eurp(1.6), "1,60 €"); assert.equal(eurp(21), "21,00 €"); assert.equal(eurp(0.62), "0,62 €");
+  assert.match(pedido, /"Añadir " \+ p\.name/); assert.match(pedido, /"Quitar uno de " \+ p\.name/); assert.match(pedido, /"Cantidad de " \+ p\.name/);
+  assert.match(pedido, /inp\.inputMode = "numeric"[^\n]*inp\.max = 999/);
+  assert.match(pedido, /\.pf-step \{[^}]*height:44px/); assert.match(pedido, /\.pf-add \{ width:44px; height:44px; border:0; border-radius:50%/);
+  assert.match(pedido, /\.pf-n \{[^}]*-webkit-line-clamp:2/); assert.match(pedido, /prefers-reduced-motion: reduce\) \{ \.pf-step \{ animation:none/);
+});

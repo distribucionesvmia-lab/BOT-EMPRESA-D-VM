@@ -738,6 +738,54 @@
   header, .app.compacto header { background:var(--accent); color:var(--on-accent); border-bottom-color:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; }
   header .bar-titulo { color:var(--on-accent); }
   .cartbtn .ds-dot { box-shadow:0 0 0 2px var(--surface); }
+
+  /* ═══ Fila compacta de producto (≤104 px a 390 px): foto 72 · datos · acción ═══ */
+  .pf { position:relative; display:grid; grid-template-columns:72px minmax(0, 1fr) auto; column-gap:var(--s3); align-items:stretch; margin:0; padding:var(--s2) max(var(--gutter), calc((100% - 860px) / 2)); background:var(--surface); border:0; border-bottom:.5px solid var(--line); border-radius:0; box-shadow:none; content-visibility:auto; contain-intrinsic-size:auto 96px; }
+  .pf.sel { background:var(--surface); }
+  .pf-av { position:relative; align-self:center; width:72px; height:72px; border-radius:var(--r-img); background:var(--fill); overflow:hidden; display:grid; place-items:center; color:#fff; font-weight:700; font-size:calc(22px / var(--k,1)); cursor:zoom-in; }
+  .pf-av img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; padding:6px; background:var(--fill); border-radius:var(--r-img); }
+  .pf-ia { position:absolute; left:0; right:0; bottom:0; padding:1px 2px; text-align:center; font-size:calc(9px / var(--k,1)); color:var(--text-2); background:var(--mat-bg); }
+  .pf-fav { position:absolute; left:0; top:0; width:44px; height:44px; padding:0; border:0; background:transparent; color:var(--text-2); display:grid; place-items:center; cursor:pointer; z-index:1; }
+  .pf-fav::before { content:""; position:absolute; left:4px; top:4px; width:26px; height:26px; border-radius:50%; background:var(--mat-bg); z-index:-1; }
+  .pf-fav svg { width:15px; height:15px; display:block; position:relative; left:-7px; top:-7px; }
+  .pf-fav[aria-pressed="true"] { color:var(--accent); }
+  .pf-fav.bump { animation:latido .42s var(--muelle); }
+  .pf-info { min-width:0; align-self:center; display:flex; flex-direction:column; gap:1px; }
+  .pf-micro { font-size:calc(var(--t-micro) / var(--k,1)); line-height:1.2; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pf-n { font-size:calc(var(--t-prod) / var(--k,1)); line-height:1.15; font-weight:600; letter-spacing:-.01em; color:var(--text); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+  .pf-sec { font-size:calc(var(--t-cap) / var(--k,1)); line-height:1.25; color:var(--text-2); font-variant-numeric:tabular-nums; }
+  .pf-sec:empty { display:none; }
+  .pf-pr { font-size:calc(var(--t-prod) / var(--k,1)); line-height:1.2; font-weight:600; font-variant-numeric:tabular-nums; color:var(--text); }
+  .pf-ud { font-size:calc(var(--t-cap) / var(--k,1)); font-weight:400; color:var(--text-2); }
+  .pf-dto { margin-left:var(--s2); font-size:calc(var(--t-cap) / var(--k,1)); font-weight:600; color:var(--ok); }
+  .pf-oferta { display:inline-block; margin-left:var(--s2); padding:1px var(--s2); border-radius:var(--r-pill); background:var(--accent-soft); color:var(--accent); font-size:calc(var(--t-micro) / var(--k,1)); font-weight:700; letter-spacing:.02em; vertical-align:middle; }
+  .pf-ctl { display:flex; flex-direction:column; align-items:flex-end; justify-content:flex-end; gap:var(--s1); width:116px; }
+  .pf-seg { display:inline-flex; height:28px; border-radius:var(--r-pill); background:var(--field); padding:2px; }
+  .pf-seg button { position:relative; min-width:44px; padding:0 var(--s2); border:0; border-radius:var(--r-pill); background:transparent; color:var(--text-2); font:inherit; font-size:calc(var(--t-cap) / var(--k,1)); font-weight:600; cursor:pointer; }
+  .pf-seg button::after { content:""; position:absolute; inset:-8px -2px; } /* zona de toque de 44 px */
+  .pf-seg button.on { background:var(--surface); color:var(--text); box-shadow:0 0 0 .5px var(--mat-line); }
+  .pf-fijo { min-height:28px; display:flex; align-items:center; font-size:calc(var(--t-cap) / var(--k,1)); font-weight:600; color:var(--text-2); }
+  .pf-slot { height:44px; display:flex; justify-content:flex-end; }
+  .pf-add { width:44px; height:44px; border:0; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; padding:0; cursor:pointer; box-shadow:none; transition:transform var(--t-press) var(--ease); }
+  .pf-add svg, .pf-step svg { width:20px; height:20px; display:block; }
+  .pf-step button::after { content:""; position:absolute; inset:0 -2px; } /* zona de toque de 44 px de ancho */
+  .pf-add:active, .pf-step button:active { transform:scale(.97); }
+  .pf-step { display:inline-flex; align-items:center; height:44px; border-radius:var(--r-pill); background:var(--accent-soft); color:var(--accent); animation:pf-abre var(--t-norm) var(--ease) both; overflow:hidden; }
+  .pf-step button { position:relative; width:40px; height:44px; border:0; background:transparent; color:var(--accent); display:grid; place-items:center; padding:0; cursor:pointer; }
+  .pf-step input { width:36px; height:44px; border:0; background:transparent; text-align:center; font:inherit; font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; padding:0; -moz-appearance:textfield; appearance:textfield; }
+  .pf-step input::-webkit-outer-spin-button, .pf-step input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  .pf-step input:focus { outline:none; box-shadow:inset 0 0 0 3px var(--accent-soft); }
+  @keyframes pf-abre { from { width:44px; opacity:.6; } to { width:116px; opacity:1; } }
+  @media (prefers-reduced-motion: reduce) { .pf-step { animation:none; } .pf-add, .pf-step button { transition:none; } .pf-add:active, .pf-step button:active { transform:none; } }
+  @media (max-width:359px) { .pf { column-gap:var(--s2); } }
+
+  /* Categorías: baldosas blancas de 2 columnas con icono de línea de 28 px */
+  .cats { gap:var(--s3); padding:var(--s3) var(--gutter); }
+  .cats > .cat { display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; gap:var(--s3); min-height:112px; padding:var(--s4); border:0; border-radius:var(--r-card); background:var(--surface); text-align:left; color:var(--text); }
+  .cat .ico { width:28px; height:28px; border-radius:0; background:none; color:var(--accent); display:block; overflow:visible; }
+  .cat .ico svg { width:28px; height:28px; display:block; }
+  .cat b { font-size:calc(var(--t-prod) / var(--k,1)); font-weight:600; letter-spacing:-.01em; line-height:1.2; }
+  .cat small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); }
 </style>
 </head>
 <body>
@@ -754,7 +802,7 @@
   <div class="titulo-bloque"><h1 class="titulo-grande">Catálogo</h1><p class="titulo-sub" id="ttl">Cargando…</p><small id="sub" hidden></small></div>
   <div class="aviso" id="avisoHoy" role="status" aria-live="polite" hidden>Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
   <div class="paso">Paso 1 de 3 · Elige tus productos</div>
-  <div class="guia" id="guia" aria-live="polite">Toca <b>«+ Añadir»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.</div>
+  <div class="guia" id="guia" aria-live="polite">Toca <b>«+»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.</div>
   <nav class="tabs">
     <button class="tab on" data-t="hab" type="button" aria-pressed="true">★ Histórico</button>
     <button class="tab" data-t="all" type="button" aria-pressed="false">☰ Catálogo</button>
@@ -837,7 +885,7 @@ const $ = id => document.getElementById(id);
 document.addEventListener("touchstart", () => {}, { passive: true }); // Safari solo enseña :active (la escala 0,97 al pulsar) si hay un oyente de toque
 const COLORS = ["#2f8f6b", "#c0763a", "#5b7bd5", "#a1507c", "#8a8f2b", "#3c8fa6", "#b8523f", "#6c5ba8"];
 const eur = n => n.toFixed(2).replace(".", ",") + " €";
-const eurp = n => Number(n).toFixed(3).replace(".", ",") + " €"; // precio de un artículo: siempre 3 decimales
+const eurp = n => { n = Number(n); const t = Math.round(n * 1000); return (n < 1 && t % 10 !== 0 ? n.toFixed(3) : n.toFixed(2)).replace(".", ",") + " €"; }; // precio de un artículo: 2 decimales (3 solo si cuesta menos de 1 € y el tercer decimal no es cero)
 let data = null, tab = "hab", query = "";
 const favs = new Set(); // favoritos del cliente (solo con sesión; en el enlace de pedido del chat no hay)
 // Clave de este pedido: si se reenvía (doble clic, fallo de red), el servidor no lo duplica
@@ -950,42 +998,37 @@ function recuperar() {
 
 function control(p) {
   const q = qty.get(p.id) || 0, box = document.createElement("div");
-  box.className = "ctl";
-  // Siempre la misma estructura (selector · hueco de compra · leyenda): «+ Añadir» y el contador miden igual y la tarjeta no cambia de alto
-  if (p.soloCaja) { // solo por cajas enteras: mismo hueco, sin botón «Uds»
-    const fijo = document.createElement("div"); fijo.className = "ud udfijo"; fijo.textContent = "Solo cajas"; fijo.title = "Este artículo se vende solo por cajas enteras"; box.appendChild(fijo);
+  box.className = "pf-ctl";
+  // Arriba: cómo se pide (Caja | Ud, o «Solo cajas»); abajo: «+» redondo que se convierte en el contador «− 2 +» sin cambiar el alto de la fila
+  if (p.soloCaja) {
+    const fijo = document.createElement("div"); fijo.className = "pf-fijo"; fijo.textContent = "Solo cajas"; fijo.title = "Este artículo se vende solo por cajas enteras"; box.appendChild(fijo);
   } else if (p.unitsPerBox) {
-    const sel = document.createElement("div"); sel.className = "ud"; sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Pedir en");
-    for (const [u, t] of [["caja", "Cajas"], ["ud", "Uds"]]) {
+    const sel = document.createElement("div"); sel.className = "pf-seg"; sel.setAttribute("role", "group"); sel.setAttribute("aria-label", "Pedir " + p.name + " en");
+    for (const [u, t] of [["caja", "Caja"], ["ud", "Ud"]]) {
       const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.className = unit(p.id) === u ? "on" : ""; b.setAttribute("aria-pressed", String(unit(p.id) === u));
       b.onclick = () => cambiarUnidad(p, u);
       sel.appendChild(b);
     }
     box.appendChild(sel);
-  } else {
-    const fijo = document.createElement("div"); fijo.className = "ud udfijo"; fijo.textContent = "Uds"; fijo.setAttribute("aria-hidden", "true"); // artículo que solo se vende suelto: mismo hueco, sin botón
-    box.appendChild(fijo);
-  }
-  const hueco = document.createElement("div"); hueco.className = "slot"; box.appendChild(hueco);
-  const cap = document.createElement("div"); cap.className = "cap";
+  } else { const sp = document.createElement("div"); sp.className = "pf-fijo"; sp.setAttribute("aria-hidden", "true"); box.appendChild(sp); } // solo se vende suelto: no hace falta selector (el hueco mantiene la fila igual)
+  const hueco = document.createElement("div"); hueco.className = "pf-slot"; box.appendChild(hueco);
   if (!q) {
     const b = document.createElement("button");
-    b.className = "add"; b.type = "button"; b.textContent = "+ Añadir"; b.setAttribute("aria-label", "Añadir " + p.name);
+    b.className = "pf-add"; b.type = "button"; b.setAttribute("aria-label", "Añadir " + p.name); b.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
     b.onclick = () => setQty(p.id, 1);
     hueco.appendChild(b);
-    cap.textContent = "\u00a0"; box.appendChild(cap);
     return box;
   }
-  const st = document.createElement("div"); st.className = "step";
-  const minus = document.createElement("button"); minus.type = "button"; minus.textContent = "−"; minus.setAttribute("aria-label", "Quitar uno de " + p.name); minus.onclick = () => setQty(p.id, q - 1);
+  const st = document.createElement("div"); st.className = "pf-step"; st.setAttribute("role", "group");
+  const enCajas = p.unitsPerBox && unit(p.id) === "caja";
+  st.setAttribute("aria-label", enCajas ? `${q} ${q === 1 ? "caja" : "cajas"} · ${q * p.unitsPerBox} uds` : `${q} ${q === 1 ? "unidad" : "unidades"}`); // lo que lleva pedido, dicho en voz alta
+  const minus = document.createElement("button"); minus.type = "button"; minus.setAttribute("aria-label", "Quitar uno de " + p.name); minus.onclick = () => setQty(p.id, q - 1);
+  minus.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
   const inp = document.createElement("input"); inp.type = "number"; inp.inputMode = "numeric"; inp.pattern = "[0-9]*"; inp.min = 0; inp.max = 999; inp.onfocus = () => inp.select(); inp.value = q; inp.setAttribute("aria-label", "Cantidad de " + p.name);
   inp.onchange = () => setQty(p.id, inp.value);
-  const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.setAttribute("aria-label", "Añadir uno de " + p.name); plus.onclick = () => setQty(p.id, q + 1);
+  const plus = document.createElement("button"); plus.type = "button"; plus.setAttribute("aria-label", "Añadir uno de " + p.name); plus.onclick = () => setQty(p.id, q + 1);
+  plus.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
   st.append(minus, inp, plus); hueco.appendChild(st);
-  // Lo que lleva pedido, siempre a la vista: «3 uds» o «2 cajas · 12 uds»
-  const enCajas = p.unitsPerBox && unit(p.id) === "caja";
-  cap.textContent = enCajas ? `${q} ${q === 1 ? "caja" : "cajas"} · ${q * p.unitsPerBox} uds` : `${q} ${q === 1 ? "unidad" : "unidades"}`;
-  box.appendChild(cap);
   return box;
 }
 
@@ -1016,8 +1059,8 @@ function verFoto(p) {
 }
 
 function row(p) {
-  const el = document.createElement("div"); el.className = "p" + (qty.get(p.id) > 0 ? " sel" : ""); el.dataset.id = p.id;
-  const av = document.createElement("div"); av.className = "av"; av.style.background = hue(p.name); av.textContent = initials(p.name);
+  const el = document.createElement("div"); el.className = "pf" + (qty.get(p.id) > 0 ? " sel" : ""); el.dataset.id = p.id;
+  const av = document.createElement("div"); av.className = "pf-av"; av.style.background = hue(p.name); av.textContent = initials(p.name);
   if (p.img) { // foto del producto encima de las iniciales; si no carga, se queda el marcador
     const im = document.createElement("img"); im.src = p.img; im.alt = ""; im.decoding = "async"; im.loading = "lazy";
     im.onerror = () => im.remove();
@@ -1025,28 +1068,26 @@ function row(p) {
     av.title = "Toca para ver la foto más grande";
     av.addEventListener("click", (ev) => { if (!ev.target.closest("button")) verFoto(p); });
   }
-  const info = document.createElement("div"); info.className = "info";
-  const n = document.createElement("div"); n.className = "n"; n.textContent = p.name;
-  if (tab === "all" && p.count > 0) { const lc = document.createElement("span"); lc.className = "lo-compras"; lc.textContent = "Lo compras"; n.append(" ", lc); } // en el catálogo se marca lo que este cliente ya compra
-  const c = document.createElement("div"); c.className = "c"; c.textContent = ""; // el código de producto no se muestra
-  const pr = document.createElement("div"); pr.className = "pr";
-  const price = document.createElement("b"); price.textContent = eurp(p.price); pr.appendChild(price);
-  if (p.discount) { const dto = document.createElement("span"); dto.className = "dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} % dto.`; dto.style.cssText = "color:#0a7a3b;font-weight:700;font-size:calc(14px / var(--k,1));margin-left:4px"; pr.appendChild(dto); } // el descuento del cliente se ve ya en la fila
-  if (p.oferta) { const of = document.createElement("span"); of.className = "oferta"; of.textContent = "OFERTA" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().slice(0, 2).join("/") : ""); of.style.cssText = "background:#d90000;color:#fff;font-weight:700;border-radius:6px;padding:1px 7px;margin-left:6px;font-size:calc(12px / var(--k,1));white-space:nowrap"; pr.appendChild(of); } // oferta de la empresa (el precio y el descuento de arriba ya la incluyen)
-  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " uds · " + eur(precioCaja(p)); // (las unidades que lleva pedidas ya salen bajo el contador: así la tarjeta no cambia de alto)
-  info.append(n, c);
-  if (p.ia) { const ia = document.createElement("div"); ia.className = "ia"; ia.textContent = "Foto orientativa creada con IA"; ia.style.cssText = "font-size:calc(11px / var(--k,1));color:#8a8a8a;font-style:italic;margin:1px 0 2px"; info.appendChild(ia); }
-  info.append(pr);
-  // Columnas: foto · datos (nombre con el corazón de favorito) · Uds/Cajas y «Añadir» siempre a la derecha
+  const info = document.createElement("div"); info.className = "pf-info";
+  if (p.marca || (tab === "all" && p.count > 0)) { const mi = document.createElement("div"); mi.className = "pf-micro"; mi.textContent = [p.marca, tab === "all" && p.count > 0 ? "Lo compras" : ""].filter(Boolean).join(" · "); info.appendChild(mi); }
+  const n = document.createElement("div"); n.className = "pf-n"; n.textContent = p.nombreCorto || p.name;
+  if (p.nombreCorto && p.nombreCorto !== p.name) n.title = p.name;
+  const c = document.createElement("div"); c.className = "pf-sec"; // el código de producto no se muestra
+  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " · " + eur(precioCaja(p));
+  const pr = document.createElement("div"); pr.className = "pf-pr";
+  const price = document.createElement("b"); price.textContent = eurp(p.price); const ud = document.createElement("span"); ud.className = "pf-ud"; ud.textContent = " /ud"; pr.append(price, ud);
+  if (p.discount) { const dto = document.createElement("span"); dto.className = "pf-dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} %`; pr.appendChild(dto); }
+  if (p.oferta) { const of = document.createElement("span"); of.className = "pf-oferta"; of.textContent = "OFERTA" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().slice(0, 2).join("/") : ""); pr.appendChild(of); }
+  info.append(n, c, pr);
+  if (p.ia) { const ia = document.createElement("div"); ia.className = "pf-ia"; ia.textContent = "Imagen orientativa"; av.appendChild(ia); }
   if (data.favs) {
-    const f = document.createElement("button"); f.type = "button"; f.className = "favb"; const on = favs.has(p.id);
-    f.textContent = on ? "♥" : "♡"; f.setAttribute("aria-pressed", String(on)); f.setAttribute("aria-label", (on ? "Quitar de favoritos " : "Marcar como favorito ") + p.name);
+    const f = document.createElement("button"); f.type = "button"; f.className = "pf-fav"; const on = favs.has(p.id);
+    f.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 20.3 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 0 1 19.4 13z" fill="${on ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>`; f.setAttribute("aria-pressed", String(on)); f.setAttribute("aria-label", (on ? "Quitar de favoritos " : "Marcar como favorito ") + p.name);
     f.onclick = () => marcarFav(p.id, !on);
     if (bumpFav === p.id) f.classList.add("bump");
-    av.appendChild(f); // el corazón va sobre la esquina de la foto: el nombre gana ancho
+    av.appendChild(f); // el corazón va sobre la esquina de la foto
   }
-  const ctl = control(p);
-  el.append(av, info, ctl);
+  el.append(av, info, control(p));
   return el;
 }
 
@@ -1095,6 +1136,20 @@ function fotoDe(cat, sub) {
   const ps = data.products.filter(p => p.img && p.cat === cat && (!sub || p.sub === sub));
   return (PREFIERE[cat] && ps.find(p => PREFIERE[cat].test(p.name))) || ps[0] || null;
 }
+// Iconos de línea (24×24, trazo 1,7) de cada categoría; las que no tienen uno propio usan la caja
+const ICONOS_CAT = {
+  cafe: '<path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3"/>',
+  pascual: '<path d="M9 3h6l1 4v13a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V7zM8 11h8M8 15h8"/>',
+  aguas: '<path d="M12 3s6 6.2 6 10.5a6 6 0 0 1-12 0C6 9.200 12 3 12 3zM9.500 14a2.500 2.500 0 0 0 2.500 2.500"/>',
+  bebidas: '<path d="M7 4h10l-1.200 16a1 1 0 0 1-1 .9H9.200a1 1 0 0 1-1-.9zM7.500 9h9M13 4l1-2"/>',
+  vinos: '<path d="M8 3h8l-.5 6a3.500 3.500 0 0 1-7 0zM12 12.500V20M8.500 21h7"/>',
+  despensa: '<path d="M6 8h12v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1zM8 8V5h8v3M6 12.500h12"/>',
+  refrigerados: '<path d="M7 3h10a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM6 10h12M9 6v2M9 13v3"/>',
+  congelados: '<path d="M12 3v18M4.500 7.500l15 9M19.500 7.500l-15 9M9.500 4.500 12 6.500l2.500-2M9.500 19.500 12 17.500l2.500 2"/>',
+  hosteleria: '<path d="M7 3v8a2 2 0 0 0 2 2v8M7 3v5M10 3v5M4.500 3v5a2.500 2.500 0 0 0 2.500 2.500M17 3c-2 1.500-3 4-3 7h3v11"/>',
+  otros: '<path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/>'
+};
+function iconoCat(id) { return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ICONOS_CAT[id] || ICONOS_CAT.otros}</svg>`; }
 function renderCategorias(list) {
   // Cliente sin historial: «Lo más pedido» entre todos los clientes (solo artículos, nunca de quién)
   const top = (data.top || []).map(id => productoPorId.get(id)).filter(Boolean);
@@ -1106,9 +1161,7 @@ function renderCategorias(list) {
   const g = document.createElement("div"); g.className = "cats";
   for (const c of data.tree) {
     const b = document.createElement("button"); b.type = "button"; b.className = "cat";
-    const i = document.createElement("span"); i.className = "ico"; i.style.background = hue(c.nombre); i.textContent = c.nombre[0].toUpperCase();
-    const ph = fotoDe(c.id, null);
-    if (ph) { const im = document.createElement("img"); im.src = ph.img; im.alt = ""; im.onerror = () => im.remove(); im.onload = () => { i.textContent = ""; i.style.background = "#fff"; i.appendChild(im); }; }
+    const i = document.createElement("span"); i.className = "ico"; i.innerHTML = iconoCat(c.id); // icono de línea de la categoría (sin foto de un producto al azar)
     const n = document.createElement("b"); n.textContent = c.nombre;
     const k = document.createElement("small"); k.textContent = c.count + (c.count === 1 ? " producto" : " productos");
     b.append(i, n, k); b.onclick = () => (c.subs.length === 1 ? irA(c.id, c.subs[0].id) : irA(c.id, null)); g.appendChild(b);
@@ -1230,7 +1283,7 @@ function renderList() {
     return;
   }
   items.slice(0, limite).forEach(p => list.appendChild(row(p)));
-  entrada(list, ".p");
+  entrada(list, ".pf");
   if (items.length > limite) {
     const m = document.createElement("button"); m.type = "button"; m.className = "big sec"; m.style.margin = "12px 14px"; m.style.width = "calc(100% - 28px)"; // sin esto el botón se salía 28 px y la lista se movía de lado
     m.textContent = `Mostrar más (${items.length - limite} restantes)`; m.onclick = () => { limite += 150; renderList(); };
@@ -1343,9 +1396,9 @@ function refresh() {
   nPrev0 = n;
   $("cnt").textContent = n; $("cnt").hidden = !n;
   $("verCarrito").textContent = n ? `Ver carrito · ${n} artículo${n === 1 ? "" : "s"} · ${eur(calc().base)} sin IVA` : "Añade productos para empezar";
-  $("guia").innerHTML = n ? `Llevas <b>${n} artículo${n === 1 ? "" : "s"}</b>. Cuando termines, pulsa el botón rojo de abajo.` : "Toca <b>«+ Añadir»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.";
+  $("guia").innerHTML = n ? `Llevas <b>${n} artículo${n === 1 ? "" : "s"}</b>. Cuando termines, pulsa el botón rojo de abajo.` : "Toca <b>«+»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.";
   $("verCarrito").disabled = !n; document.querySelector("footer").hidden = !n; document.querySelector(".app").classList.toggle("sin-carrito", !n); // sin nada en el carrito no hay barra fija que tape la lista
-  const fila = bumpId && !bumpFav && !(tab === "hab" && soloCantidad) ? $("list").querySelector(`.p[data-id="${CSS.escape(bumpId)}"]`) : null;
+  const fila = bumpId && !bumpFav && !(tab === "hab" && soloCantidad) ? $("list").querySelector(`.pf[data-id="${CSS.escape(bumpId)}"]`) : null;
   const prod = fila && productoPorId.get(bumpId);
   if (fila && prod) fila.replaceWith(row(prod)); // cambio de cantidad: solo se repinta ese producto (antes se repintaba toda la lista, fotos incluidas)
   else { const scroll = $("list").scrollTop; renderList(); $("list").scrollTop = scroll; }

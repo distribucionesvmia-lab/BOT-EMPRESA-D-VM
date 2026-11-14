@@ -115,10 +115,10 @@ test("MÓVIL con letra grande (Samsung): ninguna caja de altura fija corta los t
   assert.match(ped, /\.ud button \{ flex:1 1 auto; white-space:nowrap/);
 });
 
-test("PRECIOS DE ARTÍCULO: se enseñan siempre con 3 decimales (catálogo web, chat y Excel); los importes y totales, con 2", async () => {
+test("PRECIOS DE ARTÍCULO: se enseñan con 2 decimales, y con 3 solo si cuestan menos de 1 € y el tercero no es cero (catálogo web); los importes y totales, con 2", async () => {
   const fs = await import("node:fs");
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
-  assert.match(ped, /const eurp = n => Number\(n\)\.toFixed\(3\)/);
+  assert.match(ped, /const eurp = n => \{ n = Number\(n\); const t = Math\.round\(n \* 1000\)/); // 2 decimales; 3 solo si <1 € y el tercero no es 0
   assert.match(ped, /price\.textContent = eurp\(p\.price\)/);
   assert.match(ped, /pr\.textContent = eurp\(l\.price\) \+ " \/ ud"/);
   assert.match(ped, /const eur = n => n\.toFixed\(2\)/); // los totales siguen con 2
@@ -143,12 +143,12 @@ test("MÓVIL: el tamaño de letra del sistema (Samsung) se compensa: ningún fon
 test("CATÁLOGO WEB: «+ Añadir» y el contador miden igual en todas las filas, zonas de toque de 44 px o más, móvil apaisado y ordenador en filas anchas", async () => {
   const fs = await import("node:fs");
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
-  assert.match(ped, /className = "ud udfijo"/); // los artículos sueltos ocupan el mismo hueco que los de cajas
-  assert.match(ped, /\.slot \.add, \.slot \.step \{ width:100%; height:52px; min-height:52px; \} \.slot \.step button, \.slot \.step input \{ height:auto; align-self:stretch; min-height:48px; \}/); // 52 con el borde → los botones del contador miden 48 de verdad
-  assert.match(ped, /\.favb \{ width:44px; height:44px/);
+  assert.match(ped, /className = "pf-fijo"/); // los artículos sueltos ocupan el mismo hueco que los de cajas
+  assert.match(ped, /\.pf-slot \{ height:44px;/); assert.match(ped, /\.pf-add \{ width:44px; height:44px;/); // «+» redondo y contador miden 44 px: la fila no cambia de alto
+  assert.match(ped, /\.pf-fav \{ position:absolute; left:0; top:0; width:44px; height:44px/);
   assert.match(ped, /\.tabs button\.tab \{ min-height:48px; \}/);
   assert.match(ped, /@media \(orientation:landscape\) and \(max-height:520px\)/);
-  assert.match(ped, /@media \(min-width:900px\)[\s\S]*\.p \{ grid-template-columns:104px minmax\(0, 1fr\) 330px/); // ordenador: una fila ancha por producto (la descripción no se parte en vertical)
+  assert.match(ped, /\.pf \{ position:relative; display:grid; grid-template-columns:72px minmax\(0, 1fr\) auto;/); // fila compacta de 72 px de foto (también en ordenador)
   assert.doesNotMatch(ped, /" → " \+ qty\.get\(p\.id\) \* p\.unitsPerBox/); // el texto de la tarjeta no cambia al añadir (no se mueve lo de debajo)
 });
 
@@ -171,7 +171,7 @@ test("CATÁLOGO WEB: controles del carrito a 48 px, sin barra fija con el carrit
   assert.match(ped, /\.tl \.hstep button \{ width:48px; height:100%;/);
   assert.match(ped, /<footer hidden>/); // «Añade productos para empezar» solo existe cuando hay algo en el carrito
   assert.match(ped, /document\.querySelector\("footer"\)\.hidden = !n/);
-  assert.match(ped, /"Caja de " \+ p\.unitsPerBox \+ " uds · " \+ eur\(precioCaja\(p\)\)/); // el precio de la caja, calculado como el importe de línea
+  assert.match(ped, /"Caja de " \+ p\.unitsPerBox \+ " · " \+ eur\(precioCaja\(p\)\)/); // el precio de la caja, calculado como el importe de línea
   assert.match(ped, /\.app\.compacto \.buscar \{ max-height:0;/); // en apaisado se pliega también el buscador al bajar
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
   assert.doesNotMatch(cli, /data-q="hacer pedido"/); // el atajo de abajo se quitó…
@@ -236,7 +236,7 @@ test("PAQUETE «COMPRAR MÁS FÁCIL» A+B: lo que ya compra arriba, «Lo más pe
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
   // F-21
-  assert.match(ped, /className = "lo-compras"/); assert.match(ped, /else if \(arbol\) items = \[\.\.\.items\.filter\(p => p\.count > 0\)/);
+  assert.match(ped, /"Lo compras"/); assert.match(ped, /else if \(arbol\) items = \[\.\.\.items\.filter\(p => p\.count > 0\)/);
   assert.match(ped, /Lo más pedido/); assert.match(ped, /data\.top/);
   // F-22
   assert.doesNotMatch(ped, /atajos/); assert.match(ped, /inp\.pattern = "\[0-9\]\*"/); // sin botones «+1 caja / +6 cajas»
