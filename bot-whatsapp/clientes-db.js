@@ -51,6 +51,11 @@ CREATE TABLE IF NOT EXISTS purchases (
 );
 CREATE INDEX IF NOT EXISTS idx_purchases_customer ON purchases(customer_id, date);
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+CREATE TABLE IF NOT EXISTS customer_manual (
+  customer_id TEXT PRIMARY KEY REFERENCES customers(id),
+  data        TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
 `;
 
 const last9 = (p) => String(p ?? "").replace(/\D/g, "").slice(-9);
@@ -83,6 +88,16 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       orders: [...orders.values()],
       frequent: [],
     };
+  };
+  // ---- Datos escritos a mano en la ficha (teléfonos y correos EXTRA, razón social, dirección, población, municipio, recargo y notas internas) ----
+  // Se guardan aparte y se vuelven a aplicar tras cada importación de a3ERP: el Excel manda en lo suyo, pero no borra lo que se añadió a mano.
+  const manualDe = (id) => { try { return JSON.parse(db.prepare("SELECT data FROM customer_manual WHERE customer_id = ?").get(String(id))?.data ?? "{}"); } catch { return {}; } };
+  const aplicarManual = (id, m = manualDe(id)) => {
+    for (const [k, col] of [["legalName", "legal_name"], ["address", "address"], ["city", "city"], ["municipio", "municipio"]]) if (k in m) db.prepare(`UPDATE customers SET ${col} = ? WHERE id = ?`).run(m[k] || null, id);
+    if ("recargo" in m) db.prepare("UPDATE customers SET recargo = ? WHERE id = ?").run(m.recargo ? 1 : 0, id);
+    for (const ph of m.phones ?? []) db.prepare("INSERT OR IGNORE INTO customer_phones VALUES (?, ?)").run(id, ph);
+    for (const em of m.emails ?? []) db.prepare("INSERT OR IGNORE INTO customer_emails VALUES (?, ?)").run(id, em);
+    if (m.phones?.length && !db.prepare("SELECT phone FROM customers WHERE id = ?").get(id)?.phone) db.prepare("UPDATE customers SET phone = ? WHERE id = ?").run(m.phones[0], id);
   };
   const byId = db.prepare("SELECT * FROM customers WHERE id = ?");
 
@@ -130,6 +145,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
             db.prepare("DELETE FROM purchases WHERE customer_id = ?").run(id);
             for (const o of c.orders) for (const l of o.lines) db.prepare("INSERT INTO purchases (customer_id, doc, date, product_id, qty) VALUES (?, ?, ?, ?, ?)").run(id, String(o.doc), String(o.date), String(l.productId), Math.floor(Number(l.qty)));
           }
+          aplicarManual(id); // lo escrito a mano en la ficha se conserva
         }
         db.exec("COMMIT");
         return out;
@@ -139,6 +155,34 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       }
     },
 
+    /** Lo escrito a mano en la ficha: { phones, emails (los añadidos a mano), notes, … }. */
+    manualOf: (id) => manualDe(String(id)),
+    /**
+     * Guarda cambios de la ficha. patch: { legalName, address, city, municipio, recargo, notes, phones, emails } (phones y emails: la lista completa que se quiere ver).
+     * Lo que viene de a3ERP no se puede quitar desde aquí (volvería en la próxima importación): solo se quitan los que se añadieron a mano. Devuelve false si el cliente no existe.
+     */
+    editar(id, patch, now = new Date().toISOString()) {
+      id = String(id); if (!byId.get(id)) return false;
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const m = manualDe(id), antesTel = new Set(m.phones ?? []), antesMail = new Set(m.emails ?? []);
+        for (const k of ["legalName", "address", "city", "municipio", "recargo", "notes"]) if (k in patch) m[k] = patch[k];
+        if ("phones" in patch) {
+          const ahora = new Set(db.prepare("SELECT phone FROM customer_phones WHERE customer_id = ?").all(id).map((x) => x.phone)), erp = new Set([...ahora].filter((p) => !antesTel.has(p)));
+          m.phones = patch.phones.filter((p) => !erp.has(p));
+          for (const p of antesTel) if (!patch.phones.includes(p)) db.prepare("DELETE FROM customer_phones WHERE customer_id = ? AND phone = ?").run(id, p);
+        }
+        if ("emails" in patch) {
+          const ahora = new Set(db.prepare("SELECT email FROM customer_emails WHERE customer_id = ?").all(id).map((x) => x.email)), erp = new Set([...ahora].filter((e) => !antesMail.has(e)));
+          m.emails = patch.emails.filter((e) => !erp.has(e));
+          for (const e of antesMail) if (!patch.emails.includes(e)) db.prepare("DELETE FROM customer_emails WHERE customer_id = ? AND email = ?").run(id, e);
+        }
+        db.prepare("INSERT INTO customer_manual (customer_id, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(customer_id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at").run(id, JSON.stringify(m), now);
+        aplicarManual(id, m);
+        db.prepare("UPDATE customers SET updated_at = ? WHERE id = ?").run(now, id);
+        db.exec("COMMIT"); return true;
+      } catch (e) { db.exec("ROLLBACK"); throw e; }
+    },
     /** Clientes activos que podrían ser el que escribe (modo flexible: «alegría» encaja con «Bar Alegría»). Solo id y nombre. */
     candidates: (query) => findCustomers(db.prepare("SELECT id, name, legal_name AS legalName, active FROM customers").all().map((r) => ({ ...r, active: !!r.active })), query, { lenient: true }).map((c) => ({ id: c.id, name: c.name })),
     /** ¿Los 6 primeros dígitos del DNI escritos corresponden a este cliente? Un cliente sin NIF guardado nunca coincide. */

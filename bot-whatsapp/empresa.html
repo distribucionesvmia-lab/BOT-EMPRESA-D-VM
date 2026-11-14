@@ -194,6 +194,10 @@
   .fi-pie { display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; padding:12px 22px; border-top:1px solid var(--line); background:var(--th); }
   @media (max-width:640px) { .fi-cab, .fi-cuerpo, .fi-pie { padding-left:14px; padding-right:14px; } .fi-pie button { flex:1 1 100%; } }
   .pr-plant { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0 12px; } .pr-plant button { min-height:34px; padding:0 12px; border-radius:999px; font-size:13px; }
+  .fi-editar { margin-left:12px; min-height:28px; padding:0 10px; font-size:12px; letter-spacing:0; text-transform:none; } .fi-notas { margin:12px 0 0; padding:8px 10px; border-radius:8px; background:var(--th); }
+  .fi-form { margin:0; } .fi-chips-ed { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px; } .fi-ch { display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 10px; border:1px solid var(--line); border-radius:999px; background:var(--th); font-size:13px; }
+  .fi-ch button { min-height:22px; width:22px; padding:0; border-radius:50%; font-size:11px; line-height:1; } .fi-fila-add { display:flex; gap:8px; min-width:0; } .fi-fila-add input { flex:1 1 0; min-width:0; width:auto; } .fi-fila-add button { flex:none; } .fi-form .campo { min-width:0; }
+  .fi-form label.inv-check { display:flex; flex-direction:row; align-items:flex-start; justify-content:flex-start; text-align:left; gap:10px; } .fi-form label.inv-check > span { text-align:left; } .ayuda.err { color:var(--accent); font-weight:600; }
   .est-exp { display:inline-flex; gap:8px; margin-left:auto; }
   .est-exp button { height:40px; }
   .est-filtros { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; }
@@ -1626,6 +1630,44 @@ const fiDl = (pares) => { const dl = el("dl", "", { className: "fi-dl" }); for (
 const fiChip = (k, v) => { const c = el("div", "", { className: "fi-chip" }); c.append(el("span", k), el("b", v)); return c; };
 const fechaCorta = (iso) => (iso ? new Date(iso).toLocaleString("es-ES", { timeZone: "Europe/Madrid", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
 const diaCorto = (d) => (d ? String(d).split("-").reverse().join("/") : "—");
+// ---- Editar la ficha a mano (teléfonos, correos, dirección, notas…): se guarda aparte y las importaciones de a3ERP no lo borran ----
+const tel9 = (t) => String(t ?? "").replace(/\D/g, "").replace(/^(0034|34)(?=\d{9}$)/, "").slice(-9);
+function seccionDatos(f) {
+  const c = f.cliente, sec = fiSec("Datos", fiDl([["Razón social", c.razon], ["Dirección", [c.direccion, c.poblacion].filter(Boolean).join(", ")], ["Teléfonos", c.telefonos.join(" · ")], ["Correos", c.correos.join(" · ")]]));
+  if (f.notas) { const n = el("p", "", { className: "fi-notas" }); n.append(el("b", "Notas internas: "), f.notas); sec.append(n); }
+  if (!f.sinFicha) { const b = el("button", "Editar datos", { type: "button", className: "fi-editar" }); b.onclick = () => editarDatos(f, sec); sec.querySelector("h4").append(b); }
+  return sec;
+}
+function chipLista(titulo, ayuda, valores, manuales, norm, validar) {
+  const caja = el("div", "", { className: "fi-lista-ed" }), chips = el("div", "", { className: "fi-chips-ed" }), campo = el("input", "", { type: "text", placeholder: ayuda, autocomplete: "off" }), anadir = el("button", "Añadir", { type: "button" }), err = el("small", "", { className: "ayuda err" });
+  const lista = [...new Map(valores.map((v) => [norm(v), norm(v)])).values()].filter(Boolean), propios = new Set(manuales);
+  const pinta = () => { chips.replaceChildren(...lista.map((v) => { const ch = el("span", v, { className: "fi-ch" }); if (propios.has(v)) { const x = el("button", "✕", { type: "button", title: "Quitar" }); x.setAttribute("aria-label", "Quitar " + v); x.onclick = () => { lista.splice(lista.indexOf(v), 1); propios.delete(v); pinta(); }; ch.append(x); } else ch.title = "Viene de a3ERP: no se puede quitar desde aquí"; return ch; })); if (!lista.length) chips.append(el("span", "Ninguno", { className: "muted" })); };
+  const add = () => { const v = norm(campo.value), e = validar(v); if (!campo.value.trim()) return; if (e) { err.textContent = e; return; } err.textContent = ""; if (!lista.includes(v)) { lista.push(v); propios.add(v); } campo.value = ""; pinta(); };
+  anadir.onclick = add; campo.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } };
+  const fila = el("div", "", { className: "fi-fila-add" }); fila.append(campo, anadir);
+  const lab = el("div", "", { className: "campo campo-ancho" }); lab.append(el("span", titulo), chips, fila, err); caja.append(lab); pinta();
+  return { nodo: caja, valor: () => { if (campo.value.trim()) add(); return lista; } };
+}
+function editarDatos(f, sec) {
+  const c = f.cliente, form = el("form", "", { className: "form-grid fi-form", autocomplete: "off" });
+  const campo = (etq, id, valor, extra = {}) => { const l = el("label", "", { className: "campo" }), i = el("input", "", { id: "fe-" + id, value: valor ?? "", ...extra }); l.append(el("span", etq), i); return [l, i]; };
+  const [lRazon, iRazon] = campo("Razón social", "razon", c.razon, { maxLength: 80 }), [lDir, iDir] = campo("Dirección de entrega", "dir", c.direccion, { maxLength: 160 }), [lPob, iPob] = campo("Población", "pob", c.poblacion, { maxLength: 60 }), [lMun, iMun] = campo("Código de municipio", "mun", c.municipio, { maxLength: 5, inputMode: "numeric" });
+  lMun.append(el("small", "Medina del Campo = 47085", { className: "ayuda" }));
+  const tel = chipLista("Teléfonos", "Añadir un teléfono (9 cifras)", c.telefonos, f.manual?.telefonos ?? [], tel9, (v) => (/^\d{9}$/.test(v) ? "" : "Escribe un teléfono de 9 cifras.")),
+    mail = chipLista("Correos", "Añadir un correo", c.correos, f.manual?.correos ?? [], (v) => String(v).trim().toLowerCase(), (v) => (/^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]{2,}$/.test(v) ? "" : "Escribe un correo válido (nombre@dominio.es)."));
+  const lRe = el("label", "", { className: "inv-check campo-ancho" }), iRe = el("input", "", { type: "checkbox", checked: !!c.recargo }); lRe.append(iRe, el("span", "Tiene recargo de equivalencia"));
+  const lNotas = el("label", "", { className: "campo campo-ancho" }), iNotas = el("textarea", "", { rows: 3, maxLength: 500, value: f.notas ?? "", placeholder: "Por ejemplo: llamar antes de ir · paga en efectivo" }); lNotas.append(el("span", "Notas internas (el cliente no las ve)"), iNotas);
+  const msg = el("p", "", { className: "muted campo-ancho", role: "status" }), acc = el("div", "", { className: "acciones campo-ancho" }), guardar = el("button", "Guardar cambios", { type: "submit", className: "main" }), cancelar = el("button", "Cancelar", { type: "button" });
+  acc.append(guardar, cancelar);
+  form.append(lRazon, lDir, lPob, lMun, tel.nodo, mail.nodo, lRe, lNotas, el("p", "El nombre y el NIF los manda a3ERP y no se cambian aquí. Lo que añadas se conserva cuando se actualicen los datos desde el Excel.", { className: "muted campo-ancho", style: "margin:0" }), msg, acc);
+  sec.replaceChildren(el("h4", "Editar datos")); sec.append(form); iRazon.focus();
+  cancelar.onclick = () => abrirFicha(c.id);
+  form.onsubmit = async (e) => {
+    e.preventDefault(); guardar.disabled = true; msg.textContent = "Guardando…";
+    try { const r = await call(`/api/admin/cliente/${encodeURIComponent(c.id)}/ficha`, { razon: iRazon.value, direccion: iDir.value, poblacion: iPob.value, municipio: iMun.value, recargo: iRe.checked, notas: iNotas.value, telefonos: tel.valor(), correos: mail.valor() }); if (r.avisos?.length) alert(r.avisos.join("\n")); await abrirFicha(c.id); }
+    catch (er) { msg.textContent = er.message; guardar.disabled = false; }
+  };
+}
 async function abrirFicha(id) {
   fichaId = String(id); const dlg = $("ficha");
   $("fi-nombre").textContent = "Cargando…"; $("fi-sub").textContent = ""; $("fi-badges").replaceChildren(); $("fi-cuerpo").replaceChildren(sk(120), sk(160));
@@ -1639,7 +1681,7 @@ async function abrirFicha(id) {
   if (f.sinFicha) cuerpo.push(el("div", "Este cliente ya no está en la lista de clientes (o aún no se ha importado), pero sus pedidos sí constan.", { className: "fi-aviso" }));
   if (f.esPrueba) cuerpo.push(el("div", "Cliente de prueba: sus pedidos no cuentan en las estadísticas.", { className: "fi-aviso" }));
   if (pa?.sinPedirDeMas) cuerpo.push(el("div", `Lleva ${pa.sinPedirDeMas.dias} días sin pedir y suele pedir cada ${String(pa.sinPedirDeMas.ciclo).replace(".", ",")}.`, { className: "fi-aviso" }));
-  cuerpo.push(fiSec("Datos", fiDl([["Razón social", c.razon], ["Dirección", [c.direccion, c.poblacion].filter(Boolean).join(", ")], ["Teléfonos", c.telefonos.join(" · ")], ["Correos", c.correos.join(" · ")]])));
+  cuerpo.push(seccionDatos(f));
   cuerpo.push(fiSec("Cuenta en la aplicación", f.cuenta ? fiDl([["Estado", f.cuenta.bloqueada ? "Bloqueo temporal" : f.cuenta.estado === "blocked" ? "Bloqueada" : f.cuenta.confirmada ? "Activa" : "Sin confirmar"], ["Último acceso", fechaCorta(f.cuenta.ultimoAcceso)], ["Tiene código propio", f.cuenta.codigoPropio ? "Sí" : "No (entra con su NIF)"], ["Cuenta creada", fechaCorta(f.cuenta.creada)]]) : sinDatos("Todavía no tiene cuenta en la aplicación.")));
   const chips = el("div", "", { className: "fi-chips" });
   if (pa?.pedidos) {

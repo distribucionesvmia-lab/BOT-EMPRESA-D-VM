@@ -15,6 +15,7 @@ import { runExport } from "./exporter.js";
 import { backupDb } from "./backup.js";
 import { estadoCopias, comprobarCopias } from "./copias.js";
 import { validarProgramado, MAX_PENDIENTES } from "./avisos-programados.js";
+import { validarEdicion } from "./cliente-edicion.js";
 import { detectarTipo } from "./actualizar-datos.js";
 import { crearAvisos } from "./avisos.js";
 import { execFile } from "node:child_process";
@@ -438,6 +439,16 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       }
       // ---- Ficha de un cliente: todo lo suyo en un sitio (sin NIF: no se guarda) ----
       { const mf = /^\/api\/admin\/cliente\/([\w-]{1,20})\/ficha$/.exec(p);
+        // Editar la ficha a mano (teléfonos, correos, dirección…): se guarda aparte y las importaciones de a3ERP no lo borran
+        if (mf && post) {
+          const id = mf[1], c0 = customers.getById(id); if (!c0) return send(res, 404, { error: "No existe ese cliente." }), true;
+          const v = validarEdicion((await readJson(req)) ?? {}); if (v.error) return send(res, 400, { error: v.error }), true;
+          customers.editar(id, v.patch);
+          const avisos = []; // teléfono o correo que ya tiene otro cliente: se permite (hay teléfonos compartidos), pero se avisa
+          for (const t of v.patch.phones ?? []) { const otros = customers.search({ q: t, limit: 5 }).rows.filter((r) => String(r.id) !== id && (String(r.phones ?? "").includes(t) || String(r.phone ?? "").includes(t))); if (otros.length) avisos.push(`El teléfono ${t} también lo tiene ${otros.map((r) => r.name).join(", ")}.`); }
+          for (const e of v.patch.emails ?? []) { const otros = customers.search({ q: e, limit: 5 }).rows.filter((r) => String(r.id) !== id && String(r.emails ?? "").toLowerCase().includes(e)); if (otros.length) avisos.push(`El correo ${e} también lo tiene ${otros.map((r) => r.name).join(", ")}.`); }
+          return send(res, 200, { ok: true, avisos }), true;
+        }
         if (mf && get) {
           const id = mf[1], c0 = customers.getById(id), cu = accounts.listAccounts().find((a) => String(a.customerId) === id), todos = orders.listOrders({ limit: 5000 }).filter((o) => String(o.customer_id) === id), fijo = accounts.getStanding(id);
           if (!c0 && !todos.length && !cu) return send(res, 404, { error: "No existe ese cliente." }), true;
@@ -445,6 +456,7 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
           const c = c0 ?? { id, name: todos[0]?.name ?? "Cliente " + id, legalName: "", city: "", municipio: "", address: "", phone: "", phones: [], emails: [], recargoEquivalencia: false, active: false, orders: [] };
           const compra = c.orders?.[0] ?? null;
           return send(res, 200, {
+            manual: c0 ? { telefonos: customers.manualOf(id).phones ?? [], correos: customers.manualOf(id).emails ?? [] } : null, notas: c0 ? (customers.manualOf(id).notes ?? "") : "",
             cliente: { id: c.id, nombre: c.name, razon: c.legalName, poblacion: c.city, municipio: c.municipio, direccion: c.address, telefonos: [...new Set([c.phone, ...c.phones].filter(Boolean))], correos: c.emails, recargo: c.recargoEquivalencia, activo: c.active },
             esPrueba: esPruebaId(id), sinFicha: !c0,
             cuenta: cu ? { estado: cu.status, confirmada: cu.verified, bloqueada: cu.locked, ultimoAcceso: cu.lastLogin, creada: cu.createdAt, codigoPropio: cu.ownCode } : null,

@@ -1500,3 +1500,16 @@ test("CORREO AL CLIENTE: la preferencia necesita sesión; sin correo del servido
   assert.ok([401, 403].includes((await call("GET", "/api/admin/correo-clientes")).status));
   const r = (await call("GET", "/api/admin/correo-clientes", { admin: true })).json; for (const k of ["enviados", "sinCorreo", "errores", "ultimoError"]) assert.ok(k in r, k);
 });
+
+test("EDITAR LA FICHA DE CLIENTE: solo con la clave, valida lo que se escribe y guarda teléfonos, correos y notas", async () => {
+  assert.ok([401, 403].includes((await call("POST", "/api/admin/cliente/9001/ficha", { body: { notas: "x" } })).status));
+  const P = (id, body) => call("POST", `/api/admin/cliente/${encodeURIComponent(id)}/ficha`, { admin: true, body });
+  assert.equal((await P("NOEXISTE9", { notas: "x" })).status, 404);
+  const cli = (await call("GET", "/api/admin/clientes?q=a", { admin: true })).json[0]; assert.ok(cli, "hace falta algún cliente");
+  assert.equal((await P(cli.id, { telefonos: ["123"] })).status, 400); assert.equal((await P(cli.id, { correos: ["sin-arroba"] })).status, 400); assert.equal((await P(cli.id, {})).status, 400);
+  const r = await P(cli.id, { telefonos: ["600123456"], correos: ["nuevo@ejemplo.es"], notas: "Llamar antes de ir", municipio: "47085" }); assert.equal(r.status, 200, JSON.stringify(r.json));
+  const f = (await call("GET", `/api/admin/cliente/${encodeURIComponent(cli.id)}/ficha`, { admin: true })).json;
+  assert.ok(f.cliente.telefonos.some((t) => String(t).includes("600123456"))); assert.ok(f.cliente.correos.includes("nuevo@ejemplo.es")); assert.equal(f.notas, "Llamar antes de ir"); assert.deepEqual(f.manual.correos, ["nuevo@ejemplo.es"]); assert.ok(!/"nif/i.test(JSON.stringify(f)));
+  assert.equal((await P(cli.id, { telefonos: [], correos: [] })).status, 200); // lo añadido a mano se puede quitar
+  const g = (await call("GET", `/api/admin/cliente/${encodeURIComponent(cli.id)}/ficha`, { admin: true })).json; assert.deepEqual(g.manual.correos, []); assert.ok(!g.cliente.correos.includes("nuevo@ejemplo.es"));
+});
