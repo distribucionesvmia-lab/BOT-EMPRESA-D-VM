@@ -71,7 +71,7 @@ const LS = (gris) => ({
   descripcion: linea({ h: "left", indent: 1 }, gris),
   negrita: linea({ b: 1 }, gris),
   grisNum: linea({ color: GRIS }, gris),
-  unidadesNegras: linea({ b: 1, color: "000000" }, gris),
+  unidadesNegras: linea({ b: 1, sz: 22, color: "000000" }, gris), // mismo tamaño que el nº de cajas
   precio: linea({ color: GRIS, fmt: "#,##0.000" }, gris),
   importe: linea({ color: GRIS, fmt: 4, h: "right", indent: 1 }, gris),
 });
@@ -125,7 +125,7 @@ function orderSheet(o) {
     const st = LINE_STYLES[k % 2], porCajas = l.boxes != null && l.boxes !== 0; // k par = blanca, k impar = gris claro
     nuevaFila([
       { v: l.id, s: st.texto, from: 0 }, { v: "☐", s: st.box, from: 1 }, { v: porCajas ? l.boxes : null, s: st.cajas, from: 2 }, { v: l.name, s: st.descripcion, from: 3 },
-      { v: l.units ?? l.qty, s: porCajas ? st.grisNum : st.unidadesNegras, from: 4 }, { v: l.price ?? null, s: st.precio, from: 5 }, { v: l.discount || null, s: st.grisNum, from: 6 }, { v: l.amount, s: st.importe, from: 7 },
+      { v: l.units ?? l.qty, s: st.unidadesNegras, from: 4 }, { v: l.price ?? null, s: st.precio, from: 5 }, { v: l.discount || null, s: st.grisNum, from: 6 }, { v: l.amount, s: st.importe, from: 7 },
     ], 44); // filas más altas para que quepa la casilla grande
   });
   // TOTALES (justo debajo de las líneas, de la D a la H)
@@ -166,7 +166,7 @@ export function imprimirHtml(orders, { autoprint = true } = {}) {
     const filas = lines.map((l, k) => {
       const porCajas = l.boxes != null && l.boxes !== 0;
       return `<tr class="${k % 2 ? "g" : ""}"><td class="c">${esc(l.id)}</td><td class="chk">☐</td><td class="cajas">${porCajas ? esc(l.boxes) : ""}</td><td class="d">${esc(l.name)}</td>` +
-        `<td class="n ${porCajas ? "gr" : "b"}">${esc(l.units ?? l.qty)}</td><td class="n gr">${eur3(l.price)}</td><td class="n gr">${l.discount ? esc(l.discount) : ""}</td><td class="n gr">${eur(l.amount)}</td></tr>`;
+        `<td class="n u">${esc(l.units ?? l.qty)}</td><td class="n gr">${eur3(l.price)}</td><td class="n gr">${l.discount ? esc(l.discount) : ""}</td><td class="n gr">${eur(l.amount)}</td></tr>`;
     }).join("");
     const conNota = lines.filter((l) => String(l.note ?? "").trim());
     const nota = String(o.note ?? "").trim();
@@ -190,7 +190,7 @@ ${conNota.length ? `<div class="obsl"><b>Observaciones línea</b>${conNota.map((
 table { width:100%; border-collapse:collapse; } th { background:#dce6f4; padding:4px; border:1px solid #404040; font-size:11px; }
 td { border:1px solid #404040; padding:0 4px; height:15mm; vertical-align:middle; } tr.g td { background:#f2f2f2; }
 td.c { text-align:center; width:20mm; } td.chk { text-align:center; width:17mm; font-size:44px; line-height:1; padding:0; } td.cajas { text-align:center; width:15mm; font-weight:700; font-size:24px; }
-td.d { padding-left:6px; } td.n { text-align:right; white-space:nowrap; width:20mm; } .gr { color:#808080; } .b { font-weight:700; color:#000; }
+td.d { padding-left:6px; } td.n { text-align:right; white-space:nowrap; width:20mm; } td.u { font-weight:700; font-size:24px; text-align:center; } .gr { color:#808080; } .b { font-weight:700; color:#000; }
 .tot { width:60%; margin-left:auto; } .tot td { border:0; height:6mm; font-weight:700; } .tot td.n { font-weight:400; color:#808080; } .tot tr.fin td.n { color:#000; font-weight:700; }
 .entrega { margin:6px 0; padding:6px 10px; font-weight:700; border-radius:6px; }
 .caja { border:1px solid #7f7f7f; min-height:20mm; padding:6px 8px; white-space:pre-wrap; } .caja.rojo { color:#c00000; font-weight:700; }

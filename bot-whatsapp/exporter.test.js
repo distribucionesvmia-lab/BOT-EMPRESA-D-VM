@@ -166,14 +166,14 @@ test("hoja de pedido: cabecera sin código ni nombre de cliente, líneas con ☐
   assert.equal(Object.keys(f).some((n) => /drawing|vml|ctrlProp/i.test(n)), false);
 });
 
-test("hoja de pedido: formato de las líneas (alto 44, casilla ☐ y cajas grandes, filas alternas, cajas en negrita, cantidades y precios en gris, sin cajas → unidades en negrita y negro, centrado salvo descripción)", () => {
+test("hoja de pedido: formato de las líneas (alto 44, casilla ☐, cajas y unidades grandes, filas alternas, cajas y unidades en negrita, precios en gris, sin cajas → unidades en negrita y negro, centrado salvo descripción)", () => {
   const f = exportar([pedido("k1", {})]);
   const xml = f["xl/worksheets/sheet1.xml"];
   assert.equal([...xml.matchAll(/<row r="[56]" ht="44" customHeight="1">/g)].length, 2); // las dos líneas, filas de 44
   const caja = (ref) => estiloDe(f, xml, ref);
   assert.equal(caja("C5").negrita, true); // valor de cajas en negrita
   assert.match(f["xl/styles.xml"], /<sz val="40"/); assert.match(f["xl/styles.xml"], /<sz val="22"/); // casilla ☐ de 40 pt y cajas de 22 pt
-  assert.equal(caja("E5").color, "808080"); assert.equal(caja("E5").negrita, false); // con cajas: unidades en gris
+  assert.deepEqual([caja("E5").negrita, caja("E5").color], [true, "000000"]); // unidades en negrita y negro, del mismo tamaño que las cajas (22 pt), también con cajas
   for (const c of ["F5", "G5", "H5"]) assert.equal(caja(c).color, "808080", c); // precio, dto. e importe en gris
   assert.deepEqual([caja("E6").negrita, caja("E6").color], [true, "000000"]); // sin cajas: unidades en negrita y negro
   assert.notEqual(caja("A5").relleno, caja("A6").relleno); // una fila blanca y otra gris claro
