@@ -19,7 +19,7 @@ test("/health dice la versión en marcha y la del disco; la Ayuda la enseña (ch
 test("1. tarjeta de pedido del chat: cada línea en dos filas (nombre arriba; cantidad e importe abajo), sin ancho fijo", () => {
   assert.match(h, /\.tcard tbody tr \{ display:grid; grid-template-columns:auto minmax\(0, 1fr\)/);
   assert.match(h, /\.tcard tbody td\.c-imp \{ grid-column:2; grid-row:2; text-align:right; \}/);
-  assert.match(h, /\.tcard tfoot tr \{ display:flex; justify-content:space-between/);
+  assert.match(h, /\.tcard tfoot tr \{ display:flex; flex-wrap:wrap; justify-content:space-between/);
   assert.match(h, /<b>Histórico de pedidos<\/b>/);
 });
 test("2. cantidad con coma o punto: «1,5» se queda en 1 (nunca pasa a 15) y se avisa", () => {

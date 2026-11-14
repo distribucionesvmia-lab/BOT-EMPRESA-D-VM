@@ -9,9 +9,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { buildWorkbook } from "./xlsx.js";
+import { libre } from "./puerto-libre.js";
 
 const ADMIN = "clave-de-prueba-dos";
-const P1 = 4100 + Math.floor(Math.random() * 400), P2 = P1 + 500;
+const P1 = await libre(), P2 = await libre();
 const CLI = `http://127.0.0.1:${P1}`, EMP = `http://127.0.0.1:${P2}`;
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-dos-"));
 const aqui = path.dirname(fileURLToPath(import.meta.url));

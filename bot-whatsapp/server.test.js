@@ -10,9 +10,10 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { openDb } from "./db.js";
+import { libre } from "./puerto-libre.js";
 
 const ADMIN = "clave-de-prueba";
-const PORT = 3900 + Math.floor(Math.random() * 90);
+const PORT = await libre();
 const BASE = `http://127.0.0.1:${PORT}`;
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-srv-"));
 let proc;
@@ -281,7 +282,7 @@ test("EMPRESA: exporta a Excel una sola vez y se puede descargar", async () => {
 
 // ---- Dos aplicaciones separadas: lo del cliente no tiene nada de la empresa y al revés ----
 async function arrancar(mode) {
-  const port = 3990 + Math.floor(Math.random() * 9) + (mode === "empresa" ? 10 : 0);
+  const port = await libre();
   const d = fs.mkdtempSync(path.join(os.tmpdir(), "vm-mode-"));
   const p = spawn(process.execPath, ["server.js"], {
     cwd: path.dirname(fileURLToPath(import.meta.url)),
