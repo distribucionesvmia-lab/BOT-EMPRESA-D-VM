@@ -541,7 +541,7 @@ async function appRoutes(req, res, url) {
     if (!o || o.customer_id !== String(account.customerId) || o.status === "cancelled") return void sendJson(res, 404, { error: "No encontramos ese pedido." });
     const c = customerDirectory.getById(account.customerId);
     const buf = pdfPedido(datosPdf(o, { empresa: BUSINESS.name, cliente: c?.name ?? "" }));
-    return void res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="pedido-${o.ref}.pdf"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": buf.length }).end(buf);
+    return void res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `${url.searchParams.has("descargar") ? "attachment" : "inline"}; filename="pedido-${o.ref}.pdf"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": buf.length }).end(buf);
   }
   if (p === "/api/ayuda" && req.method === "GET") return void sendJson(res, 200, { ayuda: ayudaPublica() }); // datos públicos de contacto de la empresa
   // Datos de la pantalla de Inicio del cliente: lo que suele pedir, lo más pedido, categorías y fotos de su último pedido (todo de su catálogo; nada de otros clientes)

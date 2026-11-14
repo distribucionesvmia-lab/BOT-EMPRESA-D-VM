@@ -553,6 +553,17 @@
   @media (max-width:599px) { .vm-inicio .in-hscroll { -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 40px), transparent); mask-image:linear-gradient(to right, #000 calc(100% - 40px), transparent); } } /* el borde difuminado avisa de que hay más tarjetas */
   @media (min-width:600px) { .mrow:has(.vm-inicio) { max-width:none; width:100%; } #chat .mrow .vm-inicio, .vm-inicio { max-width:none; } .vm-inicio .in-hscroll { flex-wrap:wrap; overflow:visible; margin:0; padding:0; } .vm-inicio .in-prod { width:176px; } .vm-inicio .in-hacer { max-width:none; } }
   @media (min-width:1024px) { .vm-inicio .in-hacer { max-width:360px; } }
+
+  /* Visor de PDF con «Cerrar» */
+  .pdf-visor { position:fixed; inset:0; z-index:300; display:flex; flex-direction:column; background:var(--bg); }
+  .pdf-cab { display:flex; align-items:center; gap:var(--s2); padding:max(var(--s2), env(safe-area-inset-top)) var(--s3) var(--s2); background:var(--bar); color:var(--on-bar); }
+  .pdf-cerrar, .pdf-desc, .pdf-abre { display:inline-flex; align-items:center; justify-content:center; gap:var(--s1); min-height:44px; padding:0 var(--s4); border:0; border-radius:var(--r-pill); background:var(--surface); color:var(--accent); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; text-decoration:none; cursor:pointer; flex:none; }
+  .pdf-cerrar { padding:0 var(--s4) 0 var(--s3); } .pdf-cerrar svg { width:20px; height:20px; display:block; }
+  .pdf-tit { flex:1; min-width:0; text-align:center; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pdf-cuerpo { flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; background:#fff; }
+  .pdf-marco { display:block; width:100%; height:100%; border:0; background:#fff; }
+  .pdf-aviso { display:flex; flex-direction:column; align-items:center; gap:var(--s4); padding:var(--s10) var(--s6); text-align:center; color:#1d1d1f; background:var(--bg); min-height:100%; } .pdf-aviso p { margin:0; color:var(--text); } .pdf-abre { background:var(--accent); color:var(--on-accent); }
+  @media (max-width:359px) { .pdf-tit { display:none; } .pdf-cab { justify-content:space-between; } }
 </style>
 </head>
 <body>
@@ -856,6 +867,29 @@ async function pintarAvisos(box) {
   }
   box.appendChild(msg);
 }
+// Visor de PDF dentro de la app, con «Cerrar» y «Descargar» (en la app instalada no hay barra del navegador: sin esto no se podía salir del PDF)
+function abrirPdf(url, nombre) {
+  const viejo = document.getElementById("pdf-visor"); if (viejo) viejo.remove();
+  const v = document.createElement("div"); v.id = "pdf-visor"; v.className = "pdf-visor"; v.setAttribute("role", "dialog"); v.setAttribute("aria-modal", "true"); v.setAttribute("aria-label", nombre || "Pedido en PDF");
+  const cab = document.createElement("div"); cab.className = "pdf-cab";
+  const x = document.createElement("button"); x.type = "button"; x.className = "pdf-cerrar"; x.setAttribute("aria-label", "Cerrar el PDF");
+  x.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>Cerrar</span>';
+  const t = document.createElement("span"); t.className = "pdf-tit"; t.textContent = nombre || "Pedido";
+  const d = document.createElement("a"); d.className = "pdf-desc"; d.href = url + (url.includes("?") ? "&" : "?") + "descargar=1"; d.setAttribute("download", ""); d.textContent = "Descargar";
+  cab.append(x, t, d); v.appendChild(cab);
+  const cuerpo = document.createElement("div"); cuerpo.className = "pdf-cuerpo";
+  if (navigator.pdfViewerEnabled === false) { // este móvil no enseña PDF dentro de una página: se ofrece abrirlo o descargarlo, y «Cerrar» sigue ahí
+    const m = document.createElement("div"); m.className = "pdf-aviso"; const p = document.createElement("p"); p.textContent = "Tu móvil abre los PDF fuera de la aplicación.";
+    const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; a.className = "pdf-abre"; a.textContent = "Abrir el PDF"; m.append(p, a); cuerpo.appendChild(m);
+  } else { const f = document.createElement("iframe"); f.className = "pdf-marco"; f.src = url; f.title = nombre || "Pedido en PDF"; cuerpo.appendChild(f); }
+  v.appendChild(cuerpo);
+  let empujado = false;
+  const cierra = (desdeAtras) => { v.remove(); document.removeEventListener("keydown", esc); removeEventListener("popstate", atras); if (empujado && !desdeAtras) { try { history.back(); } catch {} } };
+  const esc = (e) => { if (e.key === "Escape") cierra(); }; const atras = () => cierra(true);
+  x.onclick = () => cierra(); document.addEventListener("keydown", esc);
+  try { history.pushState({ pdf: 1 }, ""); empujado = true; addEventListener("popstate", atras); } catch {} // «Atrás» del móvil también cierra el PDF
+  document.body.appendChild(v); x.focus();
+}
 async function abrirCuenta(irAPedidos) {
   menu(false); const B = $("cu-cuerpo"); B.innerHTML = '<div class="cu-esq" aria-hidden="true"><div class="sk" style="height:96px"></div><div class="sk" style="height:20px;width:40%"></div><div class="sk" style="height:76px"></div><div class="sk" style="height:76px"></div></div><span class="solo-lector" role="status">Un momento…</span>'; $("m-cuenta").hidden = false;
   const j = await fetch("/api/mi-cuenta").then((r) => (r.ok ? r.json() : null)).catch(() => null); B.innerHTML = "";
@@ -890,7 +924,7 @@ async function abrirCuenta(irAPedidos) {
     const rep = nodo("button", "Repetir pedido", "vm-btn primary"); rep.type = "button"; rep.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&r=1&x=1"; };
     const add = nodo("button", "Añadir al carrito", "vm-btn ghost"); add.type = "button"; add.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&a=1"; };
     acc.append(rep, add);
-    if (o.origen === "app" && /^VM-\d{4}-\d{6}$/.test(o.doc)) { const pdf = nodo("a", "Descargar PDF", "vm-btn ghost"); pdf.href = "/api/pedido/" + encodeURIComponent(o.doc) + "/pdf"; pdf.setAttribute("download", "pedido-" + o.doc + ".pdf"); pdf.setAttribute("aria-label", "Descargar el pedido " + o.doc + " en PDF"); acc.appendChild(pdf); } // el PDF solo existe para los pedidos hechos en la aplicación
+    if (o.origen === "app" && /^VM-\d{4}-\d{6}$/.test(o.doc)) { const pdf = nodo("button", "Ver PDF", "vm-btn ghost"); pdf.type = "button"; pdf.setAttribute("aria-label", "Ver el pedido " + o.doc + " en PDF (con botón para cerrarlo)"); pdf.onclick = () => abrirPdf("/api/pedido/" + encodeURIComponent(o.doc) + "/pdf", "Pedido " + o.doc); acc.appendChild(pdf); } // el PDF solo existe para los pedidos hechos en la aplicación
     if (o.editable) { const m = nodo("button", "Modificar pedido", "vm-btn ghost"); m.type = "button"; m.onclick = () => { location.href = "/catalogo#m=" + encodeURIComponent(o.doc); }; acc.appendChild(m); }
     c.appendChild(acc); if (o.editable && o.hasta) c.appendChild(nodo("small", o.hasta));
     B.appendChild(c);

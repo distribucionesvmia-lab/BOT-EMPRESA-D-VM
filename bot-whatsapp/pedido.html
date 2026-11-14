@@ -1157,6 +1157,17 @@
     .pf-fav svg { width:24px; height:24px; left:0; top:0; }
   }
   @media (min-width:1024px) { .pf-fav { position:absolute; left:calc(var(--s3) + 2px); top:calc(var(--s3) + 2px); width:44px; height:44px; margin:0; } .pf-fav::before { width:34px; height:34px; } .pf-fav svg { width:20px; height:20px; left:0; top:0; } }
+
+  /* Visor de PDF con «Cerrar» */
+  .pdf-visor { position:fixed; inset:0; z-index:300; display:flex; flex-direction:column; background:var(--bg); }
+  .pdf-cab { display:flex; align-items:center; gap:var(--s2); padding:max(var(--s2), env(safe-area-inset-top)) var(--s3) var(--s2); background:var(--bar); color:var(--on-bar); }
+  .pdf-cerrar, .pdf-desc, .pdf-abre { display:inline-flex; align-items:center; justify-content:center; gap:var(--s1); min-height:44px; padding:0 var(--s4); border:0; border-radius:var(--r-pill); background:var(--surface); color:var(--accent); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; text-decoration:none; cursor:pointer; flex:none; }
+  .pdf-cerrar { padding:0 var(--s4) 0 var(--s3); } .pdf-cerrar svg { width:20px; height:20px; display:block; }
+  .pdf-tit { flex:1; min-width:0; text-align:center; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pdf-cuerpo { flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch; background:#fff; }
+  .pdf-marco { display:block; width:100%; height:100%; border:0; background:#fff; }
+  .pdf-aviso { display:flex; flex-direction:column; align-items:center; gap:var(--s4); padding:var(--s10) var(--s6); text-align:center; color:#1d1d1f; background:var(--bg); min-height:100%; } .pdf-aviso p { margin:0; color:var(--text); } .pdf-abre { background:var(--accent); color:var(--on-accent); }
+  @media (max-width:359px) { .pdf-tit { display:none; } .pdf-cab { justify-content:space-between; } }
 </style>
 </head>
 <body>
@@ -1228,7 +1239,7 @@
     </div>
 
   <section class="screen" id="done" hidden>
-    <div class="ok"><svg class="tick-svg" viewBox="0 0 52 52" aria-hidden="true" focusable="false"><circle cx="26" cy="26" r="24" fill="none" stroke="currentColor" stroke-width="3"/><path class="tick-trazo" d="M15 27l8 8 14-16" fill="none" stroke="currentColor" stroke-width="3.500" stroke-linecap="round" stroke-linejoin="round"/></svg><h2 id="doneT">¡Pedido recibido!</h2><p id="doneRef" class="done-ref" hidden></p><p id="doneP" style="color:var(--gris)"></p><p id="modInfo" style="color:var(--gris);margin:6px 0" hidden></p><button type="button" class="big sec" id="modBtn" hidden style="margin:8px 0">Modificar pedido</button><div class="done-btns"><button type="button" class="big" id="doneVer" hidden>Ver pedido</button><a class="big sec" id="donePdf" href="#" hidden download>Descargar PDF</a><a class="big sec" id="doneInicio" href="/cliente">Volver al inicio</a></div></div>
+    <div class="ok"><svg class="tick-svg" viewBox="0 0 52 52" aria-hidden="true" focusable="false"><circle cx="26" cy="26" r="24" fill="none" stroke="currentColor" stroke-width="3"/><path class="tick-trazo" d="M15 27l8 8 14-16" fill="none" stroke="currentColor" stroke-width="3.500" stroke-linecap="round" stroke-linejoin="round"/></svg><h2 id="doneT">¡Pedido recibido!</h2><p id="doneRef" class="done-ref" hidden></p><p id="doneP" style="color:var(--gris)"></p><p id="modInfo" style="color:var(--gris);margin:6px 0" hidden></p><button type="button" class="big sec" id="modBtn" hidden style="margin:8px 0">Modificar pedido</button><div class="done-btns"><button type="button" class="big" id="doneVer" hidden>Ver pedido</button><a class="big sec" id="donePdf" href="#" hidden>Ver PDF</a><a class="big sec" id="doneInicio" href="/cliente">Volver al inicio</a></div></div>
   </section>
 </div>
 
@@ -2297,6 +2308,29 @@ $("calSig").onclick = () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } p
 $("calCerrar").onclick = () => ($("calFondo").hidden = true);
 arrastrable(document.querySelector(".cal"), () => ($("calFondo").hidden = true));
 $("calOk").onclick = () => { if (cal.sel) { $("calFondo").hidden = true; diaPersonal = !(data.delivery || []).some(o => o.date === cal.sel); elegirDia(cal.sel); } };
+// Visor de PDF dentro de la app, con «Cerrar» y «Descargar» (en la app instalada no hay barra del navegador: sin esto no se podía salir del PDF)
+function abrirPdf(url, nombre) {
+  const viejo = document.getElementById("pdf-visor"); if (viejo) viejo.remove();
+  const v = document.createElement("div"); v.id = "pdf-visor"; v.className = "pdf-visor"; v.setAttribute("role", "dialog"); v.setAttribute("aria-modal", "true"); v.setAttribute("aria-label", nombre || "Pedido en PDF");
+  const cab = document.createElement("div"); cab.className = "pdf-cab";
+  const x = document.createElement("button"); x.type = "button"; x.className = "pdf-cerrar"; x.setAttribute("aria-label", "Cerrar el PDF");
+  x.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>Cerrar</span>';
+  const t = document.createElement("span"); t.className = "pdf-tit"; t.textContent = nombre || "Pedido";
+  const d = document.createElement("a"); d.className = "pdf-desc"; d.href = url + (url.includes("?") ? "&" : "?") + "descargar=1"; d.setAttribute("download", ""); d.textContent = "Descargar";
+  cab.append(x, t, d); v.appendChild(cab);
+  const cuerpo = document.createElement("div"); cuerpo.className = "pdf-cuerpo";
+  if (navigator.pdfViewerEnabled === false) { // este móvil no enseña PDF dentro de una página: se ofrece abrirlo o descargarlo, y «Cerrar» sigue ahí
+    const m = document.createElement("div"); m.className = "pdf-aviso"; const p = document.createElement("p"); p.textContent = "Tu móvil abre los PDF fuera de la aplicación.";
+    const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; a.className = "pdf-abre"; a.textContent = "Abrir el PDF"; m.append(p, a); cuerpo.appendChild(m);
+  } else { const f = document.createElement("iframe"); f.className = "pdf-marco"; f.src = url; f.title = nombre || "Pedido en PDF"; cuerpo.appendChild(f); }
+  v.appendChild(cuerpo);
+  let empujado = false;
+  const cierra = (desdeAtras) => { v.remove(); document.removeEventListener("keydown", esc); removeEventListener("popstate", atras); if (empujado && !desdeAtras) { try { history.back(); } catch {} } };
+  const esc = (e) => { if (e.key === "Escape") cierra(); }; const atras = () => cierra(true);
+  x.onclick = () => cierra(); document.addEventListener("keydown", esc);
+  try { history.pushState({ pdf: 1 }, ""); empujado = true; addEventListener("popstate", atras); } catch {} // «Atrás» del móvil también cierra el PDF
+  document.body.appendChild(v); x.focus();
+}
 function mostrarErrorEnvio(errBox, mensaje, reintentar) {
   const sinRed = /failed to fetch|networkerror|load failed|network/i.test(mensaje);
   errBox.replaceChildren(estadoVacio({ icono: sinRed ? "nube" : "alerta", titulo: sinRed ? "Sin conexión" : "No se ha podido enviar", texto: sinRed ? "Tu pedido sigue guardado en este móvil. Comprueba tu conexión e inténtalo de nuevo." : mensaje, boton: "Reintentar", onclick: () => { errBox.textContent = ""; reintentar(); } }));
@@ -2320,7 +2354,7 @@ async function enviarPedido(delivery, errBox) {
     $("modInfo").hidden = !j.modificable; $("modInfo").textContent = j.modificable ? j.modificable + "." : ""; $("modBtn").hidden = !(j.modificable && j.ref); if (j.ref) $("modBtn").onclick = () => modificar(j.ref);
     modificando = null; $("modBanner").hidden = true;
     $("doneP").textContent = String(j.message || "").replace(/\*/g, "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim(); $("cart").hidden = true; diaElegido = null; diaPersonal = false; $("done").hidden = false; marcaNav();
-    $("doneRef").hidden = !j.ref; $("doneRef").textContent = j.ref ? "Referencia " + j.ref : ""; $("donePdf").hidden = !j.ref; if (j.ref) { $("donePdf").href = "/api/pedido/" + encodeURIComponent(j.ref) + "/pdf"; $("donePdf").setAttribute("download", "pedido-" + j.ref + ".pdf"); } $("doneVer").hidden = false; $("doneVer").onclick = () => { location.href = "/cliente#cuenta"; };
+    $("doneRef").hidden = !j.ref; $("doneRef").textContent = j.ref ? "Referencia " + j.ref : ""; $("donePdf").hidden = !j.ref; if (j.ref) { const u = "/api/pedido/" + encodeURIComponent(j.ref) + "/pdf"; $("donePdf").href = u; $("donePdf").onclick = ev => { ev.preventDefault(); abrirPdf(u, "Pedido " + j.ref); }; } $("doneVer").hidden = false; $("doneVer").onclick = () => { location.href = "/cliente#cuenta"; };
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
   } catch (e) {
     btn.disabled = false; btn.textContent = textoBtn; btn.classList.remove("hecho"); btn.classList.add("sacude"); setTimeout(() => btn.classList.remove("sacude"), 360); errBox.textContent = ""; mostrarErrorEnvio(errBox, e.message, () => enviarPedido(delivery, errBox));

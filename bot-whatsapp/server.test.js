@@ -723,7 +723,8 @@ test("PDF DEL PEDIDO: el cliente descarga SU pedido; sin sesión 401; el de otro
   const env = await call("POST", "/catalogo", { cookie: A, body: { key: "pdf-clave-1", lines: [{ id: "1010", qty: 2, unit: "ud" }], delivery: null } });
   assert.equal(env.status, 200); const ref = env.json.ref; assert.match(ref, /^VM-\d{4}-\d{6}$/);
   const r = await fetch(`http://localhost:${PORT}/api/pedido/${ref}/pdf`, { headers: { cookie: A } });
-  assert.equal(r.status, 200); assert.match(r.headers.get("content-type"), /application\/pdf/); assert.match(r.headers.get("content-disposition"), /attachment; filename="pedido-VM-/);
+  assert.equal(r.status, 200); assert.match(r.headers.get("content-type"), /application\/pdf/); assert.match(r.headers.get("content-disposition"), /^inline; filename="pedido-VM-/); // se ve dentro de la app (con «Cerrar»)
+  const d = await fetch(`http://localhost:${PORT}/api/pedido/${ref}/pdf?descargar=1`, { headers: { cookie: A } }); assert.match(d.headers.get("content-disposition"), /^attachment; filename="pedido-VM-/); // «Descargar»
   const buf = Buffer.from(await r.arrayBuffer());
   assert.equal(buf.subarray(0, 5).toString(), "%PDF-"); assert.match(buf.subarray(-6).toString(), /%%EOF/); assert.ok(buf.toString("latin1").includes(ref));
   const otro = await fetch(`http://localhost:${PORT}/api/pedido/${ref}/pdf`, { headers: { cookie: B } });

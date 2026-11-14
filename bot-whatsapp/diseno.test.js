@@ -253,3 +253,12 @@ test("tanda 4 (carrito y favoritos): cantidad solo entera y seleccionada al toca
   assert.match(pedido, /IVA \$\{String\(g\.v\)\.replace\("\.", ","\)\} % \(sobre/); // 13
   assert.match(pedido, /placeholder="Buscar productos"/); // 14
 });
+
+test("PDF: se ve dentro de la app con botón «Cerrar» (y «Descargar»), «Atrás» también cierra, y si el móvil no enseña PDFs dentro de la página se ofrece abrirlo", () => {
+  const cli = leer("./cliente.html");
+  for (const h of [cli, pedido]) {
+    assert.match(h, /function abrirPdf\(url, nombre\)/); assert.match(h, /x\.setAttribute\("aria-label", "Cerrar el PDF"\)/); assert.match(h, /d\.setAttribute\("download", ""\)/);
+    assert.match(h, /navigator\.pdfViewerEnabled === false/); assert.match(h, /history\.pushState\(\{ pdf: 1 \}/); assert.match(h, /\.pdf-cerrar, \.pdf-desc, \.pdf-abre \{[^}]*min-height:44px/);
+  }
+  assert.match(cli, /nodo\("button", "Ver PDF", "vm-btn ghost"\)/); assert.match(pedido, /id="donePdf" href="#" hidden>Ver PDF</);
+});
