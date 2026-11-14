@@ -41,3 +41,10 @@ test("fila compacta: precio con 2 decimales (3 solo si <1 € y el tercero no es
   assert.match(pedido, /\.pf-step \{[^}]*height:44px/); assert.match(pedido, /\.pf-add \{ width:44px; height:44px; border:0; border-radius:50%/);
   assert.match(pedido, /\.pf-n \{[^}]*-webkit-line-clamp:2/); assert.match(pedido, /prefers-reduced-motion: reduce\) \{ \.pf-step \{ animation:none/);
 });
+
+test("botones redondos con icono: el icono va centrado y el globo del carrito no lo empuja", () => {
+  assert.match(pedido, /header \.ds-circ, \.ds-circ \{ display:inline-flex; align-items:center; justify-content:center; gap:0; padding:0; width:44px; height:44px;/);
+  assert.match(pedido, /header \.cartbtn \.ds-dot, \.cartbtn span\.ds-dot \{ position:absolute;/);
+  assert.match(pedido, /\.ayudabtn::before \{ content:none; \}/);
+  assert.match(pedido, /minus\.innerHTML = '<svg/); assert.match(pedido, /plus\.innerHTML = '<svg/); // «−» y «+» del carrito son dibujos centrados, no letras
+});

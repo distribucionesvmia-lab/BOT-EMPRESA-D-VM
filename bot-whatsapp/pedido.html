@@ -786,6 +786,33 @@
   .cat .ico svg { width:28px; height:28px; display:block; }
   .cat b { font-size:calc(var(--t-prod) / var(--k,1)); font-weight:600; letter-spacing:-.01em; line-height:1.2; }
   .cat small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); }
+
+  /* Botones redondos con icono: el icono SIEMPRE centrado (el globo del número va aparte, flotando, y no empuja al icono) */
+  header .ds-circ, .ds-circ { display:inline-flex; align-items:center; justify-content:center; gap:0; padding:0; width:44px; height:44px; min-width:44px; min-height:44px; border-radius:50%; font-size:0; line-height:0; }
+  header .ds-circ svg { margin:0; flex:none; }
+  .ayudabtn::before { content:none; }
+  header .cartbtn .ds-dot, .cartbtn span.ds-dot { position:absolute; top:-4px; right:-4px; left:auto; min-width:20px; width:auto; height:20px; padding:0 5px; border-radius:var(--r-pill); background:var(--text); color:#fff; font-size:calc(var(--t-micro) / var(--k,1)); font-weight:700; line-height:1; display:grid; place-items:center; box-shadow:0 0 0 2px var(--accent); }
+  .cartbtn .ds-dot[hidden] { display:none; }
+  .pf-fav { display:grid; place-items:center; }
+  .pf-fav::before { left:50%; top:50%; transform:translate(-50%, -50%); }
+  .pf-fav svg { left:0; top:0; }
+
+  /* Corazón y cabecera: sin borde gris, misma presencia que «Aa» */
+  header .ds-circ, header .ds-circ.cartbtn { border:0; }
+  .pf-fav { left:calc(max(var(--gutter), calc((100% - 860px) / 2)) - 11px); top:-3px; }
+  .pf-av { font-size:calc(20px / var(--k,1)); }
+  /* Controles del carrito con el mismo diseño que la fila: selector Cajas|Uds en píldora, contador en píldora suave, «Quitar» discreto */
+  .tl .ud, .cl .cmid .ud { display:inline-flex; align-items:center; gap:0; min-width:0; height:36px; padding:2px; border:0; border-radius:var(--r-pill); background:var(--field); }
+  .tl .ud button, .cl .cmid .ud button { position:relative; min-height:32px; height:32px; min-width:56px; padding:0 var(--s3); border:0; border-radius:var(--r-pill); background:transparent; color:var(--text-2); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; }
+  .tl .ud button::after, .cl .cmid .ud button::after { content:""; position:absolute; inset:-6px 0; }
+  .tl .ud button.on, .cl .cmid .ud button.on, .tl .ud button[aria-pressed="true"], .cl .cmid .ud button[aria-pressed="true"] { background:var(--surface); color:var(--text); box-shadow:0 0 0 .5px var(--mat-line); }
+  .tl .hstep, .cl .hstep { display:inline-flex; align-items:center; height:44px; border:0; border-radius:var(--r-pill); background:var(--accent-soft); overflow:hidden; }
+  .tl .hstep button, .cl .hstep button { width:44px; height:44px; padding:0; border:0; background:transparent; color:var(--accent); font-size:calc(24px / var(--k,1)); font-weight:600; line-height:1; display:grid; place-items:center; }
+  .tl .hstep input, .cl .hstep input { width:48px; height:44px; padding:0; font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; background:transparent; font-variant-numeric:tabular-nums; }
+  .tl .hstep button:active, .cl .hstep button:active { background:rgba(200,16,46,.12); transform:scale(.97); }
+  .tl .cx, .cl .cx { min-height:44px; padding:0 var(--s4); border:0; border-radius:var(--r-pill); background:var(--fill); color:var(--text-2); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; margin:0; }
+  .tl .hstep button svg, .cl .hstep button svg { width:20px; height:20px; display:block; }
+  .tl .tl-obs button, .cl .cobs button { min-height:44px; border-radius:var(--r-pill); color:var(--accent); font-weight:600; }
 </style>
 </head>
 <body>
@@ -1331,9 +1358,9 @@ function tablaLineas(ls) {
       box.appendChild(sel);
     }
     const st = document.createElement("div"); st.className = "hstep";
-    const minus = document.createElement("button"); minus.type = "button"; minus.textContent = "−"; minus.setAttribute("aria-label", "Quitar uno de " + l.name); minus.onclick = () => setQty(l.id, l.qty - 1);
+    const minus = document.createElement("button"); minus.type = "button"; minus.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'; minus.setAttribute("aria-label", "Quitar uno de " + l.name); minus.onclick = () => setQty(l.id, l.qty - 1);
     const inp = document.createElement("input"); inp.type = "number"; inp.inputMode = "numeric"; inp.pattern = "[0-9]*"; inp.min = 0; inp.max = 999; inp.onfocus = () => inp.select(); inp.value = l.qty; inp.setAttribute("aria-label", "Cantidad de " + l.name); inp.onchange = () => setQty(l.id, inp.value);
-    const plus = document.createElement("button"); plus.type = "button"; plus.textContent = "+"; plus.setAttribute("aria-label", "Añadir uno de " + l.name); plus.onclick = () => setQty(l.id, l.qty + 1);
+    const plus = document.createElement("button"); plus.type = "button"; plus.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'; plus.setAttribute("aria-label", "Añadir uno de " + l.name); plus.onclick = () => setQty(l.id, l.qty + 1);
     st.append(minus, inp, plus); box.appendChild(st); q.appendChild(box);
     // Importe + unidades + quitar
     const m = tr.insertCell(); m.className = "tl-imp";
