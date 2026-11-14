@@ -247,6 +247,10 @@
   }
   @media (max-width: 560px) { #sol tr:not([hidden]) { grid-template-columns:minmax(0, 1fr); } #sol .acc-col, #sol td > .row { grid-template-columns:minmax(0, 1fr); } }
   .scroll:has(+ .vacio:not([hidden])), .vacio:not([hidden]) + .scroll { display:none; } #inv-card > label { max-width:420px; } #inv-card > details { margin-top:16px; }
+  /* líneas de un pedido desplegado: nombre arriba y, debajo, código · unidades · precio · importe, ajustándose al ancho de la celda (no ensanchan la tabla) */
+  #ped .lines, #ped .lines tbody { display:block; width:100%; margin-top:6px; } #ped .lines tr { display:flex; flex-wrap:wrap; gap:1px 10px; padding:6px 0; border-top:1px dashed var(--line); align-items:baseline; }
+  #ped .lines td { padding:0; white-space:nowrap; font-size:12.5px; color:var(--muted); } #ped .lines td:nth-child(2) { order:-1; flex:1 1 100%; white-space:normal; font-weight:600; color:var(--fg); }
+  #ped .lines td:nth-child(5) { margin-left:auto; font-weight:600; color:var(--fg); } #ped .lines td:nth-child(6) { flex:1 1 100%; white-space:normal; } #ped .lines td:nth-child(6):empty { display:none; }
   @media (prefers-reduced-motion: reduce) { #app > div, details.panel > :not(summary) { animation:none !important; } }
   @media (max-width: 640px) { .pag-cab h1 { font-size:19px; } .panel { padding:16px; } .panel > p.muted { font-size:13.5px; } }
 </style>

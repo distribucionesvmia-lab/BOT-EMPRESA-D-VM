@@ -35,3 +35,7 @@ test("transiciones suaves y foco visible, y todo se queda quieto con «reducir m
   assert.match(e, /@keyframes pagIn/); assert.match(e, /@media \(prefers-reduced-motion: reduce\) \{ #app > div, details\.panel > :not\(summary\) \{ animation:none !important; \}/);
   assert.match(e, /button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, a:focus-visible, \.tab:focus-visible \{ outline:3px solid var\(--accent\);/);
 });
+
+test("pedido desplegado: las líneas se adaptan al ancho de la celda y no ensanchan la tabla", () => {
+  assert.match(e, /#ped \.lines tr \{ display:flex; flex-wrap:wrap;/); assert.match(e, /#ped \.lines td:nth-child\(2\) \{ order:-1; flex:1 1 100%;/); // el nombre arriba y debajo código, unidades, precio e importe
+});
