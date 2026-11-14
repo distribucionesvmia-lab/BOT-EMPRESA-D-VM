@@ -105,3 +105,9 @@ test("PANEL: botones de descarga y tarjeta de copias en empresa.html; rutas de s
   assert.ok(!/copias.*(restaurar|unlink|rmSync)/.test(leer("./copias.js").replace(/\/\/.*$/gm, "")), "copias.js no borra ni restaura");
   assert.ok(!leer("./exporter.js").includes("estadisticas-export"), "el Excel de a3ERP no se toca");
 });
+
+test("CLIENTE (iPhone): la franja de la hora va en rojo sólido, sin degradado", () => {
+  const h = leer("./cliente.html");
+  assert.match(h, /html::before \{ content:""; position:fixed; top:0; left:0; right:0; height:env\(safe-area-inset-top\); background:var\(--bar\)/);
+  assert.match(h, /<meta name="theme-color" content="#C8102E">/);
+});

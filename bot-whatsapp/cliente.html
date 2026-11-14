@@ -123,7 +123,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#d90000">
+<meta name="theme-color" content="#C8102E">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Pedidos VM">
@@ -410,6 +410,8 @@
   /* Logo y cabecera rojos como los originales (el logo es un óvalo blanco con letras transparentes: solo se ve sobre rojo) */
   .ds-logo { background:transparent; padding:0; height:auto; border-radius:0; }
   .ds-logo img, .bar .ds-logo img { height:34px; width:auto; }
+  /* iPhone: la franja de la hora y la batería va en el mismo rojo que la cabecera (sin degradado blanco→rojo) */
+  html::before { content:""; position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); background:var(--bar); z-index:900; pointer-events:none; }
   .bar, .phone.scrolled .bar { background:var(--bar); color:var(--on-bar); border-bottom-color:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; }
   .bar .bar-titulo { color:var(--on-bar); }
   @media (max-width:479px) { .bar-titulo { display:none; } .phone.scrolled .titulo-bloque { max-height:140px; opacity:1; padding-top:var(--s2); padding-bottom:var(--s2); } }
