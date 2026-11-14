@@ -353,6 +353,17 @@
   .cu-ped ul { margin:var(--s1) 0 0; padding-left:20px; } .cu-ped li { margin:3px 0; }
   .cu-acc { display:flex; flex-wrap:wrap; gap:var(--s2); } .cu-acc .vm-btn { width:auto; flex:1 1 150px; font-size:calc(var(--t-sec) / var(--k,1)); }
   .cu-ped small { color:var(--text-2); font-size:calc(var(--t-cap) / var(--k,1)); }
+
+  /* Logo y cabecera rojos como los originales (el logo es un óvalo blanco con letras transparentes: solo se ve sobre rojo) */
+  .ds-logo { background:transparent; padding:0; height:auto; border-radius:0; }
+  .ds-logo img, .bar .ds-logo img { height:34px; width:auto; }
+  .bar, .phone.scrolled .bar { background:var(--accent); color:var(--on-accent); border-bottom-color:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; }
+  .bar .bar-titulo { color:var(--on-accent); }
+  @media (max-width:479px) { .bar-titulo { display:none; } .phone.scrolled .titulo-bloque { max-height:140px; opacity:1; padding-top:var(--s2); padding-bottom:var(--s2); } }
+  .vm .hero { background:var(--accent); color:var(--on-accent); margin-top:calc(-1 * (var(--s8) + env(safe-area-inset-top))); padding:calc(var(--s8) + env(safe-area-inset-top)) var(--gutter) var(--s8); clip-path:inset(0 -100vmax); box-shadow:0 0 0 100vmax var(--accent); }
+  .vm .hero h1, .vm .hero p { color:var(--on-accent); }
+  .vm .hero .ds-logo.grande { padding:0; margin:0 auto var(--s5); }
+  .vm .hero .ds-logo.grande img { width:min(220px, 56vw); height:auto; }
 </style>
 </head>
 <body>

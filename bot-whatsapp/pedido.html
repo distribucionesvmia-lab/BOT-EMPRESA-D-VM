@@ -731,6 +731,13 @@
   @media (prefers-reduced-transparency: reduce) { .letra-pop { background:var(--surface); -webkit-backdrop-filter:none; backdrop-filter:none; } }
   .letra-pop button { border:.5px solid var(--line); border-radius:var(--r-pill); } .letra-pop button.letra-auto[aria-pressed="true"] { background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
   .err { color:var(--accent); }
+
+  /* Logo y cabecera rojos como los originales (el logo es un óvalo blanco con letras transparentes: solo se ve sobre rojo) */
+  .ds-logo { background:transparent; padding:0; height:auto; border-radius:0; }
+  .ds-logo img, .bar .ds-logo img, header .ds-logo img { height:34px; width:auto; }
+  header, .app.compacto header { background:var(--accent); color:var(--on-accent); border-bottom-color:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; }
+  header .bar-titulo { color:var(--on-accent); }
+  .cartbtn .ds-dot { box-shadow:0 0 0 2px var(--surface); }
 </style>
 </head>
 <body>
