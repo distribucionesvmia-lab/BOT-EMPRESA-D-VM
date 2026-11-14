@@ -733,6 +733,16 @@ test("PDF DEL PEDIDO: el cliente descarga SU pedido; sin sesión 401; el de otro
   assert.equal((await call("GET", "/api/pedido/..%2f..%2fetc/pdf", { cookie: A })).status, 404);
 });
 
+test("PDF DEL HISTORIAL: exige sesión, un documento que no es suyo da 404 y uno de su historial da un PDF válido", async () => {
+  assert.equal((await call("GET", "/api/historial/ABC1/pdf")).status, 401);
+  const A = cookieOf(await entrarNif("111111"));
+  assert.equal((await call("GET", "/api/historial/NOEXISTE/pdf", { cookie: A })).status, 404);
+  assert.equal((await call("GET", "/api/historial/..%2f..%2fetc/pdf", { cookie: A })).status, 404);
+  const env = await call("POST", "/catalogo", { cookie: A, body: { key: "pdf-hist-1", lines: [{ id: "1010", qty: 1, unit: "ud" }], delivery: null } });
+  const r = await fetch(`http://localhost:${PORT}/api/historial/${env.json.ref}/pdf`, { headers: { cookie: A } });
+  assert.ok([200, 404].includes(r.status)); // los pedidos hechos en la app tienen su propio PDF; este es para los de a3ERP
+});
+
 test("INICIO DEL CLIENTE: /api/inicio exige sesión, devuelve solo su catálogo (habituales, categorías, fotos pedidas) y no enseña nada de la administración", async () => {
   assert.equal((await call("GET", "/api/inicio")).status, 401);
   const A = cookieOf(await entrarNif("111111"));

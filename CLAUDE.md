@@ -120,3 +120,11 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **Cantidad** (`campoCantidad` en `pedido.html`, catálogo y carrito): solo enteros ≤ 999; se selecciona todo al tocar; vacío o letras → vuelve al último valor válido; «2.5» se queda en 2 y avisa «Solo cantidades enteras»; 0 quita la línea con «Deshacer». **«¿Seguro?»** (`preguntar`, con el estilo de la app, nunca `confirm()`): al escribir 200 o más de un artículo y al confirmar un pedido de más de 3.000 € o con una línea de 200 o más (`LIM_CANTIDAD`, `LIM_IMPORTE`).
 - Las líneas del pedido salen en el orden en que se añadieron (lo nuevo, al final). Aviso «Hemos recuperado tu pedido…» una vez por sesión. El resumen desglosa el IVA por tipo si hay varios. «Confirmar pedido · total» no parte el importe. «Quitar» ya no se corta.
 - **Tarjeta del catálogo en móvil**: foto · nombre (3 líneas) con el selector Caja|Ud debajo · corazón de 44 px arriba a la derecha y «+» abajo a la derecha.
+
+## Tanda 5 de fallos (pedido anterior, histórico y pedido fijo)
+- **Pedidos anteriores nunca sin importe**: los hechos por la app/chat enseñan los precios guardados del día («Precios del día del pedido», `ordersOf.guardado` en `db.js`, `tablaPedido` en `bot.js`); los de a3ERP, los de hoy marcados «orientativos». Si falta un dato sale «—», nunca vacío.
+- **PDF de cualquier pedido**: «Ver / imprimir PDF» en Mi cuenta y en las tarjetas del chat. App: `/api/pedido/<ref>/pdf` (precios guardados). a3ERP: `/api/historial/<doc>/pdf` (precios de hoy, con nota en el PDF). El visor tiene Cerrar, Imprimir y Descargar.
+- **Pedido fijo semanal**: bloque aparte bajo el resumen, con la etiqueta «No envía este pedido», plegado hasta pulsar «Repetir este pedido cada semana…»; con «Guardar como pedido fijo» y «Cancelar».
+- Cantidad, «−/+» y «Quitar» del carrito: mínimo 44 × 44 px.
+- Nombres: acceso de abajo = «Lo habitual» (página «Lo que sueles pedir»); menú de cuenta = «Histórico de pedidos».
+- Redondeo (2 × 151,29 = 302,57): NO es fallo; el IVA se redondea una vez por tipo sobre la base sumada, igual que a3ERP. No cambiar.

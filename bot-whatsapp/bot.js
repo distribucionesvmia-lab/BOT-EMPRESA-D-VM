@@ -399,11 +399,20 @@ function asistir(s, rawText, now, ctx) {
 }
 
 // Tabla de un pedido para la web (cantidad · producto · importe); el texto del mensaje sigue siendo el respaldo para WhatsApp
-const tablaPedido = (titulo, items, subtitulo = "") => ({
-  titulo, subtitulo,
-  filas: items.map((i, k) => ({ cant: cantidadH(i), nombre: i.name, importe: importes(items).lines[k].amount })),
-  total: Math.round(total(items) * 100) / 100, conIva: true,
-});
+const finito = (n) => (Number.isFinite(n) ? n : null);
+function tablaPedido(titulo, items, subtitulo = "", o = null) {
+  const g = o?.guardado;
+  if (g?.length && g.every((l) => Number.isFinite(l.amount))) { // pedido hecho en la aplicación: se enseñan los precios e importes de ESE día, no los de hoy
+    const t = totals(g.map((l) => ({ amount: l.amount, vat: l.vat })), !!o.re);
+    return { titulo, subtitulo: "Precios del día del pedido", filas: g.map((l) => ({ cant: `${l.qty} ${l.qty === 1 ? "ud" : "uds"}`, nombre: l.name ?? CATALOG.find((x) => String(x.id) === l.productId)?.name ?? l.productId, importe: l.amount })), total: finito(Math.round(t.total * 100) / 100), conIva: true, ...(o?.doc ? { doc: String(o.doc) } : {}) };
+  }
+  const imp = importes(items);
+  return { // pedido de a3ERP (sin precios guardados): importes con los precios de hoy, sin dejar nunca un hueco en blanco
+    titulo, subtitulo: subtitulo || "Precios de hoy (orientativos)",
+    filas: items.map((i, k) => ({ cant: cantidadH(i), nombre: i.name, importe: finito(imp.lines[k]?.amount) })),
+    total: finito(Math.round(total(items) * 100) / 100), conIva: true, ...(o?.doc ? { doc: String(o.doc) } : {}),
+  };
+}
 /** «Último pedido»: se enseña con botones para ver el histórico o hacer un pedido. */
 function showLast(s) {
   const o = pedidosDe(s.customer).find((x) => itemsFromLines(x.lines).length);
@@ -412,7 +421,7 @@ function showLast(s) {
   return {
     reply: `🧾 *Tu último pedido* (${fmtDateFull(o.date)})\n\n` + items.map((i, k) => `• ${cantidadH(i)} · ${i.name} = ${money(importes(items).lines[k].amount)}`).join("\n") + `\n*Total con IVA: ${money(total(items))}*\n\n_Precios de hoy._`,
     short: "🧾 *Tu último pedido*",
-    cards: [tablaPedido(`Pedido del ${fmtDateFull(o.date)}`, items, "Precios de hoy")],
+    cards: [tablaPedido(`Pedido del ${fmtDateFull(o.date)}`, items, "", o)],
     session: s,
     ui: buttons(["h:hist", "Ver histórico"], ["h:open", "Hacer pedido"]),
   };
@@ -427,7 +436,7 @@ function showHistory(s) {
   return {
     reply: `📜 *Tu histórico de pedidos*\n\n` + orders.map(bloque).join("\n\n"),
     short: "📜 *Tu histórico de pedidos*",
-    cards: orders.map(({ o, items }) => tablaPedido(`Pedido del ${fmtDateFull(o.date)}`, items)),
+    cards: orders.map(({ o, items }) => tablaPedido(`Pedido del ${fmtDateFull(o.date)}`, items, "", o)),
     session: s,
     ui: buttons(["h:open", "Hacer pedido"]),
   };

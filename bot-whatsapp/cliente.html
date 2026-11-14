@@ -557,6 +557,7 @@
   /* Visor de PDF con «Cerrar» */
   .pdf-visor { position:fixed; inset:0; z-index:300; display:flex; flex-direction:column; background:var(--bg); }
   .pdf-cab { display:flex; align-items:center; gap:var(--s2); padding:max(var(--s2), env(safe-area-inset-top)) var(--s3) var(--s2); background:var(--bar); color:var(--on-bar); }
+  .tcard .t-pdf { margin:var(--s2) var(--s3) var(--s3); width:calc(100% - 2 * var(--s3)); }
   .pdf-cerrar, .pdf-desc, .pdf-abre { display:inline-flex; align-items:center; justify-content:center; gap:var(--s1); min-height:44px; padding:0 var(--s4); border:0; border-radius:var(--r-pill); background:var(--surface); color:var(--accent); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; text-decoration:none; cursor:pointer; flex:none; }
   .pdf-cerrar { padding:0 var(--s4) 0 var(--s3); } .pdf-cerrar svg { width:20px; height:20px; display:block; }
   .pdf-tit { flex:1; min-width:0; text-align:center; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -651,7 +652,7 @@
       <div class="bar-acciones">
         <button type="button" id="micuenta" class="ds-circ cuenta" aria-haspopup="dialog" aria-label="Mi cuenta: mis datos y mis pedidos"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Mi cuenta</span></button>
         <div id="letraChat"></div>
-        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar">Cambiar contraseña</button><button type="button" id="mispedidos">Mis pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><button type="button" id="salir">Salir</button></div></div>
+        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar">Cambiar contraseña</button><button type="button" id="mispedidos">Histórico de pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><button type="button" id="salir">Salir</button></div></div>
       </div>
     </div>
     <div class="titulo-bloque"><h1 class="titulo-grande">Asistente de pedidos</h1><p class="titulo-sub"><i class="dot"></i><span id="cli">Cliente</span></p></div>
@@ -868,6 +869,7 @@ async function pintarAvisos(box) {
   box.appendChild(msg);
 }
 // Visor de PDF dentro de la app, con «Cerrar» y «Descargar» (en la app instalada no hay barra del navegador: sin esto no se podía salir del PDF)
+const urlPdfDe = (doc) => (/^VM-\d{4}-\d{6}$/.test(doc) ? "/api/pedido/" + encodeURIComponent(doc) + "/pdf" : "/api/historial/" + encodeURIComponent(doc) + "/pdf");
 function abrirPdf(url, nombre) {
   const viejo = document.getElementById("pdf-visor"); if (viejo) viejo.remove();
   const v = document.createElement("div"); v.id = "pdf-visor"; v.className = "pdf-visor"; v.setAttribute("role", "dialog"); v.setAttribute("aria-modal", "true"); v.setAttribute("aria-label", nombre || "Pedido en PDF");
@@ -876,7 +878,9 @@ function abrirPdf(url, nombre) {
   x.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>Cerrar</span>';
   const t = document.createElement("span"); t.className = "pdf-tit"; t.textContent = nombre || "Pedido";
   const d = document.createElement("a"); d.className = "pdf-desc"; d.href = url + (url.includes("?") ? "&" : "?") + "descargar=1"; d.setAttribute("download", ""); d.textContent = "Descargar";
-  cab.append(x, t, d); v.appendChild(cab);
+  const im = document.createElement("button"); im.type = "button"; im.className = "pdf-desc pdf-imp"; im.textContent = "Imprimir"; im.hidden = navigator.pdfViewerEnabled === false;
+  im.onclick = () => { const f = v.querySelector("iframe"); try { f.contentWindow.focus(); f.contentWindow.print(); } catch { window.open(url, "_blank", "noopener"); } };
+  cab.append(x, t, im, d); v.appendChild(cab);
   const cuerpo = document.createElement("div"); cuerpo.className = "pdf-cuerpo";
   if (navigator.pdfViewerEnabled === false) { // este móvil no enseña PDF dentro de una página: se ofrece abrirlo o descargarlo, y «Cerrar» sigue ahí
     const m = document.createElement("div"); m.className = "pdf-aviso"; const p = document.createElement("p"); p.textContent = "Tu móvil abre los PDF fuera de la aplicación.";
@@ -907,7 +911,7 @@ async function abrirCuenta(irAPedidos) {
   const avisosCaja = nodo("div"); B.appendChild(avisosCaja); pintarAvisos(avisosCaja).catch(() => { avisosCaja.textContent = ""; });
   const cs = nodo("button", "Cerrar sesión", "vm-btn ghost cu-salir"); cs.type = "button"; cs.onclick = () => { $("m-cuenta").hidden = true; cerrarSesion(); }; B.appendChild(cs);
   // Mis pedidos, por meses
-  const tp = nodo("h3", "Mis pedidos", "cu-tit"); tp.id = "cu-pedidos"; B.appendChild(tp);
+  const tp = nodo("h3", "Histórico de pedidos", "cu-tit"); tp.id = "cu-pedidos"; B.appendChild(tp);
   if (!j.pedidos.length) B.appendChild(estadoVacio({ icono: "reloj", titulo: "Aún no tienes pedidos", texto: "Cuando hagas uno, aparecerá aquí para repetirlo cuando quieras.", boton: "Hacer pedido", onclick: () => { $("m-cuenta").hidden = true; enviar("h:open", "Hacer pedido"); } })); 
   let mesActual = "";
   for (const o of j.pedidos) {
@@ -924,7 +928,7 @@ async function abrirCuenta(irAPedidos) {
     const rep = nodo("button", "Repetir pedido", "vm-btn primary"); rep.type = "button"; rep.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&r=1&x=1"; };
     const add = nodo("button", "Añadir al carrito", "vm-btn ghost"); add.type = "button"; add.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&a=1"; };
     acc.append(rep, add);
-    if (o.origen === "app" && /^VM-\d{4}-\d{6}$/.test(o.doc)) { const pdf = nodo("button", "Ver PDF", "vm-btn ghost"); pdf.type = "button"; pdf.setAttribute("aria-label", "Ver el pedido " + o.doc + " en PDF (con botón para cerrarlo)"); pdf.onclick = () => abrirPdf("/api/pedido/" + encodeURIComponent(o.doc) + "/pdf", "Pedido " + o.doc); acc.appendChild(pdf); } // el PDF solo existe para los pedidos hechos en la aplicación
+    { const pdf = nodo("button", "Ver / imprimir PDF", "vm-btn ghost"); pdf.type = "button"; pdf.setAttribute("aria-label", "Ver o imprimir el pedido " + o.doc + " en PDF (con botón para cerrarlo)"); pdf.onclick = () => abrirPdf(urlPdfDe(o.doc), "Pedido " + o.doc); acc.appendChild(pdf); } // los de la aplicación llevan los precios de ese día; los de a3ERP, los de hoy (se dice en el PDF)
     if (o.editable) { const m = nodo("button", "Modificar pedido", "vm-btn ghost"); m.type = "button"; m.onclick = () => { location.href = "/catalogo#m=" + encodeURIComponent(o.doc); }; acc.appendChild(m); }
     c.appendChild(acc); if (o.editable && o.hasta) c.appendChild(nodo("small", o.hasta));
     B.appendChild(c);
@@ -1006,9 +1010,11 @@ function tarjetaTabla(card) {
   const th = t.createTHead().insertRow();
   [["Cant.", "c-cant"], ["Producto", ""], ["Importe", "c-imp"]].forEach(([x, k]) => { const e = document.createElement("th"); e.scope = "col"; e.textContent = x; if (k) e.className = k; th.appendChild(e); });
   const tb = t.createTBody();
-  card.filas.forEach((f) => { const r = tb.insertRow(); [[f.cant, "c-cant"], [f.nombre, ""], [eur(f.importe), "c-imp"]].forEach(([x, k]) => { const td = r.insertCell(); td.textContent = x; if (k) td.className = k; }); });
-  const ft = t.createTFoot().insertRow(); const a = ft.insertCell(); a.colSpan = 2; a.textContent = card.conIva ? "Total con IVA" : "Total"; const b = ft.insertCell(); b.className = "c-imp"; b.textContent = eur(card.total);
-  c.append(h, t); chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
+  card.filas.forEach((f) => { const r = tb.insertRow(); [[f.cant, "c-cant"], [f.nombre, ""], [f.importe == null ? "—" : eur(f.importe), "c-imp"]].forEach(([x, k]) => { const td = r.insertCell(); td.textContent = x; if (k) td.className = k; }); });
+  const ft = t.createTFoot().insertRow(); const a = ft.insertCell(); a.colSpan = 2; a.textContent = card.conIva ? "Total con IVA" : "Total"; const b = ft.insertCell(); b.className = "c-imp"; b.textContent = card.total == null ? "No disponible" : eur(card.total);
+  c.append(h, t);
+  if (card.doc) { const pb = el("button", "vm-btn ghost t-pdf", "Ver / imprimir PDF"); pb.type = "button"; pb.onclick = () => abrirPdf(urlPdfDe(card.doc), "Pedido " + card.doc); c.appendChild(pb); }
+  chat.appendChild(c); chat.scrollTop = chat.scrollHeight;
 }
 // ── Estados vacíos y de error: icono de línea de 48 px, título, una frase y UN botón ──
 const ICONOS_ESTADO = { reloj: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', nube: '<path d="M7 18a4 4 0 0 1-.5-7.970A5.500 5.500 0 0 1 17 8.500a4.500 4.500 0 0 1 .5 9.500zM4 4l16 16"/>', repetir: '<path d="M4 12a8 8 0 0 1 14-5.300L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.300L4 15M4 20v-5h5"/>' };

@@ -52,7 +52,7 @@ test("botones redondos con icono: el icono va centrado y el globo del carrito no
 test("navegación inferior: 5 pestañas, aria-current, sin «Paso 1 de 3» ni pestañas de arriba, carrito flotante", () => {
   const nav = (pedido.match(/<nav class="tabbar"[\s\S]*?<\/nav>/) || [""])[0];
   assert.equal((nav.match(/<button /g) || []).length, 5);
-  for (const t of ["Inicio", "Catálogo", "Pedido", "Mis pedidos", "Ayuda"]) assert.match(nav, new RegExp(`class="tb-t">${t}<`));
+  for (const t of ["Inicio", "Catálogo", "Pedido", "Lo habitual", "Ayuda"]) assert.match(nav, new RegExp(`class="tb-t">${t}<`));
   assert.match(pedido, /setAttribute\("aria-current", "page"\)/);
   assert.doesNotMatch(pedido, /<div class="paso">/); assert.doesNotMatch(pedido, /<nav class="tabs">/);
   assert.match(pedido, /<footer hidden role="status" aria-live="polite"><button class="pill-cart"/);
@@ -90,7 +90,7 @@ test("fotos y estados: baldosa con foto al 82 % sin agrandar, fundido de 200 ms,
   assert.match(pedido, /\.av img, \.pf-av img[^{]*\{[^}]*max-width:82%; max-height:82%;[^}]*opacity:0; transition:opacity 200ms/);
   assert.match(pedido, /Math\.min\(Math\.max\(nat \* 2\.5, 240\)/); // el zoom se ve grande: las fotos pequeñas se amplían hasta 2,5 veces assert.match(pedido, /"Imagen orientativa"/);
   assert.match(cli, /max-width:82%; max-height:82%/); assert.equal((cli.match(/data:image\/png;base64,/g) || []).length, 1); // el logo, una sola vez
-  for (const t of ["Aún no tienes histórico", "Sin resultados", "Tu pedido está vacío", "Sin conexión", "No se ha podido enviar"]) assert.ok(pedido.includes(t), t);
+  for (const t of ["Aún no tienes habituales", "Sin resultados", "Tu pedido está vacío", "Sin conexión", "No se ha podido enviar"]) assert.ok(pedido.includes(t), t);
   assert.match(pedido, /\.estado svg \{ width:48px; height:48px/); assert.match(pedido, /boton: "Reintentar"/);
   assert.match(pedido, /navigator\.vibrate\(8\)/); assert.match(pedido, /sinMovimiento\(\)/); // vibración suave, nunca con «reducir movimiento»
   assert.match(pedido, /@keyframes pulso \{ 0% \{ transform:scale\(1\); \} 50% \{ transform:scale\(1\.15\)/);
@@ -260,5 +260,16 @@ test("PDF: se ve dentro de la app con botón «Cerrar» (y «Descargar»), «Atr
     assert.match(h, /function abrirPdf\(url, nombre\)/); assert.match(h, /x\.setAttribute\("aria-label", "Cerrar el PDF"\)/); assert.match(h, /d\.setAttribute\("download", ""\)/);
     assert.match(h, /navigator\.pdfViewerEnabled === false/); assert.match(h, /history\.pushState\(\{ pdf: 1 \}/); assert.match(h, /\.pdf-cerrar, \.pdf-desc, \.pdf-abre \{[^}]*min-height:44px/);
   }
-  assert.match(cli, /nodo\("button", "Ver PDF", "vm-btn ghost"\)/); assert.match(pedido, /id="donePdf" href="#" hidden>Ver PDF</);
+  assert.match(cli, /nodo\("button", "Ver \/ imprimir PDF", "vm-btn ghost"\)/); assert.match(cli, /pdf-imp/); assert.match(pedido, /id="donePdf" href="#" hidden>Ver PDF</);
+});
+
+test("TANDA 5: pedido fijo con «Cancelar» y aparte de «Confirmar pedido»; controles del carrito de 44 px; nombres de los dos «Mis pedidos»", () => {
+  const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  assert.match(p, /id="fijoCancelar"[^>]*>Cancelar</);
+  assert.match(p, /No envía este pedido/);
+  assert.ok(p.indexOf('id="fijoCard"') > p.indexOf('id="priceNote"'));
+  assert.match(p, /#cart \.tl \.hstep button \{ min-width:44px; min-height:44px/);
+  assert.match(p, /#cart \.tl \.cx \{ min-height:44px/);
+  const c = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  assert.match(c, /Histórico de pedidos/);
 });

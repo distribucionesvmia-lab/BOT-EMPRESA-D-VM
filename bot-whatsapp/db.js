@@ -164,7 +164,8 @@ const seleccionExportacion = (refs) => {
     /** Pedidos hechos por la aplicación o el chat por un cliente (los más recientes primero), con las unidades de cada línea. */
     ordersOf: (customerId, limit = 10) =>
       db.prepare("SELECT * FROM orders WHERE customer_id = ? AND status != 'cancelled' ORDER BY id DESC LIMIT ?").all(String(customerId), limit).map(withLines)
-        .map((o) => ({ doc: o.ref ?? `W${o.id}`, date: String(o.created_at).slice(0, 10), lines: o.items.map((i) => ({ productId: String(i.product_id ?? i.id), qty: i.units ?? i.qty })).filter((l) => l.qty > 0) })),
+        .map((o) => ({ doc: o.ref ?? `W${o.id}`, date: String(o.created_at).slice(0, 10), lines: o.items.map((i) => ({ productId: String(i.product_id ?? i.id), qty: i.units ?? i.qty })).filter((l) => l.qty > 0),
+          guardado: o.items.map((i) => ({ productId: String(i.product_id ?? i.id), name: i.name ?? null, qty: i.units ?? i.qty, price: i.price, discount: i.discount ?? 0, vat: i.vat ?? null, amount: i.amount })), re: !!o.re })), // guardado: los precios e importes de ESE día
 
     /** Todos los pedidos de un cliente tal como se guardaron (derecho de acceso y portabilidad): sin claves internas. */
     ordersFull: (customerId) =>
