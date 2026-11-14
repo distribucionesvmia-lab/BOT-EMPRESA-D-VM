@@ -1,6 +1,9 @@
 <!doctype html>
+<!-- Programa creado por Pablo Martín Castañeda. © 2026. Todos los derechos reservados. Prohibida su copia, distribución o modificación sin autorización escrita. -->
 <html lang="es">
 <head>
+<meta name="author" content="Pablo Martín Castañeda">
+<meta name="copyright" content="© 2026 Pablo Martín Castañeda. Todos los derechos reservados.">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Empresa · Pedidos y altas de clientes</title>
@@ -253,6 +256,9 @@
   #ped .lines td:nth-child(5) { margin-left:auto; font-weight:600; color:var(--fg); } #ped .lines td:nth-child(6) { flex:1 1 100%; white-space:normal; } #ped .lines td:nth-child(6):empty { display:none; }
   @media (prefers-reduced-motion: reduce) { #app > div, details.panel > :not(summary) { animation:none !important; } }
   @media (max-width: 640px) { .pag-cab h1 { font-size:19px; } .panel { padding:16px; } .panel > p.muted { font-size:13.5px; } }
+  /* marca de autoría y derechos de uso */
+  .autor { margin-top:28px; padding:16px 0 4px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px; line-height:1.5; } .autor b { color:var(--fg); font-weight:600; }
+  .autor details { margin-top:6px; } .autor summary { cursor:pointer; color:var(--accent); font-weight:600; width:fit-content; padding:4px 0; } .autor .autor-txt { max-width:90ch; margin-top:6px; padding:12px 14px; background:var(--th); border:1px solid var(--line); border-radius:10px; } .autor .autor-txt p { margin:0 0 8px; } .autor .autor-txt p:last-child { margin:0; }
 </style>
 </head>
 <body>
@@ -542,6 +548,7 @@
       </div>
     </div>
   </div>
+<footer class="autor"><span>Creado por <b>Pablo Martín Castañeda</b> · © 2026 · Todos los derechos reservados</span><details><summary>Propiedad y derechos de uso</summary><div class="autor-txt"><p><b>Creado por Pablo Martín Castañeda.</b> © 2026. Todos los derechos reservados.</p><p>Este programa —su código, diseño, textos, estructura y funcionamiento— es una obra de Pablo Martín Castañeda, titular de los derechos de propiedad intelectual sobre él (Real Decreto Legislativo 1/1996, Ley de Propiedad Intelectual, y en particular su regulación de los programas de ordenador).</p><p>Queda prohibido, sin autorización previa y por escrito del titular, copiar, reproducir, distribuir, comunicar públicamente, transformar, descompilar, ceder, vender o utilizar el programa, total o parcialmente, para fines distintos del uso autorizado. Usar la aplicación no da ningún derecho sobre ella.</p><p>El nombre, la marca y el logotipo de «Distribuciones Valentín Martín» pertenecen a sus titulares, y los datos de clientes y pedidos a quienes los facilitan; se tratan conforme a la política de privacidad.</p><p>La infracción puede dar lugar a acciones civiles y penales (arts. 138 y siguientes de la Ley de Propiedad Intelectual y arts. 270 y siguientes del Código Penal).</p></div></details></footer>
 </main>
 <script>
 const $ = (id) => document.getElementById(id);

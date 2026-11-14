@@ -27,6 +27,7 @@ export function avisoLegalHtml({ titular = "Distribuciones Valentín Martín", c
 <li><b>Qué es esta aplicación:</b> un servicio para que nuestros clientes consulten el catálogo y hagan sus pedidos. El acceso es personal y no se debe compartir.</li>
 <li><b>Precios y pedidos:</b> los precios mostrados son informativos y se confirman en la factura. Un pedido hecho aquí lo revisa y prepara la empresa; el PDF del pedido no es una factura.</li>
 <li><b>Contenidos:</b> las marcas, fotos y textos pertenecen a sus titulares. No se pueden copiar ni usar con fines comerciales sin permiso.</li>
+<li><b>Propiedad intelectual del programa:</b> esta aplicación (código, diseño, textos y funcionamiento) ha sido creada por <b>Pablo Martín Castañeda</b>, titular de todos los derechos sobre ella © 2026 (Real Decreto Legislativo 1/1996, Ley de Propiedad Intelectual). Queda prohibido copiarla, reproducirla, distribuirla, modificarla, descompilarla o usarla fuera del uso autorizado sin su permiso por escrito; la infracción puede dar lugar a acciones civiles y penales.</li>
 <li><b>Responsabilidad:</b> hacemos lo posible por que la información sea correcta y esté al día, pero puede haber errores o interrupciones puntuales del servicio.</li>
 <li><b>Ley aplicable:</b> la legislación española. Para cualquier duda, llámanos o escribe a ${contacto}.</li>
 </ul></details>`;

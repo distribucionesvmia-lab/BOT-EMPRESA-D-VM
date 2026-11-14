@@ -1,6 +1,9 @@
 <!doctype html>
+<!-- Programa creado por Pablo Martín Castañeda. © 2026. Todos los derechos reservados. Prohibida su copia, distribución o modificación sin autorización escrita. -->
 <html lang="es">
 <head>
+<meta name="author" content="Pablo Martín Castañeda">
+<meta name="copyright" content="© 2026 Pablo Martín Castañeda. Todos los derechos reservados.">
 <script>
 /* Tamaño de letra. Todos los tamaños están escritos como calc(N / var(--k,1)); aquí se decide lo que vale --k para que la letra final sea N × T:
      · T = el nivel que elige el cliente (100 %, 115 % o 130 %) con los botones A− / A+; o, en «Automático», T = el menor entre 1,3 y la escala de letra del móvil
@@ -1336,6 +1339,8 @@
   :root { --gris-suave:#6E6E73; } :root[data-tema="oscuro"] { --gris-suave:#A8A8B0; }
   @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) { --gris-suave:#A8A8B0; } }
   #zoomFoto .zia, .ficha-ia { color:var(--gris-suave); }
+  .autor-pie { margin:var(--s3, 12px) 0 0; font-size:calc(var(--t-micro, 12px) / var(--k,1)); color:var(--text-2); text-align:center; line-height:1.45; } .autor-pie b { font-weight:600; color:var(--text); }
+  .autor-pie details { margin-top:4px; } .autor-pie summary { cursor:pointer; color:var(--accent); font-weight:600; display:block; text-align:center; padding:6px 4px; } .autor-pie .autor-txt { text-align:left; margin-top:6px; padding:10px 12px; background:var(--surface-2, var(--field, transparent)); border-radius:10px; } .autor-pie .autor-txt p { margin:0 0 6px; }
 </style>
 </head>
 <body>
@@ -1537,6 +1542,7 @@ function abrirAyuda(a, nombre) {
   c.appendChild(aj);
   { const v = document.createElement("p"); v.className = "ayuda-ver"; c.appendChild(v); // versión del programa que está funcionando (para saber qué se ha publicado)
     fetch("/health", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (j && j.version) v.textContent = "Versión del programa: " + j.version + (j.commitFecha ? " · " + new Date(j.commitFecha).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) : "") + (j.reinicioPendiente ? " (hay otra más nueva pendiente de reiniciar)" : ""); }).catch(() => { v.textContent = "No se ha podido comprobar la versión del programa."; }); }
+  c.appendChild(pieAutor());
   const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Cerrar";
   const cerrar = () => { f.remove(); document.removeEventListener("keydown", esc); }; const esc = (e) => { if (e.key === "Escape") cerrar(); };
   arrastrable(c, cerrar); x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
@@ -3032,6 +3038,11 @@ let huboCorte = false; // se perdió la cobertura en algún momento: los precios
 const clavePend = () => "vm_pend_" + clave();
 const pendienteGuardado = () => { try { return JSON.parse(localStorage.getItem(clavePend()) || "null"); } catch { return null; } };
 const guardarCopia = () => { try { const { __copia, ...resto } = data; copiaCat.guardar({ guardado: Date.now(), data: resto }).catch(() => {}); } catch {} };
+function pieAutor() { // marca de autoría y derechos de uso (Creado por Pablo Martín Castañeda)
+  const d = document.createElement("div"); d.className = "autor-pie";
+  d.innerHTML = 'Creado por <b>Pablo Martín Castañeda</b> · © 2026 · Todos los derechos reservados<details><summary>Propiedad y derechos de uso</summary><div class="autor-txt"><p><b>Creado por Pablo Martín Castañeda.</b> © 2026. Todos los derechos reservados.</p><p>Este programa —su código, diseño, textos, estructura y funcionamiento— es una obra de Pablo Martín Castañeda, titular de los derechos de propiedad intelectual sobre él (Real Decreto Legislativo 1/1996, Ley de Propiedad Intelectual, y en particular su regulación de los programas de ordenador).</p><p>Queda prohibido, sin autorización previa y por escrito del titular, copiar, reproducir, distribuir, comunicar públicamente, transformar, descompilar, ceder, vender o utilizar el programa, total o parcialmente, para fines distintos del uso autorizado. Usar la aplicación no da ningún derecho sobre ella.</p><p>El nombre, la marca y el logotipo de «Distribuciones Valentín Martín» pertenecen a sus titulares, y los datos de clientes y pedidos a quienes los facilitan; se tratan conforme a la política de privacidad.</p><p>La infracción puede dar lugar a acciones civiles y penales (arts. 138 y siguientes de la Ley de Propiedad Intelectual y arts. 270 y siguientes del Código Penal).</p></div></details>';
+  return d;
+}
 function pintarSoloVer() { const v = !!(data && data.soloVer); $("soloVer").hidden = !v; const r = $("revisar"); r.disabled = v; r.textContent = v ? "Solo consulta: no se puede pedir" : "Revisar pedido"; if (v) $("confirm").disabled = true; } // enlace de «solo ver» (el servidor tampoco deja enviar)
 function pintarCopia() { pintarSoloVer(); for (const id of ["copiaPrecios", "copiaPrecios2"]) { const b = $(id); b.hidden = !data.__copia; b.textContent = data.__copia ? `Precios de ${new Date(data.__copia).toLocaleString("es-ES", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}; se actualizarán al enviar.` : ""; } }
 // Mete en pantalla unos datos nuevos del servidor sin perder el pedido: lo que ya no existe se quita (y se dice)

@@ -13,5 +13,8 @@
     "test": "node --test",
     "start:cliente": "APP_MODE=cliente node server.js",
     "start:empresa": "APP_MODE=empresa node server.js"
-  }
+  },
+  "license": "UNLICENSED",
+  "author": "Pablo Martín Castañeda",
+  "description": "Sistema de pedidos de Distribuciones Valentín Martín. © 2026 Pablo Martín Castañeda. Todos los derechos reservados."
 }

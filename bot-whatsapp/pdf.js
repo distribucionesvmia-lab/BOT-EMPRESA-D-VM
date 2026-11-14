@@ -38,6 +38,7 @@ export function pdfPedido(d) {
   fila("Base imponible", fmt(d.totales.base)); fila("IVA", fmt(d.totales.iva)); if (d.conRe) fila("Recargo de equivalencia", fmt(d.totales.re)); fila("Total con IVA", fmt(d.totales.total), true);
   if (d.nota) { y -= 8; txt(M, y, "Observaciones", { b: true, pt: 10 }); y -= 14; for (const l of parte(d.nota, W - 2 * M)) { txt(M, y, l, { pt: 10 }); y -= 14; } }
   txt(M, M - 10, "Documento informativo del pedido. No es una factura.", { pt: 8, gris: true });
+  txt(M, M - 22, "Programa creado por Pablo Martín Castañeda · © 2026 · Todos los derechos reservados", { pt: 7, gris: true });
   paginas.push(cur);
   // objetos: 1 catálogo, 2 páginas, 3 y 4 fuentes; después, por cada página, su contenido y su página
   const objs = [null, null, Buffer.from("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"), Buffer.from("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")];
