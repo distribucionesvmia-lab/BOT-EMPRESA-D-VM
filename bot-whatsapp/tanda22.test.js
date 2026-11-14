@@ -55,3 +55,7 @@ test("6. letra al 100, 115 y 130 %: la barra inferior no crece más del 115 % (C
   assert.match(p, /\.tb-t \{ font-size:calc\(12\.5px \/ max\(var\(--k,1\), \.87\)\);/);
   assert.match(p, /data-letra-grande/); // con la letra grande el nombre ocupa hasta 4 líneas (Tanda 8)
 });
+
+test("la tarjeta «Pon tu código» (Inicio) no se sale de la pantalla: botones que se pliegan, sin scroll a lo ancho", () => {
+  assert.match(c, /\.in-codigo \.fila \{ display:flex; flex-wrap:wrap;/); assert.match(c, /\.in-codigo \.vm-btn \{ flex:1 1 130px; width:auto !important; min-width:0;/);
+});
