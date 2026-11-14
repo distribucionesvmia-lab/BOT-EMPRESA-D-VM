@@ -162,3 +162,13 @@ test("búsqueda por voz: botón de micrófono solo si el navegador sabe, se conv
   for (const m of ["Permite el micrófono", "No te hemos oído", "Sin conexión: la búsqueda por voz", "No encontramos el micrófono"]) assert.ok(pedido.includes(m), m);
   assert.match(pedido, /\.vozbtn \{[^}]*width:44px; height:44px/); assert.match(pedido, /prefers-reduced-motion: reduce\) \{ \.vozbtn\.escucha \{ animation:none/);
 });
+
+test("toque premium: transiciones entre páginas y de lista, esqueletos de carga, foto que vuela al carrito y botón de confirmar con estados", () => {
+  const cli = leer("./cliente.html");
+  for (const h of [cli, pedido]) { assert.match(h, /@view-transition \{ navigation: auto; \}/); assert.match(h, /prefers-reduced-motion: reduce\) \{ ::view-transition-group\(\*\)/); assert.match(h, /@keyframes sk-brillo/); }
+  assert.match(pedido, /function conTransicion\(fn\)/); assert.match(pedido, /document\.startViewTransition\(fn\)/); assert.match(pedido, /#list \{ view-transition-name:lista; \}/);
+  assert.equal((pedido.match(/class="sk-fila"/g) || []).length, 6); assert.match(pedido, /list\.removeAttribute\("aria-busy"\)/);
+  assert.match(cli, /class: "in-esq"|el\("div", "in-esq"\)/); assert.match(cli, /quitaEsq\(\)/);
+  assert.match(pedido, /function volarAlCarrito\(id\)/); assert.match(pedido, /duration: 400/); assert.match(pedido, /antes === 0 && Math\.floor\(Number\(n\) \|\| 0\) > 0\) volarAlCarrito\(id\)/);
+  assert.match(pedido, /class="rueda"/); assert.match(pedido, /Pedido enviado/); assert.match(pedido, /btn\.classList\.add\("sacude"\)/); assert.match(pedido, /#confirm\.hecho \{ background:var\(--ok\)/);
+});

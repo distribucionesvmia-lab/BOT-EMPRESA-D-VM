@@ -93,3 +93,9 @@ Barra de 5 pestañas fija abajo: **Inicio** (vuelve al chat `/cliente`), **Catá
 - **Ofertas en el Inicio**: fila con las ofertas vigentes que de verdad le cambian el precio a ESE cliente (`/api/inicio` → `ofertas`).
 - **Si un artículo ya no está** (`data.retirados` en `/catalogo/datos`): al repetir o añadir un pedido anterior se ofrecen hasta 3 parecidos (mismas palabras, mismo tipo y formato) para añadir con la misma cantidad. No hay datos de existencias: «ya no está» = retirado/bloqueado en a3ERP.
 - **Búsqueda por voz** (botón de micrófono en el buscador; reconocimiento del navegador del móvil, que envía el audio a su servicio de voz — Google/Apple —; sin soporte no sale el botón; con texto el botón pasa a «borrar»).
+
+## Toque premium (transiciones y detalles)
+- **Transiciones**: entre páginas (chat ↔ catálogo) con `@view-transition` (fundido corto + deslizamiento de 8 px; sin soporte, solo un fundido de entrada); dentro del catálogo, al cambiar de pestaña o categoría, la lista usa `document.startViewTransition` (`conTransicion` en `pedido.html`). Con «reducir movimiento» no hay ninguna.
+- **Esqueletos de carga** (clase `.sk`, brillo suave): filas del catálogo (ya en el HTML, se quitan al pintar la lista), tarjetas del Inicio y Mi cuenta.
+- **La foto vuela al carrito** (`volarAlCarrito`, 400 ms): al añadir por primera vez un artículo, su miniatura viaja a la pestaña Pedido (o al panel de la derecha en ordenador).
+- **Botón «Confirmar pedido»** con estados: rueda «Enviando…», tick verde «Pedido enviado» (650 ms) y, si falla, sacudida + «Reintentar».

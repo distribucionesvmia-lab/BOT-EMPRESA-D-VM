@@ -1051,6 +1051,39 @@
   @keyframes vozpulso { 0%, 100% { transform:scale(1); } 50% { transform:scale(1.1); } }
   @media (prefers-reduced-motion: reduce) { .vozbtn.escucha { animation:none; } }
   @media (min-width:1024px) { .vozbtn { right:calc(var(--s6) + var(--s1)); } }
+
+  /* ═══ Transiciones y esqueletos de carga ═══ */
+  @view-transition { navigation: auto; } /* entre páginas (chat ↔ catálogo): fundido corto con un pequeño deslizamiento */
+  @keyframes vt-sale { to { opacity:0; } }
+  @keyframes vt-entra { from { opacity:0; transform:translateY(8px); } }
+  @keyframes aparece-pag { from { opacity:0; } }
+  ::view-transition-old(root) { animation:180ms ease both vt-sale; }
+  ::view-transition-new(root) { animation:250ms cubic-bezier(.2,.8,.2,1) both vt-entra; }
+  @supports not (view-transition-name:a) { body { animation:aparece-pag 220ms ease both; } } /* navegadores sin transición entre páginas: solo un fundido de entrada */
+  @media (prefers-reduced-motion: reduce) { ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation:none !important; } body { animation:none !important; } }
+  @keyframes sk-brillo { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+  .sk { border-radius:var(--r-img); background-color:var(--fill); background:linear-gradient(90deg, var(--fill) 25%, color-mix(in srgb, var(--fill) 55%, var(--surface)) 50%, var(--fill) 75%); background-size:200% 100%; animation:sk-brillo 1.4s linear infinite; }
+  @media (prefers-reduced-motion: reduce) { .sk { animation:none; } }
+
+  #list { view-transition-name:lista; }
+  html.vt-lista::view-transition-old(root), html.vt-lista::view-transition-new(root) { animation:none; }
+  ::view-transition-old(lista) { animation:150ms ease both vt-sale; }
+  ::view-transition-new(lista) { animation:250ms cubic-bezier(.2,.8,.2,1) both vt-entra; }
+  .sk-fila { display:grid; grid-template-columns:72px minmax(0, 1fr) 44px; column-gap:var(--s3); align-items:center; padding:var(--s2) var(--gutter); background:var(--surface); border-bottom:.5px solid var(--line); min-height:95px; }
+  .sk-fila .sk-foto { width:72px; height:72px; }
+  .sk-fila .sk-lineas { display:flex; flex-direction:column; gap:var(--s2); }
+  .sk-fila .sk-l1 { height:16px; width:78%; border-radius:6px; } .sk-fila .sk-l2 { height:12px; width:52%; border-radius:6px; } .sk-fila .sk-l3 { height:16px; width:34%; border-radius:6px; }
+  .sk-fila .sk-bt { width:44px; height:44px; border-radius:50%; }
+  /* El botón de confirmar cambia de estado: enviando (rueda) → enviado (tick) o error (sacudida) */
+  #confirm { position:relative; transition:background-color var(--t-norm) var(--ease), transform var(--t-press) var(--ease); }
+  #confirm .rueda { display:inline-block; width:18px; height:18px; margin-right:var(--s2); vertical-align:-3px; border:2.5px solid currentColor; border-right-color:transparent; border-radius:50%; animation:girar .7s linear infinite; }
+  #confirm.hecho { background:var(--ok); color:#fff; }
+  #confirm.hecho svg { width:20px; height:20px; margin-right:var(--s2); vertical-align:-4px; }
+  #confirm.hecho svg path { stroke-dasharray:24; stroke-dashoffset:24; animation:tick-t 300ms 60ms var(--ease) forwards; }
+  #confirm.sacude { animation:sacude 320ms var(--ease); }
+  @keyframes girar { to { transform:rotate(360deg); } }
+  @keyframes sacude { 20% { transform:translateX(-6px); } 45% { transform:translateX(5px); } 70% { transform:translateX(-3px); } }
+  @media (prefers-reduced-motion: reduce) { #confirm .rueda { animation-duration:2s; } #confirm.sacude { animation:none; } #confirm.hecho svg path { animation:none; stroke-dashoffset:0; } }
 </style>
 </head>
 <body>
@@ -1070,7 +1103,7 @@
   <div class="buscar"><svg class="lupa" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.500" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.500 4.500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="q" type="search" placeholder="Buscar en todo el catálogo" autocomplete="off" aria-label="Buscar un producto" aria-controls="sugs" aria-expanded="false"><button type="button" class="vozbtn" id="vozBtn" aria-label="Buscar con la voz" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.500 11a6.500 6.500 0 0 0 13 0M12 17.500V21"/></svg></button><div id="sugs" class="sugs" role="listbox" aria-label="Sugerencias" hidden></div></div>
   <!-- Filtro de ida y vuelta, solo en la pestaña «Histórico» (data-t="hab") -->
   <div class="filbar" id="filbar" hidden><button class="fil" id="fil" type="button" aria-pressed="false">☑ Ver solo lo que he marcado</button><span id="filinfo"></span><div id="busqfil" class="busqfil"></div></div>
-  <main id="list"></main>
+  <main id="list" aria-busy="true"><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div><div class="sk-fila" aria-hidden="true"><div class="sk sk-foto"></div><div class="sk-lineas"><div class="sk sk-l1"></div><div class="sk sk-l2"></div><div class="sk sk-l3"></div></div><div class="sk sk-bt"></div></div></main>
   <div id="toast" role="status" aria-live="polite" hidden></div>
   <div id="anuncio" class="solo-lector" role="status" aria-live="polite"></div>
   <nav class="tabbar" aria-label="Secciones">
@@ -1205,9 +1238,26 @@ function aviso(texto, deshacer) {
 const sinMovimiento = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const vibra = () => { try { if (!sinMovimiento() && navigator.vibrate) navigator.vibrate(8); } catch {} };
 document.addEventListener("load", e => { if (e.target && e.target.tagName === "IMG") e.target.classList.add("cargada"); }, true); // las fotos aparecen con un fundido de 200 ms
+// La foto del artículo «vuela» hasta el carrito (pestaña Pedido o panel de la derecha) al añadirlo por primera vez
+function volarAlCarrito(id) {
+  if (sinMovimiento() || !document.body.animate) return;
+  try {
+    const fuente = document.querySelector(`.pf[data-id="${CSS.escape(id)}"] .pf-av`) || document.querySelector(`.sug[data-id="${CSS.escape(id)}"] .sug-im`);
+    const destino = escritorio() ? document.querySelector("#cart .ped-cab") : document.querySelector('.tb[data-nav="pedido"] svg');
+    if (!fuente || !destino) return;
+    const a = fuente.getBoundingClientRect(), b = destino.getBoundingClientRect(); if (!a.width || !b.width) return;
+    const c = fuente.cloneNode(true); c.removeAttribute("id"); c.querySelectorAll(".pf-fav, .pf-ia").forEach(x => x.remove());
+    Object.assign(c.style, { position: "fixed", left: a.left + "px", top: a.top + "px", width: a.width + "px", height: a.height + "px", margin: "0", zIndex: "200", pointerEvents: "none", transformOrigin: "center", boxShadow: "0 6px 18px rgba(0,0,0,.25)" });
+    c.setAttribute("aria-hidden", "true"); document.body.appendChild(c);
+    const dx = b.left + b.width / 2 - (a.left + a.width / 2), dy = b.top + b.height / 2 - (a.top + a.height / 2);
+    const an = c.animate([{ transform: "translate(0,0) scale(1)", opacity: 1 }, { transform: `translate(${dx * 0.55}px, ${dy * 0.45 - 30}px) scale(.6)`, opacity: .95, offset: .55 }, { transform: `translate(${dx}px, ${dy}px) scale(.15)`, opacity: .2 }], { duration: 400, easing: "cubic-bezier(.45,0,.7,.35)" });
+    an.onfinish = an.oncancel = () => c.remove();
+  } catch {}
+}
 function setQty(id, n) {
   const antes = qty.get(id) || 0, u = unitOf.get(id), nota = notes.get(id);
   bumpId = id; if (n > antes) vibra();
+  if (antes === 0 && Math.floor(Number(n) || 0) > 0) volarAlCarrito(id);
   try { const nm = productoPorId.get(id)?.name ?? "artículo", v = Math.max(0, Math.floor(Number(n) || 0)); $("anuncio").textContent = v ? `${nm}: ${v} en el pedido` : `${nm}: quitado del pedido`; } catch {}
   n = Math.max(0, Math.floor(Number(n) || 0));
   if (n > 999) { n = 999; aviso("La cantidad máxima por artículo es 999."); }
@@ -1387,7 +1437,13 @@ let nav = { cat: null, sub: null }; // sub: null = elegir subcategoría; "*" = t
   };
   lista.addEventListener("scroll", () => { if (!esperando) { esperando = true; requestAnimationFrame(revisa); } }, { passive: true });
 })();
-const irA = (cat, sub) => { animarLista = true; limite = 150; nav = { cat, sub }; $("list").scrollTop = 0; renderList(); };
+// Cambios de vista dentro del catálogo (pestaña, categoría): la lista se funde con un pequeño deslizamiento (si el navegador lo permite)
+function conTransicion(fn) {
+  if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return fn();
+  const h = document.documentElement; h.classList.add("vt-lista");
+  try { const t = document.startViewTransition(fn); t.finished.finally(() => h.classList.remove("vt-lista")); } catch { h.classList.remove("vt-lista"); fn(); }
+}
+const irA = (cat, sub) => conTransicion(() => { animarLista = true; limite = 150; nav = { cat, sub }; $("list").scrollTop = 0; renderList(); });
 // Foto representativa de una sección: un producto suyo con foto (se prefiere el más típico de la sección); sin foto, una letra de color
 const PREFIERE = { cafe: /capsula|molido|grano|natural/i, pascual: /leche/i, vinos: /ribera|crianza|reserva|verdejo|rueda|cava/i, aguas: /\bagua\b|bezoya/i, despensa: /aceite|oliva/i, refrigerados: /queso|jamon|chorizo|salchich/i, "f-hosteleria-y-menaje": /\bvaso|copa/i };
 function fotoDe(cat, sub) {
@@ -1534,7 +1590,7 @@ function arrastrable(caja, cerrar) {
   caja.addEventListener("pointerup", suelta); caja.addEventListener("pointercancel", suelta);
 }
 function renderList() {
-  const list = $("list"); list.innerHTML = "";
+  const list = $("list"); list.innerHTML = ""; list.removeAttribute("aria-busy");
   const q = norm(query.trim());
   const enBusqueda = !!q;
   $("fil").hidden = $("filinfo").hidden = enBusqueda || tab !== "hab";
@@ -1735,8 +1791,9 @@ function cambiarTab(t, { historia = true } = {}) {
   if (t !== tab) { posTab[tab].scroll = $("list").scrollTop; posTab[tab].nav = { ...nav }; }
   const cambia = t !== tab; tab = t; limite = 150; animarLista = cambia;
   nav = posTab[t].nav ? { ...posTab[t].nav } : { cat: null, sub: null };
-  marcaNav(); renderList();
-  $("list").scrollTop = cambia ? posTab[t].scroll : $("list").scrollTop;
+  marcaNav();
+  const pinta = () => { renderList(); $("list").scrollTop = cambia ? posTab[t].scroll : $("list").scrollTop; };
+  if (cambia) conTransicion(pinta); else pinta();
   if (cambia && historia) { try { history.pushState({ vmTab: t }, ""); } catch {} }
 }
 document.querySelectorAll(".tabbar .tb").forEach(b => b.onclick = () => {
@@ -2065,11 +2122,14 @@ function mostrarErrorEnvio(errBox, mensaje, reintentar) {
 async function enviarPedido(delivery, errBox) {
   if (delivery) { await refrescarEntrega(); if (delivery === data.today && !(data.delivery || []).some(o => o.kind === "hoy")) { errBox.textContent = "Ya no llegamos a entregarlo hoy: elige otro día."; return; } } // «hoy» solo vale antes de las 10:00
   const btn = $("confirm"), textoBtn = btn.textContent;
-  btn.disabled = true; btn.textContent = "Enviando…"; errBox.textContent = "";
+  btn.disabled = true; btn.innerHTML = '<span class="rueda" aria-hidden="true"></span>Enviando…'; errBox.textContent = "";
   try {
     const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, ...(modificando ? { replaces: modificando.ref } : {}), lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value, deliveryAddress: dirEntrega(), delivery }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "No se ha podido enviar el pedido");
+    btn.classList.add("hecho"); btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.500l4.500 4.500L19 7.500" fill="none" stroke="currentColor" stroke-width="2.600" stroke-linecap="round" stroke-linejoin="round"/></svg>Pedido enviado'; vibra();
+    await new Promise(r => setTimeout(r, sinMovimiento() ? 0 : 650)); // el botón enseña el tick un momento antes de cambiar de pantalla
+    btn.classList.remove("hecho"); btn.disabled = false;
     pedidoEnviado = true; uso("pedido", Math.round((Date.now() - tAbierto) / 1000));
     if (modoDir() === "otra" && $("dirGuardar").checked && dirEntrega().length >= 5) { try { fetch("/api/direcciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texto: dirEntrega() }) }).then(cargarDirs); } catch {} $("dirGuardar").checked = false; }
     qty.clear(); unitOf.clear(); notes.clear(); try { localStorage.removeItem(clave()); } catch {}
@@ -2080,7 +2140,7 @@ async function enviarPedido(delivery, errBox) {
     $("doneRef").hidden = !j.ref; $("doneRef").textContent = j.ref ? "Referencia " + j.ref : ""; $("donePdf").hidden = !j.ref; if (j.ref) { $("donePdf").href = "/api/pedido/" + encodeURIComponent(j.ref) + "/pdf"; $("donePdf").setAttribute("download", "pedido-" + j.ref + ".pdf"); } $("doneVer").hidden = false; $("doneVer").onclick = () => { location.href = "/cliente#cuenta"; };
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
   } catch (e) {
-    btn.disabled = false; btn.textContent = textoBtn; errBox.textContent = ""; mostrarErrorEnvio(errBox, e.message, () => enviarPedido(delivery, errBox));
+    btn.disabled = false; btn.textContent = textoBtn; btn.classList.remove("hecho"); btn.classList.add("sacude"); setTimeout(() => btn.classList.remove("sacude"), 360); errBox.textContent = ""; mostrarErrorEnvio(errBox, e.message, () => enviarPedido(delivery, errBox));
     if (/10:00|día|fecha/i.test(e.message)) { diaElegido = null; diaPersonal = false; pintarDias(); errBox.textContent = e.message; } // el día ya no vale: hay que elegir otro
     if (/10:00/.test(e.message)) { // pasó la hora de corte mientras elegía: se actualizan las opciones
       const r2 = await fetch(location.pathname + "/datos").catch(() => null);
