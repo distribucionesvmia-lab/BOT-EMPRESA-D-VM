@@ -745,6 +745,18 @@ test("PDF DEL HISTORIAL: exige sesión, un documento que no es suyo da 404 y uno
   assert.ok([200, 404].includes(r.status)); // los pedidos hechos en la app tienen su propio PDF; este es para los de a3ERP
 });
 
+test("APP INSTALABLE: favicon, iconos (normales y maskable), capturas y manifest se sirven siempre; lo que no existe da 404 (nunca 500)", async () => {
+  for (const [u, tipo] of [["/favicon.ico", "image/png"], ["/icono-192.png", "image/png"], ["/icono-maskable-512.png", "image/png"], ["/apple-touch-icon.png", "image/png"], ["/captura-estrecha.png", "image/png"], ["/manifest.webmanifest", "application/manifest+json"]]) {
+    const r = await fetch(BASE + u); assert.equal(r.status, 200, u); assert.match(r.headers.get("content-type"), new RegExp(tipo.replace("+", "\\+")), u); await r.arrayBuffer();
+  }
+  assert.equal((await fetch(BASE + "/icono-192.png", { method: "HEAD" })).status, 200);
+  assert.equal((await fetch(BASE + "/icono-no-existe.png")).status, 404);
+  const m = await (await fetch(BASE + "/manifest.webmanifest")).json();
+  assert.equal(m.id, "/cliente"); assert.ok(m.icons.every((i) => i.purpose === "any" || i.purpose === "maskable")); assert.ok(m.icons.some((i) => i.purpose === "maskable")); assert.ok(m.screenshots.some((x) => x.form_factor === "narrow") && m.screenshots.some((x) => x.form_factor === "wide"));
+  const html = await (await fetch(BASE + "/cliente")).text();
+  assert.match(html, /rel="icon" href="\/favicon\.ico"/); assert.match(html, /<title>Inicio · Distribuciones VM<\/title>/);
+});
+
 test("INICIO DEL CLIENTE: /api/inicio exige sesión, devuelve solo su catálogo (habituales, categorías, fotos pedidas) y no enseña nada de la administración", async () => {
   assert.equal((await call("GET", "/api/inicio")).status, 401);
   const A = cookieOf(await entrarNif("111111"));

@@ -1,4 +1,4 @@
-import { BUSINESS, PRODUCTS, AYUDA } from "./config.js";
+import { BUSINESS, PRODUCTS, AYUDA, HORARIO_REPARTO } from "./config.js";
 import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRows, isYes, isNo, isDone, parseRemove, parseChangeQty, lev } from "./nlu.js";
 import { isTooGeneric } from "./identify.js";
 import { categorizar } from "./categorias.js";
@@ -391,7 +391,7 @@ function asistir(s, rawText, now, ctx) {
     catalogo: CATALOG, cliente: s.customer, habituales, ahora: now, ultimo: !!ultimo, recomendados: s.reco ?? [],
     precioOf: priceOf, upbOf,
     fmtPrecio: (p) => `${moneyP(priceOf(p))}${upbOf(p) ? ` · caja de ${upbOf(p)} (${money(priceOf(p) * upbOf(p))})` : ""}`,
-    caja: (p) => money(priceOf(p) * upbOf(p)), unidad: (p) => moneyP(priceOf(p)), ayuda: AYUDA,
+    caja: (p) => money(priceOf(p) * upbOf(p)), unidad: (p) => moneyP(priceOf(p)), ayuda: AYUDA, horarioReparto: HORARIO_REPARTO(),
   });
   if (!r) return null;
   if (r.tipo === "pedido") return handleMessageInner(s, r.texto, ctx); // lo anota el intérprete de pedidos de siempre

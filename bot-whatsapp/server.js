@@ -37,7 +37,7 @@ import { crearNotificador } from "./notificaciones.js";
 import { scheduleBackups } from "./backup.js";
 import { sourceFromEnv } from "./drive.js";
 import nodePath from "node:path";
-import { BUSINESS, ayudaPublica, condicionesPedido } from "./config.js";
+import { BUSINESS, ayudaPublica, condicionesPedido, envTexto } from "./config.js";
 import { pdfPedido, datosPdf } from "./pdf.js";
 import { categorizar } from "./categorias.js";
 import { puedeEditarPedido, weekday } from "./delivery.js";
@@ -484,8 +484,12 @@ const isJson = (req) => /^application\/json/i.test(req.headers["content-type"] ?
 async function appRoutes(req, res, url) {
   const p = url.pathname;
   // Instalar la web como app (PWA): manifiesto, iconos y service worker (públicos: no llevan datos)
-  const PWA = { "/manifest.webmanifest": ["manifest.webmanifest", "application/manifest+json"], "/icono-192.png": ["icono-192.png", "image/png"], "/icono-512.png": ["icono-512.png", "image/png"], "/sw.js": ["sw.js", "text/javascript; charset=utf-8"] };
-  if (PWA[p] && req.method === "GET") return void res.writeHead(200, { "Content-Type": PWA[p][1], "Cache-Control": p === "/sw.js" ? "no-cache" : "public, max-age=86400", "X-Content-Type-Options": "nosniff", ...(p === "/sw.js" ? { "Service-Worker-Allowed": "/" } : {}) }).end(fs.readFileSync(new URL(`./pwa/${PWA[p][0]}`, import.meta.url)));
+  const PWA = { "/manifest.webmanifest": ["manifest.webmanifest", "application/manifest+json"], "/icono-192.png": ["icono-192.png", "image/png"], "/icono-512.png": ["icono-512.png", "image/png"], "/icono-maskable-192.png": ["icono-maskable-192.png", "image/png"], "/icono-maskable-512.png": ["icono-maskable-512.png", "image/png"],
+    "/captura-estrecha.png": ["captura-estrecha.png", "image/png"], "/captura-ancha.png": ["captura-ancha.png", "image/png"], "/favicon.ico": ["icono-192.png", "image/png"], "/apple-touch-icon.png": ["icono-192.png", "image/png"], "/sw.js": ["sw.js", "text/javascript; charset=utf-8"] };
+  if (PWA[p] && (req.method === "GET" || req.method === "HEAD")) { // archivos fijos de la app instalable: siempre se sirven; si faltara alguno, 404 (nunca un error 500)
+    try { const cuerpo = fs.readFileSync(new URL(`./pwa/${PWA[p][0]}`, import.meta.url)); return void res.writeHead(200, { "Content-Type": PWA[p][1], "Cache-Control": p === "/sw.js" ? "no-cache" : "public, max-age=86400", "X-Content-Type-Options": "nosniff", ...(p === "/sw.js" ? { "Service-Worker-Allowed": "/" } : {}) }).end(req.method === "HEAD" ? undefined : cuerpo); }
+    catch (e) { console.error("archivo fijo no disponible:", p, e.message); return void res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }).end("No encontrado"); }
+  }
   if (p === "/robots.txt") return void res.writeHead(200, { "Content-Type": "text/plain" }).end("User-agent: *\nDisallow: /\n"); // que Google no indexe nada
   if (p === "/") {
     if (!String(req.headers.accept ?? "").includes("text/html")) return void res.end("Bot activo");
@@ -502,7 +506,7 @@ async function appRoutes(req, res, url) {
   }
   // Aplicación del cliente
   if (!clientEnabled) return void res.writeHead(404).end();
-  if (p === "/cliente" && req.method === "GET") return void enviar(res, 200, HTML, (() => { const dl = { titular: process.env.PRIVACY_TITULAR || undefined, cif: process.env.PRIVACY_CIF || "", direccion: process.env.PRIVACY_DIRECCION || undefined, email: process.env.PRIVACY_EMAIL || "" }; return page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml(dl)).replaceAll("<div data-aviso-legal></div>", avisoLegalHtml(dl)); })());
+  if (p === "/cliente" && req.method === "GET") return void enviar(res, 200, HTML, (() => { const dl = { titular: envTexto("PRIVACY_TITULAR") || undefined, cif: envTexto("PRIVACY_CIF"), direccion: envTexto("PRIVACY_DIRECCION") || undefined, email: envTexto("PRIVACY_EMAIL") }; return page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml(dl)).replaceAll("<div data-aviso-legal></div>", avisoLegalHtml(dl)); })());
   if (await auth.route(req, res, url)) return;
 
   const account = auth.sessionOf(req);
@@ -737,7 +741,7 @@ async function appRoutes(req, res, url) {
 http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://x");
-    if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/img/")) {
+    if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.png" || url.pathname.startsWith("/captura-") || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/img/")) {
       appRoutes(req, res, url).catch((err) => {
         console.error(err);
         if (!res.headersSent) res.writeHead(500).end();

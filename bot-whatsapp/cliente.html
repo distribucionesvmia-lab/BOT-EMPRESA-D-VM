@@ -92,7 +92,9 @@
 <meta name="color-scheme" content="light dark">
 <script>document.documentElement.classList.add("cargando");setTimeout(function(){document.documentElement.classList.remove("cargando")},2500);document.addEventListener("DOMContentLoaded",function(){document.documentElement.classList.remove("cargando")})</script>
 <script>try{var t=localStorage.getItem("vm:tema");if(t==="claro"||t==="oscuro")document.documentElement.setAttribute("data-tema",t);var c=localStorage.getItem("vm:contraste");if(c==="alto"||c==="normal")document.documentElement.setAttribute("data-contraste",c)}catch(e){}</script>
-<title>Pedidos · Distribuciones VM</title>
+<link rel="icon" href="/favicon.ico" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Inicio · Distribuciones VM</title>
 <style>
   /* ═══ SISTEMA DE DISEÑO · TOKENS (idénticos en cliente.html y pedido.html) ═══ */
   :root {
@@ -615,6 +617,7 @@
   @media (prefers-contrast: more) and (prefers-color-scheme: dark) { :root:not([data-tema="claro"]):not([data-contraste="normal"]) { --text:#FFFFFF; --text-2:#D8D8DD; --line:#9A9AA0; --accent:#FF8A98; --accent-soft:rgba(255,138,152,.2); --tab-off:#D8D8DD; } }
   :root[data-contraste="alto"] *:focus-visible { outline:3px solid currentColor; outline-offset:2px; }
   .ayuda-contraste { display:flex; align-items:center; gap:var(--s2); min-height:44px; margin-top:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; } .ayuda-contraste input { width:22px; height:22px; accent-color:var(--accent); flex:none; }
+  .inst-pasos { margin:0; padding-left:var(--s5); display:flex; flex-direction:column; gap:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); line-height:1.4; }
 </style>
 </head>
 <body>
@@ -704,7 +707,7 @@
       <div class="bar-acciones">
         <button type="button" id="micuenta" class="ds-circ cuenta" aria-haspopup="dialog" aria-label="Mi cuenta: mis datos y mis pedidos"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Mi cuenta</span></button>
         <div id="letraChat"></div>
-        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar">Cambiar código de entrada</button><button type="button" id="mispedidos">Histórico de pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><button type="button" id="legal-menu">Privacidad y aviso legal</button><button type="button" id="salir">Salir</button></div></div>
+        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar">Cambiar código de entrada</button><button type="button" id="mispedidos">Histórico de pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><button type="button" id="instalar-menu">Instalar la app</button><button type="button" id="legal-menu">Privacidad y aviso legal</button><button type="button" id="salir">Salir</button></div></div>
       </div>
     </div>
     <div class="titulo-bloque"><h1 class="titulo-grande">Asistente de pedidos</h1><p class="titulo-sub"><i class="dot"></i><span id="cli">Cliente</span></p></div>
@@ -1270,6 +1273,11 @@ function inicio(ui) {
       if (j.ayuda.whatsappHref) { const a = el("a", "vm-btn ghost", "WhatsApp"); a.href = j.ayuda.whatsappHref + "?text=" + encodeURIComponent("Hola, necesito ayuda con mi pedido" + (nombre ? ". Soy " + nombre : "")); a.target = "_blank"; a.rel = "noopener"; bs.appendChild(a); }
       ay.appendChild(bs); secciones.appendChild(ay);
     }
+    if (!yaInstalada()) { // instalar la app: un toque en Android, instrucciones en el iPhone
+      const ins = el("section", "in-ayuda"); ins.setAttribute("aria-label", "Instalar la app"); ins.appendChild(el("h3", null, "Instala la app en tu móvil"));
+      ins.appendChild(el("p", null, "Entra más rápido desde su icono en la pantalla de inicio y sin escribir la dirección."));
+      const bi = el("button", "vm-btn ghost", "Instalar la app"); bi.type = "button"; bi.onclick = abrirInstalar; ins.appendChild(bi); secciones.appendChild(ins);
+    }
     if (j.categorias?.length) {
       const sec = el("section", "in-sec"); sec.setAttribute("aria-label", "Categorías"); sec.appendChild(el("h3", null, "Categorías"));
       const fila = el("div", "in-chips"); for (const a of j.accesos || []) { const x = el("a", "in-chip in-acceso", a.nombre); x.href = cat + "#cat=" + encodeURIComponent(a.cat) + "&sub=" + encodeURIComponent(a.sub); fila.appendChild(x); } for (const k of j.categorias) { const a = el("a", "in-chip", k.nombre); a.href = cat + "#cat=" + encodeURIComponent(k.id); fila.appendChild(a); }
@@ -1395,11 +1403,25 @@ function entrar(nombre) { $("cli").textContent = nombre; chat.innerHTML = ""; ve
 })();
 </script>
 <script>
+let instalacion = null;
+const yaInstalada = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+async function abrirInstalar() {
+  if (instalacion) { instalacion.prompt(); await instalacion.userChoice.catch(() => {}); instalacion = null; return; } // Android/Chrome: el aviso de instalación del propio navegador
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const viejo = document.getElementById("ayuda-fondo"); if (viejo) viejo.remove();
+  const f = document.createElement("div"); f.id = "ayuda-fondo"; f.className = "ayuda-fondo"; f.setAttribute("role", "dialog"); f.setAttribute("aria-modal", "true"); f.setAttribute("aria-label", "Instalar la app");
+  const c = document.createElement("div"); c.className = "ayuda-caja"; const h = document.createElement("h2"); h.textContent = "Instalar la app"; c.appendChild(h);
+  const pasos = ios ? ["Abre esta página en Safari.", "Pulsa el botón «Compartir» (el cuadrado con la flecha hacia arriba).", "Elige «Añadir a pantalla de inicio» y pulsa «Añadir»."] : ["Abre el menú del navegador (los tres puntos ⋮).", "Elige «Instalar app» o «Añadir a pantalla de inicio».", "Confirma, y busca el icono «Pedidos VM» en tu pantalla de inicio."];
+  const ol = document.createElement("ol"); ol.className = "inst-pasos"; for (const t of pasos) { const li = document.createElement("li"); li.textContent = t; ol.appendChild(li); } c.appendChild(ol);
+  const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Entendido"; x.onclick = () => f.remove(); f.onclick = (e) => { if (e.target === f) f.remove(); };
+  c.appendChild(x); f.appendChild(c); document.body.appendChild(f); x.focus();
+}
 // Instalar como app: registra el service worker y, en Android/Chrome, ofrece el botón «Instalar ahora»
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-let instalacion = null;
-addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); instalacion = e; const b = document.getElementById("instalar-btn"); if (b) b.hidden = false; });
-document.getElementById("instalar-btn")?.addEventListener("click", async () => { if (!instalacion) return; instalacion.prompt(); await instalacion.userChoice.catch(() => {}); instalacion = null; document.getElementById("instalar-btn").hidden = true; });
+// El aviso de instalación del navegador se guarda y se enseña cuando el cliente pulsa «Instalar la app» (menú ⋯ o Inicio); sin él (iPhone, otros navegadores) se explican los pasos
+addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); instalacion = e; });
+addEventListener("appinstalled", () => { instalacion = null; const m = document.getElementById("instalar-menu"); if (m) m.hidden = true; });
+{ const m = document.getElementById("instalar-menu"); if (m) { m.hidden = yaInstalada(); m.onclick = () => { menu(false); abrirInstalar(); }; } }
 </script>
 </body>
 </html>

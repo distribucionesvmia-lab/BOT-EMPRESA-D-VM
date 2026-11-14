@@ -92,7 +92,9 @@
 <meta name="color-scheme" content="light dark">
 <script>document.documentElement.classList.add("cargando");setTimeout(function(){document.documentElement.classList.remove("cargando")},2500);document.addEventListener("DOMContentLoaded",function(){document.documentElement.classList.remove("cargando")})</script>
 <script>try{var t=localStorage.getItem("vm:tema");if(t==="claro"||t==="oscuro")document.documentElement.setAttribute("data-tema",t);var c=localStorage.getItem("vm:contraste");if(c==="alto"||c==="normal")document.documentElement.setAttribute("data-contraste",c)}catch(e){}</script>
-<title>Hacer pedido</title>
+<link rel="icon" href="/favicon.ico" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Catálogo · Distribuciones VM</title>
 <style>
   /* ═══ SISTEMA DE DISEÑO · TOKENS (idénticos en cliente.html y pedido.html) ═══ */
   :root {
@@ -2168,7 +2170,7 @@ function marcaNav() {
   document.querySelectorAll(".tabbar .tb").forEach(b => { const on = (b.dataset.nav || b.dataset.t) === act; b.classList.toggle("on", on); if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
   document.querySelectorAll(".tabbar .tb.tab").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.t === tab)));
   const titulo = act === "pedido" ? "Pedido" : tab === "hab" ? "Lo que sueles pedir" : "Catálogo";
-  document.querySelector(".titulo-grande").textContent = titulo; document.querySelector(".bar-titulo").textContent = titulo;
+  document.querySelector(".titulo-grande").textContent = titulo; document.querySelector(".bar-titulo").textContent = titulo; document.title = titulo + " · Distribuciones VM"; // un solo formato en todas las pantallas
 }
 function cambiarTab(t, { historia = true } = {}) {
   while (abiertas().length) cerrarArriba();
@@ -2743,12 +2745,12 @@ obs.observe(document.body, { childList: true }); // ayuda y preguntas aparecen y
   pintarAviso();
   window.vmLetra.control($("letraBox"), "boton");
   if (data.ayuda) { $("ayudaBtn").hidden = false; $("ayudaBtn").onclick = () => abrirAyuda(data.ayuda, data.customer.name); }
-  document.title = "Pedido a " + data.business;
+  
   $("ttl").textContent = data.customer.name;
   $("sub").textContent = "Haz tu pedido a " + data.business;
   $("addr").textContent = data.customer.address || "La dirección que tenemos de tu negocio (la confirmaremos contigo).";
   pintarDireccion();
-  $("priceNote").textContent = data.priceNote ? "Las líneas van sin IVA; este resumen ya lo incluye. Los importes se confirman al preparar el pedido." : "";
+  $("priceNote").textContent = data.priceNote || "";
   if (data.used) { $("doneT").textContent = "Este pedido ya se envió"; $("doneP").textContent = "Vuelve al chat para hacer otro pedido."; $("done").hidden = false; return; }
   if (!data.products.some(p => p.count > 0)) { tab = "all"; try { history.replaceState({ vmTab: "all" }, ""); } catch {} }
   (data.favs || []).forEach(id => favs.add(id));

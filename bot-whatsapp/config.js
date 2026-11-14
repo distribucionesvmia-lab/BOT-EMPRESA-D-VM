@@ -3,7 +3,16 @@
 
 // ── AYUDA («¿Necesitas ayuda?») ── RELLENAR: teléfono, WhatsApp y horario de atención. También se pueden poner como variables
 // AYUDA_TEL, AYUDA_WHATSAPP y AYUDA_HORARIO en C:\vm\config. Si un dato está vacío, ese botón no se muestra; si están todos vacíos, el botón de ayuda no aparece.
-const ayudaEnv = (k) => String(globalThis.process?.env?.[k] ?? "").trim();
+/** Texto de una variable de configuración, a prueba de archivos guardados con otra codificación: «Valent??n» (acento perdido) se descarta y «ValentÃ­n» se repara. */
+export function limpiaTextoEnv(v) {
+  let s = String(v ?? "").trim().replace(/^["']|["']$/g, "");
+  if (/[ÃÂ][\u0080-\u00BF]/.test(s)) { try { const r = Buffer.from(s, "latin1").toString("utf8"); if (!r.includes("\uFFFD")) s = r; } catch { /* se deja como está */ } }
+  if (/\uFFFD/.test(s) || /[A-Za-zÁ-ú]\?+[A-Za-zÁ-ú]/.test(s)) return ""; // acento perdido por la codificación del archivo: se usa el valor por defecto
+  return s;
+}
+export const envTexto = (k) => limpiaTextoEnv(globalThis.process?.env?.[k]);
+export const HORARIO_REPARTO = () => envTexto("HORARIO_REPARTO"); // p. ej. «Lunes a viernes, de 8:00 a 14:00»
+const ayudaEnv = envTexto;
 export const AYUDA = {
   telefono: ayudaEnv("AYUDA_TEL") || "", // p. ej. "983 000 000"
   whatsapp: ayudaEnv("AYUDA_WHATSAPP") || "", // p. ej. "600 000 000" (con o sin el 34 delante)
@@ -14,7 +23,7 @@ export const AYUDA = {
 export const condicionesPedido = () => {
   const e = (k) => String(globalThis.process?.env?.[k] ?? "").trim();
   const min = Number(e("PEDIDO_MINIMO").replace(",", "."));
-  return { pago: BUSINESS.payment, minimo: Number.isFinite(min) && min > 0 ? min : 0, portes: e("PORTES_TEXTO") };
+  return { pago: BUSINESS.payment, minimo: Number.isFinite(min) && min > 0 ? min : 0, portes: envTexto("PORTES_TEXTO") };
 };
 /** Lo que se enseña al cliente: solo los datos rellenados; null si no hay ninguno. */
 export const ayudaPublica = () => {
@@ -32,7 +41,7 @@ export const BUSINESS = {
   name: "DistribucionesVM",
   currency: "€",
   info: "📍 Calle Ejemplo 123\n🕘 Lunes a viernes, 9:00–18:00\n🚚 Envíos a toda la ciudad en 24–48 h",
-  priceNote: "Los importes van sin IVA. El IVA se suma al elegir el día de entrega, donde verás el total final. Los confirmamos al preparar el pedido.",
+  priceNote: "Precios sin IVA; abajo tienes el total con IVA. Los confirmamos al preparar el pedido.",
   payment:"Te enviaremos el enlace o los datos de pago cuando confirmemos tu pedido.",
 };
 
