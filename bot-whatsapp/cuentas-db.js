@@ -121,6 +121,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   db.exec("CREATE TABLE IF NOT EXISTS rights (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, tipo TEXT NOT NULL, texto TEXT, estado TEXT NOT NULL DEFAULT 'pendiente', created_at TEXT NOT NULL, resolved_at TEXT)");
   addCol("accounts", "deleted_at", "TEXT");
   addCol("push_log", "detalle", "TEXT");
+  db.exec("CREATE TABLE IF NOT EXISTS avisos_programados (id INTEGER PRIMARY KEY AUTOINCREMENT, titulo TEXT NOT NULL, texto TEXT NOT NULL, destino TEXT NOT NULL, cliente_id TEXT, dia TEXT NOT NULL, hora TEXT NOT NULL, cuando TEXT NOT NULL, repetir TEXT NOT NULL DEFAULT 'no', abre TEXT NOT NULL DEFAULT 'inicio', estado TEXT NOT NULL DEFAULT 'pendiente', resultado TEXT, creado TEXT NOT NULL, resuelto TEXT)");
   addCol("standing_orders", "skip_week", "TEXT"); // lunes de la semana que el cliente ha saltado («Saltar esta semana»)
   addCol("registrations", "pin_hash", "TEXT");
   addCol("registrations", "address", "TEXT"); // dirección (calle y localidad) que escribe un cliente nuevo: pasa a su ficha al aceptarlo
@@ -137,6 +138,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       INSERT INTO accounts_new (${cols}) SELECT ${cols} FROM accounts; DROP TABLE accounts; ALTER TABLE accounts_new RENAME TO accounts; COMMIT; PRAGMA foreign_keys = ON;`);
   }
 
+  const avisoProgOut = (r) => r && { id: r.id, titulo: r.titulo, texto: r.texto, destino: r.destino, clienteId: r.cliente_id, dia: r.dia, hora: r.hora, cuando: r.cuando, repetir: r.repetir, abre: r.abre, estado: r.estado, resultado: r.resultado, creado: r.creado, resuelto: r.resuelto };
   const accountOut = (r) => r && { id: r.id, customerId: r.customer_id, phone: r.phone, email: r.email, status: r.status, verified: !!r.verified, locked: !!r.locked_until && r.locked_until > new Date().toISOString(), lastLogin: r.last_login, createdAt: r.created_at, ownCode: !!r.code_key };
   const byPhone = db.prepare("SELECT * FROM accounts WHERE phone = ?");
   const byId = db.prepare("SELECT * FROM accounts WHERE id = ?");
@@ -523,6 +525,15 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     ajusteBorrar: (clave) => db.prepare("DELETE FROM ajustes WHERE clave = ?").run(clave),
     ajusteSiFalta(clave, crearValor) { db.prepare("INSERT OR IGNORE INTO ajustes (clave, valor) VALUES (?, ?)").run(clave, crearValor()); return db.prepare("SELECT valor FROM ajustes WHERE clave = ?").get(clave).valor; },
     pushLogAdd: (x, now = new Date().toISOString()) => db.prepare("INSERT INTO push_log (at, titulo, texto, destino, enviados, fallidos, detalle) VALUES (?, ?, ?, ?, ?, ?, ?)").run(now, x.titulo, x.texto, x.destino, x.enviados, x.fallidos, x.detalle ?? null),
+    // ---- Avisos programados (promociones y descuentos que se mandan solos a su hora) ----
+    avisoProgAdd: (x) => Number(db.prepare("INSERT INTO avisos_programados (titulo, texto, destino, cliente_id, dia, hora, cuando, repetir, abre, creado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(x.titulo, x.texto, x.destino, x.clienteId ?? x.cliente_id ?? null, x.dia, x.hora, x.cuando, x.repetir ?? "no", x.abre ?? "inicio", x.creado ?? new Date().toISOString()).lastInsertRowid),
+    avisoProgPendientes: () => db.prepare("SELECT * FROM avisos_programados WHERE estado = 'pendiente' ORDER BY cuando, id").all().map(avisoProgOut),
+    avisoProgHistorial: (limit = 15) => db.prepare("SELECT * FROM avisos_programados WHERE estado != 'pendiente' ORDER BY COALESCE(resuelto, creado) DESC, id DESC LIMIT ?").all(limit).map(avisoProgOut),
+    avisoProgVencidos: (ahora) => db.prepare("SELECT * FROM avisos_programados WHERE estado = 'pendiente' AND cuando <= ? ORDER BY cuando, id").all(ahora).map(avisoProgOut),
+    avisoProgReservar: (id) => db.prepare("UPDATE avisos_programados SET estado = 'enviando' WHERE id = ? AND estado = 'pendiente'").run(Number(id)).changes === 1, // un solo ciclo lo manda
+    avisoProgMarcar: (id, estado, resultado, ahora = new Date().toISOString()) => db.prepare("UPDATE avisos_programados SET estado = ?, resultado = ?, resuelto = ? WHERE id = ? AND estado IN ('pendiente', 'enviando')").run(estado, resultado ?? null, ahora, Number(id)).changes === 1,
+    avisoProgCancelar: (id) => db.prepare("UPDATE avisos_programados SET estado = 'cancelado', resuelto = ? WHERE id = ? AND estado = 'pendiente'").run(new Date().toISOString(), Number(id)).changes === 1,
+    avisoProgCuentaPendientes: () => db.prepare("SELECT COUNT(*) AS n FROM avisos_programados WHERE estado = 'pendiente'").get().n,
     pushLogList: (limit = 15) => db.prepare("SELECT at, titulo, texto, destino, enviados, fallidos, detalle FROM push_log ORDER BY id DESC LIMIT ?").all(limit),
     pushLogCount: (desde) => db.prepare("SELECT COUNT(*) AS n FROM push_log WHERE at >= ? AND enviados > 0").get(desde).n, // solo cuentan los avisos que han llegado a algún móvil: los intentos fallidos no gastan el límite
 

@@ -14,6 +14,7 @@ import { categorizar } from "./categorias.js";
 import { runExport } from "./exporter.js";
 import { backupDb } from "./backup.js";
 import { estadoCopias, comprobarCopias } from "./copias.js";
+import { validarProgramado, MAX_PENDIENTES } from "./avisos-programados.js";
 import { detectarTipo } from "./actualizar-datos.js";
 import { crearAvisos } from "./avisos.js";
 import { execFile } from "node:child_process";
@@ -431,7 +432,7 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
           pedidos: { pendientes: listos.length, retenidos: ret.length, masAntiguoHoras: pend.length ? Math.max(...pend.map((o) => horasDesde(o.fecha))) : 0, listos: listos.slice(0, 6).map(vista), retenidosLista: ret.slice(0, 6).map(vista) },
           altas: { pendientes: regs.length, lista: regs.slice(0, 5).map((x) => ({ id: x.id, negocio: x.business, telefono: x.phone, creada: x.createdAt })) },
           cuentasSinConfirmar: accounts.listAccounts().filter((a) => !a.verified && a.status !== "deleted").length, derechosPendientes: accounts.listRightsRequests("pendiente").length,
-          atrasados: atrasados(b.validos, ahora, 6), recordatorios: recordatorios().filas.length, problemas, copias: { ok: estadoCopias(process.env.BACKUP_DIR ?? "respaldos").ok },
+          atrasados: atrasados(b.validos, ahora, 6), recordatorios: recordatorios().filas.length, avisosHoy: accounts.avisoProgPendientes().filter((x) => x.dia === hoy).length, problemas, copias: { ok: estadoCopias(process.env.BACKUP_DIR ?? "respaldos").ok },
         }), true;
       }
       // ---- Ficha de un cliente: todo lo suyo en un sitio (sin NIF: no se guarda) ----
@@ -553,6 +554,20 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       accounts.pushLogAdd({ titulo, texto, destino: cli ? `${cli.id} ${cli.name}` : "todos", enviados: r.enviados, fallidos: r.fallidos, detalle: r.errores?.join(" · ") || null });
       return send(res, 200, { ok: true, ...r }), true;
     }
+    // ---- Avisos programados (promociones y descuentos): se confirman aquí y salen solos a su hora; se pueden cancelar mientras estén pendientes ----
+    if (p === "/api/admin/avisos/programados" && get) {
+      const nom = (x) => ({ ...x, para: x.destino === "todos" ? "Todos los clientes con avisos" : (customers.getById(x.clienteId)?.name ?? "Cliente " + x.clienteId) });
+      return send(res, 200, { pendientes: accounts.avisoProgPendientes().map(nom), historial: accounts.avisoProgHistorial(15).map(nom), maximo: MAX_PENDIENTES }), true;
+    }
+    if (p === "/api/admin/avisos/programar" && post) {
+      const v = validarProgramado((await readJson(req)) ?? {}, { existeCliente: (id) => !!customers.getById(id) });
+      if (v.error) return send(res, 400, { error: v.error }), true;
+      if (accounts.avisoProgCuentaPendientes() >= MAX_PENDIENTES) return send(res, 400, { error: `Ya hay ${MAX_PENDIENTES} avisos programados. Cancela alguno para añadir más.` }), true;
+      const id = accounts.avisoProgAdd(v.aviso);
+      return send(res, 200, { ok: true, id, cuando: v.aviso.cuando }), true;
+    }
+    { const mc = /^\/api\/admin\/avisos\/programados\/(\d+)\/cancelar$/.exec(p);
+      if (mc && post) return accounts.avisoProgCancelar(mc[1]) ? send(res, 200, { ok: true }) : send(res, 409, { error: "Ese aviso ya salió, se canceló o no existe." }), true; }
     // ---- Bandeja de entrada (carpeta del ordenador) ----
     if (p === "/api/admin/entrada" && get) return send(res, 200, listarEntrada()), true;
     if (p === "/api/admin/entrada/archivo" && get) {

@@ -44,6 +44,7 @@ import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
 import { categorizar } from "./categorias.js";
 import { empaquetar, estatico } from "./estaticos.js";
 import { avisarCortes, horaAviso } from "./avisocorte.js";
+import { enviarProgramados } from "./avisos-programados.js";
 import { zip as zipNode } from "./zip.js";
 import { limpiaError, navegadorCorto } from "./errores.js";
 const latidoLimite = rateLimiter(Number(process.env.LATIDO_LIMIT ?? 20), 60e3); // latidos por minuto y cliente (el normal es 1 cada 45 s)
@@ -986,6 +987,10 @@ http
     // «Hoy es tu día»: aviso al móvil antes de la hora límite a quien tenga pedido fijo (AVISO_CORTE_HORA, por defecto 8:30; AVISO_CORTE=0 lo desactiva). Nunca envía ningún pedido.
     if (process.env.DEMO !== "1" && !process.env.VM_TEST && clientEnabled && process.env.AVISO_CORTE !== "0") {
       setInterval(() => { avisarCortes({ accounts: getAccountsDb(), db: getDb(), customers: customerDirectory, avisos: avisosPush() }).catch((e) => console.error("Aviso de hora límite:", e.message)); }, 60e3).unref();
+    }
+    // Avisos programados desde el panel (promociones, descuentos…): cada minuto manda los que ya tocan. Solo en la aplicación de la empresa; AVISOS_PROGRAMADOS=0 lo apaga.
+    if (process.env.DEMO !== "1" && !process.env.VM_TEST && adminEnabled && process.env.AVISOS_PROGRAMADOS !== "0") {
+      setInterval(() => { enviarProgramados({ accounts: getAccountsDb(), avisos: avisosPush(), customers: customerDirectory }).catch((e) => console.error("Avisos programados:", e.message)); }, 60e3).unref();
     }
     // Vigilancia: avisa por correo de problemas nuevos y manda un informe diario (VIGILANCIA=0 la desactiva)
     if (process.env.DEMO !== "1" && adminEnabled && process.env.VIGILANCIA !== "0") {

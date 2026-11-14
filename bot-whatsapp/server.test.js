@@ -1475,3 +1475,17 @@ test("PANEL «HOY», FICHA DE CLIENTE Y BUSCADOR: solo con la clave, solo lectur
   const b = (await call("GET", "/api/admin/buscar?q=" + encodeURIComponent(ped.ref.slice(0, 8)), { admin: true })).json; assert.ok(b.pedidos.some((o) => o.ref === ped.ref));
   assert.ok((await call("GET", "/api/admin/buscar?q=agua", { admin: true })).json.articulos.length >= 1);
 });
+
+test("AVISOS PROGRAMADOS: programar con confirmación, verlos, cancelarlos y que no se pueda programar en el pasado", async () => {
+  for (const [m, u, body] of [["GET", "/api/admin/avisos/programados"], ["POST", "/api/admin/avisos/programar", {}], ["POST", "/api/admin/avisos/programados/1/cancelar", {}]]) assert.ok([401, 403].includes((await call(m, u, { body })).status), u);
+  const dia = new Date(Date.now() + 3 * 86400_000).toISOString().slice(0, 10), ok = { titulo: "Oferta de la semana", texto: "Cerveza al mejor precio", destino: "todos", dia, hora: "09:00", repetir: "no", abre: "catalogo" };
+  const P = (body) => call("POST", "/api/admin/avisos/programar", { admin: true, body });
+  assert.equal((await P({ ...ok })).status, 400); // sin confirmar no se programa
+  assert.equal((await P({ ...ok, confirmo: true, dia: "2020-01-01" })).status, 400); // en el pasado, tampoco
+  const r = await P({ ...ok, confirmo: true }); assert.equal(r.status, 200, JSON.stringify(r.json)); assert.ok(r.json.id);
+  const l = (await call("GET", "/api/admin/avisos/programados", { admin: true })).json; const x = l.pendientes.find((a) => a.id === r.json.id);
+  assert.ok(x); assert.equal(x.titulo, "Oferta de la semana"); assert.equal(x.para, "Todos los clientes con avisos"); assert.equal(x.abre, "catalogo");
+  assert.equal((await call("POST", `/api/admin/avisos/programados/${r.json.id}/cancelar`, { admin: true, body: {} })).status, 200);
+  assert.equal((await call("POST", `/api/admin/avisos/programados/${r.json.id}/cancelar`, { admin: true, body: {} })).status, 409); // ya cancelado
+  const l2 = (await call("GET", "/api/admin/avisos/programados", { admin: true })).json; assert.ok(!l2.pendientes.some((a) => a.id === r.json.id)); assert.ok(l2.historial.some((a) => a.id === r.json.id && a.estado === "cancelado"));
+});

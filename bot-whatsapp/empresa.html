@@ -193,6 +193,7 @@
   .fi-ped { width:100%; border-collapse:collapse; } .fi-ped td, .fi-ped th { padding:7px 8px; border-bottom:1px solid var(--line-2); text-align:left; vertical-align:top; } .fi-ped th { font-size:12px; color:var(--muted); } .fi-ped td.num, .fi-ped th.num { text-align:right; }
   .fi-pie { display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; padding:12px 22px; border-top:1px solid var(--line); background:var(--th); }
   @media (max-width:640px) { .fi-cab, .fi-cuerpo, .fi-pie { padding-left:14px; padding-right:14px; } .fi-pie button { flex:1 1 100%; } }
+  .pr-plant { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0 12px; } .pr-plant button { min-height:34px; padding:0 12px; border-radius:999px; font-size:13px; }
   .est-exp { display:inline-flex; gap:8px; margin-left:auto; }
   .est-exp button { height:40px; }
   .est-filtros { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; }
@@ -556,6 +557,32 @@
           <label class="campo campo-ancho"><span>Mensaje <small>(máximo 180 letras)</small></span><textarea id="av-texto" maxlength="180" rows="3" placeholder="Por ejemplo: Esta semana, cerveza al mejor precio. ¡Haz tu pedido antes de las 10:00 y te lo llevamos hoy!" required></textarea></label>
           <div class="acciones campo-ancho"><button class="main" id="av-enviar">Enviar aviso</button><span class="muted" id="av-msg" role="status"></span></div>
         </form>
+      </div>
+      <div class="panel" id="pr-card">
+        <h2>Programar un aviso</h2>
+        <p class="muted" style="margin:0 0 4px">Deja preparada una promoción o un descuento para que salga <b>solo</b> el día y la hora que elijas. Lo confirmas ahora y puedes cancelarlo mientras esté pendiente.</p>
+        <div class="pr-plant" role="group" aria-label="Ideas para empezar"><span class="muted">Ideas:</span>
+          <button type="button" data-t="Oferta de la semana" data-x="Esta semana, precios especiales en artículos seleccionados. ¡Haz tu pedido y aprovecha!">Oferta de la semana</button>
+          <button type="button" data-t="Nueva promoción" data-x="Tenemos una nueva promoción para ti. Entra en el catálogo y échale un vistazo.">Nueva promoción</button>
+          <button type="button" data-t="Descuento por tiempo limitado" data-x="Descuento especial solo estos días. Haz tu pedido antes de las 10:00 y te lo llevamos hoy.">Descuento limitado</button>
+        </div>
+        <form id="f-prog" class="form-grid" autocomplete="off">
+          <label class="campo"><span>Para quién</span><select id="pr-destino"><option value="todos">Todos los clientes que tienen los avisos activados</option><option value="cliente">Un solo cliente</option></select></label>
+          <div id="pr-uno" class="form-grid campo-ancho" hidden><label class="campo"><span>Buscar cliente</span><input id="pr-q" type="search" placeholder="Nombre o código del cliente" aria-label="Buscar cliente"></label><label class="campo"><span>Cliente elegido</span><select id="pr-sel" aria-label="Cliente"></select></label></div>
+          <label class="campo campo-ancho"><span>Título <small>(máximo 50 letras)</small></span><input id="pr-titulo" maxlength="50" placeholder="Por ejemplo: Oferta de la semana" required></label>
+          <label class="campo campo-ancho"><span>Mensaje <small id="pr-cuenta">(máximo 180 letras)</small></span><textarea id="pr-texto" maxlength="180" rows="3" placeholder="Por ejemplo: Esta semana, cerveza al mejor precio. ¡Haz tu pedido antes de las 10:00 y te lo llevamos hoy!" required></textarea></label>
+          <label class="campo"><span>Día</span><input type="date" id="pr-dia" required></label>
+          <label class="campo"><span>Hora (de Madrid)</span><input type="time" id="pr-hora" value="09:00" required></label>
+          <label class="campo"><span>¿Se repite?</span><select id="pr-repetir"><option value="no">No, solo una vez</option><option value="semana">Sí, el mismo día cada semana</option></select></label>
+          <label class="campo"><span>Al tocar el aviso se abre</span><select id="pr-abre"><option value="catalogo">El catálogo</option><option value="inicio">El inicio de la aplicación</option></select></label>
+          <p class="inv-resumen campo-ancho" id="pr-resumen" role="status" aria-live="polite"></p>
+          <div class="acciones campo-ancho"><button class="main" id="pr-enviar" type="submit">Programar aviso</button><span class="muted" id="pr-msg" role="status"></span></div>
+        </form>
+      </div>
+      <div class="panel"><h2>Avisos programados</h2>
+        <p class="vacio" id="pr-vacio" hidden><b>No hay avisos programados.</b><span>Cuando programes uno, aparecerá aquí hasta que salga. Mientras tanto puedes cancelarlo.</span></p>
+        <div class="scroll"><table id="pr-tabla"><thead><tr><th>Cuándo</th><th>Aviso</th><th>Para</th><th></th></tr></thead><tbody id="pr-lista"></tbody></table></div>
+        <h4 style="margin:16px 0 6px">Ya resueltos</h4><div class="scroll"><table><tbody id="pr-hist"></tbody></table></div>
       </div>
       <div class="panel"><h2>Últimos avisos enviados</h2><div class="scroll"><table><tbody id="av-hist"></tbody></table></div><p class="vacio" id="av-vacio" hidden><b>Todavía no has enviado ningún aviso.</b><span>Los avisos que mandes aparecerán aquí con cuántos móviles los han recibido.</span></p></div>
     </div>
@@ -1170,6 +1197,7 @@ function explicarPush(errores) {
   return `${que} (Detalle técnico: ${t})`;
 }
 async function avisosClientes() {
+  programados().catch(() => {});
   const r = await call("/api/admin/avisos");
   $("av-contacto").textContent = r.contacto ? `Los avisos se envían identificando al servidor con: ${r.contacto}` : "Falta la dirección pública para identificar los avisos (Apple los rechaza sin ella). Entra una vez como cliente por la dirección pública (la de las «Avisos activados») o pon VAPID_SUB en C:\\vm\\config.";
   $("av-estado").textContent = r.moviles ? `Ahora mismo hay ${r.clientes} cliente${r.clientes === 1 ? "" : "s"} con los avisos activados (${r.moviles} móvil${r.moviles === 1 ? "" : "es"}).` : "Todavía ningún cliente ha activado los avisos en su móvil.";
@@ -1177,6 +1205,42 @@ async function avisosClientes() {
   for (const x of r.ultimos) { const tr = document.createElement("tr"), t = el("td"); t.append(el("b", x.titulo), el("div", x.texto, { className: "muted" })); tr.append(el("td", hora(x.at)), t, el("td", x.destino === "todos" ? "A todos" : "A " + x.destino), el("td", `${x.enviados} enviado${x.enviados === 1 ? "" : "s"}${x.fallidos ? ` · ${x.fallidos} sin entregar${x.detalle ? " (" + x.detalle + ")" : ""}` : ""}`)); tb.appendChild(tr); }
 }
 $("av-destino").onchange = () => { $("av-uno").hidden = $("av-destino").value !== "cliente"; };
+// ═════════ Avisos programados ═════════
+const hoyMadridStr = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+const sumaDia = (d, n) => { const x = new Date(d + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+$("pr-dia").min = hoyMadridStr(); $("pr-dia").value = sumaDia(hoyMadridStr(), 1);
+const prCuando = () => { const d = $("pr-dia").value, h = $("pr-hora").value; if (!d || !h) return ""; return new Date(d + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " a las " + h; };
+function prResumen() {
+  const uno = $("pr-destino").value === "cliente", cuando = prCuando(), q = uno ? ($("pr-sel").selectedOptions[0]?.textContent.replace(/ \(\w+\)$/, "") || "el cliente que elijas") : "todos los clientes que tienen los avisos activados";
+  const sem = $("pr-repetir").value === "semana" && $("pr-dia").value ? ` y se repetirá cada ${new Date($("pr-dia").value + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long" })}` : "";
+  $("pr-resumen").textContent = cuando ? `Se enviará el ${cuando} a ${q}${sem}.` : "Elige el día y la hora.";
+  $("pr-cuenta").textContent = `(${$("pr-texto").value.length} de 180 letras)`;
+}
+for (const id of ["pr-destino", "pr-sel", "pr-dia", "pr-hora", "pr-repetir", "pr-texto"]) { $(id).addEventListener("input", prResumen); $(id).addEventListener("change", prResumen); }
+$("pr-destino").addEventListener("change", () => { $("pr-uno").hidden = $("pr-destino").value !== "cliente"; });
+let tPr = 0; $("pr-q").oninput = () => { clearTimeout(tPr); tPr = setTimeout(async () => { const q = $("pr-q").value.trim(), sel = $("pr-sel"); sel.innerHTML = ""; if (q.length >= 2) { const r = await call("/api/admin/clientes?q=" + encodeURIComponent(q)).catch(() => []); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); if (!r.length) sel.appendChild(el("option", "Ningún cliente con ese nombre", { value: "" })); } prResumen(); }, 250); };
+for (const b of document.querySelectorAll(".pr-plant button")) b.onclick = () => { $("pr-titulo").value = b.dataset.t; $("pr-texto").value = b.dataset.x; prResumen(); $("pr-titulo").focus(); };
+const ESTADO_PR = { enviado: "Enviado", cancelado: "Cancelado", perdido: "No salió", error: "Con error", enviando: "Enviando…" };
+async function programados() {
+  const r = await call("/api/admin/avisos/programados"), tb = $("pr-lista"); tb.innerHTML = ""; $("pr-vacio").hidden = r.pendientes.length > 0; $("pr-tabla").hidden = !r.pendientes.length;
+  for (const x of r.pendientes) {
+    const tr = document.createElement("tr"), t = el("td"), acc = el("td"); t.append(el("b", x.titulo), el("div", x.texto, { className: "muted" }));
+    const b = el("button", "Cancelar", { type: "button", className: "peligro" }); b.onclick = async () => { if (!confirm(`¿Cancelar este aviso?\n\n«${x.titulo}»\nIba a salir el ${fechaEs(x.cuando)}.`)) return; const a = await call(`/api/admin/avisos/programados/${x.id}/cancelar`, {}).catch((e) => ({ error: e.message })); if (a?.error) alert(a.error); programados(); }; acc.append(b);
+    tr.append(el("td", fechaEs(x.cuando) + (x.repetir === "semana" ? " · cada semana" : "")), t, el("td", x.para), acc); tb.append(tr);
+  }
+  const th = $("pr-hist"); th.innerHTML = "";
+  for (const x of r.historial) { const tr = document.createElement("tr"), t = el("td"), e_ = el("td"); t.append(el("b", x.titulo), el("div", x.texto, { className: "muted" })); e_.append(el("span", ESTADO_PR[x.estado] ?? x.estado, { className: "badge " + (x.estado === "enviado" ? "exportado" : x.estado === "cancelado" ? "pendiente" : "retenido") })); if (x.resultado) e_.append(el("div", x.resultado, { className: "muted" })); tr.append(el("td", fechaEs(x.cuando)), t, el("td", x.para), e_); th.append(tr); }
+  if (!r.historial.length) th.append(el("tr")), th.lastChild.append(el("td", "Todavía no ha salido ningún aviso programado.", { className: "muted" }));
+}
+$("f-prog").onsubmit = async (e) => {
+  e.preventDefault(); const msg = $("pr-msg"), uno = $("pr-destino").value === "cliente"; msg.textContent = "";
+  if (uno && !$("pr-sel").value) { msg.textContent = "Busca y elige un cliente."; return; }
+  const cuerpo = { titulo: $("pr-titulo").value, texto: $("pr-texto").value, destino: $("pr-destino").value, clienteId: uno ? $("pr-sel").value : undefined, dia: $("pr-dia").value, hora: $("pr-hora").value, repetir: $("pr-repetir").value, abre: $("pr-abre").value, confirmo: true };
+  if (!confirm(`¿Programar este aviso?\n\nSe enviará el ${prCuando()}${$("pr-repetir").value === "semana" ? " (y cada semana)" : ""} a ${uno ? $("pr-sel").selectedOptions[0].textContent : "todos los clientes con avisos activados"}:\n\n«${cuerpo.titulo}»\n${cuerpo.texto}\n\nPodrás cancelarlo mientras esté pendiente.`)) return;
+  $("pr-enviar").disabled = true;
+  try { await call("/api/admin/avisos/programar", cuerpo); msg.textContent = "Aviso programado."; $("pr-titulo").value = ""; $("pr-texto").value = ""; prResumen(); await programados(); } catch (er) { msg.textContent = er.message; } finally { $("pr-enviar").disabled = false; }
+};
+prResumen();
 // Enlace de invitación (un solo uso, 7 días): lo crea la oficina y lo manda ella misma
 let tInv = 0, invActual = null;
 $("inv-q").oninput = () => { clearTimeout(tInv); tInv = setTimeout(async () => { const q = $("inv-q").value.trim(), sel = $("inv-sel"); sel.innerHTML = ""; if (q.length < 2) return; const r = await call("/api/admin/clientes?q=" + encodeURIComponent(q)).catch(() => []); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); if (!r.length) sel.appendChild(el("option", "Ningún cliente con ese nombre", { value: "" })); }, 300); };
@@ -1525,6 +1589,7 @@ async function hoy() {
   if (d.cuentasSinConfirmar) tarea("media", `${d.cuentasSinConfirmar} cuenta${d.cuentasSinConfirmar === 1 ? "" : "s"} sin confirmar`, "Sus pedidos quedan retenidos hasta que las confirmes", "Ver cuentas", () => irA("cuentas"));
   if (d.derechosPendientes) tarea("alta", `${d.derechosPendientes} petición${d.derechosPendientes === 1 ? "" : "es"} de derechos de datos pendiente${d.derechosPendientes === 1 ? "" : "s"}`, "Hay plazo legal para contestar", "Ver", () => irA("cuentas"));
   if (d.recordatorios) tarea("info", `${d.recordatorios} cliente${d.recordatorios === 1 ? "" : "s"} a los que hoy les toca reponer`, "Les puedes mandar un recordatorio por WhatsApp", "Ver recordatorios", () => { irA("pedidos"); $("rec-panel").open = true; $("rec-panel").scrollIntoView({ block: "start" }); });
+  if (d.avisosHoy) tarea("info", `${d.avisosHoy} aviso${d.avisosHoy === 1 ? "" : "s"} programado${d.avisosHoy === 1 ? "" : "s"} para hoy`, "Saldrán solos a su hora; puedes cancelarlos mientras estén pendientes", "Ver avisos", () => irA("avisos"));
   for (const pr of d.problemas) {
     if (["pedidos-sin-exportar", "pedidos-retenidos", "altas-sin-resolver"].includes(pr.clave)) continue; // ya salen arriba
     const copia = /copia/.test(pr.clave);
