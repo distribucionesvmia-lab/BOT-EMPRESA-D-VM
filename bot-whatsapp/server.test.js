@@ -697,6 +697,21 @@ test("MODIFICAR UN PEDIDO ENVIADO: sustituye al anterior (mismo número, sin dup
   assert.equal((await call("GET", `/catalogo/pedido?ref=${ref}`, { cookie: A })).status, 409);
 });
 
+test("PDF DEL PEDIDO: el cliente descarga SU pedido; sin sesión 401; el de otro cliente o uno inventado, 404; es un PDF válido con el total", async () => {
+  assert.equal((await call("GET", "/api/pedido/VM-2026-000001/pdf")).status, 401);
+  const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar uno"));
+  const env = await call("POST", "/catalogo", { cookie: A, body: { key: "pdf-clave-1", lines: [{ id: "1010", qty: 2, unit: "ud" }], delivery: null } });
+  assert.equal(env.status, 200); const ref = env.json.ref; assert.match(ref, /^VM-\d{4}-\d{6}$/);
+  const r = await fetch(`http://localhost:${PORT}/api/pedido/${ref}/pdf`, { headers: { cookie: A } });
+  assert.equal(r.status, 200); assert.match(r.headers.get("content-type"), /application\/pdf/); assert.match(r.headers.get("content-disposition"), /attachment; filename="pedido-VM-/);
+  const buf = Buffer.from(await r.arrayBuffer());
+  assert.equal(buf.subarray(0, 5).toString(), "%PDF-"); assert.match(buf.subarray(-6).toString(), /%%EOF/); assert.ok(buf.toString("latin1").includes(ref));
+  const otro = await fetch(`http://localhost:${PORT}/api/pedido/${ref}/pdf`, { headers: { cookie: B } });
+  assert.equal(otro.status, 404);
+  assert.equal((await call("GET", "/api/pedido/VM-2026-999999/pdf", { cookie: A })).status, 404);
+  assert.equal((await call("GET", "/api/pedido/..%2f..%2fetc/pdf", { cookie: A })).status, 404);
+});
+
 test("INICIO DEL CLIENTE: /api/inicio exige sesión, devuelve solo su catálogo (habituales, categorías, fotos pedidas) y no enseña nada de la administración", async () => {
   assert.equal((await call("GET", "/api/inicio")).status, 401);
   const A = cookieOf(await entrarNif("111111"));

@@ -421,6 +421,7 @@
   @media (prefers-reduced-motion: reduce) { .vm-inicio .in-pim img, .vm-inicio .in-foto img { transition:none; } }
 
   /* Estados vacíos y de error */
+  #m-cuenta a.vm-btn { text-decoration:none; display:flex; align-items:center; justify-content:center; }
   .estado { display:flex; flex-direction:column; align-items:center; text-align:center; gap:var(--s2); padding:var(--s8) var(--s5); }
   .estado svg { width:48px; height:48px; color:var(--text-2); margin-bottom:var(--s2); }
   .estado h3 { margin:0; font-size:calc(var(--t-md) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; color:var(--text); }
@@ -740,6 +741,7 @@ async function abrirCuenta(irAPedidos) {
     const rep = nodo("button", "Repetir pedido", "vm-btn primary"); rep.type = "button"; rep.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&r=1&x=1"; };
     const add = nodo("button", "Añadir al carrito", "vm-btn ghost"); add.type = "button"; add.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&a=1"; };
     acc.append(rep, add);
+    if (o.origen === "app" && /^VM-\d{4}-\d{6}$/.test(o.doc)) { const pdf = nodo("a", "Descargar PDF", "vm-btn ghost"); pdf.href = "/api/pedido/" + encodeURIComponent(o.doc) + "/pdf"; pdf.setAttribute("download", "pedido-" + o.doc + ".pdf"); pdf.setAttribute("aria-label", "Descargar el pedido " + o.doc + " en PDF"); acc.appendChild(pdf); } // el PDF solo existe para los pedidos hechos en la aplicación
     if (o.editable) { const m = nodo("button", "Modificar pedido", "vm-btn ghost"); m.type = "button"; m.onclick = () => { location.href = "/catalogo#m=" + encodeURIComponent(o.doc); }; acc.appendChild(m); }
     c.appendChild(acc); if (o.editable && o.hasta) c.appendChild(nodo("small", o.hasta));
     B.appendChild(c);

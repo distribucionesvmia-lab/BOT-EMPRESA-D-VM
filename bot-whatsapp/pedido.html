@@ -1087,7 +1087,7 @@
     </div>
 
   <section class="screen" id="done" hidden>
-    <div class="ok"><svg class="tick-svg" viewBox="0 0 52 52" aria-hidden="true" focusable="false"><circle cx="26" cy="26" r="24" fill="none" stroke="currentColor" stroke-width="3"/><path class="tick-trazo" d="M15 27l8 8 14-16" fill="none" stroke="currentColor" stroke-width="3.500" stroke-linecap="round" stroke-linejoin="round"/></svg><h2 id="doneT">¡Pedido recibido!</h2><p id="doneRef" class="done-ref" hidden></p><p id="doneP" style="color:var(--gris)"></p><p id="modInfo" style="color:var(--gris);margin:6px 0" hidden></p><button type="button" class="big sec" id="modBtn" hidden style="margin:8px 0">Modificar pedido</button><div class="done-btns"><button type="button" class="big" id="doneVer" hidden>Ver pedido</button><a class="big sec" id="doneInicio" href="/cliente">Volver al inicio</a></div></div>
+    <div class="ok"><svg class="tick-svg" viewBox="0 0 52 52" aria-hidden="true" focusable="false"><circle cx="26" cy="26" r="24" fill="none" stroke="currentColor" stroke-width="3"/><path class="tick-trazo" d="M15 27l8 8 14-16" fill="none" stroke="currentColor" stroke-width="3.500" stroke-linecap="round" stroke-linejoin="round"/></svg><h2 id="doneT">¡Pedido recibido!</h2><p id="doneRef" class="done-ref" hidden></p><p id="doneP" style="color:var(--gris)"></p><p id="modInfo" style="color:var(--gris);margin:6px 0" hidden></p><button type="button" class="big sec" id="modBtn" hidden style="margin:8px 0">Modificar pedido</button><div class="done-btns"><button type="button" class="big" id="doneVer" hidden>Ver pedido</button><a class="big sec" id="donePdf" href="#" hidden download>Descargar PDF</a><a class="big sec" id="doneInicio" href="/cliente">Volver al inicio</a></div></div>
   </section>
 </div>
 
@@ -1948,7 +1948,7 @@ async function enviarPedido(delivery, errBox) {
     $("modInfo").hidden = !j.modificable; $("modInfo").textContent = j.modificable ? j.modificable + "." : ""; $("modBtn").hidden = !(j.modificable && j.ref); if (j.ref) $("modBtn").onclick = () => modificar(j.ref);
     modificando = null; $("modBanner").hidden = true;
     $("doneP").textContent = String(j.message || "").replace(/\*/g, "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim(); $("cart").hidden = true; diaElegido = null; diaPersonal = false; $("done").hidden = false; marcaNav();
-    $("doneRef").hidden = !j.ref; $("doneRef").textContent = j.ref ? "Referencia " + j.ref : ""; $("doneVer").hidden = false; $("doneVer").onclick = () => { location.href = "/cliente#cuenta"; };
+    $("doneRef").hidden = !j.ref; $("doneRef").textContent = j.ref ? "Referencia " + j.ref : ""; $("donePdf").hidden = !j.ref; if (j.ref) { $("donePdf").href = "/api/pedido/" + encodeURIComponent(j.ref) + "/pdf"; $("donePdf").setAttribute("download", "pedido-" + j.ref + ".pdf"); } $("doneVer").hidden = false; $("doneVer").onclick = () => { location.href = "/cliente#cuenta"; };
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
   } catch (e) {
     btn.disabled = false; btn.textContent = textoBtn; errBox.textContent = ""; mostrarErrorEnvio(errBox, e.message, () => enviarPedido(delivery, errBox));

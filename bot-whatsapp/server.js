@@ -37,6 +37,7 @@ import { scheduleBackups } from "./backup.js";
 import { sourceFromEnv } from "./drive.js";
 import nodePath from "node:path";
 import { BUSINESS, ayudaPublica } from "./config.js";
+import { pdfPedido, datosPdf } from "./pdf.js";
 import { puedeEditarPedido, weekday } from "./delivery.js";
 const DIAS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
@@ -505,6 +506,16 @@ async function appRoutes(req, res, url) {
   if (p === "/catalogo" && req.method === "GET") {
     if (!account) return void res.writeHead(302, { Location: "/cliente" }).end();
     return void enviar(res, 200, HTML, page("pedido.html"));
+  }
+  // PDF de SU pedido (solo los hechos en la aplicación; un pedido de otro cliente responde igual que uno que no existe)
+  const mPdf = /^\/api\/pedido\/(VM-\d{4}-\d{6})\/pdf$/.exec(p);
+  if (mPdf && req.method === "GET") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const o = getDb().getOrderByRef(mPdf[1]);
+    if (!o || o.customer_id !== String(account.customerId) || o.status === "cancelled") return void sendJson(res, 404, { error: "No encontramos ese pedido." });
+    const c = customerDirectory.getById(account.customerId);
+    const buf = pdfPedido(datosPdf(o, { empresa: BUSINESS.name, cliente: c?.name ?? "" }));
+    return void res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="pedido-${o.ref}.pdf"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": buf.length }).end(buf);
   }
   if (p === "/api/ayuda" && req.method === "GET") return void sendJson(res, 200, { ayuda: ayudaPublica() }); // datos públicos de contacto de la empresa
   // Datos de la pantalla de Inicio del cliente: lo que suele pedir, lo más pedido, categorías y fotos de su último pedido (todo de su catálogo; nada de otros clientes)
