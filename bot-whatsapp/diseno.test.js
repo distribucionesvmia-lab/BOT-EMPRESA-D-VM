@@ -244,7 +244,7 @@ test("tanda 4 (carrito y favoritos): cantidad solo entera y seleccionada al toca
   assert.match(pedido, /const LIM_CANTIDAD = 200, LIM_IMPORTE = 3000/); assert.match(pedido, /titulo: "¿Seguro\?"/); assert.match(pedido, /¿Seguro que quieres enviarlo\?/); // 4
   assert.match(pedido, /#cart \.tl td\.tl-imp \{ grid-column:1; display:flex; flex-wrap:wrap;/); // 5
   assert.match(pedido, /#confirm \.nw \{ white-space:nowrap; \}/); assert.match(pedido, /sp\.className = "nw"/); // 6
-  assert.match(pedido, /grid-template-areas:"av info fav" "av seg slot"/); assert.match(pedido, /\.pf-n \{ -webkit-line-clamp:3; \}/); // 7
+  assert.match(pedido, /grid-template-areas:"av info info" "fav seg slot"/); assert.match(pedido, /\.pf-n \{ -webkit-line-clamp:3; \}/); // 7
   assert.match(pedido, /el\.appendChild\(f\); \/\/ el corazón es un hijo de la tarjeta/); assert.match(pedido, /\.pf-fav \{ position:static; grid-area:fav;[^}]*width:44px; height:44px;/); // 8
   assert.match(pedido, /\.diasfijo button \{ min-height:44px; min-width:56px; \}/); // 9
   assert.match(pedido, /async function cambiarUnidad/); assert.match(pedido, /titulo: "No son cajas completas"/); assert.doesNotMatch(pedido.slice(pedido.indexOf("async function cambiarUnidad"), pedido.indexOf("async function cambiarUnidad") + 900), /\bconfirm\(/); // 10

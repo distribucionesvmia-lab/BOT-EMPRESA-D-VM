@@ -102,7 +102,7 @@
     --bg:#F5F5F7; --surface:#FFFFFF; --text:#1D1D1F; --text-2:#636366; --fill:#F2F2F7; --line:#E5E5EA;
     --accent:#C8102E; --accent-soft:#FBEAED; --on-accent:#FFFFFF; --bar:#C8102E; --on-bar:#FFFFFF; --foto-bg:#F2F2F7;
     --ok:#1D7A45; --ok-bg:#E8F5EC; --warn:#8A5F00; --warn-bg:#FFF4DB;
-    --field:rgba(118,118,128,.12); --tab-off:#8E8E93; --scrim:rgba(0,0,0,.4);
+    --field:rgba(118,118,128,.12); --tab-off:#6E6E73; --scrim:rgba(0,0,0,.4);
     --mat-bg:rgba(255,255,255,.78); --mat-line:rgba(0,0,0,.14);
     /* tipografía: pila del sistema, pesos 400 / 600 / 700; tamaños base (se dividen por --k para respetar A− / A+) */
     --font:-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, system-ui, sans-serif;
@@ -881,7 +881,7 @@
   .migas span { font-size:calc(var(--t-md) / var(--k,1)); font-weight:700; letter-spacing:-.015em; color:var(--text); min-width:0; }
   /* Móvil apaisado y pantallas bajas: la barra se compacta */
   @media (orientation:landscape) and (max-height:520px) { .app { --tb-h:calc(48px + env(safe-area-inset-bottom)); } .tb { min-height:48px; flex-direction:row; gap:var(--s2); padding:4px; } .tb-t { font-size:calc(var(--t-micro) / var(--k,1)); } .tb-dot { top:2px; left:auto; right:12%; } .app footer { left:auto; right:var(--gutter); } .pill-cart { width:auto; min-width:260px; min-height:48px; } main, .app.sin-carrito main { padding-bottom:calc(var(--tb-h) + 70px); } .app footer #verCarrito.pill-cart { min-height:48px; } }
-  @media (max-width:359px) { .tb-t { font-size:calc(10.5px / var(--k,1)); } .tb svg { width:22px; height:22px; } }
+  @media (max-width:359px) { .tb-t { font-size:calc(12px / var(--k,1)); } .tb svg { width:22px; height:22px; } }
 
   /* ═══ Pantalla «Pedido» única: líneas, entrega, resumen y confirmar ═══ */
   #cart { background:var(--bg); }
@@ -1150,13 +1150,14 @@
   #cart .tl tr.tl-obs { display:block; } #cart .tl tr.tl-obs td { display:block; padding:0 10px 8px; }
   #cart .tl .hstep input { width:52px; }
   @media (max-width:1023px) { /* tarjeta del catálogo en móvil: foto · nombre (hasta 3 líneas) con el selector debajo · corazón arriba a la derecha y «+» abajo a la derecha */
-    .pf { grid-template-columns:72px minmax(0, 1fr) auto; grid-template-areas:"av info fav" "av seg slot"; align-items:start; row-gap:var(--s2); }
-    .pf-av { grid-area:av; } .pf-info { grid-area:info; align-self:start; }
+    /* en dos niveles: arriba foto + nombre (hasta 3 líneas, con todo el ancho); debajo, el corazón, el selector Caja|Ud y el «+» a la derecha */
+    .pf { grid-template-columns:64px minmax(0, 1fr) auto; grid-template-areas:"av info info" "fav seg slot"; align-items:start; row-gap:var(--s2); }
+    .pf-av { grid-area:av; width:64px; height:64px; } .pf-info { grid-area:info; align-self:start; }
     .pf-ctl { display:contents; }
     .pf-seg, .pf-fijo { grid-area:seg; justify-self:start; align-self:center; }
     .pf-slot { grid-area:slot; align-self:center; justify-self:end; }
     .pf-n { -webkit-line-clamp:3; }
-    .pf-fav { position:static; grid-area:fav; justify-self:end; align-self:start; width:44px; height:44px; margin:-6px -10px 0 0; }
+    .pf-fav { position:static; grid-area:fav; justify-self:start; align-self:center; width:44px; height:44px; margin:0 0 0 -6px; }
     .pf-fav::before { display:none; }
     .pf-fav svg { width:24px; height:24px; left:0; top:0; }
   }
@@ -1251,6 +1252,18 @@
   @media (prefers-contrast: more) and (prefers-color-scheme: dark) { :root:not([data-tema="claro"]):not([data-contraste="normal"]) { --text:#FFFFFF; --text-2:#D8D8DD; --line:#9A9AA0; --accent:#FF8A98; --accent-soft:rgba(255,138,152,.2); --tab-off:#D8D8DD; } }
   :root[data-contraste="alto"] *:focus-visible { outline:3px solid currentColor; outline-offset:2px; }
   .ayuda-contraste { display:flex; align-items:center; gap:var(--s2); min-height:44px; margin-top:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; } .ayuda-contraste input { width:22px; height:22px; accent-color:var(--accent); flex:none; }
+  /* ═══ Bench 2: que se lea ═══ */
+  #zoomFoto { position:fixed; inset:0; z-index:120; background:rgba(15,15,18,.88); flex-direction:column; align-items:center; justify-content:center; padding:16px; overflow:auto; }
+  #zoomFoto .zx { position:absolute; top:12px; right:14px; width:48px; height:48px; border:0; border-radius:24px; background:var(--surface); color:var(--text); font-size:calc(22px / var(--k,1)); cursor:pointer; }
+  #zoomFoto .zcaja { background:var(--surface); color:var(--text); border-radius:18px; padding:14px; box-shadow:0 12px 40px rgba(0,0,0,.45); display:flex; flex-direction:column; align-items:center; gap:10px; max-width:min(96vw, 760px); }
+  #zoomFoto img { display:block; max-width:100%; max-height:68vh; width:auto; height:auto; object-fit:contain; border-radius:10px; background:var(--foto-bg, #fff); }
+  #zoomFoto .znom { font-weight:700; font-size:calc(19px / var(--k,1)); text-align:center; line-height:1.25; overflow-wrap:anywhere; color:var(--text); }
+  #zoomFoto .zinfo { color:var(--text-2); font-size:calc(16px / var(--k,1)); text-align:center; }
+  #zoomFoto .zia { color:var(--text-2); text-align:center; font-size:calc(13px / var(--k,1)); font-style:italic; }
+  /* barra inferior: etiquetas de 12,5 px como mínimo y sin mayúsculas */
+  .tb-t { font-size:calc(12.5px / var(--k,1)); text-transform:none; letter-spacing:0; }
+  /* tarjeta en pantalla ancha: caja de foto de 96 px y, si no hay foto, sin cuadrado vacío */
+  @media (min-width:1024px) { .pf-av { aspect-ratio:auto; width:96px; height:96px; align-self:flex-start; margin:0 auto; } .pf.sin-foto .pf-av { display:none; } .pf-info { align-self:stretch; } }
 </style>
 </head>
 <body>
@@ -1608,14 +1621,10 @@ function control(p) {
 function verFoto(p) {
   let z = document.getElementById("zoomFoto");
   if (!z) {
-    z = document.createElement("div"); z.id = "zoomFoto"; z.setAttribute("role", "dialog"); z.setAttribute("aria-modal", "true"); z.setAttribute("aria-label", "Foto del producto");
-    z.style.cssText = "position:fixed;inset:0;z-index:50;background:rgba(15,15,18,.88);display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px;overflow:auto";
-    z.innerHTML = '<button type="button" aria-label="Cerrar" style="position:absolute;top:12px;right:14px;width:48px;height:48px;border:0;border-radius:24px;background:#fff;font-size:calc(22px / var(--k,1));cursor:pointer">✕</button>'
-      + '<div class="zcaja" style="background:#fff;border-radius:18px;padding:14px;box-shadow:0 12px 40px rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;gap:10px;max-width:min(96vw,760px)">'
-      + '<img alt="" style="display:block;max-width:100%;max-height:68vh;width:auto;height:auto;object-fit:contain;border-radius:10px;background:#fff">'
-      + '<div class="znom" style="font-weight:700;font-size:calc(19px / var(--k,1));text-align:center;line-height:1.25;overflow-wrap:anywhere"></div>'
-      + '<div class="zinfo" style="color:#5f6368;font-size:calc(16px / var(--k,1));text-align:center"></div>'
-      + '<div class="zia" style="color:#8a8a8a;text-align:center;font-size:calc(13px / var(--k,1));font-style:italic"></div></div>';
+    z = document.createElement("div"); z.id = "zoomFoto"; z.setAttribute("role", "dialog"); z.setAttribute("aria-modal", "true"); z.setAttribute("aria-label", "Foto del producto"); z.style.display = "none"; // el aspecto va en el CSS (colores con variables: vale en claro y en oscuro)
+    z.innerHTML = '<button type="button" class="zx" aria-label="Cerrar">✕</button>'
+      + '<div class="zcaja"><img alt="">'
+      + '<div class="znom"></div><div class="zinfo"></div><div class="zia"></div></div>';
     z.onclick = () => (z.style.display = "none"); // (el atributo hidden no vale: el display del estilo lo anula)
     document.body.appendChild(z);
     obs.observe(z, { attributes: true, attributeFilter: ["style"] }); // abrir/cerrar la foto cuenta para «Atrás»
@@ -1669,7 +1678,7 @@ function abrirFicha(p) {
 }
 function row(p) {
   if (!String(p.name ?? "").trim()) return document.createDocumentFragment(); // sin nombre no hay tarjeta (nunca una tarjeta vacía)
-  const el = document.createElement("div"); el.className = "pf" + (qty.get(p.id) > 0 ? " sel" : ""); el.dataset.id = p.id; el.tabIndex = -1; el.setAttribute("role", "group"); el.setAttribute("aria-label", p.name); // teclas: + añade, − quita
+  const el = document.createElement("div"); el.className = "pf" + (qty.get(p.id) > 0 ? " sel" : "") + (p.img ? "" : " sin-foto"); el.dataset.id = p.id; el.tabIndex = -1; el.setAttribute("role", "group"); el.setAttribute("aria-label", p.name); // teclas: + añade, − quita
   const av = document.createElement("div"); av.className = "pf-av"; av.style.background = hue(p.name); av.textContent = initials(p.name);
   if (p.img) { // foto del producto encima de las iniciales; si no carga, se queda el marcador
     const im = document.createElement("img"); im.src = p.img; im.alt = ""; im.decoding = "async"; im.loading = "lazy";

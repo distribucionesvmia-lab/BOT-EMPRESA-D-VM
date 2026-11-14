@@ -201,3 +201,10 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **`/health`** añade `ruta` (carpeta desde la que corre: sirve para ver si hay DOS copias del programa), `pid`, `node` y `actualizacion` (última comprobación de «VM Actualizar», versión rechazada `actualizar.mala` y último aviso de `actualizar.log`; carpeta `ACTUALIZAR_LOGS`, por defecto `C:\vm\logs` en Windows). Sin datos de clientes.
 - El PDF no se carga solo con ninguna página (ni iframe, ni embed, ni enlace automático); se abre solo al pulsar «Ver / imprimir PDF» (el visor lo carga entonces). Si Chrome lo descarga en lugar de enseñarlo, es porque en ese navegador está activada la opción «Descargar PDF» (el visor del programa ya lo detecta con `navigator.pdfViewerEnabled`).
 - Pruebas: `tanda17.test.js`.
+
+## Bench 2 (diseño visual I: que se lea)
+- **Ampliar foto** (`#zoomFoto`): todo el aspecto en CSS con variables (`--surface`, `--text`, `--text-2`), así vale en claro y en oscuro; va por encima de la ficha (`z-index:120`; antes quedaba detrás). Solo `display` se maneja desde JS.
+- **Fila de producto en móvil** (≤ 1023 px) en dos niveles: arriba foto de 64 px y nombre (3 líneas; 4 con letra grande) con casi todo el ancho; debajo, corazón, selector Caja|Ud y «+» a la derecha. Tocar el nombre o la foto abre la ficha.
+- **Barra inferior**: etiquetas de 12,5 px (12 en < 360 px), sin mayúsculas. **Contrastes**: `--tab-off:#6E6E73` en claro (≥ 4,5:1) y el texto «Imagen orientativa» usa `--text-2`.
+- **Pantalla ancha** (≥ 1024 px): caja de foto de 96 px; el artículo sin foto no enseña cuadrado vacío (`.sin-foto`).
+- Pruebas: `bench2.test.js`.
