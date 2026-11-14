@@ -1184,6 +1184,39 @@
   .pf-n.completo { -webkit-line-clamp:unset !important; display:block; }
   .buscar input { text-overflow:ellipsis; }
   html[data-letra-grande] .buscar input { padding-left:44px; padding-right:8px; letter-spacing:-.01em; }
+
+  /* ═══ Tanda 9: cierre del pedido ═══ */
+  /* dentro del pedido no hace falta el menú inferior: más sitio para las líneas */
+  @media (max-width:1023px) { .app:has(#cart:not([hidden])) .tabbar, .app:has(#resumen:not([hidden])) .tabbar { display:none; } }
+  /* pie: total en una línea + un botón, en una sola fila */
+  #cart .cartfoot-1 { display:flex; align-items:center; gap:var(--s3); padding:var(--s2) var(--gutter) max(var(--s2), env(safe-area-inset-bottom)); text-align:left; }
+  .pie-tot { flex:none; display:flex; flex-direction:column; line-height:1.15; } .pie-tot small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); } .pie-tot b { font-size:calc(var(--t-md) / var(--k,1)); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  #cart .cartfoot-1 .big { flex:1 1 auto; width:auto; min-height:50px; }
+  #resumen .cartfoot { text-align:center; display:flex; flex-direction:column; gap:var(--s2); padding:var(--s3) var(--gutter); } #resumen .cartfoot .big { width:100%; min-height:50px; border-radius:var(--r-pill); }
+  /* cabecera que se encoge al bajar */
+  .screen.compacta .ped-cab { padding-top:var(--s2); padding-bottom:var(--s1); } .screen.compacta .ped-tit { font-size:calc(var(--t-lg) / var(--k,1)); } .screen.compacta .ped-sub { display:none; }
+  /* «Vaciar el pedido»: lejos de los botones de añadir, y se nota que es otra cosa */
+  .vaciar { margin-top:var(--s7); background:none !important; color:var(--text-2) !important; border:.5px solid var(--line) !important; font-weight:600; }
+  /* sugerencias «¿Te falta algo?»: botón secundario (el rojo es solo para enviar) */
+  .falta .falta-fila .add.sec-add { background:var(--surface); color:var(--accent); border:1px solid var(--accent); box-shadow:none; font-weight:600; }
+  /* días en dos filas (todos a la vista, «Otro día» incluido) */
+  .dchips { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); overflow:visible; scroll-snap-type:none; }
+  .dchip { min-width:0; padding:var(--s2); }
+  @media (min-width:600px) { .dchips { grid-template-columns:repeat(auto-fill, minmax(104px, 1fr)); } }
+  /* observaciones: contador */
+  .note-cnt { text-align:right; font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); margin-top:var(--s1); font-variant-numeric:tabular-nums; } .note-cnt.lleno { color:var(--accent); font-weight:600; }
+  /* dirección: toda la fila se puede pulsar */
+  .addrop { position:relative; } .addrop span { flex:1; align-self:stretch; display:flex; align-items:center; }
+  /* resumen: condiciones y aviso de mínimo */
+  .cond-fila { display:flex; flex-direction:column; gap:2px; padding:var(--s2) 0; border-top:.5px solid var(--line); } .cond-fila:first-child { border-top:0; } .cond-fila b { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); text-transform:uppercase; letter-spacing:.04em; } .cond-fila span { font-size:calc(var(--t-sec) / var(--k,1)); color:var(--text); }
+  .aviso-min { margin:var(--s3) var(--gutter); }
+
+  #resumen .ped-h, #cart .ped-h { padding:0 var(--gutter); } #resumen .card { margin-left:var(--gutter); margin-right:var(--gutter); } #resumen .cval { overflow-wrap:anywhere; }
+  #resumen .nota { padding:0 var(--gutter); }
+  #confirm .nw { display:block; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; opacity:.92; margin-top:2px; }
+  #confirm { line-height:1.2; padding-top:var(--s2); padding-bottom:var(--s2); }
+  main, .app.sin-carrito main { padding-bottom:calc(var(--tb-h) + var(--pie-h, 88px) + 28px); } .app.sin-carrito main { padding-bottom:calc(var(--tb-h) + 16px); }
+  @media (min-width:1024px) { #resumen .cartfoot { align-items:center; } #resumen .cartfoot .big { max-width:520px; } }
 </style>
 </head>
 <body>
@@ -1234,11 +1267,9 @@
         <div id="dirGuardadas" class="dirguard" role="group" aria-label="Tus direcciones guardadas" hidden></div>
         <label class="dirchk" id="dirGuardarLbl" hidden><input type="checkbox" id="dirGuardar"><span>Guardar esta dirección para próximos pedidos</span></label>
       </div>
+      <div class="aviso aviso-min" id="avisoMin" role="status" aria-live="polite" hidden></div>
       <div class="ped-dias" id="pedDias"><div class="ctit" id="diaTit">¿Qué día lo quieres?</div><div class="dchips" id="diaChips" role="radiogroup" aria-label="Día de entrega"></div><div class="nota" id="diaInfo" role="status" aria-live="polite"></div></div>
-      <div class="card"><label for="note" class="ctit">Observaciones del pedido</label><textarea id="note" placeholder="Ej.: avísame por teléfono antes de entregar (opcional)" maxlength="200"></textarea></div>
-      <h3 class="ped-h">Resumen</h3>
-      <div class="card ped-res" id="pedRes"><div class="rr"><span>Base imponible</span><b id="sumBase">0,00 €</b></div><div class="rr" id="sumIvaFila"><span>IVA</span><b id="sumIva">0,00 €</b></div><div id="sumIvaTipos"></div><div class="rr" id="sumReFila" hidden><span>Recargo de equivalencia</span><b id="sumRe">0,00 €</b></div><div class="rr tt"><span>Total con IVA</span><b id="sumTotal">0,00 €</b></div></div>
-      <div class="nota" id="priceNote"></div>
+      <div class="card"><label for="note" class="ctit">Observaciones del pedido</label><textarea id="note" placeholder="Ej.: avísame por teléfono antes de entregar (opcional)" maxlength="200" aria-describedby="noteCnt"></textarea><div class="note-cnt" id="noteCnt" aria-live="polite">0/200</div></div>
       <div class="card fijo-card" id="fijoCard" hidden>
         <div class="ctit">Pedido fijo semanal <span class="fijo-aviso">No envía este pedido</span></div>
         <p class="cval" id="fijoTxt" style="margin:0 0 8px"></p>
@@ -1250,7 +1281,21 @@
         <div class="nota" id="fijoMsg" role="status" aria-live="polite"></div></div>
       <div class="err" id="err" role="alert"></div>
     </div>
-    <div class="cartfoot"><button class="big" id="confirm" type="button">Confirmar pedido</button><p class="plazo" id="plazo">Después de enviarlo verás hasta cuándo puedes modificarlo.</p></div>
+    <div class="cartfoot cartfoot-1"><div class="pie-tot" aria-live="polite"><small>Total con IVA</small><b id="pieTotal">0,00 €</b></div><button class="big" id="revisar" type="button">Revisar pedido</button></div>
+  </section>
+  <!-- Paso de resumen: lo último que se ve antes de enviar. Aquí se envía; en el carrito solo se revisa -->
+  <section class="screen" id="resumen" hidden aria-label="Resumen del pedido">
+    <div class="ped-cab"><h2 class="ped-tit">Revisa tu pedido</h2><p class="ped-sub">Todavía no se ha enviado nada.</p></div>
+    <div class="body cartbody">
+      <h3 class="ped-h">Entrega</h3>
+      <div class="card"><div class="ctit">Día</div><div class="cval" id="resDia"></div><div class="ctit" style="margin-top:10px">Dirección</div><div class="cval" id="resDir"></div><div class="ctit" id="resNotaT" style="margin-top:10px">Observaciones</div><div class="cval" id="resNota"></div></div>
+      <h3 class="ped-h">Importe</h3>
+      <div class="card ped-res" id="pedRes"><div class="rr"><span>Base imponible</span><b id="sumBase">0,00 €</b></div><div class="rr" id="sumIvaFila"><span>IVA</span><b id="sumIva">0,00 €</b></div><div id="sumIvaTipos"></div><div class="rr" id="sumReFila" hidden><span>Recargo de equivalencia</span><b id="sumRe">0,00 €</b></div><div class="rr tt"><span>Total con IVA</span><b id="sumTotal">0,00 €</b></div></div>
+      <div class="nota" id="priceNote"></div>
+      <div class="card" id="resCond"></div>
+      <div class="err" id="errRes" role="alert"></div>
+    </div>
+    <div class="cartfoot cartfoot-res"><button class="big" id="confirm" type="button">Enviar pedido a Distribuciones VM</button><button class="keepbtn" id="resVolver" type="button">Volver al pedido</button><p class="plazo" id="plazo">Después de enviarlo verás hasta cuándo puedes modificarlo.</p></div>
   </section>
     <div class="cal-fondo" id="calFondo" hidden>
       <div class="cal" role="dialog" aria-modal="true" aria-label="Elegir otro día de entrega">
@@ -1285,6 +1330,13 @@ const uds = l => l.qty * (unit(l.id) === "caja" ? (l.unitsPerBox || 1) : 1);
 const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const hue = s => COLORS[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % COLORS.length];
 const initials = n => { const r = String(n ?? "").replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ0-9 ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase(); return r || "•"; }; // siempre hay marcador, aunque el nombre empiece por comillas o símbolos
+// Nombre que se enseña: el corto, salvo que otro artículo se llame igual de corto (entonces el completo, para distinguirlos)
+let _dupCorto = null;
+function nombreVisible(p) {
+  if (!p.nombreCorto || p.nombreCorto === p.name) return p.name;
+  if (!_dupCorto) { _dupCorto = new Map(); for (const x of data.products) { const k = x.nombreCorto || x.name; _dupCorto.set(k, (_dupCorto.get(k) || 0) + 1); } }
+  return _dupCorto.get(p.nombreCorto) > 1 ? p.name : p.nombreCorto;
+}
 const lines = () => [...qty].filter(([id, n]) => n > 0 && productoPorId.has(id)).map(([id, n]) => ({ ...productoPorId.get(id), qty: n })); // en el orden en que se fueron añadiendo (lo nuevo, al final)
 const count = () => lines().length;
 // Importes EXACTOS (en céntimos, con enteros): el mismo cálculo que el servidor (pricing.js), sin errores de coma flotante
@@ -1294,6 +1346,7 @@ const mitadArriba = (num, den) => (num * 2n + den) / (2n * den);
 const precioCaja = p => Number(mitadArriba(escala(p.unitsPerBox, 3) * escala(p.price, 4) * (10000n - escala(p.discount || 0, 2)) * 100n, 1000n * 10000n * 10000n)) / 100;
 const importeCent = l => Number(mitadArriba(escala(uds(l), 3) * escala(l.price, 4) * (10000n - escala(l.discount || 0, 2)) * 100n, 1000n * 10000n * 10000n));
 const importe = l => importeCent(l) / 100;
+const precioUdExacto = l => { const p = Number(l.price) * (1 - (Number(l.discount) || 0) / 100); return Number(p.toFixed(4)).toFixed(Math.max(2, (String(Number(p.toFixed(4))).split(".")[1] || "").length)).replace(".", ","); };
 const RE_TIPO = { 21: 5.2, 10: 1.4, 4: 0.5 };
 // Total CON IVA, como en a3ERP: bases por tipo de IVA, IVA de cada base y recargo de equivalencia si el cliente lo tiene (los dos sobre la misma base)
 function calc() {
@@ -1524,7 +1577,7 @@ function row(p) {
   }
   const info = document.createElement("div"); info.className = "pf-info";
   if (p.marca) { const mi = document.createElement("div"); mi.className = "pf-micro"; mi.textContent = p.marca; info.appendChild(mi); }
-  const n = document.createElement("div"); n.className = "pf-n"; n.textContent = p.nombreCorto || p.name; n.title = p.name; n.addEventListener("click", () => n.classList.toggle("completo")); // tocar el nombre lo enseña entero
+  const n = document.createElement("div"); n.className = "pf-n"; n.textContent = nombreVisible(p); n.title = p.name; n.addEventListener("click", () => n.classList.toggle("completo")); // tocar el nombre lo enseña entero
   if (p.nombreCorto && p.nombreCorto !== p.name) n.title = p.name;
   const c = document.createElement("div"); c.className = "pf-sec"; // el código de producto no se muestra
   const pk = /(\d+)\s*[xX×]\s*(\d+)/.exec(p.name), esPack = /\bpack\b/i.test(p.name) || (pk && Number(pk[1]) * Number(pk[2]) > 1);
@@ -1902,7 +1955,7 @@ function tablaLineas(ls) {
     // Importe + unidades + quitar
     const m = tr.insertCell(); m.className = "tl-imp";
     const ib = document.createElement("b"); ib.textContent = eur(importe(l));
-    const is = document.createElement("small"); is.textContent = cj ? `${l.qty} ${l.qty === 1 ? "caja" : "cajas"} = ${uds(l)} uds` : `${uds(l)} ${uds(l) === 1 ? "unidad" : "unidades"}`;
+    const is = document.createElement("small"); is.textContent = (cj ? `${l.qty} ${l.qty === 1 ? "caja" : "cajas"} = ${uds(l)} uds` : `${uds(l)} ${uds(l) === 1 ? "unidad" : "unidades"}`) + ` × ${precioUdExacto(l)} €`; // el precio exacto que se multiplica (redondeado al céntimo solo al final)
     const x = document.createElement("button"); x.type = "button"; x.className = "cx"; x.textContent = "Quitar"; x.setAttribute("aria-label", "Quitar " + l.name); x.onclick = () => setQty(l.id, 0);
     m.append(ib, is, x);
     // Deslizar la línea hacia la izquierda la quita (con «Deshacer» durante 8 s); el botón «Quitar» hace lo mismo
@@ -1938,8 +1991,8 @@ function pintarFalta(box) {
     const f = document.createElement("div"); f.className = "falta-fila";
     const av = document.createElement("button"); av.type = "button"; av.className = "falta-av"; av.style.background = hue(x.name); av.textContent = initials(x.name); av.setAttribute("aria-label", x.img ? "Ampliar la foto de " + x.name : x.name);
     if (x.img) { const im = document.createElement("img"); im.src = x.img; im.alt = ""; im.loading = "lazy"; av.textContent = ""; im.onerror = () => { im.remove(); av.textContent = initials(x.name); }; av.appendChild(im); av.onclick = () => verFoto(x); } else av.style.cursor = "default";
-    const n = document.createElement("span"); n.className = "falta-n"; const nb = document.createElement("b"); nb.textContent = x.nombreCorto || x.name; nb.title = x.name; const ns = document.createElement("small"); ns.textContent = eurp(x.price) + (x.unitsPerBox ? " · caja de " + x.unitsPerBox : ""); n.append(nb, ns);
-    const b = document.createElement("button"); b.type = "button"; b.className = "add"; b.textContent = "+ Añadir"; b.setAttribute("aria-label", "Añadir " + x.name); b.onclick = () => setQty(x.id, 1);
+    const n = document.createElement("span"); n.className = "falta-n"; const nb = document.createElement("b"); nb.textContent = nombreVisible(x); nb.title = x.name; const ns = document.createElement("small"); ns.textContent = eurp(x.price) + (x.unitsPerBox ? " · caja de " + x.unitsPerBox : ""); n.append(nb, ns);
+    const b = document.createElement("button"); b.type = "button"; b.className = "add sec-add"; b.textContent = "Añadir"; b.setAttribute("aria-label", "Añadir " + x.name); b.onclick = () => setQty(x.id, 1);
     f.append(av, n, b); s.appendChild(f);
   }
   box.appendChild(s);
@@ -1950,7 +2003,10 @@ function pintarResumen() {
   const varios = c.grupos.length > 1; $("sumIvaFila").hidden = varios; $("sumIvaTipos").innerHTML = ""; // con productos a distintos tipos, una línea de IVA por tipo
   if (varios) for (const g of c.grupos) { const f = document.createElement("div"); f.className = "rr"; const a = document.createElement("span"), b = document.createElement("b"); a.textContent = `IVA ${String(g.v).replace(".", ",")} % (sobre ${eur(g.base)})`; b.textContent = eur(g.iva); f.append(a, b); $("sumIvaTipos").appendChild(f); }
   $("sumReFila").hidden = !data.customer.re; $("sumRe").textContent = eur(c.re); $("sumTotal").textContent = eur(c.total);
-  const bt = $("confirm"); bt.textContent = "Confirmar pedido"; if (c.base) { const sp = document.createElement("span"); sp.className = "nw"; sp.textContent = ` · ${eur(c.total)}`; bt.appendChild(sp); } // el importe nunca se parte de línea
+  $("pieTotal").textContent = eur(c.total); $("revisar").disabled = !c.base; // el total siempre a la vista, en una línea, mientras cambias cantidades
+  const bt = $("confirm"); if (!bt.disabled) { bt.textContent = "Enviar pedido a Distribuciones VM"; if (c.base) { const sp = document.createElement("span"); sp.className = "nw"; sp.textContent = `Total ${eur(c.total)}`; bt.appendChild(sp); } } // el importe nunca se parte de línea
+  const cd = data.condiciones || {}, falta = cd.minimo && c.base < cd.minimo ? cd.minimo - c.base : 0, am = $("avisoMin");
+  am.hidden = !falta; am.textContent = falta ? `El pedido mínimo es de ${eur(cd.minimo)} sin IVA. Te faltan ${eur(falta)} para llegar. Puedes enviarlo igualmente: la empresa lo revisará.` : "";
 }
 function renderCart() {
   const box = $("cartLines"); box.innerHTML = "";
@@ -1988,7 +2044,7 @@ function refresh() {
 }
 const escritorio = () => matchMedia("(min-width:1024px)").matches; // ordenador: el pedido es un panel fijo a la derecha, no una pantalla
 matchMedia("(min-width:1024px)").addEventListener("change", () => { try { refresh(); marcaNav(); } catch {} });
-function showCart(on) { if (escritorio()) { if (on) { renderCart(); $("cart").querySelector("button, input")?.focus({ preventScroll: true }); } return; } $("cart").hidden = !on; setTimeout(marcaNav, 0); $("cart").classList.toggle("nuevo", on); if (on) { $("err").textContent = ""; renderCart(); setTimeout(() => $("cart").classList.remove("nuevo"), 900); } }
+function showCart(on) { if (escritorio()) { if (on) { renderCart(); $("cart").querySelector("button, input")?.focus({ preventScroll: true }); } return; } $("cart").hidden = !on; if (!on) $("resumen").hidden = true; setTimeout(marcaNav, 0); $("cart").classList.toggle("nuevo", on); if (on) { $("err").textContent = ""; pintaContNota(); renderCart(); setTimeout(() => $("cart").classList.remove("nuevo"), 900); } }
 
 // ── Barra inferior: Inicio · Catálogo · Pedido · Lo habitual · Ayuda ──
 const posTab = { all: { nav: { cat: null, sub: null }, scroll: 0 }, hab: { nav: null, scroll: 0 } }; // cada pestaña recuerda dónde estabas
@@ -2016,6 +2072,7 @@ document.querySelectorAll(".tabbar .tb").forEach(b => b.onclick = () => {
   if (k === "pedido") { showCart(true); return; }
   cambiarTab(b.dataset.t);
 });
+try { const pie = document.querySelector("footer"), app = document.querySelector(".app"); const medP = () => app.style.setProperty("--pie-h", (pie.offsetHeight || 88) + "px"); new ResizeObserver(medP).observe(pie); medP(); } catch {} // la última fila del catálogo nunca queda tapada por «Ver pedido»
 const ajustaLetra = () => { const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--k")) || 1, g = k < 0.9; document.documentElement.toggleAttribute("data-letra-grande", g); $("q").placeholder = g ? "Buscar" : "Buscar productos"; };
 try { ajustaLetra(); new MutationObserver(ajustaLetra).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] }); } catch {}
 // La altura real de la barra (letra grande, 2 líneas) manda: todo lo que va encima se coloca según ella
@@ -2251,11 +2308,14 @@ $("q").addEventListener("keydown", e => { if (e.key === "Escape") { $("sugs").hi
 $("q").addEventListener("search", () => anotarBusqueda($("q").value)); // Enter o la X de borrar
 $("verCarrito").onclick = $("cartIcon").onclick = () => count() && showCart(true);
 $("keep").onclick = () => showCart(false);
+document.querySelectorAll("#cart .cartbody, #resumen .cartbody").forEach(b => b.addEventListener("scroll", () => b.closest(".screen").classList.toggle("compacta", b.scrollTop > 24), { passive: true })); // la cabecera se encoge al bajar
 function ajustaCuenta() { const b = $("cuentaBtn"), h = document.querySelector("header"); if (!b || !h || !h.offsetWidth) return; b.classList.remove("solo-icono"); if (h.scrollWidth > h.clientWidth + 1) b.classList.add("solo-icono"); } // con texto si cabe; solo icono si no
 try { const h = document.querySelector("header"); new ResizeObserver(ajustaCuenta).observe(h); new MutationObserver(ajustaCuenta).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] }); } catch {}
 $("cuentaBtn").onclick = () => { location.href = "/cliente#cuenta"; }; // Mi cuenta (datos y pedidos) está en el chat: se abre sola con #cuenta
-$("vaciar").onclick = () => { // vacía todo el pedido, con «Deshacer» durante 8 segundos
+$("vaciar").onclick = async () => { // vacía todo el pedido: primero se pregunta; después, «Deshacer» durante 8 segundos
   if (!count()) return;
+  const n = count();
+  if (!(await preguntar({ titulo: "¿Vaciar el pedido?", texto: `Se quitarán los ${n} artículo${n === 1 ? "" : "s"} del pedido. Podrás deshacerlo unos segundos.`, si: "Sí, vaciar", no: "No, mantenerlo" }))) return;
   const copia = { q: new Map(qty), u: new Map(unitOf), n: new Map(notes) };
   qty.clear(); unitOf.clear(); notes.clear(); showCart(false); refresh();
   aviso("Pedido vaciado", () => { for (const [k, v] of copia.q) qty.set(k, v); for (const [k, v] of copia.u) unitOf.set(k, v); for (const [k, v] of copia.n) notes.set(k, v); refresh(); showCart(true); });
@@ -2299,20 +2359,46 @@ function direccionOk(errBox) {
   if (modoDir() === "otra" && dirEntrega().length < 5) { $("errDir").textContent = sinDireccion() ? "Escribe a dónde te lo llevamos." : "Escribe la otra dirección de entrega, o elige «En la dirección de siempre»."; $("addrOtra").setAttribute("aria-invalid", "true"); errBox.textContent = ""; $("addrOtra").hidden = false; $("addrOtra").focus(); return false; }
   return true;
 }
+const pintaContNota = () => { const n = $("note").value.length, max = 200, c = $("noteCnt"); c.textContent = n >= max - 20 ? `${n}/${max} · te quedan ${max - n}` : `${n}/${max}`; c.classList.toggle("lleno", n >= max - 20); };
+$("note").addEventListener("input", pintaContNota); pintaContNota();
+function validaCierre(errBox) { // dirección y día: lo mismo que se pedía antes de enviar
+  errBox.textContent = ""; if (!direccionOk(errBox)) return false;
+  if ((data.delivery || []).length && !diaElegido) { errBox.textContent = "Elige el día de entrega."; $("pedDias").scrollIntoView({ block: "center", behavior: "smooth" }); return false; }
+  return true;
+}
+// Paso de resumen: día, dirección, observaciones, importes y condiciones, ANTES de enviar
+function pintarPasoResumen() {
+  $("resDia").textContent = diaElegido ? largo(diaElegido).replace(/^./, c => c.toUpperCase()) : "Sin día elegido: te lo confirmaremos";
+  $("resDir").textContent = dirFinal() || "La dirección que tenemos de tu negocio";
+  const n = $("note").value.trim(); $("resNota").textContent = n || "Sin observaciones";
+  const cd = data.condiciones || {}, c = calc(), box = $("resCond"); box.innerHTML = "";
+  const fila = (t, v) => { if (!v) return; const d = document.createElement("div"); d.className = "cond-fila"; const a = document.createElement("b"); a.textContent = t; const s = document.createElement("span"); s.textContent = v; d.append(a, s); box.appendChild(d); };
+  fila("Pago", cd.pago);
+  if (cd.minimo) fila("Pedido mínimo", `${eur(cd.minimo)} sin IVA` + (c.base < cd.minimo ? ` · te faltan ${eur(cd.minimo - c.base)}` : " · lo alcanzas"));
+  fila("Portes", cd.portes);
+  fila("Importes", "Cada línea se redondea al céntimo y el total suma esas líneas.");
+  box.hidden = !box.children.length;
+}
+$("revisar").onclick = () => {
+  $("err").textContent = ""; if (!validaCierre($("err"))) return;
+  pintarPasoResumen(); $("errRes").textContent = ""; $("resumen").hidden = false; $("resumen").querySelector(".body").scrollTop = 0; $("confirm").focus({ preventScroll: true });
+};
+$("resVolver").onclick = () => ($("resumen").hidden = true);
 $("confirm").onclick = async () => {
-  $("err").textContent = ""; if (!direccionOk($("err"))) return;
-  if ((data.delivery || []).length && !diaElegido) { $("err").textContent = "Elige el día de entrega."; $("pedDias").scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+  const eb = $("errRes"); eb.textContent = "";
+  if (!validaCierre($("err"))) { $("resumen").hidden = true; return; } // algo cambió: se vuelve al pedido para corregirlo
   const c = calc(), mayor = Math.max(0, ...lines().map(l => l.qty));
   if ((c.total > LIM_IMPORTE || mayor >= LIM_CANTIDAD) && !(await preguntar({ titulo: "¿Seguro que quieres enviarlo?", texto: `El pedido es de ${eur(c.total)}${mayor >= LIM_CANTIDAD ? " y lleva una cantidad muy alta de un artículo" : ""}: es bastante más de lo habitual. Revisa las cantidades antes de enviarlo.`, si: "Sí, enviar", no: "Revisar el pedido" }))) return;
-  enviarPedido(diaElegido, $("err"));
+  enviarPedido(diaElegido, eb);
 };
 // Día de entrega: fichas de 64 px (Hoy solo si toca, Mañana, los siguientes días de servicio y «Otro día» con calendario)
-let diaElegido = null;
+let diaElegido = null, diaSinPre = false; // diaSinPre: el día elegido dejó de valer; se obliga a elegir otro en vez de poner uno solo
 function pintarDias() {
   const box = $("diaChips"); box.innerHTML = "";
   const ops = data.delivery || [];
   $("pedDias").hidden = !ops.length;
   if (diaElegido && !ops.some(o => o.date === diaElegido) && !diaPersonal) diaElegido = null;
+  if (!diaElegido && !diaPersonal && !diaSinPre && ops.length) diaElegido = (ops.find(o => o.kind !== "hoy") || ops[0]).date; // el primer día de reparto ya viene marcado (nunca «Hoy» sin querer); se cambia con un toque
   const ficha = (titulo, sub, activa, onclick, id) => {
     const b = document.createElement("button"); b.type = "button"; b.className = "dchip" + (activa ? " on" : ""); if (id) b.id = id;
     b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(!!activa));
@@ -2326,10 +2412,10 @@ function pintarDias() {
   }
   const otro = diaPersonal && diaElegido ? largo(diaElegido).replace(/^./, c => c.toUpperCase()) : null;
   ficha("Otro día", otro ? otro.split(" ").slice(1).join(" ") : "Calendario", !!otro, abrirCal, "otroDia");
-  $("diaInfo").textContent = diaElegido ? "Entrega: " + largo(diaElegido).replace(/^./, c => c.toUpperCase()) : "";
+  $("diaInfo").textContent = diaElegido ? "Entrega: " + largo(diaElegido).replace(/^./, c => c.toUpperCase()) + (diaPersonal ? "" : ". Cámbialo si prefieres otro día.") : "Elige un día: es obligatorio para enviar el pedido.";
 }
 let diaPersonal = false;
-function elegirDia(date) { diaElegido = date; $("err").textContent = ""; pintarDias(); }
+function elegirDia(date) { diaElegido = date; diaSinPre = false; $("err").textContent = ""; pintarDias(); }
 // «Otro día»: calendario pequeño para marcar un día de servicio (lunes a viernes) más adelante de los botones, hasta dentro de 90 días
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -2365,7 +2451,7 @@ $("calAnt").onclick = () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } p
 $("calSig").onclick = () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } pintarCal(); };
 $("calCerrar").onclick = () => ($("calFondo").hidden = true);
 arrastrable(document.querySelector(".cal"), () => ($("calFondo").hidden = true));
-$("calOk").onclick = () => { if (cal.sel) { $("calFondo").hidden = true; diaPersonal = !(data.delivery || []).some(o => o.date === cal.sel); elegirDia(cal.sel); } };
+$("calOk").onclick = () => { if (cal.sel) { diaSinPre = false; $("calFondo").hidden = true; diaPersonal = !(data.delivery || []).some(o => o.date === cal.sel); elegirDia(cal.sel); } };
 // Visor de PDF dentro de la app, con «Cerrar» y «Descargar» (en la app instalada no hay barra del navegador: sin esto no se podía salir del PDF)
 function abrirPdf(url, nombre) {
   const viejo = document.getElementById("pdf-visor"); if (viejo) viejo.remove();
@@ -2413,12 +2499,12 @@ async function enviarPedido(delivery, errBox) {
     $("doneT").textContent = j.modificado ? "¡Pedido modificado!" : "¡Pedido recibido!";
     $("modInfo").hidden = !j.modificable; $("modInfo").textContent = j.modificable ? j.modificable + "." : ""; $("modBtn").hidden = !(j.modificable && j.ref); if (j.ref) $("modBtn").onclick = () => modificar(j.ref);
     modificando = null; $("modBanner").hidden = true;
-    $("doneP").textContent = String(j.message || "").replace(/\*/g, "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim(); $("cart").hidden = true; diaElegido = null; diaPersonal = false; $("done").hidden = false; marcaNav();
+    $("doneP").textContent = String(j.message || "").replace(/\*/g, "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim(); $("cart").hidden = true; $("resumen").hidden = true; diaElegido = null; diaPersonal = false; $("done").hidden = false; marcaNav();
     $("doneRef").hidden = !j.ref; $("doneRef").textContent = j.ref ? "Referencia " + j.ref : ""; $("donePdf").hidden = !j.ref; if (j.ref) { const u = "/api/pedido/" + encodeURIComponent(j.ref) + "/pdf"; $("donePdf").href = u; $("donePdf").onclick = ev => { ev.preventDefault(); abrirPdf(u, "Pedido " + j.ref); }; } $("doneVer").hidden = false; $("doneVer").onclick = () => { location.href = "/cliente#cuenta"; };
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
   } catch (e) {
     btn.disabled = false; btn.textContent = textoBtn; btn.classList.remove("hecho"); btn.classList.add("sacude"); setTimeout(() => btn.classList.remove("sacude"), 360); errBox.textContent = ""; mostrarErrorEnvio(errBox, e.message, () => enviarPedido(delivery, errBox));
-    if (/10:00|día|fecha/i.test(e.message)) { diaElegido = null; diaPersonal = false; pintarDias(); errBox.textContent = e.message; } // el día ya no vale: hay que elegir otro
+    if (/10:00|día|fecha/i.test(e.message)) { diaElegido = null; diaPersonal = false; diaSinPre = true; $("resumen").hidden = true; pintarDias(); errBox = $("err"); errBox.textContent = e.message; } // el día ya no vale: hay que elegir otro
     if (/10:00/.test(e.message)) { // pasó la hora de corte mientras elegía: se actualizan las opciones
       const r2 = await fetch(location.pathname + "/datos").catch(() => null);
       if (r2 && r2.ok) { const d2 = await r2.json(); data.delivery = d2.delivery; data.today = d2.today; data.minDate = d2.minDate; pintarDias(); errBox.textContent = e.message; }
@@ -2441,7 +2527,7 @@ async function refrescarEntrega() {
     pintarAviso();
     const quedaHoy = data.delivery.some(o => o.kind === "hoy");
     if (teniaHoy && !quedaHoy) { // pasaron las 10:00 mientras elegía: «Hoy» desaparece y, si la tenía elegida, se le dice claro
-      if (diaElegido === hoyViejo) { diaElegido = null; diaPersonal = false; $("err").textContent = "Ya no llegamos a entregarlo hoy: elige otro día."; }
+      if (diaElegido === hoyViejo) { diaElegido = null; diaPersonal = false; diaSinPre = true; $("resumen").hidden = true; $("err").textContent = "Ya no llegamos a entregarlo hoy: elige otro día."; }
       pintarDias();
     }
   } finally { refrescando = false; }
@@ -2450,7 +2536,7 @@ setInterval(refrescarEntrega, 30000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refrescarEntrega(); });
 
 // Pantallas superpuestas (carrito, día de entrega, resumen, calendario): foco, tecla Esc y botón «Atrás» del móvil
-const CAPAS = ["cart"], FONDO = ["header", ".guia", ".buscar", ".filbar", "#list", "footer"];
+const CAPAS = ["cart", "resumen"], FONDO = ["header", ".guia", ".buscar", ".filbar", "#list", "footer"];
 const DINAMICAS = ["ayuda-fondo", "pregunta-fondo", "zoomFoto"]; // hojas que se crean al vuelo (ayuda, preguntas, foto ampliada): también las cierra «Atrás»
 const dinamicas = () => DINAMICAS.filter(id => { const e = document.getElementById(id); return e && e.style.display !== "none"; });
 const abiertas = () => [...CAPAS.filter(id => !$(id).hidden), ...($("calFondo").hidden ? [] : ["calFondo"]), ...dinamicas()];
@@ -2458,6 +2544,7 @@ function cerrarArriba() {
   const d = dinamicas();
   if (d.length) { const e = document.getElementById(d[d.length - 1]); if (e.id === "zoomFoto") e.style.display = "none"; else { const b = e.querySelector(".ayuda-cerrar"); if (b) b.click(); else e.remove(); } return; }
   if (!$("calFondo").hidden) $("calFondo").hidden = true;
+  else if (!$("resumen").hidden) $("resumen").hidden = true; // del resumen se vuelve al pedido, no se sale de él
   else if (!$("cart").hidden) showCart(false);
 }
 let prof = 0, silencio = false, foco = null, nPrev = 0;
@@ -2477,7 +2564,7 @@ function capasCambian() {
 addEventListener("popstate", () => { if (silencio) { silencio = false; return; } if (prof > 0) { prof--; cerrarArriba(); } });
 addEventListener("offline", () => aviso("Sin conexión. Tu pedido se guarda en este móvil."));
 addEventListener("online", () => aviso("Conexión recuperada."));
-addEventListener("keydown", e => { if (e.key === "Escape" && abiertas().length) { e.preventDefault(); cerrarArriba(); } });
+addEventListener("keydown", e => { if (e.key === "Escape" && !e.defaultPrevented && abiertas().length) { e.preventDefault(); e.stopImmediatePropagation(); cerrarArriba(); } }); // una sola capa por pulsación: con el calendario abierto, Esc cierra solo el calendario
 const obs = new MutationObserver(capasCambian);
 [...CAPAS, "calFondo"].forEach(id => obs.observe($(id), { attributes: true, attributeFilter: ["hidden"] }));
 obs.observe(document.body, { childList: true }); // ayuda y preguntas aparecen y desaparecen del documento
@@ -2496,7 +2583,7 @@ obs.observe(document.body, { childList: true }); // ayuda y preguntas aparecen y
   $("sub").textContent = "Haz tu pedido a " + data.business;
   $("addr").textContent = data.customer.address || "La dirección que tenemos de tu negocio (la confirmaremos contigo).";
   pintarDireccion();
-  $("priceNote").textContent = data.priceNote ? "Las líneas y el carrito van sin IVA; el resumen de arriba ya lo incluye. Los importes se confirman al preparar el pedido." : "";
+  $("priceNote").textContent = data.priceNote ? "Las líneas van sin IVA; este resumen ya lo incluye. Los importes se confirman al preparar el pedido." : "";
   if (data.used) { $("doneT").textContent = "Este pedido ya se envió"; $("doneP").textContent = "Vuelve al chat para hacer otro pedido."; $("done").hidden = false; return; }
   if (!data.products.some(p => p.count > 0)) { tab = "all"; try { history.replaceState({ vmTab: "all" }, ""); } catch {} }
   (data.favs || []).forEach(id => favs.add(id));

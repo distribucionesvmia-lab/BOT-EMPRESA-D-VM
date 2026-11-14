@@ -36,7 +36,7 @@ import { crearNotificador } from "./notificaciones.js";
 import { scheduleBackups } from "./backup.js";
 import { sourceFromEnv } from "./drive.js";
 import nodePath from "node:path";
-import { BUSINESS, ayudaPublica } from "./config.js";
+import { BUSINESS, ayudaPublica, condicionesPedido } from "./config.js";
 import { pdfPedido, datosPdf } from "./pdf.js";
 import { categorizar } from "./categorias.js";
 import { puedeEditarPedido, weekday } from "./delivery.js";
@@ -297,6 +297,7 @@ function webOrderRoutes(req, res, url) {
       return json(res, {
         business: BUSINESS.name,
         priceNote: BUSINESS.priceNote,
+        condiciones: condicionesPedido(),
         customer: { name: view.name, address: view.address },
         used: getDb().hasOrderKey(linkKey(link)),
         products,
@@ -591,6 +592,7 @@ async function appRoutes(req, res, url) {
     return void sendJson(res, 200, {
       business: BUSINESS.name,
       priceNote: BUSINESS.priceNote,
+      condiciones: condicionesPedido(),
       customer: { name: customer.name, address: customer.address, re: !!customer.recargoEquivalencia },
       used: false,
       favs: getAccountsDb().favorites(account.customerId),

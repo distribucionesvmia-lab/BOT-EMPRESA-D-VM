@@ -267,7 +267,7 @@ test("TANDA 5: pedido fijo con «Cancelar» y aparte de «Confirmar pedido»; co
   const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
   assert.match(p, /id="fijoCancelar"[^>]*>Cancelar</);
   assert.match(p, /No envía este pedido/);
-  assert.ok(p.indexOf('id="fijoCard"') > p.indexOf('id="priceNote"'));
+  assert.ok(p.indexOf('id="fijoCard"') > p.indexOf('id="pedDias"'));
   assert.match(p, /#cart \.tl \.hstep button \{ min-width:44px; min-height:44px/);
   assert.match(p, /#cart \.tl \.cx \{ min-height:44px/);
   const c = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");

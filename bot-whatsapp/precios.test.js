@@ -217,7 +217,7 @@ test("«¿Te falta algo?» con foto del artículo y entrega: dirección de siemp
   assert.match(ped, /className = "falta-av"/); assert.match(ped, /\.falta-fila \.falta-av \{ flex:none; width:56px; height:56px/);
   assert.match(ped, /name="addrmode" value="otra"/); assert.match(ped, /deliveryAddress: dirEntrega\(\)/);
   assert.match(ped, /const sinDireccion = \(\) => !String\(data\.customer\.address/);
-  assert.match(ped, /\$\("confirm"\)\.onclick = async \(\) => \{\s*\$\("err"\)\.textContent = ""; if \(!direccionOk/); // sin dirección válida no se pasa a elegir el día
+  assert.match(ped, /function validaCierre\(errBox\) \{[^}]*if \(!direccionOk\(errBox\)\) return false/); assert.match(ped, /\$\("revisar"\)\.onclick = \(\) => \{\s*\$\("err"\)\.textContent = ""; if \(!validaCierre/); // sin dirección válida no se pasa al resumen ni se envía
 });
 
 test("ACTUALIZACIÓN AUTOMÁTICA: cada 10 minutos, con pruebas, comprobación de arranque, vuelta atrás y botón «Actualizar ahora»", async () => {
@@ -301,8 +301,8 @@ test("TOTALES EN EL CATÁLOGO: la barra flotante va SIN IVA; la pantalla Pedido 
   assert.match(ped, /\$\("pcT"\)\.textContent = n \? `\$\{eur\(calc\(\)\.base\)\} sin IVA`/); // carrito flotante: sin IVA
   assert.match(ped, /\$\("sumBase"\)\.textContent = eur\(c\.base\); \$\("sumIva"\)\.textContent = eur\(c\.iva\)/); // resumen: base + IVA
   assert.match(ped, /\$\("sumRe"\)\.textContent = eur\(c\.re\); \$\("sumTotal"\)\.textContent = eur\(c\.total\)/); // recargo de equivalencia y total
-  assert.match(ped, /sp\.textContent = ` · \$\{eur\(c\.total\)\}`/); // «Confirmar pedido · 169,91 €»
-  assert.doesNotMatch(ped, /id="when"/); assert.doesNotMatch(ped, /id="resumen"/); // ya no hay pasos 2 y 3 aparte
+  assert.match(ped, /sp\.textContent = `Total \$\{eur\(c\.total\)\}`/); // «Enviar pedido a Distribuciones VM» + «Total 169,91 €»
+  assert.doesNotMatch(ped, /id="when"/); assert.match(ped, /id="resumen"/); // tanda 9: un único paso de resumen antes de enviar (ya no hay los antiguos pasos 2 y 3)
 });
 
 test("CÓDIGOS CON PUNTO (157.10, 151.21…): «repetir pedido» separa bien el código de la cantidad", async () => {

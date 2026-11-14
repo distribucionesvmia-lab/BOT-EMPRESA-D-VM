@@ -9,6 +9,13 @@ export const AYUDA = {
   whatsapp: ayudaEnv("AYUDA_WHATSAPP") || "", // p. ej. "600 000 000" (con o sin el 34 delante)
   horario: ayudaEnv("AYUDA_HORARIO") || "", // p. ej. "Lunes a viernes, de 8:00 a 14:00"
 };
+// ── CONDICIONES DEL PEDIDO que se enseñan al cliente antes de enviarlo. RELLENAR en C:\vm\config: PEDIDO_MINIMO (euros sin IVA; vacío = sin mínimo) y
+// PORTES_TEXTO (p. ej. "Portes gratis desde 150 €"). Lo que esté vacío no se enseña: nunca se inventa una condición.
+export const condicionesPedido = () => {
+  const e = (k) => String(globalThis.process?.env?.[k] ?? "").trim();
+  const min = Number(e("PEDIDO_MINIMO").replace(",", "."));
+  return { pago: BUSINESS.payment, minimo: Number.isFinite(min) && min > 0 ? min : 0, portes: e("PORTES_TEXTO") };
+};
 /** Lo que se enseña al cliente: solo los datos rellenados; null si no hay ninguno. */
 export const ayudaPublica = () => {
   const dig = (s) => String(s).replace(/\D/g, "");
