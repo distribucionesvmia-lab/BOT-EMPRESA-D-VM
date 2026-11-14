@@ -1104,6 +1104,13 @@
   .sust-bt:disabled { background:var(--fill); color:var(--text-2); }
 
   /* Botón de voz / borrar dentro del buscador */
+  /* Cabecera al bajar por la lista (móvil/tablet): el título «Catálogo» ya no flota encima de «Mi cuenta» (ahora ocupa el hueco entre el logo y los botones y se acorta con «…»)
+     y las filas ya no asoman por la rendija de 4 px que quedaba entre el buscador y la barra fija de la categoría (relleno superior de la lista a 0). */
+  @media (max-width:1023px) {
+    .bar-titulo { position:static; transform:none; flex:1 1 0; min-width:0; max-width:none; text-align:left; margin-left:var(--s1); }
+    .app > main#list { padding-top:0; }
+  }
+  @media (max-width:520px) { .bar-titulo { display:none; } } /* en el móvil no cabe entero junto a «Mi cuenta» (salía «Catál…»): el contexto ya lo da la barra «‹ Catálogo · Café» */
   .buscar input[type="search"]::-webkit-search-cancel-button { -webkit-appearance:none; display:none; }
   .buscar input { padding-right:calc(var(--s4) + 44px); }
   .vozbtn { position:absolute; right:calc(max(var(--gutter), calc((100% - 860px) / 2)) + var(--s1)); top:2px; width:44px; height:44px; border:0; border-radius:50%; background:transparent; color:var(--text-2); display:grid; place-items:center; padding:0; cursor:pointer; }

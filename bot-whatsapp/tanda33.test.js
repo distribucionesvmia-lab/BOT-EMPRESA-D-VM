@@ -111,3 +111,10 @@ test("CLIENTE (iPhone): la franja de la hora va en rojo sólido, sin degradado",
   assert.match(h, /html::before \{ content:""; position:fixed; top:0; left:0; right:0; height:env\(safe-area-inset-top\); background:var\(--bar\)/);
   assert.match(h, /<meta name="theme-color" content="#C8102E">/);
 });
+
+test("CATÁLOGO (móvil): sin rendija sobre la barra de categoría y el título de la cabecera no pisa «Mi cuenta»", () => {
+  const h = leer("./pedido.html");
+  assert.match(h, /\.app > main#list \{ padding-top:0; \}/);
+  assert.match(h, /\.bar-titulo \{ position:static; transform:none; flex:1 1 0; min-width:0;/);
+  assert.match(h, /@media \(max-width:520px\) \{ \.bar-titulo \{ display:none; \} \}/);
+});
