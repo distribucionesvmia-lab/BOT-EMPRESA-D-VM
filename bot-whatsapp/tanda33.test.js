@@ -118,3 +118,11 @@ test("CATÁLOGO (móvil): sin rendija sobre la barra de categoría y el título 
   assert.match(h, /\.bar-titulo \{ position:static; transform:none; flex:1 1 0; min-width:0;/);
   assert.match(h, /@media \(max-width:520px\) \{ \.bar-titulo \{ display:none; \} \}/);
 });
+
+test("PANEL: el formulario de enlaces va en 4 pasos con resumen antes de crear y conserva todos sus campos", () => {
+  const h = leer("./empresa.html");
+  for (const n of [1, 2, 3, 4]) assert.match(h, new RegExp(`<span class="inv-num">${n}</span>`));
+  for (const id of ["inv-para", "inv-q", "inv-sel", "inv-n-tipo", "inv-n-nombre", "inv-n-tel", "inv-n-nif", "inv-n-dir", "inv-n-pob", "inv-n-re", "inv-modo", "inv-codigo", "inv-dias", "inv-fecha", "inv-hora", "inv-usos", "inv-msg-b", "inv-crear", "inv-res", "inv-url", "inv-copiar", "inv-wa", "inv-plantilla"]) assert.ok(h.includes(`id="${id}"`), id);
+  assert.match(h, /id="inv-resumen"/); assert.match(h, /function invResumen\(\)/); assert.match(h, /Se creará un enlace para/);
+  assert.match(h, /#inv-card \[hidden\] \{ display:none !important; \}/); // lo oculto no se ve (ni el cliente vacío ni la ficha)
+});

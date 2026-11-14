@@ -137,6 +137,23 @@
   .est-cab { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:flex-end; justify-content:space-between; } .est-t { font-size:22px; text-transform:none; letter-spacing:-.02em; color:var(--fg); margin:0 0 2px; font-weight:800; }
   #copias-tabla td { white-space:nowrap; } #copias-tabla td:last-child { white-space:normal; }
   .copias-aviso { background:var(--warn); color:var(--warn-fg); border-radius:8px; padding:10px 14px; font-weight:600; margin:10px 0; }
+  /* Enlaces de acceso: cuatro pasos numerados, cada uno en su bloque, con ayuda debajo de cada campo y un resumen antes de crear */
+  #inv-card [hidden] { display:none !important; }
+  .inv-paso { margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+  .inv-paso h3 { margin:0 0 12px; font-size:15px; display:flex; align-items:center; gap:10px; }
+  .inv-num { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--accent); color:var(--accent-fg, #fff); font-size:13px; font-weight:700; flex:none; }
+  .inv-paso .form-grid + .form-grid { margin-top:12px; }
+  .inv-check { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--th); cursor:pointer; font-size:13.5px; align-self:end; }
+  #inv-card label.inv-check { display:flex; flex-direction:row; align-items:flex-start; justify-content:flex-start; text-align:left; gap:10px; }
+  #inv-card label.inv-check > span { display:block; text-align:left; }
+  .inv-check input { width:18px; height:18px; margin-top:2px; flex:none; accent-color:var(--accent); }
+  .inv-check .ayuda { display:block; margin-top:2px; }
+  .ayuda { display:block; font-size:12px; color:var(--muted, #667085); font-weight:400; margin-top:4px; }
+  .inv-pie { margin-top:20px; padding:14px 16px; border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:10px; background:var(--th); }
+  .inv-resumen { margin:0 0 12px; font-size:14px; line-height:1.45; }
+  .inv-res { margin-top:14px; display:grid; gap:8px; padding:14px 16px; border:1px solid var(--line); border-radius:10px; }
+  .inv-res[hidden] { display:none; }
+  #sync-panel + #copias-panel { margin-top:0; }
   .est-exp { display:inline-flex; gap:8px; margin-left:auto; }
   .est-exp button { height:40px; }
   .est-filtros { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; }
@@ -488,44 +505,68 @@
       <div class="pag-cab"><h1>Cuentas de clientes</h1><p>Accesos de los clientes, enlaces de invitación, uso de la aplicación, errores y derechos de datos.</p></div>
       <div class="panel" id="inv-card">
         <h2>Enlaces de acceso para un cliente</h2>
-        <p class="muted" style="margin:0 0 8px">Crea un enlace para que un cliente entre sin escribir nada. Tú eliges cuánto vale, cuántas veces se puede usar y si solo puede mirar o también pedir. <b>Lo mandas tú</b>: el sistema no envía nada.</p>
-        <label>Para quién es
-          <select id="inv-para" aria-label="Para quién es el enlace"><option value="cliente" selected>Un cliente que ya tengo</option><option value="nuevo">Una persona nueva (aún sin alta)</option></select></label>
-        <div id="inv-cli" class="inv-grid" style="margin-top:10px"><input id="inv-q" type="search" placeholder="Busca el cliente por nombre o código" aria-label="Buscar cliente para el enlace"><select id="inv-sel" aria-label="Cliente"></select></div>
-        <div id="inv-nuevo" class="inv-grid" hidden style="margin-top:10px">
-          <label class="req"><span>Nombre de la persona o del negocio</span> <input id="inv-n-nombre" type="text" maxlength="80" autocomplete="off" aria-label="Nombre de la persona nueva"></label>
-          <label>Qué quieres que pueda hacer
-            <select id="inv-n-tipo" aria-label="Qué puede hacer la persona nueva"><option value="alta">Solo darse de alta (se le abre el formulario con su nombre)</option><option value="ver">Ver la app por dentro, sin pedir</option><option value="pedir">Pedir con normalidad (hay que rellenar su ficha)</option></select></label>
-          <label><span>Teléfono <small id="inv-n-tel-o" class="muted">(opcional: solo para abrir el WhatsApp)</small><b id="inv-n-tel-r" class="rojo" hidden>*</b></span> <input id="inv-n-tel" type="tel" inputmode="tel" autocomplete="off" aria-label="Teléfono"></label>
-          <div id="inv-n-ficha" class="inv-grid inv-ancho" hidden>
-            <p class="muted" style="margin:0">Ficha del cliente: para que pueda pedir como cualquier cliente hay que rellenarla. Se crea como cliente provisional (código P0000x) hasta que le des su código de a3ERP.</p>
-            <label class="req"><span>DNI, NIE o CIF</span> <input id="inv-n-nif" type="text" maxlength="12" autocomplete="off" aria-label="DNI, NIE o CIF"></label>
-            <label class="req"><span>Dirección de entrega</span> <input id="inv-n-dir" type="text" maxlength="160" autocomplete="off" aria-label="Dirección"></label>
-            <label class="req"><span>Población</span> <input id="inv-n-pob" type="text" maxlength="60" autocomplete="off" aria-label="Población"></label>
-            <label>Código de municipio (Medina del Campo = 47085; opcional) <input id="inv-n-mun" type="text" maxlength="5" inputmode="numeric" autocomplete="off" aria-label="Código de municipio"></label>
-            <label>Correo (opcional) <input id="inv-n-mail" type="email" autocomplete="off" aria-label="Correo"></label>
-            <label>Razón social (opcional) <input id="inv-n-razon" type="text" maxlength="80" autocomplete="off" aria-label="Razón social"></label>
-            <label style="display:flex;gap:8px;align-items:center"><input id="inv-n-re" type="checkbox"> Tiene recargo de equivalencia</label>
+        <p class="muted" style="margin:0 0 4px">Crea un enlace para que alguien entre en la aplicación sin escribir nada. Sigue los 4 pasos y pulsa «Crear». <b>Lo mandas tú</b>: el sistema no envía nada.</p>
+        <section class="inv-paso" aria-labelledby="ip1">
+          <h3 id="ip1"><span class="inv-num">1</span>¿Para quién es?</h3>
+          <div class="form-grid">
+            <label class="campo"><span>Tipo de destinatario</span>
+              <select id="inv-para" aria-label="Para quién es el enlace"><option value="cliente" selected>Un cliente que ya tengo</option><option value="nuevo">Una persona nueva (aún sin alta)</option></select></label>
           </div>
+          <div id="inv-cli" class="form-grid">
+            <label class="campo"><span>Buscar cliente</span><input id="inv-q" type="search" placeholder="Escribe 2 letras del nombre o el código" aria-label="Buscar cliente para el enlace"><small class="ayuda">Al escribir aparecerá la lista para elegir.</small></label>
+            <label class="campo" id="inv-sel-l" hidden><span>Elige el cliente</span><select id="inv-sel" aria-label="Cliente"></select></label>
+          </div>
+          <div id="inv-nuevo" class="form-grid" hidden>
+            <label class="campo"><span>Nombre de la persona o del negocio *</span><input id="inv-n-nombre" type="text" maxlength="80" autocomplete="off" aria-label="Nombre de la persona nueva"></label>
+            <label class="campo"><span>¿Qué podrá hacer?</span>
+              <select id="inv-n-tipo" aria-label="Qué puede hacer la persona nueva"><option value="alta">Solo darse de alta (se le abre el formulario con su nombre)</option><option value="ver">Ver la app por dentro, sin pedir</option><option value="pedir">Pedir con normalidad (hay que rellenar su ficha)</option></select></label>
+            <label class="campo"><span>Teléfono <small id="inv-n-tel-o" class="muted">(opcional: solo para abrir el WhatsApp)</small><b id="inv-n-tel-r" class="rojo" hidden>*</b></span><input id="inv-n-tel" type="tel" inputmode="tel" autocomplete="off" aria-label="Teléfono"></label>
+            <div id="inv-n-ficha" class="form-grid campo-ancho inv-ancho" hidden>
+              <p class="muted campo-ancho" style="margin:0"><b>Ficha del cliente.</b> Para que pueda pedir como cualquier cliente hay que rellenarla. Se crea como cliente provisional (código P0000x) hasta que le des su código de a3ERP.</p>
+              <label class="campo"><span>DNI, NIE o CIF *</span><input id="inv-n-nif" type="text" maxlength="12" autocomplete="off" aria-label="DNI, NIE o CIF"></label>
+              <label class="campo"><span>Dirección de entrega *</span><input id="inv-n-dir" type="text" maxlength="160" autocomplete="off" aria-label="Dirección"></label>
+              <label class="campo"><span>Población *</span><input id="inv-n-pob" type="text" maxlength="60" autocomplete="off" aria-label="Población"></label>
+              <label class="campo"><span>Código de municipio (opcional)</span><input id="inv-n-mun" type="text" maxlength="5" inputmode="numeric" autocomplete="off" aria-label="Código de municipio"><small class="ayuda">Medina del Campo = 47085</small></label>
+              <label class="campo"><span>Correo (opcional)</span><input id="inv-n-mail" type="email" autocomplete="off" aria-label="Correo"></label>
+              <label class="campo"><span>Razón social (opcional)</span><input id="inv-n-razon" type="text" maxlength="80" autocomplete="off" aria-label="Razón social"></label>
+              <label class="inv-check campo-ancho"><input id="inv-n-re" type="checkbox"> Tiene recargo de equivalencia</label>
+            </div>
+          </div>
+        </section>
+        <section class="inv-paso" aria-labelledby="ip2">
+          <h3 id="ip2"><span class="inv-num">2</span>Permisos y seguridad</h3>
+          <div class="form-grid">
+            <label class="campo" id="inv-modo-l"><span>Permiso</span>
+              <select id="inv-modo" aria-label="Qué puede hacer"><option value="pedir" selected>Ver el catálogo y pedir</option><option value="ver">Solo ver el catálogo (no puede enviar pedidos)</option></select></label>
+            <label class="inv-check" id="inv-codigo-l"><input id="inv-codigo" type="checkbox" checked><span>Pedirle que ponga su código de entrada al entrar<small class="ayuda">Recomendado: así el enlace no sirve de contraseña para otra persona.</small></span></label>
+          </div>
+        </section>
+        <section class="inv-paso inv-opc" aria-labelledby="ip3">
+          <h3 id="ip3"><span class="inv-num">3</span>¿Cuánto tiempo vale?</h3>
+          <div class="form-grid">
+            <label class="campo"><span>Días de validez</span>
+              <select id="inv-dias" aria-label="Días que vale el enlace"><option value="1">1 día</option><option value="3">3 días</option><option value="7" selected>7 días</option><option value="30">30 días</option><option value="fecha">Hasta una fecha…</option></select></label>
+            <label class="campo" id="inv-fecha-l" hidden><span>Fecha en la que caduca</span><input id="inv-fecha" type="date" aria-label="Fecha de caducidad"></label>
+            <label class="campo"><span>Hora de caducidad (opcional)</span><input id="inv-hora" type="time" aria-label="Hora de caducidad"><small class="ayuda">Hora de Madrid. Si la dejas vacía vale hasta el final del día.</small></label>
+            <label class="campo"><span>Veces que se puede usar</span><input id="inv-usos" type="number" min="1" max="20" step="1" value="1" inputmode="numeric" aria-label="Usos del enlace"><small class="ayuda">De 1 a 20. Con 1, solo funciona una vez.</small></label>
+          </div>
+        </section>
+        <section class="inv-paso" aria-labelledby="ip4">
+          <h3 id="ip4"><span class="inv-num">4</span>Mensaje de bienvenida <small class="muted">(opcional)</small></h3>
+          <div class="form-grid">
+            <label class="campo campo-ancho"><span>Lo verá al entrar</span><input id="inv-msg-b" type="text" maxlength="300" placeholder="Hola Pablo, aquí tienes tu enlace" aria-label="Mensaje de bienvenida"></label>
+          </div>
+        </section>
+        <div class="inv-pie">
+          <p class="inv-resumen" id="inv-resumen" role="status" aria-live="polite"></p>
+          <div class="acciones"><button class="main" id="inv-crear" type="button">Crear enlace de acceso</button></div>
         </div>
-        <div class="inv-opc inv-grid" style="margin-top:10px">
-          <label>Cuánto vale el enlace
-            <select id="inv-dias" aria-label="Días que vale el enlace"><option value="1">1 día</option><option value="3">3 días</option><option value="7" selected>7 días</option><option value="30">30 días</option><option value="fecha">Hasta una fecha…</option></select></label>
-          <label id="inv-fecha-l" hidden>Fecha en la que caduca <input id="inv-fecha" type="date" aria-label="Fecha de caducidad"></label>
-          <label>Hora de caducidad (opcional, hora de Madrid) <input id="inv-hora" type="time" aria-label="Hora de caducidad"></label>
-          <label>Cuántas veces se puede usar (de 1 a 20) <input id="inv-usos" type="number" min="1" max="20" step="1" value="1" inputmode="numeric" aria-label="Usos del enlace"></label>
-          <label id="inv-modo-l">Qué puede hacer el cliente
-            <select id="inv-modo" aria-label="Qué puede hacer"><option value="pedir" selected>Ver el catálogo y pedir</option><option value="ver">Solo ver el catálogo (no puede enviar pedidos)</option></select></label>
-          <label id="inv-codigo-l" style="display:flex;gap:8px;align-items:center"><input id="inv-codigo" type="checkbox" checked> Pedirle que ponga su código de entrada al entrar</label>
-          <label>Mensaje de bienvenida (opcional; lo ve al entrar) <input id="inv-msg-b" type="text" maxlength="300" placeholder="Hola Pablo, aquí tienes tu enlace" aria-label="Mensaje de bienvenida"></label>
-          <button class="main" id="inv-crear" type="button">Crear enlace de acceso</button>
-        </div>
+        <div id="inv-res" class="inv-res" hidden><label class="campo"><span>Enlace creado</span><input id="inv-url" readonly aria-label="Enlace creado"></label><div class="muted" id="inv-info"></div><div class="acciones"><button class="main" id="inv-copiar" type="button">Copiar enlace</button><button id="inv-wa" type="button">Abrir en WhatsApp</button></div><div class="muted" id="inv-msg" role="status"></div></div>
         <details style="margin-top:10px"><summary>Texto del WhatsApp (editable)</summary>
           <p class="muted" style="margin:6px 0">Escribe el mensaje que mandarás. Pon <b>{enlace}</b> donde va el enlace (obligatorio). También valen <b>{nombre}</b>, <b>{usos}</b> y <b>{caduca}</b>.</p>
           <textarea id="inv-plantilla" rows="4" maxlength="500" style="width:100%" aria-label="Texto del WhatsApp"></textarea>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="main" id="inv-pl-g" type="button">Guardar texto</button><button id="inv-pl-r" type="button">Volver al texto de siempre</button></div><div class="muted" id="inv-pl-msg" role="status"></div>
         </details>
-        <div id="inv-res" hidden style="margin-top:10px;display:grid;gap:6px"><input id="inv-url" readonly aria-label="Enlace creado"><div class="muted" id="inv-info"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="main" id="inv-copiar" type="button">Copiar enlace</button><button id="inv-wa" type="button">Abrir en WhatsApp</button></div><div class="muted" id="inv-msg" role="status"></div></div>
         <h4 style="margin:14px 0 6px">Enlaces creados</h4>
         <p class="vacio" id="inv-vacio" hidden><b>Todavía no has creado ningún enlace.</b><span>Cuando crees uno, aparecerá aquí con su estado, sus usos y cuándo caduca.</span></p>
         <div class="scroll"><table><thead><tr><th>Para</th><th>Estado</th><th>Usos</th><th>Caduca</th><th>Qué puede hacer</th><th></th></tr></thead><tbody id="inv-lista"></tbody></table></div>
@@ -1088,9 +1129,20 @@ function invPara() {
   $("inv-n-tel-o").hidden = tipo === "pedir"; $("inv-n-tel-r").hidden = tipo !== "pedir";
   $("inv-modo-l").hidden = nuevo; $("inv-codigo-l").hidden = nuevo && tipo !== "pedir";
   $("inv-crear").textContent = nuevo ? "Crear enlace para la persona nueva" : "Crear enlace de acceso";
+  if (typeof invResumen === "function") invResumen();
 }
 $("inv-para").onchange = $("inv-n-tipo").onchange = invPara;
 $("inv-dias").onchange = () => { $("inv-fecha-l").hidden = $("inv-dias").value !== "fecha"; };
+function invResumen() {
+  const nuevo = $("inv-para").value === "nuevo", tipo = $("inv-n-tipo").value, sel = $("inv-sel");
+  const quien = nuevo ? ($("inv-n-nombre").value.trim() || "la persona nueva") : (sel.value ? sel.selectedOptions[0].textContent.replace(/ \(\w+\)$/, "") : "el cliente que elijas");
+  const dias = $("inv-dias").value, usos = Number($("inv-usos").value) || 1;
+  const vale = dias === "fecha" ? ($("inv-fecha").value ? "hasta el " + $("inv-fecha").value.split("-").reverse().join("/") : "hasta la fecha que elijas") : `${dias} ${dias === "1" ? "día" : "días"}`;
+  const hace = nuevo && tipo === "alta" ? "solo podrá darse de alta" : (nuevo ? tipo === "ver" : $("inv-modo").value === "ver") ? "podrá ver el catálogo pero no pedir" : "podrá ver el catálogo y pedir";
+  $("inv-resumen").textContent = `Se creará un enlace para ${quien}: ${hace}. Vale ${vale}${$("inv-hora").value ? " (hasta las " + $("inv-hora").value + ")" : ""} y ${usos === 1 ? "se puede usar una sola vez" : "se puede usar hasta " + usos + " veces"}.`;
+}
+for (const id of ["inv-para", "inv-n-tipo", "inv-n-nombre", "inv-sel", "inv-modo", "inv-dias", "inv-fecha", "inv-hora", "inv-usos"]) { $(id).addEventListener("input", invResumen); $(id).addEventListener("change", invResumen); }
+new MutationObserver(() => { $("inv-sel-l").hidden = !$("inv-sel").options.length; invResumen(); }).observe($("inv-sel"), { childList: true });
 async function invitaciones() {
   const r = await call("/api/admin/invitaciones").catch(() => null); if (!r) return;
   if (document.activeElement !== $("inv-plantilla")) $("inv-plantilla").value = r.plantilla;
