@@ -16,7 +16,7 @@ import { estadoSistema, crearVigilante } from "./monitor.js";
 import { privacidadHtml, avisoLegalHtml } from "./privacidad.js";
 import { estadoVersion } from "./version.js";
 import { sendMail } from "./mailer.js";
-import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, accesosDe } from "./weborder.js";
+import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, accesosDe, HISTORIAL_MAX, HISTORIAL_VER_MAS } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "./delivery.js";
 // Lo que el catálogo necesita para el aviso «entrega hoy» y las opciones de día: se calcula SIEMPRE en el servidor con la hora de Madrid
 // «Lo más pedido» (para un cliente sin historial): identificadores de los artículos que más clientes compran, sin ningún dato personal; se recalcula cada 10 minutos
@@ -432,7 +432,8 @@ function datosPdfComunes() {
 }
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
-const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));
+const clienteConPedidos = (id, max = HISTORIAL_MAX) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id, max), max);
+const sinDocumento = (d) => !String(d ?? "").trim() || /^(undefined|null)$/i.test(String(d).trim()); // pedido de a3ERP sin número de documento: no hay PDF que enseñar
 const lunesDe = (day) => addDays(day, -((weekday(day) + 6) % 7)); // lunes de esa semana
 // Parecidos a un artículo retirado: mismas categoría y subcategoría y alguna palabra del nombre en común (hasta 3, solo del catálogo actual)
 const stopP = new Set(["con", "sin", "del", "las", "los", "una", "uno", "para", "caja", "pack", "lata", "botella", "uds", "und", "de", "la", "el", "en"]);
@@ -756,7 +757,8 @@ async function appRoutes(req, res, url) {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     const c = customerDirectory.getById(account.customerId);
     if (!c) return void sendJson(res, 404, { error: "No encontramos tu ficha." });
-    const hist = webHistory(clienteConPedidos(account.customerId), catalogNow());
+    const mas = url.searchParams.get("mas") === "1", max = mas ? HISTORIAL_VER_MAS : HISTORIAL_MAX; // «Ver más»: hasta 30 pedidos (por defecto, los 10 últimos)
+    const todosH = webHistory(clienteConPedidos(account.customerId, HISTORIAL_VER_MAS), catalogNow(), HISTORIAL_VER_MAS), hist = todosH.slice(0, max);
     const pedidos = hist.map((o) => {
       const propio = /^VM-\d{4}-\d{6}$/.test(o.doc) ? getDb().getOrderByRef(o.doc) : null; // un pedido hecho en la aplicación: se puede saber si aún se modifica
       const pe = propio && propio.customer_id === String(account.customerId) ? puedeEditarPedido(propio) : null;
@@ -768,7 +770,7 @@ async function appRoutes(req, res, url) {
       else { const cust = clienteConPedidos(account.customerId); const pr = priceOrder({ items: o.lines.map((l) => ({ id: l.id, qty: l.qty, unit: "ud" })) }, cust, catalogNow()); total = totals(pr.items, !!cust?.recargoEquivalencia).total; orientativo = true; }
       return {
         total, totalOrientativo: orientativo, paso, proximo: !!propio && !!ent && ent >= hoyD, entregaTexto: ent ? longDate(ent) : "",
-        doc: o.doc, fecha: o.date, entrega: ent, origen: propio ? "app" : "a3erp",
+        doc: sinDocumento(o.doc) ? "" : o.doc, pdf: !sinDocumento(o.doc), fecha: o.date, entrega: ent, origen: propio ? "app" : "a3erp",
         estado: !propio ? "Entregado" : propio.export_status === "exported" ? "En preparación" : pe?.ok ? "Recibido · puedes modificarlo" : "Recibido",
         editable: !!pe?.ok, hasta: pe?.ok ? pe.texto : "", modificado: propio?.modified_at ?? null,
         lineas: o.lines.map((l) => { // «1 caja (6 uds)» igual que en el PDF; sin dato de caja (pedidos de a3ERP), unidades
@@ -779,7 +781,7 @@ async function appRoutes(req, res, url) {
     });
     return void sendJson(res, 200, {
       cliente: { nombre: c.name, razonSocial: c.legalName && c.legalName !== c.name ? c.legalName : "", direccion: c.address, poblacion: c.city, telefono: account.phone ?? "", correo: account.email ?? "" },
-      pedidos, ayuda: ayudaPublica(),
+      pedidos, hayMas: !mas && todosH.length > HISTORIAL_MAX, ayuda: ayudaPublica(),
     });
   }
   if (p === "/api/push/clave" && req.method === "GET") { // clave pública para que el móvil pueda activar los avisos

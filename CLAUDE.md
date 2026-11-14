@@ -242,3 +242,12 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **Fallos visibles** (`falloCarga`): «No hemos podido cargar esto» + «Reintentar» en aviso de entrega de hoy, pedido fijo, teléfono de ayuda, hora límite y recuperar el último pedido. Quedan mudos a propósito: telemetría (`/api/uso`), instalar la app y registrar el service worker.
 - Fotos de listas con `width`/`height`. **Pendiente**: fusionar las reglas CSS repetidas (R2), por riesgo; con CSS en caché y gzip el beneficio es pequeño.
 - Pruebas: `tanda21.test.js` y «BENCH 6» en `server.test.js`.
+
+## Bench 7 (pulido final)
+- **Un solo nombre de marca**: «Distribuciones Valentín Martín» en títulos de pestaña, botón «Enviar pedido a…», alt del logo, pie, notificaciones push (título por defecto), correo de prueba, manifest, página sin conexión, privacidad y saludo del chat (`BUSINESS.name`). Solo queda «Pedidos VM» como `short_name` del icono (el nombre del icono en el móvil es corto a la fuerza).
+- **Nombres de tarifa** (`limpiarNombre`): sin comillas ni «´25», «0.33 ml» (error de la tarifa) → «0,33 L», «1.5 lt» → «1,5 L», litros siempre «L» (ml y cl se quedan). El orden alfabético ignora comillas, acentos y mayúsculas (`cmpNombre` en la página, `claveOrdenNombre` en `weborder.js`); el nombre original sigue en datos, `title`, `aria-label` y búsqueda.
+- **Carrito de más de 24 h**: banner «Hemos recuperado tu pedido sin terminar del jueves 12 de noviembre; los precios son los de hoy.» con «Entendido» (los precios siempre se recalculan con el catálogo de ahora).
+- **Mi cuenta**: «Ver más pedidos» (`/api/mi-cuenta?mas=1`, hasta `HISTORIAL_VER_MAS` = 30) en lugar de «Aquí salen tus 10 últimos pedidos» (por defecto siguen los 10 últimos; ESTO relaja la regla de «historial = 10 últimos» solo para lo que ve el cliente). Los pedidos de a3ERP sin número de documento no llevan botón de PDF (`pdf:false`). **El albarán del ERP** no se enseña en la app del cliente (no existe esa función): no hay nada que ocultar.
+- **Ojo** para ver el código en todos los campos de contraseña (`.pw-ojo`, 44 px; vuelve a ocultarse al enviar).
+- **Letra 100/115/130 % a 360 px** comprobada: nombres de 2 a 4 líneas, botones dentro de su tarjeta, sin scroll horizontal; la barra inferior deja de crecer a partir del 115 % para que «Catálogo» no se parta.
+- Pruebas: `tanda22.test.js`.

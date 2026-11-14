@@ -18,8 +18,8 @@ test("T16 5-8: manifest con id y capturas, iconos separados, favicon y un solo f
   const m = JSON.parse(leer("./pwa/manifest.webmanifest")); assert.equal(m.id, "/cliente"); assert.equal(m.icons.length, 4);
   for (const i of m.icons) assert.ok(["any", "maskable"].includes(i.purpose));
   for (const f of ["icono-maskable-192.png", "icono-maskable-512.png", "captura-estrecha.png", "captura-ancha.png"]) assert.ok(fs.existsSync(new URL("./pwa/" + f, import.meta.url)), f);
-  for (const h of [cli, ped]) { assert.match(h, /<link rel="icon" href="\/favicon\.ico"/); assert.match(h, /<link rel="apple-touch-icon"/); assert.match(h, /<title>[^<]+ · Distribuciones VM<\/title>/); }
-  assert.match(ped, /document\.title = titulo \+ " · Distribuciones VM"/); assert.doesNotMatch(ped, /document\.title = "Pedido a "/);
+  for (const h of [cli, ped]) { assert.match(h, /<link rel="icon" href="\/favicon\.ico"/); assert.match(h, /<link rel="apple-touch-icon"/); assert.match(h, /<title>[^<]+ · Distribuciones Valentín Martín<\/title>/); }
+  assert.match(ped, /document\.title = titulo \+ " · Distribuciones Valentín Martín"/); assert.doesNotMatch(ped, /document\.title = "Pedido a "/);
 });
 test("T16 4: «Instalar la app» en el menú ⋯ y en Inicio, con el aviso del navegador o instrucciones (también iPhone)", () => {
   assert.match(cli, /id="instalar-menu">Instalar la app</); assert.match(cli, /"Instala la app en tu móvil"/); assert.match(cli, /async function abrirInstalar\(\)/);

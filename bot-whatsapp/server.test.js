@@ -757,7 +757,7 @@ test("APP INSTALABLE: favicon, iconos (normales y maskable), capturas y manifest
   const m = await (await fetch(BASE + "/manifest.webmanifest")).json();
   assert.equal(m.id, "/cliente"); assert.ok(m.icons.every((i) => i.purpose === "any" || i.purpose === "maskable")); assert.ok(m.icons.some((i) => i.purpose === "maskable")); assert.ok(m.screenshots.some((x) => x.form_factor === "narrow") && m.screenshots.some((x) => x.form_factor === "wide"));
   const html = await (await fetch(BASE + "/cliente")).text();
-  assert.match(html, /rel="icon" href="\/favicon\.ico"/); assert.match(html, /<title>Inicio · Distribuciones VM<\/title>/);
+  assert.match(html, /rel="icon" href="\/favicon\.ico"/); assert.match(html, /<title>Inicio · Distribuciones Valentín Martín<\/title>/);
 });
 
 test("INICIO DEL CLIENTE: /api/inicio exige sesión, devuelve solo su catálogo (habituales, categorías, fotos pedidas) y no enseña nada de la administración", async () => {

@@ -40,6 +40,8 @@ function oferta(p, customer) {
   const sin = precioEfectivo({ ...p, promo: null }, customer, String(p.id)), con = precioEfectivo(p, customer, String(p.id));
   return sin.price !== con.price || sin.discount !== con.discount ? { tipo: o.tipo, valor: Number(o.valor), ...(o.hasta ? { hasta: o.hasta } : {}) } : null;
 }
+/** Clave para ordenar por nombre sin fijarse en comillas, acentos ni mayúsculas (el nombre original no se toca). */
+export const claveOrdenNombre = (n) => String(n ?? "").replace(/[´`"“”«»‘’']/g, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 export function webProducts(customer, catalog, habitualProducts, imgOf = () => null, iaOf = () => false) {
   const habit = new Map(habitualProducts(customer).map((p) => [p.id, p]));
   const limpio = process.env.NOMBRES_LIMPIOS === "1";
@@ -61,7 +63,7 @@ export function webProducts(customer, catalog, habitualProducts, imgOf = () => n
       lastQty: habit.get(p.id)?.lastQty ?? null,
       count: habit.get(p.id)?.count ?? 0,
     }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    .sort((a, b) => b.count - a.count || claveOrdenNombre(a.name).localeCompare(claveOrdenNombre(b.name), "es"))
     .filter((p, i, todos) => todos.findIndex((x) => x.id === p.id) === i && String(p.name ?? "").trim()) // mismo código solo una vez; sin nombre, no hay tarjeta
     .reduce((acc, p) => { // mismo nombre, precio y caja → se enseña uno: el que el cliente ya compra o, si no, el de código menor
       const k = [normNombre(p.name), p.price, p.discount ?? 0, p.unitsPerBox ?? 0].join("|"), j = acc.claves.get(k);
@@ -85,15 +87,16 @@ export function conHistorial(clientes, historial = {}) {
  * Suma al historial de a3ERP los pedidos que el cliente ha hecho por la aplicación o el chat (y que a3ERP aún no ha facturado):
  * solo los de fecha igual o posterior al último pedido de a3ERP, para no contarlos dos veces cuando después aparezcan en su historial.
  */
+export const HISTORIAL_VER_MAS = 30; // «Ver más» en Mi cuenta: hasta 30 pedidos
 export const HISTORIAL_MAX = 10; // pedidos que se guardan como historial de cada cliente: al llegar el 11.º se va el más antiguo
-const masRecientes = (orders) => [...orders].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, HISTORIAL_MAX);
-export function withOwnOrders(customer, ownOrders = []) {
+const masRecientes = (orders, max = HISTORIAL_MAX) => [...orders].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, max);
+export function withOwnOrders(customer, ownOrders = [], max = HISTORIAL_MAX) {
   if (!customer) return customer;
   const orders = customer.orders ?? [];
   const lastA3 = orders.reduce((m, o) => (String(o.date) > m ? String(o.date) : m), "");
   const seen = new Set(orders.map((o) => String(o.doc)));
   const own = ownOrders.filter((o) => o.date >= lastA3 && !seen.has(String(o.doc)) && o.lines.length);
-  return { ...customer, orders: masRecientes([...own, ...orders]) }; // historial = sus 10 últimos pedidos (los de a3ERP y los hechos por la aplicación)
+  return { ...customer, orders: masRecientes([...own, ...orders], max) }; // historial = sus 10 últimos pedidos (los de a3ERP y los hechos por la aplicación)
 }
 
 /** Últimos pedidos del cliente (los más recientes primero) con sus líneas, para volver a comprarlos o modificarlos. */

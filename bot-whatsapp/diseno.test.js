@@ -99,7 +99,7 @@ test("fotos y estados: baldosa con foto al 82 % sin agrandar, fundido de 200 ms,
 test("chat: Mi cuenta y Mi pedido fijo usan estados con un solo botón; la hoja de Ayuda se arrastra", () => {
   const cli = leer("./cliente.html");
   for (const t of ["Aún no tienes pedidos", "No se ha podido cargar", "Aún no tienes pedido fijo"]) assert.ok(cli.includes(t), t);
-  assert.match(cli, /boton: "Reintentar", onclick: \(\) => abrirCuenta\(irAPedidos\)/);
+  assert.match(cli, /boton: "Reintentar", onclick: \(\) => abrirCuenta\(irAPedidos, mas\)/);
   assert.match(cli, /arrastrable\(c, cerrar\)/); assert.match(cli, /\.estado svg \{ width:48px; height:48px/);
 });
 

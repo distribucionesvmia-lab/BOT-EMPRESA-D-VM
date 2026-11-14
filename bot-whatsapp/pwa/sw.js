@@ -3,7 +3,7 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 // Página «Sin conexión» (sale al abrir la app sin red): con la marca, un botón para reintentar y el aviso de que el pedido empezado sigue guardado en el móvil
-const SIN_CONEXION = `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Sin conexión · Distribuciones VM</title>
+const SIN_CONEXION = `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Sin conexión · Distribuciones Valentín Martín</title>
 <style>:root{--bg:#F5F5F7;--card:#fff;--text:#1D1D1F;--text2:#5F5F65;--accent:#C8102E;--on:#fff}@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1C1C1E;--text:#F5F5F7;--text2:#A8A8B0;--accent:#FF6B7D;--on:#1D1D1F}}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 header{background:#C8102E;color:#fff;padding:20px 16px;text-align:center;font-weight:700;font-size:20px;letter-spacing:.2px}
@@ -18,8 +18,8 @@ self.addEventListener("fetch", (e) => {
 
 // Avisos al móvil (Web Push): «Pedido recibido» y avisos de la empresa. Lo que llega es solo un título y un texto corto.
 self.addEventListener("push", (e) => {
-  let d = {}; try { d = e.data ? e.data.json() : {}; } catch { d = { title: "Distribuciones Valentín", body: e.data ? e.data.text() : "" }; }
-  e.waitUntil(self.registration.showNotification(String(d.title || "Distribuciones Valentín").slice(0, 80), { body: String(d.body || "").slice(0, 240), icon: "/icono-192.png", badge: "/icono-192.png", tag: d.tag || undefined, data: { url: typeof d.url === "string" && d.url.startsWith("/") ? d.url : "/cliente" } }));
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch { d = { title: "Distribuciones Valentín Martín", body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(String(d.title || "Distribuciones Valentín Martín").slice(0, 80), { body: String(d.body || "").slice(0, 240), icon: "/icono-192.png", badge: "/icono-192.png", tag: d.tag || undefined, data: { url: typeof d.url === "string" && d.url.startsWith("/") ? d.url : "/cliente" } }));
 });
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();

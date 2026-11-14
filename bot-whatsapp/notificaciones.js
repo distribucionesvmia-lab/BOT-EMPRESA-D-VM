@@ -78,7 +78,7 @@ export function crearNotificador({ db, config, send = sendMail, log = console, n
     stop() { clearInterval(timer); timer = null; },
     /** Correo de prueba para comprobar la configuración. */
     async prueba() {
-      await send(config.smtp, { from: config.from, to: config.to, subject: "PRUEBA - avisos de pedidos de Distribuciones VM", text: "Este es un correo de prueba. Si lo lees, los avisos de PEDIDO REALIZADO llegarán a esta dirección.\n" });
+      await send(config.smtp, { from: config.from, to: config.to, subject: "PRUEBA - avisos de pedidos de Distribuciones Valentín Martín", text: "Este es un correo de prueba. Si lo lees, los avisos de PEDIDO REALIZADO llegarán a esta dirección.\n" });
       lastError = null;
     },
     status: () => ({ configurado: true, destino: config.to, enviados, ultimoError: lastError }),

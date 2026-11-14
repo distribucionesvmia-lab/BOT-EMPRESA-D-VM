@@ -17,7 +17,7 @@ test("1. nombre visible: sin comillas ni «´», en tipo frase y con la añada a
   assert.equal(limpiarNombre('"MOCAY´S" CAFE MOLIDO 250 G'), "Mocays cafe molido 250 g");
   assert.equal(limpiarNombre("PINNA FIDELIS ROBLE 2023"), "Pinna fidelis roble 2023");
   assert.equal(limpiarNombre("VINO 2019 RIOJA CRIANZA D.O. 75 CL"), "Vino rioja crianza D.O. 75 cl 2019");
-  assert.equal(limpiarNombre("PACK 2000 UDS VASOS"), "Pack 2000 uds vasos"); assert.equal(limpiarNombre("AGUA BEZOYA 1,5 L"), "Agua bezoya 1,5 l"); assert.equal(limpiarNombre("ACEITE AOVE 5 L"), "Aceite AOVE 5 l");
+  assert.equal(limpiarNombre("PACK 2000 UDS VASOS"), "Pack 2000 uds vasos"); assert.equal(limpiarNombre("AGUA BEZOYA 1,5 L"), "Agua bezoya 1,5 L"); assert.equal(limpiarNombre("ACEITE AOVE 5 L"), "Aceite AOVE 5 L");
   assert.match(p, /h\.textContent = nombreVisible\(p\); h\.title = p\.name/); assert.match(p, /n\.textContent = nombreVisible\(l\); n\.title = l\.name/); // ficha y carrito
   assert.match(p, /el\.setAttribute\("aria-label", p\.name\)/); // el nombre original sigue para lectores de pantalla y búsqueda
 });

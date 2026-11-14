@@ -8,7 +8,7 @@ const s = fs.readFileSync(new URL("./server.js", import.meta.url), "utf8").repla
 
 test("1. paso de resumen: el pedido se revisa y SOLO desde el resumen se envía, con un texto claro", () => {
   assert.match(p, /id="revisar" type="button">Revisar pedido</);
-  assert.match(p, /<section class="screen" id="resumen"/); assert.match(p, /id="confirm" type="button">Enviar pedido a Distribuciones VM</);
+  assert.match(p, /<section class="screen" id="resumen"/); assert.match(p, /id="confirm" type="button">Enviar pedido a Distribuciones Valentín Martín</);
   for (const id of ["resDia", "resDir", "resNota", "sumBase", "sumIva", "sumTotal", "resCond"]) assert.ok(p.includes(`id="${id}"`), id);
   assert.ok(p.indexOf('id="confirm"') > p.indexOf('id="resumen"')); // el botón de enviar está dentro del resumen, no en el carrito
   assert.match(p, /const CAPAS = \["cart", "resumen"\]/); // «Atrás» y Escape cierran el resumen primero

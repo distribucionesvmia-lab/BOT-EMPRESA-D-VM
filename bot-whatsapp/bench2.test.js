@@ -20,7 +20,7 @@ test("2. fila de producto en móvil en dos niveles: nombre arriba (hasta 3 líne
   assert.match(p, /html\[data-letra-grande\] \.pf-n \{ -webkit-line-clamp:4; \}/); // con la letra al 130 %
 });
 test("3. barra inferior: etiquetas de 12,5 px (12 en pantallas muy estrechas) y sin mayúsculas", () => {
-  assert.match(p, /\.tb-t \{ font-size:calc\(12\.5px \/ var\(--k,1\)\); text-transform:none;/); assert.match(p, /@media \(max-width:359px\) \{ \.tb-t \{ font-size:calc\(12px \/ var\(--k,1\)\);/);
+  assert.match(p, /\.tb-t \{ font-size:calc\(12\.5px \/ max\(var\(--k,1\), \.87\)\); text-transform:none;/); assert.match(p, /@media \(max-width:359px\) \{ \.tb-t \{ font-size:calc\(12px \/ var\(--k,1\)\);/);
 });
 test("4. contrastes: --tab-off y el texto «Imagen orientativa» ≥ 4,5:1 sobre los fondos donde se usan", () => {
   for (const h of [p, c]) assert.match(h, /--tab-off:#6E6E73/);

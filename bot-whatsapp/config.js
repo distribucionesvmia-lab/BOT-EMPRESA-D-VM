@@ -38,7 +38,7 @@ export const ayudaPublica = () => {
 };
 
 export const BUSINESS = {
-  name: "DistribucionesVM",
+  name: "Distribuciones Valentín Martín",
   currency: "€",
   info: "📍 Calle Ejemplo 123\n🕘 Lunes a viernes, 9:00–18:00\n🚚 Envíos a toda la ciudad en 24–48 h",
   priceNote: "Precios sin IVA; abajo tienes el total con IVA. Los confirmamos al preparar el pedido.",
