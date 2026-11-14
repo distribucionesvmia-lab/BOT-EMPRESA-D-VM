@@ -22,14 +22,21 @@ export function diaLimiteEdicion(deliveryDay, orderAtIso) {
   while (!isWorkday(d)) d = addDays(d, -1);
   return d;
 }
+const ABR = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+/** Hasta cuándo se podrá modificar un pedido con esa entrega: { dia, texto, corto } (o null sin fecha). Es LA misma regla que usa `puedeEditarPedido`. */
+export function plazoModificacion(deliveryDay, orderAtIso = new Date().toISOString(), nowIso = new Date().toISOString()) {
+  const dia = diaLimiteEdicion(deliveryDay, orderAtIso);
+  if (!dia) return null;
+  const hoy = madridDay(nowIso), cuando = dia === hoy ? "de hoy" : `del ${DIAS[weekday(dia)]}`;
+  return { dia, texto: `Puedes modificarlo hasta las ${LIMITE_EDICION_HORA}:00 ${cuando}`, corto: `${dia === hoy ? "hoy" : ABR[weekday(dia)]} ${LIMITE_EDICION_HORA}:00` };
+}
 /** ¿Se puede modificar? { ok, texto }: un pedido ya exportado al Excel no se puede editar. */
 export function puedeEditarPedido(order, nowIso = new Date().toISOString()) {
   if (!order || order.status === "cancelled" || order.export_status !== "pending") return { ok: false, texto: "" };
   const dia = diaLimiteEdicion(order.delivery_date, order.created_at);
   if (!dia) return { ok: true, texto: "" };
   const hoy = madridDay(nowIso), ok = hoy < dia || (hoy === dia && madridHour(nowIso) < LIMITE_EDICION_HORA);
-  const cuando = dia === hoy ? "de hoy" : `del ${DIAS[weekday(dia)]}`;
-  return { ok, texto: `Puedes modificarlo hasta las ${LIMITE_EDICION_HORA}:00 ${cuando}` };
+  return { ok, texto: plazoModificacion(order.delivery_date, order.created_at, nowIso)?.texto ?? "" };
 }
 
 export const MUNICIPIOS_HOY = ["47085"];

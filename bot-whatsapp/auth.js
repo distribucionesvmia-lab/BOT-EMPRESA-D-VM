@@ -164,14 +164,15 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         const customer = customers.getById(r.account.customerId);
         return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": cookie(r.token, 30 * 86400) }), true;
       }
-      if (empresa.trim().length < 2) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
-      // Teléfono + PIN + nombre de la empresa: el nombre debe coincidir con el del cliente guardado en la base de datos
+      // Teléfono + código: el nombre de la empresa solo se pide si hace falta (varios clientes comparten ese teléfono). Si se escribe, debe coincidir.
+      const sinNombre = empresa.trim().length < 2;
       const registrada = accounts.hasPhone(b.telefono);
-      let r = accounts.login(b.telefono, b.pin, undefined, (acc) => customers.nameMatches(customers.getById(acc.customerId), empresa));
+      if (sinNombre && !registrada && !customers.getByPhone(b.telefono)) return send(res, 409, { necesitaNombre: true, error: "Escribe también el nombre de tu empresa." }), true; // teléfono desconocido o compartido: misma respuesta (no se puede averiguar cuál)
+      let r = accounts.login(b.telefono, b.pin, undefined, (acc) => sinNombre || customers.nameMatches(customers.getById(acc.customerId), empresa));
       // Cliente habitual: el teléfono con el que suele contactar con nosotros (el de la lista de clientes) + la contraseña personal que eligió dentro de la aplicación
       if (!r.ok && !registrada && r.reason === "invalid" && validCode(b.pin)) {
         const c = customers.getByPhone(b.telefono);
-        if (c && customers.nameMatches(c, empresa)) r = accounts.loginCustomerCode(c.id, codeKey(b.pin));
+        if (c && (sinNombre || customers.nameMatches(c, empresa))) r = accounts.loginCustomerCode(c.id, codeKey(b.pin));
       }
       if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Teléfono, código de entrada o nombre de la empresa incorrectos. Usa el teléfono con el que sueles contactar con nosotros." }), true;
       const customer = customers.getById(r.account.customerId);

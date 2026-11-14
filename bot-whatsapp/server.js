@@ -27,7 +27,9 @@ const topIds = () => {
   }
   return topCache.ids;
 };
-const avisoEntrega = (customer) => ({ entregaHoy: entregaHoyDisponible(customer), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) });
+// Hasta cuándo se podrá cambiar un pedido hecho AHORA para cada día de reparto: la misma regla que el «Puedes modificarlo hasta…» de después de enviarlo
+const plazosDe = (ops) => Object.fromEntries(ops.map((o) => [o.date, plazoModificacion(o.date)]).filter(([, v]) => v).map(([d, v]) => [d, { texto: v.texto.replace(/^Puedes modificarlo/, "Podrás modificarlo"), corto: v.corto }]));
+const avisoEntrega = (customer) => ({ entregaHoy: entregaHoyDisponible(customer), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), plazos: plazosDe(deliveryOptions(undefined, { hoy: puedeHoy(customer) })), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) });
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { crearAvisos } from "./avisos.js";
@@ -40,7 +42,7 @@ import nodePath from "node:path";
 import { BUSINESS, AYUDA, ayudaPublica, condicionesPedido, envTexto } from "./config.js";
 import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
 import { categorizar } from "./categorias.js";
-import { puedeEditarPedido, weekday } from "./delivery.js";
+import { puedeEditarPedido, plazoModificacion, longDate, weekday } from "./delivery.js";
 const DIAS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
 if (process.env.DEMO === "1") {
@@ -422,6 +424,16 @@ function datosPdfComunes() {
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
 const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));
+// Pedidos de este cliente (y este teléfono) que todavía se pueden cambiar: para avisarle y dejarle AÑADIR en vez de duplicar
+function abiertosDe(account) {
+  const hoy = madridDay(), out = [];
+  for (const o of getDb().recentOrders(account.customerId, 10)) {
+    if (String(o.phone) !== String(account.phone) || !o.delivery_date || o.delivery_date < hoy) continue;
+    const pe = puedeEditarPedido(o); if (!pe.ok) continue;
+    out.push({ ref: o.ref, entrega: o.delivery_date, entregaTexto: longDate(o.delivery_date), hasta: pe.texto });
+  }
+  return out;
+}
 // Artículos que este cliente compró y ya no están en el catálogo (retirados o bloqueados): para ofrecerle uno parecido al repetir un pedido
 function retiradosDe(customer) {
   const activos = new Set(catalogNow().map((p) => String(p.id))), out = {};
@@ -601,6 +613,11 @@ async function appRoutes(req, res, url) {
       ayuda: ayudaPublica(),
     });
   }
+  if (p === "/catalogo/plazo" && req.method === "GET") { // hasta cuándo podrá cambiar un pedido hecho ahora para ese día (para el calendario de «Otro día»)
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const d = String(url.searchParams.get("dia") ?? ""), pz = /^\d{4}-\d{2}-\d{2}$/.test(d) ? plazoModificacion(d) : null;
+    return void sendJson(res, 200, pz ? { texto: pz.texto.replace(/^Puedes modificarlo/, "Podrás modificarlo"), corto: pz.corto } : { texto: "", corto: "" });
+  }
   if (p === "/catalogo/aviso" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     return void sendJson(res, 200, avisoEntrega(clienteConPedidos(account.customerId)));
@@ -621,6 +638,7 @@ async function appRoutes(req, res, url) {
       tree: webTree(catalogNow()), accesos: accesosDe(webTree(catalogNow())),
       top: topIds(),
       retirados: retiradosDe(customer),
+      abiertos: abiertosDe(account),
       ...avisoEntrega(customer),
     });
   }

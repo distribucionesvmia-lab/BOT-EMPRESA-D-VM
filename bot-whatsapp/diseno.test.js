@@ -195,7 +195,7 @@ test("chat: los atajos son botones pequeños (44 px, ancho a su texto), sin lín
 
 test("acceso (tanda 1): NIF primero, validación propia en español, aviso de los 6 primeros dígitos, error que se borra al editar, cerrar sesión en Mi cuenta, invitado sin 401", () => {
   const cli = leer("./cliente.html");
-  assert.match(cli, /<form class="vm-card" id="f-acceso" autocomplete="off" novalidate>/); // sin avisos nativos del navegador en inglés
+  assert.match(cli, /<form class="vm-card" id="f-acceso" novalidate>/); // sin avisos nativos del navegador en inglés; sin autocomplete="off" (el móvil puede recordar el teléfono y el código)
   assert.match(cli, /id="m-nif" aria-pressed="true">Entrar con mi NIF</); assert.match(cli, /modoAcceso\(false\);\n\/\/ Validación con mensajes propios/);
   assert.match(cli, /id="a-nif" type="text" inputmode="numeric"/); assert.doesNotMatch(cli, /id="a-nif"[^>]*pattern=/);
   for (const m of ["Escribe los 6 primeros dígitos de tu DNI o CIF", "Formato incorrecto", "Solo cuentan los 6 primeros dígitos del DNI o CIF", "Las letras no cuentan", "Escribe el nombre de tu empresa."]) assert.ok(cli.includes(m), m);

@@ -606,6 +606,10 @@
   .req { color:var(--accent); } .req-nota { margin:0; font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text-2); }
   .err-campo { color:var(--accent); font-weight:600; font-size:calc(var(--t-cap) / var(--k,1)); min-height:0; } .err-campo:empty { display:none; }
   .vm input[aria-invalid="true"], .vm-modal input[aria-invalid="true"] { box-shadow:0 0 0 2px var(--accent); }
+  .acc-contacto { margin:0; font-size:calc(var(--t-sec) / var(--k,1)); color:var(--text-2); } .acc-contacto a { color:var(--accent); font-weight:600; text-decoration:none; display:inline-block; min-height:44px; line-height:44px; }
+  .acc-olvido { margin:0; } .acc-olvido .vm-link { min-height:44px; text-align:left; padding:0; }
+  .in-codigo { background:var(--accent-soft); border-radius:var(--r-card); padding:var(--s4); display:flex; flex-direction:column; gap:var(--s2); }
+  .in-codigo p { margin:0; font-size:calc(var(--t-sec) / var(--k,1)); } .in-codigo .fila { display:flex; gap:var(--s2); } .in-codigo .vm-btn { flex:1; min-height:44px; }
   .acc-ayuda { display:flex; flex-direction:column; gap:var(--s1); margin:0; } .acc-ayuda .vm-link { min-height:44px; text-align:left; padding:0; }
 
   /* ═══ Tanda 15: contraste del tema oscuro (≥ 4,5:1) y contraste alto ═══ */
@@ -642,16 +646,18 @@
         <p>Haz tu pedido en un momento, desde el móvil o el ordenador.</p>
       </header>
 
-      <form class="vm-card" id="f-acceso" autocomplete="off" novalidate>
+      <form class="vm-card" id="f-acceso" novalidate>
         <span class="tag">Cliente habitual</span>
         <h2>Inicia sesión</h2>
+        <p class="acc-contacto" id="acc-contacto" hidden></p>
         <p class="acc-ayuda"><button class="vm-link" type="button" id="no-entro">¿No puedes entrar? Llámanos o escríbenos</button><button class="vm-link" type="button" id="ir-registro-2">¿Cliente nuevo? Solicitar acceso</button></p>
         <div class="acc-modo" role="group" aria-label="Cómo quieres entrar"><button type="button" id="m-nif" aria-pressed="true">Entrar con mi NIF</button><button type="button" id="m-tel" aria-pressed="false">Teléfono y código</button></div>
         <p id="t-tel">Entra con el <b>teléfono que usas habitualmente para contactar con nosotros</b> y tu código de entrada.</p>
         <p id="t-nif" hidden>Solo para <b>clientes habituales</b>: entra con los <b>6 primeros dígitos de tu DNI o CIF</b> (en un CIF, los 6 primeros números, sin la letra). Una vez dentro podrás <b>poner un código de entrada personal</b> y entrar después con tu teléfono.</p>
         <label id="l-tel">Teléfono con el que sueles contactar con nosotros<input id="a-tel" type="tel" inputmode="tel" autocomplete="tel"></label>
         <label id="l-pin">Código de entrada de 6 letras o números<input id="a-pin" type="password" pattern="[A-Za-z0-9]{6}" maxlength="6" autocapitalize="off" autocomplete="current-password"></label>
-        <label id="l-emp">Nombre de tu empresa<input id="a-emp" maxlength="80" autocomplete="organization"></label>
+        <p class="acc-olvido" id="l-olvido"><button class="vm-link" type="button" id="olvido">¿No recuerdas tu código de entrada? Llámanos y lo solucionamos</button></p>
+        <label id="l-emp" hidden>Nombre de tu empresa <small class="pista">(solo si te lo pedimos)</small><input id="a-emp" maxlength="80" autocomplete="organization"></label>
         <label id="l-nif" hidden>Primeros 6 dígitos del DNI o CIF (o tu código de entrada)<input id="a-nif" type="text" inputmode="numeric" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 123456" aria-describedby="a-aviso a-err"></label>
         <div class="pista" id="a-aviso" role="status" aria-live="polite"></div>
         <button class="vm-link" type="button" id="nif-letras" hidden>Mi código tiene letras: usar el teclado completo</button>
@@ -831,7 +837,7 @@ const chat = $("chat"), sheet = $("sheet");
 
 function ver(v) { for (const id of ["acceso", "registro", "chatbox"]) $(id).hidden = id !== v; document.body.classList.toggle("app", v === "chatbox"); }
 $("ir-registro").onclick = $("ir-registro-2").onclick = () => ver("registro");
-$("no-entro").onclick = () => abrirAyuda(AYUDA, "");
+$("no-entro").onclick = $("olvido").onclick = () => abrirAyuda(AYUDA, "");
 $("ir-acceso").onclick = () => ver("acceso");
 
 // DNI, NIE y CIF: formato y letra de control (en español, mientras se escribe)
@@ -892,7 +898,7 @@ const limpia = (id) => $(id).value.replace(/[^A-Za-z0-9]/g, "");
 function modoAcceso(pin) {
   conPin = pin;
   $("t-tel").hidden = !pin; $("t-nif").hidden = pin;
-  $("l-nif").hidden = pin; $("l-tel").hidden = !pin; $("l-pin").hidden = !pin; $("l-emp").hidden = !pin; if (!pin) $("a-emp").value = "";
+  $("l-nif").hidden = pin; $("l-tel").hidden = !pin; $("l-pin").hidden = !pin; $("l-olvido").hidden = !pin; if (!pin) { $("l-emp").hidden = true; $("a-emp").value = ""; }
   $("nif-letras").hidden = pin; $("a-aviso").textContent = "";
   $("m-nif").setAttribute("aria-pressed", String(!pin)); $("m-tel").setAttribute("aria-pressed", String(pin));
   $("a-err").textContent = ""; marcaError(null);
@@ -924,18 +930,18 @@ function validaAcceso() {
   }
   if (!$("a-tel").value.trim()) return fallo("a-tel", "Escribe el teléfono con el que sueles contactar con nosotros.");
   if (limpia("a-pin").length !== 6) return fallo("a-pin", $("a-pin").value ? "El código de entrada tiene 6 letras o números." : "Escribe tu código de entrada de 6 letras o números.");
-  if ($("a-emp").value.trim().length < 2) return fallo("a-emp", "Escribe el nombre de tu empresa.");
+  if (!$("l-emp").hidden && $("a-emp").value.trim().length < 2) return fallo("a-emp", "Escribe el nombre de tu empresa.");
   return true;
 }
 $("f-acceso").onsubmit = (e) => {
   e.preventDefault(); $("a-err").textContent = "";
   if (!validaAcceso()) return;
   return enviando($("f-acceso"), $("f-acceso").querySelector("button.primary"), async () => {
-  const body = conPin ? { telefono: $("a-tel").value, empresa: $("a-emp").value, pin: $("a-pin").value } : { nif: limpia("a-nif"), ...(!$("l-emp").hidden && { empresa: $("a-emp").value }) };
+  const body = conPin ? { telefono: $("a-tel").value, ...(!$("l-emp").hidden && { empresa: $("a-emp").value }), pin: $("a-pin").value } : { nif: limpia("a-nif"), ...(!$("l-emp").hidden && { empresa: $("a-emp").value }) };
   const r = await post("/api/acceso", body);
   const j = await r.json().catch(() => ({}));
-  if (j.necesitaNombre) { $("l-emp").hidden = false; $("a-emp").required = true; $("a-emp").focus(); $("a-err").textContent = j.error; return; } // mismo NIF en varios negocios: pide el nombre
-  if (!r.ok) { const f = $("f-acceso"); f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); $("a-err").textContent = j.error || "No se pudo entrar."; $("a-pin").value = ""; $("a-nif").value = ""; $("a-aviso").textContent = ""; return; }
+  if (j.necesitaNombre) { $("l-emp").hidden = false; $("a-emp").required = true; $("a-emp").focus(); $("a-err").textContent = j.error; return; } // se conserva lo escrito // mismo NIF en varios negocios: pide el nombre
+  if (!r.ok) { const f = $("f-acceso"); f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); $("a-err").textContent = j.error || "No se pudo entrar."; if (conPin) { $("a-pin").value = ""; $("a-pin").focus(); } return; } // solo se borra el código si es incorrecto; el teléfono, el nombre y el NIF se quedan para corregirlos
   $("f-acceso").reset(); $("a-aviso").textContent = ""; entrar(j.cliente.nombre);
   }, "a-err");
 };
@@ -952,7 +958,7 @@ $("f-codigo").onsubmit = async (e) => {
   const r = await post("/api/codigo", { nuevo: $("c-nuevo").value });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { $("c-err").textContent = j.error || "No se pudo cambiar el código de entrada."; return; }
-  $("c-ok").textContent = "Listo: desde ahora entras con tu nuevo código de entrada."; $("f-codigo").reset();
+  $("c-ok").textContent = "Listo: desde ahora entras con tu nuevo código de entrada."; $("f-codigo").reset(); yoCache = null; document.querySelectorAll(".in-codigo").forEach((k) => k.remove());
   setTimeout(() => ($("m-codigo").hidden = true), 1800);
 };
 
@@ -1268,6 +1274,7 @@ const diaSemanaDe = (iso) => { try { return new Intl.DateTimeFormat("es-ES", { t
 document.addEventListener("load", (e) => { if (e.target && e.target.tagName === "IMG") e.target.classList.add("cargada"); }, true); // fundido de las fotos
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 const flecha = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+let yoCache = null; const cargaYo = () => (yoCache ??= fetch("/api/yo").then((r) => (r.ok ? r.json() : null)).then((j) => j?.cliente ?? null).catch(() => null));
 function inicio(ui) {
   window.__saludo = null;
   window.__catUrl = ui.url || "/catalogo";
@@ -1281,6 +1288,14 @@ function inicio(ui) {
   const esq = el("div", "in-esq"); esq.setAttribute("aria-hidden", "true"); // esqueletos mientras llegan «Ofertas», «Lo que sueles pedir» y las categorías
   esq.innerHTML = '<div class="sk in-esq-t"></div><div class="in-esq-f">' + '<div class="sk in-esq-c"></div>'.repeat(3) + '</div>'; secciones.appendChild(esq);
   const quitaEsq = () => esq.remove();
+  cargaYo().then((y) => { // entró con el NIF y aún no tiene código personal: se le ofrece (una vez; «Ahora no» lo recuerda en este móvil)
+    let no = false; try { no = localStorage.getItem("vm:codigo-no") === "1"; } catch {}
+    if (!y || y.codigoPropio !== false || no || c.querySelector(".in-codigo")) return;
+    const k = el("div", "in-codigo"); k.setAttribute("role", "region"); k.setAttribute("aria-label", "Pon tu código de entrada personal");
+    const fila = el("div", "fila"), si = el("button", "vm-btn primary", "Poner mi código"), nop = el("button", "vm-btn ghost", "Ahora no"); si.type = nop.type = "button";
+    si.onclick = () => $("cambiar").click(); nop.onclick = () => { try { localStorage.setItem("vm:codigo-no", "1"); } catch {} k.remove(); };
+    fila.append(si, nop); k.append(el("p", null, "Entra más rápido y más seguro: elige un código personal de 6 letras o números y úsalo con tu teléfono."), fila); c.insertBefore(k, sal.nextSibling);
+  });
   const hacer = el("button", "vm-btn primary in-hacer", "Hacer pedido"); hacer.type = "button"; hacer.onclick = () => enviar("h:open", "Hacer pedido"); // lo contesta el asistente (con el aviso de «entrega hoy» si toca) y abre el catálogo
   // Tu pedido de siempre (o «Empieza tu primer pedido»)
   const ids = [];
@@ -1450,7 +1465,14 @@ function abrirAyuda(a, nombre) {
   arrastrable(c, cerrar); x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
   c.appendChild(x); f.appendChild(c); document.body.appendChild(f); (c.querySelector("a") || x).focus();
 }
-let AYUDA = null; fetch("/api/ayuda").then((r) => r.json()).then((j) => { AYUDA = j.ayuda; }).catch(() => {});
+let AYUDA = null; fetch("/api/ayuda").then((r) => r.json()).then((j) => { AYUDA = j.ayuda; pintaContactoAcceso(); }).catch(() => {});
+function pintaContactoAcceso() { // teléfono y WhatsApp visibles ya en la portada (no hace falta pulsar nada para tenerlos)
+  const p = $("acc-contacto"), a = AYUDA; if (!p) return; p.textContent = "";
+  if (!a || !(a.telHref || a.whatsappHref)) { p.hidden = true; return; }
+  p.append("¿Dudas? "); const l = (t, h, ext) => { const e = document.createElement("a"); e.href = h; e.textContent = t; if (ext) { e.target = "_blank"; e.rel = "noopener"; } return e; };
+  if (a.telHref) p.append(l("Llámanos" + (a.tel ? " al " + a.tel : ""), a.telHref)); if (a.telHref && a.whatsappHref) p.append(" · ");
+  if (a.whatsappHref) p.append(l("WhatsApp", a.whatsappHref, true)); p.hidden = false;
+}
 $("ayuda-menu").onclick = () => { menu(false); abrirAyuda(AYUDA, $("hola")?.textContent || ""); };
 window.vmLetra.control($("letraChat"), "boton"); // botón circular «Aa» en la cabecera: abre el control de letra directamente
 { // título grande → título pequeño centrado en la barra translúcida al bajar por la conversación (con histéresis para que no parpadee)
@@ -1471,7 +1493,7 @@ function ajustaCuenta() {
   b.classList.remove("solo-icono"); if (bar.scrollWidth > bar.clientWidth + 1) b.classList.add("solo-icono");
 }
 try { const bar = document.querySelector("#chatbox .bar"); if (bar) { new ResizeObserver(ajustaCuenta).observe(bar); new MutationObserver(ajustaCuenta).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] }); } } catch {}
-function entrar(nombre) { $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
+function entrar(nombre) { yoCache = null; $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
 
 (async () => {
   const r = await fetch("/api/yo").catch(() => null);

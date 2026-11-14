@@ -111,7 +111,10 @@ test("ALTA PENDIENTE: si no coincide, la empresa ve la solicitud con lo que enca
 });
 
 test("ACCESO: pide teléfono, nombre de la empresa y PIN, y el nombre se compara con la base de datos", async () => {
-  assert.equal((await call("POST", "/api/acceso", { body: { telefono: "600000001", pin: "111111" } })).status, 400); // falta la empresa
+  const sinNombre = await call("POST", "/api/acceso", { body: { telefono: "600000001", pin: "111111" } });
+  assert.equal(sinNombre.status, 200); // teléfono único: no hace falta el nombre de la empresa (solo se pide si hace falta)
+  assert.equal((await call("POST", "/api/acceso", { body: { telefono: "699999999", pin: "111111" } })).json.necesitaNombre, true); // teléfono desconocido o compartido: se pide el nombre
+  assert.equal((await call("POST", "/api/acceso", { body: { telefono: "600000001", pin: "999999" } })).status, 401); // código incorrecto
   const bien = await entrar("600000001", "Bar El Ejemplo", "111111");
   assert.equal(bien.status, 200);
   assert.match(bien.login.setCookie, /HttpOnly/);
@@ -967,6 +970,25 @@ test("PEDIDO DE SIEMPRE: el cliente lo puede editar, borrar y recuperar, sin env
   const ini3 = await inicio(A); assert.equal(ini3.ui?.siempre, "auto"); assert.ok(ini3.ui.last.lineas.length >= 1);
   // nada de esto crea ni borra pedidos
   assert.equal((await call("GET", "/api/mi-cuenta", { cookie: A })).json.pedidos.length, pedidosAntes);
+});
+
+test("BENCH 4: /catalogo/datos trae los pedidos abiertos (solo los suyos) y la hora límite de cada día, con la misma regla que «hasta»", async () => {
+  const A = cookieOf(await entrarNif("111111"));
+  const B = cookieOf(await entrarNif("122222", "bar dos"));
+  const dia = (() => { let d = new Date(Date.now() + 20 * 86_400_000); while ([0, 6].includes(d.getUTCDay())) d = new Date(d.getTime() + 86_400_000); return d.toISOString().slice(0, 10); })();
+  const r = await call("POST", "/catalogo", { cookie: A, body: { key: "bench4-abierto-1", lines: [{ id: "1010", qty: 1 }], delivery: dia } });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  const dA = (await call("GET", "/catalogo/datos", { cookie: A })).json, dB = (await call("GET", "/catalogo/datos", { cookie: B })).json;
+  const ab = dA.abiertos.find((x) => x.ref === r.json.ref);
+  assert.ok(ab, "su pedido sin exportar sale como abierto"); assert.equal(ab.entrega, dia); assert.match(ab.hasta, /^Puedes modificarlo hasta las 10:00 del /); assert.match(ab.entregaTexto, /^\p{L}+ \d+ de \p{L}+$/u);
+  assert.equal(r.json.modificable, ab.hasta); // idéntico al texto que sale tras enviar
+  assert.equal(dB.abiertos.some((x) => x.ref === r.json.ref), false, "otro cliente no ve pedidos ajenos");
+  const fechas = dA.delivery.map((o) => o.date);
+  assert.deepEqual(Object.keys(dA.plazos).sort(), [...fechas].sort());
+  for (const d of fechas) { assert.match(dA.plazos[d].texto, /^Podrás modificarlo hasta las 10:00 (del \p{L}+|de hoy)$/u); assert.match(dA.plazos[d].corto, /^(hoy|\p{L}+) 10:00$/u); }
+  const pz = (await call("GET", "/catalogo/plazo?dia=" + dia, { cookie: A })).json; assert.equal(pz.texto, ab.hasta.replace("Puedes", "Podrás")); // el calendario usa la misma regla
+  assert.deepEqual((await call("GET", "/catalogo/plazo?dia=basura", { cookie: A })).json, { texto: "", corto: "" });
+  assert.equal((await call("GET", "/catalogo/plazo?dia=" + dia)).status, 401);
 });
 
 test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repetir o añadir), nunca los de otro ni su NIF", async () => {

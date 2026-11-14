@@ -904,6 +904,11 @@
   .dchip:active { transform:scale(.97); }
   .dchip.on { background:var(--text); color:var(--surface); } .dchip.on small { color:var(--surface); opacity:.85; }
   #diaInfo:empty { display:none; }
+  .aviso.abierto { border-radius:var(--r-card); display:flex; flex-direction:column; gap:var(--s2); align-items:flex-start; }
+  .aviso.abierto[hidden], .dia-aviso[hidden] { display:none; }
+  .aviso.abierto .vm-lnk, .dia-aviso .vm-lnk { min-height:44px; padding:0 var(--s4); border:0; border-radius:var(--r-pill); background:var(--accent); color:var(--on-accent); font:inherit; font-weight:600; }
+  .dia-aviso { margin-top:var(--s2); padding:var(--s3); border-radius:var(--r-field); background:var(--accent-soft); color:var(--text); display:flex; flex-direction:column; gap:var(--s2); align-items:flex-start; }
+  .dchip small.lim { white-space:normal; font-size:calc(11.5px / var(--k,1)); line-height:1.2; }
   .ped-res .rr { display:flex; justify-content:space-between; gap:var(--s3); padding:var(--s2) 0; font-size:calc(var(--t-sec) / var(--k,1)); color:var(--text-2); font-variant-numeric:tabular-nums; }
   .ped-res .rr b { color:var(--text); font-weight:600; }
   .ped-res .rr[hidden] { display:none; }
@@ -1298,6 +1303,7 @@
   </header>
   <div class="titulo-bloque"><h1 class="titulo-grande">Catálogo</h1><p class="titulo-sub" id="ttl">Cargando…</p><small id="sub" hidden></small></div>
   <div class="aviso" id="avisoHoy" role="status" aria-live="polite" hidden>Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
+  <div class="aviso abierto" id="abierto" role="status" aria-live="polite" hidden></div>
   <div class="guia" id="guia" aria-live="polite">Toca <b>«+»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.</div>
   <div class="buscar"><svg class="lupa" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.500" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.500 4.500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><input id="q" type="search" placeholder="Buscar productos" autocomplete="off" aria-label="Buscar un producto" aria-controls="sugs" aria-expanded="false"><button type="button" class="vozbtn" id="vozBtn" aria-label="Buscar con la voz" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.500 11a6.500 6.500 0 0 0 13 0M12 17.500V21"/></svg></button><div id="sugs" class="sugs" role="listbox" aria-label="Sugerencias" hidden></div></div>
   <!-- Filtro de ida y vuelta, solo en la pestaña «Histórico» (data-t="hab") -->
@@ -1317,6 +1323,7 @@
   <section class="screen" id="cart" hidden aria-label="Pedido">
     <div class="ped-cab"><h2 class="ped-tit">Pedido</h2><p class="ped-sub" id="cartCount"></p></div>
     <div class="aviso" id="modBanner" role="status" aria-live="polite" hidden></div>
+    <div class="aviso abierto" id="abierto2" role="status" aria-live="polite" hidden></div>
     <div class="aviso" id="avisoHoy2" role="status" aria-live="polite" hidden>Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
     <div class="body cartbody">
       <div id="cartLines"></div>
@@ -1333,7 +1340,7 @@
         <label class="dirchk" id="dirGuardarLbl" hidden><input type="checkbox" id="dirGuardar"><span>Guardar esta dirección para próximos pedidos</span></label>
       </div>
       <div class="aviso aviso-min" id="avisoMin" role="status" aria-live="polite" hidden></div>
-      <div class="ped-dias" id="pedDias"><div class="ctit" id="diaTit">¿Qué día lo quieres?</div><div class="dchips" id="diaChips" role="radiogroup" aria-label="Día de entrega"></div><div class="nota" id="diaInfo" role="status" aria-live="polite"></div></div>
+      <div class="ped-dias" id="pedDias"><div class="ctit" id="diaTit">¿Qué día lo quieres?</div><div class="dchips" id="diaChips" role="radiogroup" aria-label="Día de entrega"></div><div class="nota" id="diaInfo" role="status" aria-live="polite"></div><div class="nota dia-aviso" id="diaAviso" role="status" aria-live="polite" hidden></div></div>
       <div class="card"><label for="note" class="ctit">Observaciones del pedido</label><textarea id="note" placeholder="Ej.: avísame por teléfono antes de entregar (opcional)" maxlength="200" aria-describedby="noteCnt"></textarea><div class="note-cnt" id="noteCnt" aria-live="polite">0/200</div></div>
       <div class="card fijo-card" id="fijoCard" hidden>
         <div class="ctit">Pedido fijo semanal <span class="fijo-aviso">No envía este pedido</span></div>
@@ -2300,7 +2307,7 @@ async function modificar(ref) {
   for (const l of j.lineas) { if (!productoPorId.has(l.id)) { falta++; continue; } { const pr = productoPorId.get(l.id); const enCajas = l.unit === "caja" || (pr && pr.soloCaja); qty.set(l.id, enCajas && l.unit !== "caja" && pr ? Math.ceil(l.qty / pr.unitsPerBox) : l.qty); unitOf.set(l.id, enCajas ? "caja" : "ud"); } if (l.note) notes.set(l.id, l.note); }
   modificando = { ref: j.ref, hasta: j.hasta };
   $("note").value = j.nota || ""; if (j.direccion) { document.querySelector('input[name="addrmode"][value="otra"]').checked = true; $("addrOtra").value = j.direccion; } pintarDireccion();
-  $("modBanner").hidden = false; $("modBanner").textContent = `Estás modificando el pedido ${j.ref}. ${j.hasta}.`;
+  $("modBanner").hidden = false; $("modBanner").textContent = `Estás modificando el pedido ${j.ref}. ${j.hasta}.`; pintarAbierto(); pintarAvisoDia();
   $("done").hidden = true; $("confirm").disabled = false; pedidoEnviado = false; refresh(); showCart(true);
   if (falta) aviso(falta === 1 ? "1 artículo ya no está disponible." : falta + " artículos ya no están disponibles.");
 }
@@ -2621,20 +2628,68 @@ function pintarDias() {
   $("pedDias").hidden = !ops.length;
   if (diaElegido && !ops.some(o => o.date === diaElegido) && !diaPersonal) diaElegido = null;
   if (!diaElegido && !diaPersonal && !diaSinPre && ops.length) diaElegido = (ops.find(o => o.kind !== "hoy") || ops[0]).date; // el primer día de reparto ya viene marcado (nunca «Hoy» sin querer); se cambia con un toque
-  const ficha = (titulo, sub, activa, onclick, id) => {
+  const ficha = (titulo, sub, activa, onclick, id, lim) => {
     const b = document.createElement("button"); b.type = "button"; b.className = "dchip" + (activa ? " on" : ""); if (id) b.id = id;
     b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(!!activa));
     const t = document.createElement("b"); t.textContent = titulo; b.appendChild(t);
     if (sub) { const m = document.createElement("small"); m.textContent = sub; b.appendChild(m); }
+    if (lim) { const m = document.createElement("small"); m.className = "lim"; m.textContent = "Cambios hasta " + lim; b.appendChild(m); b.setAttribute("aria-label", `${titulo} ${sub || ""}. Podrás modificarlo hasta ${lim}`.replace(/\s+/g, " ")); }
     b.onclick = onclick; box.appendChild(b);
   };
   for (const o of ops) {
     const [titulo, sub] = o.kind === "dia" ? [o.label.split(" ")[0].replace(/^./, c => c.toUpperCase()), o.label.split(" ").slice(1).join(" ")] : [o.label, o.detail.replace(/^[^ ]+ /, "")];
-    ficha(titulo, sub, diaElegido === o.date, () => { diaPersonal = false; elegirDia(o.date); });
+    ficha(titulo, sub, diaElegido === o.date, () => { diaPersonal = false; elegirDia(o.date); }, null, data.plazos?.[o.date]?.corto);
   }
   const otro = diaPersonal && diaElegido ? largo(diaElegido).replace(/^./, c => c.toUpperCase()) : null;
   ficha("Otro día", otro ? otro.split(" ").slice(1).join(" ") : "Calendario", !!otro, abrirCal, "otroDia");
   $("diaInfo").textContent = diaElegido ? "Entrega: " + largo(diaElegido).replace(/^./, c => c.toUpperCase()) + (diaPersonal ? "" : ". Cámbialo si prefieres otro día.") : "Elige un día: es obligatorio para enviar el pedido.";
+  pintarPlazo(); pintarAvisoDia();
+}
+// Hora límite para cambiar el pedido: la calcula el servidor (la misma regla que «Puedes modificarlo hasta…» después de enviar)
+const plazoCache = new Map();
+function plazoDe(date) { // texto ya sabido (botones) o pedido al servidor (calendario «Otro día»); null si aún no se sabe
+  if (!date) return null; const k = data.plazos?.[date]; if (k) return k;
+  if (plazoCache.has(date)) return plazoCache.get(date) || null;
+  plazoCache.set(date, null);
+  fetch("/catalogo/plazo?dia=" + encodeURIComponent(date)).then(r => (r.ok ? r.json() : null)).then(j => { plazoCache.set(date, j && j.texto ? j : false); if (diaElegido === date) { pintarPlazo(); } }).catch(() => {});
+  return null;
+}
+function pintarPlazo() {
+  const pz = plazoDe(diaElegido);
+  $("plazo").textContent = pz ? pz.texto + ". Después de enviarlo lo verás también aquí." : "Después de enviarlo verás hasta cuándo puedes modificarlo.";
+}
+// Pedido ya enviado que se puede cambiar: se avisa donde se compra y se deja AÑADIR a él (sin duplicar el envío)
+function abiertosDeDia(date) { return (data.abiertos || []).filter(a => a.entrega === date); }
+function anadirAPedido(ref) {
+  const snapQty = new Map(qty), snapUnit = new Map(unitOf), snapNotes = new Map(notes);
+  return modificar(ref).then(() => {
+    if (!modificando || modificando.ref !== ref) return; // no se ha podido abrir: el carrito se queda como estaba
+    let cambiadas = 0;
+    for (const [id, q] of snapQty) {
+      if (!productoPorId.has(id)) continue;
+      if (!qty.has(id)) { qty.set(id, q); unitOf.set(id, snapUnit.get(id) || "ud"); if (snapNotes.get(id)) notes.set(id, snapNotes.get(id)); }
+      else if ((unitOf.get(id) || "ud") === (snapUnit.get(id) || "ud")) qty.set(id, Math.min(999, qty.get(id) + q));
+      else { cambiadas++; continue; }
+    }
+    refresh(); aviso(cambiadas ? "Añadido a tu pedido. Revisa las cantidades de " + cambiadas + " artículo(s) con distinta unidad." : "Añadido a tu pedido " + ref + ". Revísalo y pulsa «Revisar pedido».");
+  });
+}
+function pintarAbierto() {
+  const ab = (data.abiertos || [])[0];
+  for (const id of ["abierto", "abierto2"]) {
+    const box = $(id); box.textContent = "";
+    if (!ab || modificando) { box.hidden = true; continue; }
+    const t = document.createElement("span"); t.textContent = `Ya tienes un pedido para el ${ab.entregaTexto.replace(/ de [a-zé]+$/, "")}. ${ab.hasta.replace(/^Puedes modificarlo/, "Se puede cambiar")}.`;
+    const b = document.createElement("button"); b.type = "button"; b.className = "vm-lnk"; b.textContent = "Añadir a ese pedido"; b.onclick = () => anadirAPedido(ab.ref);
+    box.append(t, b); box.hidden = false;
+  }
+}
+function pintarAvisoDia() {
+  const box = $("diaAviso"), ab = !modificando && abiertosDeDia(diaElegido)[0]; box.textContent = "";
+  if (!ab) { box.hidden = true; return; }
+  const t = document.createElement("span"); t.textContent = `Ya tienes un pedido para ese día (${ab.ref}). Si envías este, serán dos pedidos distintos. ${ab.hasta.replace(/^Puedes modificarlo/, "El otro se puede cambiar")}.`;
+  const b = document.createElement("button"); b.type = "button"; b.className = "vm-lnk"; b.textContent = "Añadir a ese pedido"; b.onclick = () => anadirAPedido(ab.ref);
+  box.append(t, b); box.hidden = false;
 }
 let diaPersonal = false;
 function elegirDia(date) { diaElegido = date; diaSinPre = false; $("err").textContent = ""; pintarDias(); }
@@ -2744,7 +2799,7 @@ async function refrescarEntrega() {
     const r = await fetch(location.pathname + "/aviso").catch(() => null);
     if (!r || !r.ok) return;
     const d = await r.json(), hoyViejo = data.today, teniaHoy = (data.delivery || []).some(o => o.kind === "hoy");
-    Object.assign(data, { entregaHoy: d.entregaHoy, delivery: d.delivery, today: d.today, minDate: d.minDate });
+    Object.assign(data, { entregaHoy: d.entregaHoy, delivery: d.delivery, plazos: d.plazos, today: d.today, minDate: d.minDate });
     pintarAviso();
     const quedaHoy = data.delivery.some(o => o.kind === "hoy");
     if (teniaHoy && !quedaHoy) { // pasaron las 10:00 mientras elegía: «Hoy» desaparece y, si la tenía elegida, se le dice claro
@@ -2804,7 +2859,7 @@ obs.observe(document.body, { childList: true }); // ayuda y preguntas aparecen y
   if (!r.ok) { $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 primeros dígitos de tu DNI</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
   data = await r.json();
   data.products.forEach(p => productoPorId.set(p.id, p));
-  pintarAviso();
+  pintarAviso(); pintarAbierto();
   window.vmLetra.control($("letraBox"), "boton");
   if (data.ayuda) { $("ayudaBtn").hidden = false; $("ayudaBtn").onclick = () => abrirAyuda(data.ayuda, data.customer.name); }
   
