@@ -89,6 +89,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   // Pedido fijo semanal (F-16): la plantilla de líneas y los días de reparto; NUNCA se envía solo, el cliente la revisa cada día que toca
   db.exec("CREATE TABLE IF NOT EXISTS standing_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, days TEXT NOT NULL, paused INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)");
   db.exec("CREATE TABLE IF NOT EXISTS reminders (customer_id TEXT NOT NULL, day TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY (customer_id, day))"); // day = '' para «no avisar más»
+  db.exec("CREATE TABLE IF NOT EXISTS delivery_addresses (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL)"); // direcciones de entrega que el cliente guarda para otras veces (máx. 5)
+  db.exec("CREATE INDEX IF NOT EXISTS delivery_addresses_cliente ON delivery_addresses (customer_id)");
   db.exec("CREATE TABLE IF NOT EXISTS favorites (customer_id TEXT NOT NULL, product_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (customer_id, product_id))");
   // Avisos al móvil (Web Push): un registro por navegador/móvil del cliente que los ha activado; claves VAPID y registro de avisos de la empresa
   db.exec("CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, customer_id TEXT NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, created_at TEXT NOT NULL)");
@@ -180,6 +182,18 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
 
     /** ¿Esta cuenta ya cambió el código del NIF por uno personal? Entonces el NIF deja de valer para entrar. */
     /** Ids de los productos favoritos del cliente (los más recientes primero). */
+    /** Direcciones de entrega guardadas del cliente (las más recientes primero). */
+    addresses: (customerId) => db.prepare("SELECT id, text FROM delivery_addresses WHERE customer_id = ? ORDER BY id DESC").all(String(customerId)).map((r) => ({ id: r.id, texto: r.text })),
+    /** Guarda una dirección (máx. 5; si ya está igual, no la repite). Devuelve { ok, id } o { ok:false, error }. */
+    addAddress(customerId, texto, now = new Date().toISOString()) {
+      const c = String(customerId), t = String(texto ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+      if (t.length < 5 || t.length > 160) return { ok: false, error: "Escribe la dirección completa (calle, número y localidad)." };
+      const ya = db.prepare("SELECT id FROM delivery_addresses WHERE customer_id = ? AND lower(text) = lower(?)").get(c, t);
+      if (ya) return { ok: true, id: ya.id };
+      if (db.prepare("SELECT COUNT(*) AS n FROM delivery_addresses WHERE customer_id = ?").get(c).n >= 5) return { ok: false, error: "Ya tienes 5 direcciones guardadas. Quita alguna para guardar otra." };
+      return { ok: true, id: Number(db.prepare("INSERT INTO delivery_addresses (customer_id, text, created_at) VALUES (?, ?, ?)").run(c, t, now).lastInsertRowid) };
+    },
+    removeAddress: (customerId, id) => db.prepare("DELETE FROM delivery_addresses WHERE customer_id = ? AND id = ?").run(String(customerId), Number(id)).changes > 0,
     favorites: (customerId) => db.prepare("SELECT product_id FROM favorites WHERE customer_id = ? ORDER BY created_at DESC, rowid DESC").all(String(customerId)).map((r) => r.product_id),
     /** Marca o desmarca un favorito. Máximo 300 por cliente. Devuelve false si se pasa del máximo. */
     setFavorite(customerId, productId, on, now = new Date().toISOString()) {
@@ -406,6 +420,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       try {
         dropSessions.run(row.id);
         db.prepare("DELETE FROM favorites WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM delivery_addresses WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM standing_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM push_subs WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM registrations WHERE customer_id = ? OR (phone = ? AND ? IS NOT NULL)").run(row.customer_id, row.phone, row.phone);

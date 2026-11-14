@@ -1019,6 +1019,16 @@
   #cart .cartbody > .card, #cart .cartbody > .ped-res, #cart .cartbody > .tl-wrap, #cart #cartLines > .tl-wrap, #cart #cartLines > .falta { margin-left:0; margin-right:0; width:100%; box-sizing:border-box; }
   #cart .dchips { margin-right:calc(-1 * var(--gutter)); padding-right:var(--gutter); }
   .falta-fila .falta-av img { position:absolute; inset:0; margin:auto; width:auto; height:auto; max-width:82%; max-height:82%; background:none; }
+
+  /* Direcciones guardadas */
+  .dirguard { display:flex; flex-direction:column; gap:var(--s2); margin-top:var(--s3); }
+  .dirfila { display:flex; align-items:stretch; gap:var(--s2); }
+  .dirop { flex:1; min-width:0; min-height:48px; padding:var(--s2) var(--s4); border:0; border-radius:var(--r-field); background:var(--fill); color:var(--text); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); text-align:left; overflow-wrap:anywhere; cursor:pointer; }
+  .dirop[aria-pressed="true"] { background:var(--accent-soft); color:var(--accent); font-weight:600; box-shadow:inset 0 0 0 1.5px var(--accent); }
+  .dirquita { flex:none; min-height:48px; padding:0 var(--s3); border:0; border-radius:var(--r-field); background:none; color:var(--text-2); font:inherit; font-size:calc(var(--t-cap) / var(--k,1)); font-weight:600; cursor:pointer; }
+  .dirchk { display:flex; align-items:center; gap:var(--s3); min-height:44px; margin-top:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); color:var(--text); }
+  .dirchk input { width:22px; height:22px; accent-color:var(--accent); }
+  .dirguard[hidden], .dirchk[hidden] { display:none; }
 </style>
 </head>
 <body>
@@ -1065,6 +1075,8 @@
           <label class="addrop"><input type="radio" name="addrmode" value="otra"><span>En otra dirección distinta</span></label>
         </div>
         <input id="addrOtra" type="text" maxlength="160" autocomplete="street-address" placeholder="Calle, número y localidad" aria-label="Dirección de entrega" aria-describedby="errDir" hidden><div class="err-campo" id="errDir" role="alert"></div>
+        <div id="dirGuardadas" class="dirguard" role="group" aria-label="Tus direcciones guardadas" hidden></div>
+        <label class="dirchk" id="dirGuardarLbl" hidden><input type="checkbox" id="dirGuardar"><span>Guardar esta dirección para próximos pedidos</span></label>
       </div>
       <div class="ped-dias" id="pedDias"><div class="ctit" id="diaTit">¿Qué día lo quieres?</div><div class="dchips" id="diaChips" role="radiogroup" aria-label="Día de entrega"></div><div class="nota" id="diaInfo" role="status" aria-live="polite"></div></div>
       <div class="card" id="fijoCard" hidden><div class="ctit">Repetir cada semana</div><p class="cval" id="fijoTxt" style="margin:0 0 8px"></p>
@@ -1857,8 +1869,28 @@ function pintarDireccion() {
   $("addrTit").textContent = nuevo ? "¿Dónde te lo llevamos?" : "Entrega en";
   $("addr").hidden = nuevo; $("addrOpc").hidden = nuevo; $("addrOtra").hidden = modoDir() !== "otra";
   $("addrOtra").setAttribute("aria-required", nuevo ? "true" : "false");
+  pintarDirs();
 }
 document.querySelectorAll('input[name="addrmode"]').forEach(r => (r.onchange = () => { pintarDireccion(); if (modoDir() === "otra") $("addrOtra").focus(); }));
+// Direcciones de entrega guardadas (hasta 5): se eligen con un toque y se pueden quitar; una nueva se guarda marcando la casilla
+let dirs = [];
+async function cargarDirs() { try { const r = await fetch("/api/direcciones"); if (r.ok) dirs = (await r.json()).direcciones || []; } catch {} pintarDirs(); }
+const mismaDir = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+function pintarDirs() {
+  const caja = $("dirGuardadas"), otra = modoDir() === "otra";
+  caja.innerHTML = ""; caja.hidden = !(otra && dirs.length);
+  for (const d of dirs) {
+    const fila = document.createElement("div"); fila.className = "dirfila";
+    const b = document.createElement("button"); b.type = "button"; b.className = "dirop"; b.textContent = d.texto; b.setAttribute("aria-pressed", String(mismaDir($("addrOtra").value, d.texto)));
+    b.onclick = () => { $("addrOtra").value = d.texto; $("errDir").textContent = ""; $("addrOtra").removeAttribute("aria-invalid"); pintarDirs(); };
+    const q = document.createElement("button"); q.type = "button"; q.className = "dirquita"; q.textContent = "Quitar"; q.setAttribute("aria-label", "Quitar la dirección " + d.texto);
+    q.onclick = async () => { try { const r = await fetch("/api/direcciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quitar: d.id }) }); const j = await r.json(); if (r.ok) dirs = j.direcciones || []; } catch { aviso("No se ha podido quitar. Inténtalo de nuevo."); } pintarDirs(); };
+    fila.append(b, q); caja.appendChild(fila);
+  }
+  const t = $("addrOtra").value.trim();
+  $("dirGuardarLbl").hidden = !(otra && t.length >= 5 && dirs.length < 5 && !dirs.some(d => mismaDir(d.texto, t)));
+}
+$("addrOtra").addEventListener("input", () => { pintarDirs(); });
 function direccionOk(errBox) {
   $("errDir").textContent = ""; $("addrOtra").removeAttribute("aria-invalid");
   if (modoDir() === "otra" && dirEntrega().length < 5) { $("errDir").textContent = sinDireccion() ? "Escribe a dónde te lo llevamos." : "Escribe la otra dirección de entrega, o elige «En la dirección de siempre»."; $("addrOtra").setAttribute("aria-invalid", "true"); errBox.textContent = ""; $("addrOtra").hidden = false; $("addrOtra").focus(); return false; }
@@ -1943,6 +1975,7 @@ async function enviarPedido(delivery, errBox) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "No se ha podido enviar el pedido");
     pedidoEnviado = true; uso("pedido", Math.round((Date.now() - tAbierto) / 1000));
+    if (modoDir() === "otra" && $("dirGuardar").checked && dirEntrega().length >= 5) { try { fetch("/api/direcciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texto: dirEntrega() }) }).then(cargarDirs); } catch {} $("dirGuardar").checked = false; }
     qty.clear(); unitOf.clear(); notes.clear(); try { localStorage.removeItem(clave()); } catch {}
     $("doneT").textContent = j.modificado ? "¡Pedido modificado!" : "¡Pedido recibido!";
     $("modInfo").hidden = !j.modificable; $("modInfo").textContent = j.modificable ? j.modificable + "." : ""; $("modBtn").hidden = !(j.modificable && j.ref); if (j.ref) $("modBtn").onclick = () => modificar(j.ref);
@@ -2029,6 +2062,7 @@ const obs = new MutationObserver(capasCambian);
   if (data.used) { $("doneT").textContent = "Este pedido ya se envió"; $("doneP").textContent = "Vuelve al chat para hacer otro pedido."; $("done").hidden = false; return; }
   if (!data.products.some(p => p.count > 0)) { tab = "all"; try { history.replaceState({ vmTab: "all" }, ""); } catch {} }
   (data.favs || []).forEach(id => favs.add(id));
+  cargarDirs();
   recuperar();
   precargar();
   refresh();

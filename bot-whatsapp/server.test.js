@@ -697,6 +697,26 @@ test("MODIFICAR UN PEDIDO ENVIADO: sustituye al anterior (mismo número, sin dup
   assert.equal((await call("GET", `/catalogo/pedido?ref=${ref}`, { cookie: A })).status, 409);
 });
 
+test("DIRECCIONES GUARDADAS: el cliente guarda hasta 5 direcciones de entrega, las quita, no ve las de otro y sin sesión no hay nada", async () => {
+  assert.equal((await call("GET", "/api/direcciones")).status, 401);
+  assert.equal((await call("POST", "/api/direcciones", { body: { texto: "Calle Falsa 123, Medina" } })).status, 401);
+  const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar uno"));
+  assert.deepEqual((await call("GET", "/api/direcciones", { cookie: A })).json.direcciones, []);
+  assert.equal((await call("POST", "/api/direcciones", { cookie: A, body: { texto: "ab" } })).status, 400); // demasiado corta
+  const r = await call("POST", "/api/direcciones", { cookie: A, body: { texto: "  Calle   Mayor 1,\n Medina del Campo " } });
+  assert.equal(r.status, 200); assert.equal(r.json.direcciones[0].texto, "Calle Mayor 1, Medina del Campo"); // espacios y saltos limpios
+  assert.equal((await call("POST", "/api/direcciones", { cookie: A, body: { texto: "calle mayor 1, medina del campo" } })).json.direcciones.length, 1); // no se repite
+  for (const n of [2, 3, 4, 5]) assert.equal((await call("POST", "/api/direcciones", { cookie: A, body: { texto: `Plaza ${n}, Medina del Campo` } })).status, 200);
+  const sexta = await call("POST", "/api/direcciones", { cookie: A, body: { texto: "Plaza 6, Medina del Campo" } });
+  assert.equal(sexta.status, 400); assert.match(sexta.json.error, /5 direcciones/);
+  assert.deepEqual((await call("GET", "/api/direcciones", { cookie: B })).json.direcciones, []); // el otro cliente no ve ninguna
+  const id = (await call("GET", "/api/direcciones", { cookie: A })).json.direcciones[0].id;
+  assert.equal((await call("POST", "/api/direcciones", { cookie: B, body: { quitar: id } })).status, 400); // ni puede quitar las de otro
+  assert.equal((await call("GET", "/api/direcciones", { cookie: A })).json.direcciones.length, 5);
+  const q = await call("POST", "/api/direcciones", { cookie: A, body: { quitar: id } });
+  assert.equal(q.status, 200); assert.equal(q.json.direcciones.length, 4);
+});
+
 test("PDF DEL PEDIDO: el cliente descarga SU pedido; sin sesión 401; el de otro cliente o uno inventado, 404; es un PDF válido con el total", async () => {
   assert.equal((await call("GET", "/api/pedido/VM-2026-000001/pdf")).status, 401);
   const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar uno"));

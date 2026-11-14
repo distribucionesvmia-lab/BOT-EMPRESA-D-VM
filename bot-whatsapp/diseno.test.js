@@ -134,3 +134,9 @@ test("Pedido: las tarjetas (entrega, pedido fijo, observaciones, resumen) ocupan
   assert.match(pedido, /#cart \.cartbody > \.card, #cart \.cartbody > \.ped-res[^{]*\{ margin-left:0; margin-right:0; width:100%;/);
   assert.match(pedido, /\.falta-fila \.falta-av img \{[^}]*max-width:82%/);
 });
+
+test("direcciones guardadas: lista con «Quitar», casilla para guardar una nueva y se guarda al enviar", () => {
+  assert.match(pedido, /id="dirGuardadas" class="dirguard"/); assert.match(pedido, /id="dirGuardar"/);
+  assert.match(pedido, /fetch\("\/api\/direcciones"\)/); assert.match(pedido, /quitar: d\.id/); assert.match(pedido, /\$\("dirGuardar"\)\.checked && dirEntrega\(\)\.length >= 5/);
+  assert.match(pedido, /\.dirop \{[^}]*min-height:48px/);
+});

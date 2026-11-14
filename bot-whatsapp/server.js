@@ -360,6 +360,7 @@ const datosDelCliente = (acc) => {
     historial_de_compras: (c?.orders ?? []).map((o) => ({ documento: o.doc, fecha: o.date, lineas: o.lines })),
     pedidos_hechos_en_la_aplicacion: getDb().ordersFull(acc.customerId),
     favoritos: getAccountsDb().favorites(acc.customerId),
+    direcciones_de_entrega_guardadas: getAccountsDb().addresses(acc.customerId).map((d) => d.texto),
     pedido_fijo_semanal: getAccountsDb().getStanding(acc.customerId),
     avisos_en_el_movil: getAccountsDb().pushOf(acc.customerId).length, // móviles donde tiene activados los avisos (las claves de cada móvil no se incluyen)
   };
@@ -506,6 +507,18 @@ async function appRoutes(req, res, url) {
   if (p === "/catalogo" && req.method === "GET") {
     if (!account) return void res.writeHead(302, { Location: "/cliente" }).end();
     return void enviar(res, 200, HTML, page("pedido.html"));
+  }
+  // Direcciones de entrega guardadas (solo las suyas; máximo 5)
+  if (p === "/api/direcciones" && req.method === "GET") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    return void sendJson(res, 200, { direcciones: getAccountsDb().addresses(account.customerId) });
+  }
+  if (p === "/api/direcciones" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const body = await readJson(req);
+    const r = body?.quitar != null ? { ok: getAccountsDb().removeAddress(account.customerId, body.quitar), error: "No encontramos esa dirección." } : getAccountsDb().addAddress(account.customerId, body?.texto);
+    return void sendJson(res, r.ok ? 200 : 400, r.ok ? { ok: true, direcciones: getAccountsDb().addresses(account.customerId) } : { error: r.error });
   }
   // PDF de SU pedido (solo los hechos en la aplicación; un pedido de otro cliente responde igual que uno que no existe)
   const mPdf = /^\/api\/pedido\/(VM-\d{4}-\d{6})\/pdf$/.exec(p);
