@@ -144,3 +144,6 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **Ayuda**: sin teléfono/WhatsApp configurados el título es «Ayuda y ajustes de pantalla»; siempre hay «Hablar con una persona (por el chat)». Para que salga el botón de llamar (tel:) hay que rellenar `AYUDA_TEL` (y `AYUDA_WHATSAPP`, `AYUDA_HORARIO`) en `C:\vm\config`.
 - **Privacidad y aviso legal**: ventana propia (menú ⋯, Ayuda y «Mis datos y privacidad»). El aviso legal (`avisoLegalHtml` en `privacidad.js`) usa `PRIVACY_TITULAR`, `PRIVACY_CIF`, `PRIVACY_DIRECCION` y `PRIVACY_EMAIL`: hay que rellenarlos y que la gestoría revise el texto.
 - Pruebas: `tanda7.test.js`.
+
+## Tanda 8 de QA (accesibilidad y rendimiento)
+- **Atajos «Último pedido» / «Histórico»** con la letra al máximo: se partía «Históric/o» por la mitad (era un fallo real, no la versión antigua). Ahora no se parte ninguna palabra y, si no caben juntos, pasan uno debajo del otro (`.quick` con `flex-wrap`, `min-width:min-content`). Comprobado a 360 y 320 px con letra normal, 130 % y más. El subtítulo («Verlo y repetirlo») sigue oculto en móvil a propósito. Prueba: `tanda8.test.js`.

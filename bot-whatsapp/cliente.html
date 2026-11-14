@@ -570,6 +570,12 @@
   .vm-modal .cab-modal { padding:0 0 var(--s2); border:0; }
   .vm-x { flex:none; width:44px; height:44px; border:0; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:calc(26px / var(--k,1)); line-height:1; cursor:pointer; display:grid; place-items:center; }
   .enlace-legal { display:inline; min-height:44px; padding:0; text-decoration:underline; font-size:inherit; }
+
+  /* Atajos con la letra al máximo: nunca se parte una palabra por la mitad; si no caben juntos, pasan uno debajo del otro */
+  .quick { flex-wrap:wrap; }
+  .quick button, .quick button { flex:1 1 auto; min-width:min-content; max-width:100%; }
+  .quick .q-tx b { overflow-wrap:normal; word-break:normal; hyphens:none; }
+  @media (max-width:420px) { .quick button { flex:1 1 auto; } }
 </style>
 </head>
 <body>
