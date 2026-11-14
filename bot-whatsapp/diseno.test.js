@@ -172,3 +172,10 @@ test("toque premium: transiciones entre páginas y de lista, esqueletos de carga
   assert.match(pedido, /function volarAlCarrito\(id\)/); assert.match(pedido, /duration: 400/); assert.match(pedido, /antes === 0 && Math\.floor\(Number\(n\) \|\| 0\) > 0\) volarAlCarrito\(id\)/);
   assert.match(pedido, /class="rueda"/); assert.match(pedido, /Pedido enviado/); assert.match(pedido, /btn\.classList\.add\("sacude"\)/); assert.match(pedido, /#confirm\.hecho \{ background:var\(--ok\)/);
 });
+
+test("chat: atajos «Último pedido» e «Histórico» como dos tarjetas con icono y título; el mensaje del cliente lleva solo el título", () => {
+  const cli = leer("./cliente.html");
+  assert.match(cli, /<nav class="quick" id="quick"[\s\S]*data-q="último pedido"[\s\S]*class="q-ico"[\s\S]*data-q="histórico"/);
+  assert.match(cli, /\.quick button \{ display:flex; align-items:center; gap:var\(--s3\); min-height:56px;/);
+  assert.match(cli, /enviar\(b\.dataset\.q, b\.querySelector\("b"\)\?\.textContent \?\? b\.textContent\)/);
+});

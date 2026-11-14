@@ -458,6 +458,19 @@
   .vm-inicio .in-esq-c { flex:none; width:148px; height:190px; border-radius:var(--r-card); }
   .cu-esq { display:flex; flex-direction:column; gap:var(--s3); padding:var(--s5); }
   .solo-lector { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+
+  /* Atajos del chat: dos tarjetas iguales con icono, título y una línea de ayuda */
+  .quick { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:var(--s2); overflow:visible; padding:var(--s2) max(var(--gutter), calc((100% - 860px) / 2)) 0; }
+  .quick button { display:flex; align-items:center; gap:var(--s3); min-height:56px; padding:var(--s2) var(--s3); border:0; border-radius:var(--r-card); background:var(--surface); box-shadow:0 0 0 .5px var(--line); text-align:left; min-width:0; transition:transform var(--t-press) var(--ease), background-color var(--t-norm) var(--ease); }
+  .quick button:active { transform:scale(.97); background:var(--accent-soft); }
+  .quick .q-ico { flex:none; width:36px; height:36px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; }
+  .quick .q-ico svg { width:20px; height:20px; display:block; }
+  .quick .q-tx { display:flex; flex-direction:column; min-width:0; line-height:1.2; }
+  .quick .q-tx b { font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; color:var(--text); }
+  .quick .q-tx small { margin-top:2px; font-size:calc(var(--t-micro) / var(--k,1)); font-weight:400; color:var(--text-2); }
+  @media (max-width:359px) { .quick .q-tx small { display:none; } .quick button { gap:var(--s2); padding:var(--s2); } .quick .q-ico { width:32px; height:32px; } }
+  @media (min-width:1024px) { .quick { grid-template-columns:repeat(2, minmax(0, 260px)); } }
+  @media (prefers-reduced-motion: reduce) { .quick button { transition:none; } .quick button:active { transform:none; } }
 </style>
 </head>
 <body>
@@ -550,8 +563,8 @@
     <div id="chat" role="log" aria-live="polite"></div>
     <div class="sheet" id="sheet" hidden></div>
     <nav class="quick" id="quick" aria-label="Atajos">
-      <button type="button" data-q="último pedido">Último pedido</button>
-      <button type="button" data-q="histórico">Histórico</button>
+      <button type="button" data-q="último pedido"><span class="q-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg></span><span class="q-tx"><b>Último pedido</b><small>Verlo y repetirlo</small></span></button>
+      <button type="button" data-q="histórico"><span class="q-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.600-5.900M4 4v4h4M12 8v4l2.500 1.500"/></svg></span><span class="q-tx"><b>Histórico</b><small>Tus 10 últimos</small></span></button>
     </nav>
     <form class="send" id="f"><input id="t" autocomplete="off" placeholder="Escribe un mensaje" aria-label="Mensaje"><button aria-label="Enviar">➤</button></form>
   </section>
@@ -1048,7 +1061,7 @@ const mbtn = $("mbtn"), mpop = $("mpop");
 const menu = (abrir) => { mpop.hidden = !abrir; mbtn.setAttribute("aria-expanded", String(abrir)); };
 mbtn.onclick = (e) => { e.stopPropagation(); menu(mpop.hidden); };
 document.addEventListener("click", () => menu(false)); document.addEventListener("keydown", (e) => { if (e.key === "Escape") menu(false); });
-document.querySelectorAll("#quick button").forEach((b) => (b.onclick = () => enviar(b.dataset.q, b.textContent)));
+document.querySelectorAll("#quick button").forEach((b) => (b.onclick = () => enviar(b.dataset.q, b.querySelector("b")?.textContent ?? b.textContent)));
 $("f").onsubmit = (e) => { e.preventDefault(); const v = $("t").value.trim(); if (v) { $("t").value = ""; enviar(v); } };
 function entrar(nombre) { $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
 
