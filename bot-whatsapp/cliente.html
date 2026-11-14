@@ -55,6 +55,7 @@
       var fila = document.createElement("div"); fila.className = "letra-fila"; fila.appendChild(menos); fila.appendChild(n); fila.appendChild(mas);
       pop.appendChild(fila); pop.appendChild(auto);
       bt = boton("", "Tamaño de letra", function () {
+        if (pop.hidden) document.dispatchEvent(new CustomEvent("vm:abre-panel", { detail: "letra" })); // el menú ⋯ (u otro desplegable) se cierra
         pop.hidden = !pop.hidden; bt.setAttribute("aria-expanded", String(!pop.hidden));
         if (!pop.hidden) { var r = bt.getBoundingClientRect(); pop.style.top = Math.round(r.bottom + 8) + "px"; pop.style.right = Math.max(8, Math.round(innerWidth - r.right)) + "px"; }
       });
@@ -62,6 +63,7 @@
       caja.className = "letra letra-caja"; caja.removeAttribute("role"); caja.appendChild(bt); caja.appendChild(pop);
       var cerrar = function () { if (!pop.hidden) { pop.hidden = true; bt.setAttribute("aria-expanded", "false"); } };
       document.addEventListener("pointerdown", function (ev) { if (!caja.contains(ev.target)) cerrar(); });
+      document.addEventListener("vm:abre-panel", function (ev) { if (ev.detail !== "letra") cerrar(); });
       document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") cerrar(); });
     } else { caja.appendChild(menos); caja.appendChild(n); caja.appendChild(mas); caja.appendChild(auto); }
     function pintar() {
@@ -851,19 +853,22 @@ document.querySelectorAll("input[required], textarea[required], select[required]
 // ── Ventanas: se cierran con la X o «Cerrar», con Escape, tocando fuera y con «Atrás» del móvil ──
 (() => {
   const todas = () => [...document.querySelectorAll(".vm-modal")].filter((m) => m.id !== "m-avisos"); // la pregunta de avisos pide una respuesta
-  const abiertas = () => todas().filter((m) => !m.hidden);
+  const ayudaAb = () => [...document.querySelectorAll("#ayuda-fondo")]; // «Ayuda y ajustes» se crea al vuelo
+  const abiertas = () => [...todas().filter((m) => !m.hidden), ...ayudaAb()];
+  const cierra = (m) => { if (m.id === "ayuda-fondo") { const b = m.querySelector(".ayuda-cerrar"); if (b) b.click(); else m.remove(); } else m.hidden = true; };
   let empujada = false, t = 0;
   const revisa = () => { clearTimeout(t); t = setTimeout(() => { // una sola entrada en el historial mientras haya alguna ventana abierta
     const hay = abiertas().length > 0;
     if (hay && !empujada) { try { history.pushState({ modal: 1 }, ""); empujada = true; } catch {} }
     else if (!hay && empujada) { empujada = false; try { if (history.state?.modal) history.back(); } catch {} }
   }, 0); };
+  new MutationObserver(revisa).observe(document.body, { childList: true });
   todas().forEach((m) => {
     new MutationObserver(revisa).observe(m, { attributes: true, attributeFilter: ["hidden"] });
     m.addEventListener("click", (e) => { if (e.target === m) m.hidden = true; });
   });
-  addEventListener("popstate", (e) => { if (e.state?.modal) return; if (abiertas().length) { empujada = false; abiertas().forEach((m) => (m.hidden = true)); } });
-  document.addEventListener("keydown", (e) => { if (e.key !== "Escape" || document.querySelector(".pdf-visor, #ayuda-fondo")) return; const a = abiertas(); if (a.length) a[a.length - 1].hidden = true; });
+  addEventListener("popstate", (e) => { if (e.state?.modal) return; if (abiertas().length) { empujada = false; abiertas().forEach(cierra); } });
+  document.addEventListener("keydown", (e) => { if (e.key !== "Escape" || document.querySelector(".pdf-visor, #ayuda-fondo")) return; const a = abiertas(); if (a.length) cierra(a[a.length - 1]); });
   const abreLegal = () => { $("m-legal").querySelectorAll("details").forEach((d) => (d.open = true)); $("m-legal").hidden = false; };
   window.vmAbreLegal = abreLegal;
   $("legal-menu").onclick = () => { menu(false); abreLegal(); };
@@ -1284,7 +1289,8 @@ window.vmLetra.control($("letraChat"), "boton"); // botón circular «Aa» en la
 }
 document.addEventListener("touchstart", () => {}, { passive: true }); // Safari solo enseña :active (la escala 0,97 al pulsar) si hay un oyente de toque
 const mbtn = $("mbtn"), mpop = $("mpop");
-const menu = (abrir) => { mpop.hidden = !abrir; mbtn.setAttribute("aria-expanded", String(abrir)); };
+const menu = (abrir) => { if (abrir) document.dispatchEvent(new CustomEvent("vm:abre-panel", { detail: "menu" })); mpop.hidden = !abrir; mbtn.setAttribute("aria-expanded", String(abrir)); };
+document.addEventListener("vm:abre-panel", (e) => { if (e.detail !== "menu" && !mpop.hidden) { mpop.hidden = true; mbtn.setAttribute("aria-expanded", "false"); } });
 mbtn.onclick = (e) => { e.stopPropagation(); menu(mpop.hidden); };
 document.addEventListener("click", () => menu(false)); document.addEventListener("keydown", (e) => { if (e.key === "Escape") menu(false); });
 document.querySelectorAll("#quick button").forEach((b) => (b.onclick = () => enviar(b.dataset.q, b.querySelector("b")?.textContent ?? b.textContent)));

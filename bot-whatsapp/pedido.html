@@ -55,6 +55,7 @@
       var fila = document.createElement("div"); fila.className = "letra-fila"; fila.appendChild(menos); fila.appendChild(n); fila.appendChild(mas);
       pop.appendChild(fila); pop.appendChild(auto);
       bt = boton("", "Tamaño de letra", function () {
+        if (pop.hidden) document.dispatchEvent(new CustomEvent("vm:abre-panel", { detail: "letra" })); // el menú ⋯ (u otro desplegable) se cierra
         pop.hidden = !pop.hidden; bt.setAttribute("aria-expanded", String(!pop.hidden));
         if (!pop.hidden) { var r = bt.getBoundingClientRect(); pop.style.top = Math.round(r.bottom + 8) + "px"; pop.style.right = Math.max(8, Math.round(innerWidth - r.right)) + "px"; }
       });
@@ -62,6 +63,7 @@
       caja.className = "letra letra-caja"; caja.removeAttribute("role"); caja.appendChild(bt); caja.appendChild(pop);
       var cerrar = function () { if (!pop.hidden) { pop.hidden = true; bt.setAttribute("aria-expanded", "false"); } };
       document.addEventListener("pointerdown", function (ev) { if (!caja.contains(ev.target)) cerrar(); });
+      document.addEventListener("vm:abre-panel", function (ev) { if (ev.detail !== "letra") cerrar(); });
       document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") cerrar(); });
     } else { caja.appendChild(menos); caja.appendChild(n); caja.appendChild(mas); caja.appendChild(auto); }
     function pintar() {
@@ -1176,6 +1178,12 @@
   .fijo-bt .keepbtn { align-self:center; }
   /* Controles del carrito de 44 × 44 como mínimo */
   #cart .tl .hstep { min-height:44px; } #cart .tl .hstep button { min-width:44px; min-height:44px; } #cart .tl .cx { min-height:44px; min-width:44px; }
+
+  /* Letra al máximo: el nombre del artículo ocupa hasta 4 líneas y se ve entero al tocarlo; el buscador no corta su texto */
+  html[data-letra-grande] .pf-n { -webkit-line-clamp:4; }
+  .pf-n.completo { -webkit-line-clamp:unset !important; display:block; }
+  .buscar input { text-overflow:ellipsis; }
+  html[data-letra-grande] .buscar input { padding-left:44px; padding-right:8px; letter-spacing:-.01em; }
 </style>
 </head>
 <body>
@@ -1491,6 +1499,7 @@ function verFoto(p) {
       + '<div class="zia" style="color:#8a8a8a;text-align:center;font-size:calc(13px / var(--k,1));font-style:italic"></div></div>';
     z.onclick = () => (z.style.display = "none"); // (el atributo hidden no vale: el display del estilo lo anula)
     document.body.appendChild(z);
+    obs.observe(z, { attributes: true, attributeFilter: ["style"] }); // abrir/cerrar la foto cuenta para «Atrás»
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && z.style.display !== "none") { z.style.display = "none"; e.stopImmediatePropagation(); } }, true);
   }
   const im = z.querySelector("img");
@@ -1515,7 +1524,7 @@ function row(p) {
   }
   const info = document.createElement("div"); info.className = "pf-info";
   if (p.marca) { const mi = document.createElement("div"); mi.className = "pf-micro"; mi.textContent = p.marca; info.appendChild(mi); }
-  const n = document.createElement("div"); n.className = "pf-n"; n.textContent = p.nombreCorto || p.name;
+  const n = document.createElement("div"); n.className = "pf-n"; n.textContent = p.nombreCorto || p.name; n.title = p.name; n.addEventListener("click", () => n.classList.toggle("completo")); // tocar el nombre lo enseña entero
   if (p.nombreCorto && p.nombreCorto !== p.name) n.title = p.name;
   const c = document.createElement("div"); c.className = "pf-sec"; // el código de producto no se muestra
   const pk = /(\d+)\s*[xX×]\s*(\d+)/.exec(p.name), esPack = /\bpack\b/i.test(p.name) || (pk && Number(pk[1]) * Number(pk[2]) > 1);
@@ -1771,6 +1780,7 @@ function arrastrable(caja, cerrar) {
 }
 let obsMas = null;
 function renderList() {
+  try { notaBusqueda(); } catch {}
   const list = $("list"); list.innerHTML = ""; list.removeAttribute("aria-busy");
   const q = norm(query.trim());
   const enBusqueda = !!q, orden = q ? buscarOrden(query.trim()) : null;
@@ -2006,10 +2016,41 @@ document.querySelectorAll(".tabbar .tb").forEach(b => b.onclick = () => {
   if (k === "pedido") { showCart(true); return; }
   cambiarTab(b.dataset.t);
 });
+const ajustaLetra = () => { const k = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--k")) || 1, g = k < 0.9; document.documentElement.toggleAttribute("data-letra-grande", g); $("q").placeholder = g ? "Buscar" : "Buscar productos"; };
+try { ajustaLetra(); new MutationObserver(ajustaLetra).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] }); } catch {}
 // La altura real de la barra (letra grande, 2 líneas) manda: todo lo que va encima se coloca según ella
 try { const barra = document.querySelector(".tabbar"), app = document.querySelector(".app"); const med = () => app.style.setProperty("--tb-h", barra.offsetHeight + "px"); med(); new ResizeObserver(med).observe(barra); } catch {}
-addEventListener("popstate", ev => { if (prof > 0 || silencio) return; const t = ev.state && ev.state.vmTab; if (t && t !== tab) cambiarTab(t, { historia: false }); });
-try { history.replaceState({ vmTab: "all" }, ""); } catch {}
+// Búsqueda y posición en el historial: «Atrás» sale de la búsqueda, «Adelante» (o recargar) la devuelve con su posición en la lista
+const estadoInicial = (() => { try { const s = history.state; return s && s.vmTab && (s.q || s.sc || s.cat) ? s : null; } catch { return null; } })();
+let busqEmpujada = false, popBusq = false, tGuarda = 0, restaurando = false;
+const estadoBusq = () => ({ vmTab: tab, busq: 1, q: query.trim(), cat: nav.cat ?? null, sub: nav.sub ?? null, sc: $("list").scrollTop, lim: limite });
+function guardaPos() { // la posición del scroll se anota en la entrada actual del historial (sin crear otra)
+  clearTimeout(tGuarda);
+  tGuarda = setTimeout(() => { if (prof > 0 || abiertas().length) return; try { const s = history.state || {}; if (s.capa || s.pdf || s.modal) return; history.replaceState(s.busq ? estadoBusq() : { ...s, vmTab: tab, sc: $("list").scrollTop, cat: nav.cat ?? null, sub: nav.sub ?? null, lim: limite }, ""); } catch {} }, 250);
+}
+function notaBusqueda() { // al buscar se abre una entrada del historial; al borrar la búsqueda, se cierra
+  if (prof > 0 || restaurando) return;
+  try {
+    const hay = !!query.trim();
+    if (hay && !history.state?.busq) { history.pushState(estadoBusq(), ""); busqEmpujada = true; }
+    else if (!hay && history.state?.busq && busqEmpujada) { busqEmpujada = false; popBusq = true; history.back(); }
+    else if (hay) guardaPos();
+  } catch {}
+}
+function restauraDe(s) { // pone la búsqueda, la categoría y el punto de la lista que dice el historial
+  query = s.q || ""; $("q").value = query; fMarca = fFormato = null; limite = s.lim || 150;
+  nav = { cat: s.cat ?? null, sub: s.sub ?? null }; marcaNav(); renderList();
+  if (s.sc != null) { $("list").scrollTop = s.sc; requestAnimationFrame(() => { $("list").scrollTop = s.sc; }); }
+}
+addEventListener("popstate", ev => {
+  if (prof > 0 || silencio) return;
+  if (popBusq) { popBusq = false; return; }
+  const s = ev.state; if (!s || !s.vmTab) return;
+  restaurando = true;
+  try { if (s.vmTab !== tab) cambiarTab(s.vmTab, { historia: false }); if (s.vmTab === "all" || "q" in s || "sc" in s) restauraDe(s); } finally { restaurando = false; }
+});
+$("list").addEventListener("scroll", guardaPos, { passive: true });
+try { if (!estadoInicial) history.replaceState({ vmTab: "all" }, ""); } catch {}
 // Pedido en marcha que viene del chat (#c=código.unidades,…): lo que ya había pedido se queda en el carrito y se le suma lo nuevo
 // ── Modificar un pedido ya enviado (F-18): se reabre con sus líneas, pasa por los pasos 2 y 3 y, al confirmar, sustituye al anterior ──
 let modificando = null;
@@ -2410,8 +2451,12 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) refr
 
 // Pantallas superpuestas (carrito, día de entrega, resumen, calendario): foco, tecla Esc y botón «Atrás» del móvil
 const CAPAS = ["cart"], FONDO = ["header", ".guia", ".buscar", ".filbar", "#list", "footer"];
-const abiertas = () => [...CAPAS.filter(id => !$(id).hidden), ...($("calFondo").hidden ? [] : ["calFondo"])];
+const DINAMICAS = ["ayuda-fondo", "pregunta-fondo", "zoomFoto"]; // hojas que se crean al vuelo (ayuda, preguntas, foto ampliada): también las cierra «Atrás»
+const dinamicas = () => DINAMICAS.filter(id => { const e = document.getElementById(id); return e && e.style.display !== "none"; });
+const abiertas = () => [...CAPAS.filter(id => !$(id).hidden), ...($("calFondo").hidden ? [] : ["calFondo"]), ...dinamicas()];
 function cerrarArriba() {
+  const d = dinamicas();
+  if (d.length) { const e = document.getElementById(d[d.length - 1]); if (e.id === "zoomFoto") e.style.display = "none"; else { const b = e.querySelector(".ayuda-cerrar"); if (b) b.click(); else e.remove(); } return; }
   if (!$("calFondo").hidden) $("calFondo").hidden = true;
   else if (!$("cart").hidden) showCart(false);
 }
@@ -2435,6 +2480,7 @@ addEventListener("online", () => aviso("Conexión recuperada."));
 addEventListener("keydown", e => { if (e.key === "Escape" && abiertas().length) { e.preventDefault(); cerrarArriba(); } });
 const obs = new MutationObserver(capasCambian);
 [...CAPAS, "calFondo"].forEach(id => obs.observe($(id), { attributes: true, attributeFilter: ["hidden"] }));
+obs.observe(document.body, { childList: true }); // ayuda y preguntas aparecen y desaparecen del documento
 
 (async () => {
   const r = await fetch(location.pathname + "/datos").catch(() => null);
@@ -2458,6 +2504,7 @@ const obs = new MutationObserver(capasCambian);
   recuperar();
   precargar();
   refresh();
+  if (estadoInicial && !/[#&](?:c|m|cat|tab)=/.test(String(window.vmPrecarga ?? location.hash))) setTimeout(() => { restaurando = true; try { tab = estadoInicial.vmTab === "hab" ? "hab" : "all"; restauraDe(estadoInicial); } finally { restaurando = false; } }, 0); // recargar o volver con «Adelante»: la búsqueda y el punto de la lista
 })();
 </script>
 </body>
