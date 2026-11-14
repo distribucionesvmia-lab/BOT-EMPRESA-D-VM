@@ -61,3 +61,26 @@ test("Bench 1.8, 1.10 y T16 3: orderKey nuevo tras cada envío, carrito 7 días 
   assert.match(ped, /function guardar\(\) \{ if \(sinGuardar\) return;/); // al aplicar lo de otra pestaña no se vuelve a escribir (sin bucles)
   const s = leer("./server.js"); assert.equal((s.match(/codigo: String\(/g) ?? []).length, 2);
 });
+
+import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
+test("T16 1-2 y Bench 1.13-1.14: el PDF enseña formato, unidades por caja, precio ud., descuento e importe, y los datos fiscales de la empresa", () => {
+  const l = lineaPdf({ name: "ROSCA VERDEJO", unit: "caja", boxes: 1, units: 6, qty: 1, price: 5, discount: 25.07, amount: 22.48 });
+  assert.deepEqual(l, { cant: "1 caja", formato: "Caja de 6 · 6 uds", nombre: "ROSCA VERDEJO", precio: 5, dto: 25.07, importe: 22.48 });
+  assert.deepEqual(lineaPdf({ name: "AGUA", unit: "ud", qty: 6, units: 6, price: 0.4, amount: 2.4 }), { cant: "6 uds", formato: "Unidades", nombre: "AGUA", precio: 0.4, dto: 0, importe: 2.4 });
+  const o = { ref: "VM-2026-000004", created_at: "2026-11-13T10:00:00Z", delivery_date: "2026-11-16", address: "Calle Mayor 1", note: "", re: 0, items: [{ product_id: "1", name: "ROSCA VERDEJO", unit: "caja", boxes: 1, units: 6, qty: 1, price: 5, discount: 25.07, vat: 10, amount: 22.48 }] };
+  const buf = pdfPedido(datosPdf(o, { empresa: "Distribuciones Valentín Martín", datosEmpresa: ["CIF B12345674 · Calle Ejemplo 1, Medina del Campo", "Tel. 983 000 000 · info@vm.es"], cliente: "BAR UNO", codigoCliente: "T0818", telefonoCliente: "600000001" }));
+  const t = buf.toString("latin1");
+  for (const x of ["Formato", "Dto.", "Precio ud.", "Importe", "Caja de 6", "25,07 %", "CIF B12345674", "Tel. 983 000 000", "T0818", "600000001", "22,48"]) assert.ok(t.includes(x), x);
+  assert.equal(buf.subarray(0, 5).toString(), "%PDF-"); assert.match(buf.subarray(-6).toString(), /%%EOF/);
+  const s = leer("./server.js"); assert.match(s, /function datosPdfComunes\(\)/); assert.match(s, /cant: cajas \? `\$\{cajas\} \$\{cajas === 1 \? "caja" : "cajas"\} \(\$\{l\.qty\} uds\)`/);
+  assert.match(cli, /\$\{l\.cant \|\| l\.uds\} \$\{l\.nombre\}/); // Mi cuenta usa el mismo formato
+});
+
+test("Bench 1.11, 1.12, 1.15, 1.16: recordatorio del fijo bien explicado, sin mezclar el carrito, formularios sin fallos en silencio y guía de la portada", () => {
+  assert.match(cli, /los días que elijas te lo recordamos al abrir la aplicación/); assert.match(ped, /Elige los días en que quieres que te lo recordemos/); assert.match(ped, /aria-label="Días en que te lo recordamos"/);
+  // «Revisar y enviar» y «Cambiar» del fijo abren con #c=…&r=1 (nunca &a=1): con un pedido empezado sale la pregunta sustituir/añadir
+  const fijoLinks = [...cli.matchAll(/"#c=" \+ (?:j\.fijo|f)\.lineas\.map[^;]*?\+ "(&r=1[^"]*)"/g)].map((m) => m[1]); assert.ok(fijoLinks.length >= 2); for (const l of fijoLinks) assert.doesNotMatch(l, /a=1/);
+  assert.match(cli, /async function enviando\(form, boton, fn, errId\)/); assert.match(cli, /if \(form\.dataset\.enviando\) return;/); assert.match(cli, /catch \{ \$\(errId\)\.textContent = SIN_RED; \}/);
+  assert.match(cli, /return enviando\(\$\("f-acceso"\)/); assert.match(cli, /return enviando\(\$\("f-registro"\)/);
+  assert.match(cli, /<b>Entra<\/b> con los 6 primeros dígitos de tu DNI o CIF, o con tu <b>teléfono y tu código de entrada<\/b>/); assert.match(cli, /«Ver solo lo que he marcado»/); assert.doesNotMatch(cli, /«Solo con cantidad»/);
+});

@@ -16,17 +16,18 @@ export function pdfPedido(d) {
   const txt = (x, yy, t, { b = false, pt = 10, der = false, gris = false } = {}) => { const bt = esc(bytes(t)); const xx = der ? x - ancho(t, pt) : x; cur.push(Buffer.concat([Buffer.from(`BT /${b ? "F2" : "F1"} ${pt} Tf ${gris ? "0.4 0.4 0.4" : "0 0 0"} rg ${xx.toFixed(2)} ${yy.toFixed(2)} Td (`), bt, Buffer.from(") Tj ET\n")])); };
   const linea = (y1, y2 = y1) => cur.push(Buffer.from(`0.8 0.8 0.8 RG 0.5 w ${M} ${y1} m ${W - M} ${y2} l S\n`));
   const nueva = () => { if (cur.length) paginas.push(cur); cur = []; y = H - M; };
-  const cabeceraTabla = () => { txt(M, y, "Cant.", { b: true, pt: 9 }); txt(M + 70, y, "Producto", { b: true, pt: 9 }); txt(W - M - 90, y, "Precio ud.", { b: true, pt: 9, der: true }); txt(W - M, y, "Importe", { b: true, pt: 9, der: true }); y -= 6; linea(y); y -= 14; };
-  txt(M, y, d.empresa || "Distribuciones", { b: true, pt: 16 }); y -= 22;
-  txt(M, y, "Resumen de tu pedido", { pt: 12 }); y -= 26;
-  const info = [["Pedido", d.ref], ["Fecha", fecha(d.fecha)], ["Cliente", d.cliente], ["Entrega", fecha(d.entrega) || "Por confirmar"], ["Dirección", d.direccion]];
+  const cabeceraTabla = () => { txt(M, y, "Cant.", { b: true, pt: 9 }); txt(M + 38, y, "Formato", { b: true, pt: 9 }); txt(M + 130, y, "Producto", { b: true, pt: 9 }); txt(W - M - 70, y, "Precio ud.", { b: true, pt: 9, der: true }); txt(W - M - 38, y, "Dto.", { b: true, pt: 9, der: true }); txt(W - M, y, "Importe", { b: true, pt: 9, der: true }); y -= 6; linea(y); y -= 14; };
+  txt(M, y, d.empresa || "Distribuciones", { b: true, pt: 16 }); y -= 18;
+  for (const l of d.datosEmpresa ?? []) { if (l) { txt(M, y, l, { pt: 9, gris: true }); y -= 12; } } // nombre fiscal, CIF, dirección y teléfono de la empresa (los de la configuración)
+  y -= 6; txt(M, y, "Resumen de tu pedido", { pt: 12 }); y -= 24;
+  const info = [["Pedido", d.ref], ["Fecha", fecha(d.fecha)], ["Cliente", d.cliente], ["Nº de cliente", d.codigoCliente], ["Teléfono", d.telefonoCliente], ["Entrega", fecha(d.entrega) || "Por confirmar"], ["Dirección", d.direccion]];
   for (const [k, v] of info) { if (!v) continue; txt(M, y, k, { b: true, pt: 10 }); for (const l of parte(v, W - 2 * M - 80)) { txt(M + 80, y, l, { pt: 10 }); y -= 14; } }
   y -= 8; linea(y); y -= 16; cabeceraTabla();
   for (const l of d.lineas) {
-    const nombre = parte(l.nombre, 280); const alto = nombre.length * 12 + 4;
+    const nombre = parte(l.nombre, 205), formato = parte(l.formato ?? "", 88); const alto = Math.max(nombre.length, formato.length, 1) * 12 + 4;
     if (y - alto < M + 30) { nueva(); cabeceraTabla(); }
-    txt(M, y, String(l.cant), { pt: 9 }); nombre.forEach((n, i) => txt(M + 70, y - i * 12, n, { pt: 9 }));
-    txt(W - M - 90, y, fmt(l.precio), { pt: 9, der: true }); txt(W - M, y, fmt(l.importe), { pt: 9, der: true });
+    txt(M, y, String(l.cant), { pt: 9 }); formato.forEach((n, i) => txt(M + 38, y - i * 12, n, { pt: 9 })); nombre.forEach((n, i) => txt(M + 130, y - i * 12, n, { pt: 9 }));
+    txt(W - M - 70, y, fmt(l.precio), { pt: 9, der: true }); txt(W - M - 38, y, l.dto ? String(l.dto).replace(".", ",") + " %" : "—", { pt: 9, der: true }); txt(W - M, y, fmt(l.importe), { pt: 9, der: true });
     y -= alto;
   }
   if (y < M + 120) { nueva(); }
@@ -54,12 +55,24 @@ export function pdfPedido(d) {
   return Buffer.concat(partes);
 }
 
-/** Datos del PDF a partir de un pedido guardado (`getOrderByRef`). */
-export function datosPdf(o, { empresa, cliente }) {
+/** Una línea para la tabla: cantidad, formato (Caja de 12 · 24 uds), precio por unidad SIN descuento, % de descuento e importe (el que se factura). Sirve para pedidos guardados y para los del historial. */
+export function lineaPdf(i) {
+  const ud = Number(i.units ?? (i.unit === "caja" ? (i.boxes ?? i.qty) * (i.upb ?? 1) : i.qty)) || 0;
+  const cajas = i.unit === "caja" ? Number(i.boxes ?? i.qty) : 0;
+  const porCaja = cajas && ud ? Math.round(ud / cajas) : (i.upb ?? 0);
+  return {
+    cant: cajas ? `${cajas} ${cajas === 1 ? "caja" : "cajas"}` : `${ud} ${ud === 1 ? "ud" : "uds"}`,
+    formato: cajas ? `Caja de ${porCaja || "?"} · ${ud} uds` : "Unidades",
+    nombre: i.name ?? i.product_id, precio: i.price, dto: Number(i.discount) > 0 ? Number(i.discount) : 0, importe: i.amount,
+  };
+}
+
+/** Datos del PDF a partir de un pedido guardado (`getOrderByRef`). `empresa`, `cliente`; opcional: datosEmpresa (líneas con nombre fiscal, CIF, dirección y teléfono), codigoCliente, telefonoCliente. */
+export function datosPdf(o, { empresa, cliente, datosEmpresa, codigoCliente, telefonoCliente }) {
   const items = (o.items ?? []).map((i) => ({ ...i, amount: i.amount ?? 0 }));
   const t = totals(items, !!o.re);
   return {
-    empresa, cliente, ref: o.ref, fecha: o.created_at, entrega: o.delivery_date, direccion: o.address, nota: o.note, conRe: !!o.re, totales: t,
-    lineas: items.map((i) => ({ cant: i.unit === "caja" ? `${i.boxes ?? i.qty} ${(i.boxes ?? i.qty) === 1 ? "caja" : "cajas"}` : `${i.units ?? i.qty} ud`, nombre: i.name ?? i.product_id, precio: i.price, importe: i.amount })),
+    empresa, cliente, datosEmpresa, codigoCliente, telefonoCliente, ref: o.ref, fecha: o.created_at, entrega: o.delivery_date, direccion: o.address, nota: o.note, conRe: !!o.re, totales: t,
+    lineas: items.map(lineaPdf),
   };
 }

@@ -37,8 +37,8 @@ import { crearNotificador } from "./notificaciones.js";
 import { scheduleBackups } from "./backup.js";
 import { sourceFromEnv } from "./drive.js";
 import nodePath from "node:path";
-import { BUSINESS, ayudaPublica, condicionesPedido, envTexto } from "./config.js";
-import { pdfPedido, datosPdf } from "./pdf.js";
+import { BUSINESS, AYUDA, ayudaPublica, condicionesPedido, envTexto } from "./config.js";
+import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
 import { categorizar } from "./categorias.js";
 import { puedeEditarPedido, weekday } from "./delivery.js";
 const DIAS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -414,6 +414,11 @@ const estadoDelSistema = adminEnabled ? () => {
 const ficheroActualizaciones = nodePath.join(nodePath.dirname(process.env.CUSTOMERS_DB ?? "clientes.sqlite"), "actualizaciones.log");
 const leerActualizaciones = () => { try { return fs.readFileSync(ficheroActualizaciones, "utf8").trim().split("\n").slice(-60).map((l) => JSON.parse(l)).reverse(); } catch { return []; } };
 const admin = createAdmin({ sync, mail: notificador, actualizador, estado: estadoDelSistema, actualizaciones: leerActualizaciones, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), catalogDb: dbsAdmin?.catalogDb ?? null, adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
+/** Datos fiscales de la empresa para el PDF: los PRIVACY_* de la configuración (lo que esté vacío no se imprime) y el teléfono de ayuda. */
+function datosPdfComunes() {
+  const titular = envTexto("PRIVACY_TITULAR") || "Distribuciones Valentín Martín", cif = envTexto("PRIVACY_CIF"), dir = envTexto("PRIVACY_DIRECCION"), tel = AYUDA.telefono, mail = envTexto("PRIVACY_EMAIL");
+  return { empresa: titular, datosEmpresa: [[cif && "CIF " + cif, dir].filter(Boolean).join(" · "), [tel && "Tel. " + tel, mail].filter(Boolean).join(" · ")].filter(Boolean) };
+}
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
 const clienteConPedidos = (id) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id));
@@ -546,7 +551,7 @@ async function appRoutes(req, res, url) {
     const o = getDb().getOrderByRef(mPdf[1]);
     if (!o || o.customer_id !== String(account.customerId) || o.status === "cancelled") return void sendJson(res, 404, { error: "No encontramos ese pedido." });
     const c = customerDirectory.getById(account.customerId);
-    const buf = pdfPedido(datosPdf(o, { empresa: BUSINESS.name, cliente: c?.name ?? "" }));
+    const buf = pdfPedido(datosPdf(o, { ...datosPdfComunes(), cliente: c?.name ?? "", codigoCliente: String(account.customerId ?? ""), telefonoCliente: c?.phone ?? c?.phones?.[0] ?? "" }));
     return void res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `${url.searchParams.has("descargar") ? "attachment" : "inline"}; filename="pedido-${o.ref}.pdf"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": buf.length }).end(buf);
   }
   // PDF de un pedido del historial que viene de a3ERP (sin precios guardados): importes con los precios de hoy, avisado en el propio PDF
@@ -560,9 +565,9 @@ async function appRoutes(req, res, url) {
     if (!o || !items.length) return void sendJson(res, 404, { error: "No encontramos ese pedido." });
     const priced = priceOrder({ items }, customer, catalog), t = totals(priced.items, !!customer.recargoEquivalencia);
     const buf = pdfPedido({
-      empresa: BUSINESS.name, cliente: customer.name ?? "", ref: "Pedido " + doc, fecha: o.date, entrega: null, direccion: customer.address, conRe: !!customer.recargoEquivalencia, totales: t,
+      ...datosPdfComunes(), cliente: customer.name ?? "", codigoCliente: String(account.customerId ?? ""), telefonoCliente: customer.phone ?? "", ref: "Pedido " + doc, fecha: o.date, entrega: null, direccion: customer.address, conRe: !!customer.recargoEquivalencia, totales: t,
       nota: "Importes con los precios de hoy: este pedido es anterior y no guarda los precios de ese día, así que son orientativos.",
-      lineas: priced.items.map((i) => ({ cant: `${i.qty} ${i.qty === 1 ? "ud" : "uds"}`, nombre: i.name, precio: i.price, importe: i.amount })),
+      lineas: priced.items.map((i) => lineaPdf({ ...i, unit: "ud" })),
     });
     return void res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `${url.searchParams.has("descargar") ? "attachment" : "inline"}; filename="pedido-${doc.replace(/[^\w.-]/g, "")}.pdf"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": buf.length }).end(buf);
   }
@@ -669,7 +674,10 @@ async function appRoutes(req, res, url) {
         doc: o.doc, fecha: o.date, entrega: propio?.delivery_date ?? null, origen: propio ? "app" : "a3erp",
         estado: !propio ? "Entregado" : propio.export_status === "exported" ? "En preparación" : pe?.ok ? "Recibido · puedes modificarlo" : "Recibido",
         editable: !!pe?.ok, hasta: pe?.ok ? pe.texto : "", modificado: propio?.modified_at ?? null,
-        lineas: o.lines.map((l) => ({ id: l.id, nombre: l.name, uds: l.qty })),
+        lineas: o.lines.map((l) => { // «1 caja (6 uds)» igual que en el PDF; sin dato de caja (pedidos de a3ERP), unidades
+          const g = propio?.items?.find((x) => String(x.product_id ?? x.id) === String(l.id)), cajas = g && g.unit === "caja" ? Number(g.boxes ?? g.qty) : 0;
+          return { id: l.id, nombre: l.name, uds: l.qty, cant: cajas ? `${cajas} ${cajas === 1 ? "caja" : "cajas"} (${l.qty} uds)` : `${l.qty} ${l.qty === 1 ? "ud" : "uds"}` };
+        }),
       };
     });
     return void sendJson(res, 200, {

@@ -5,7 +5,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 
 export function privacidadHtml({ titular = "Distribuciones Valentín Martín", cif = "", direccion = "Medina del Campo (Valladolid)", email = "" } = {}) {
   const contacto = email ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : "el establecimiento (datos de contacto en tu factura)";
-  return `<details class="priv" style="font-size:13px;line-height:1.5;color:#555;margin:12px 0"><summary style="cursor:pointer;font-weight:600">Información sobre privacidad (protección de datos)</summary>
+  return `<details class="priv" style="font-size:13px;line-height:1.5;color:var(--text-2,#555);margin:12px 0"><summary style="cursor:pointer;font-weight:600">Información sobre privacidad (protección de datos)</summary>
 <ul style="margin:8px 0 0;padding-left:18px">
 <li><b>Responsable:</b> ${esc(titular)}${cif ? ` · CIF ${esc(cif)}` : ""} · ${esc(direccion)} · Contacto: ${contacto}.</li>
 <li><b>Para qué usamos tus datos:</b> gestionar tu acceso, tus pedidos, su entrega y facturación, y atender tu solicitud de alta como cliente.</li>
@@ -21,7 +21,7 @@ export function privacidadHtml({ titular = "Distribuciones Valentín Martín", c
 /** Aviso legal (datos del titular que exige la ley de servicios de la sociedad de la información, art. 10 LSSI). Texto estándar: conviene que lo revise la gestoría. */
 export function avisoLegalHtml({ titular = "Distribuciones Valentín Martín", cif = "", direccion = "Medina del Campo (Valladolid)", email = "" } = {}) {
   const contacto = email ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : "el establecimiento (datos de contacto en tu factura)";
-  return `<details class="priv" style="font-size:13px;line-height:1.5;color:#555;margin:12px 0"><summary style="cursor:pointer;font-weight:600">Aviso legal</summary>
+  return `<details class="priv" style="font-size:13px;line-height:1.5;color:var(--text-2,#555);margin:12px 0"><summary style="cursor:pointer;font-weight:600">Aviso legal</summary>
 <ul style="margin:8px 0 0;padding-left:18px">
 <li><b>Titular:</b> ${esc(titular)}${cif ? ` · CIF ${esc(cif)}` : ""} · Domicilio: ${esc(direccion)} · Contacto: ${contacto}.</li>
 <li><b>Qué es esta aplicación:</b> un servicio para que nuestros clientes consulten el catálogo y hagan sus pedidos. El acceso es personal y no se debe compartir.</li>
