@@ -551,7 +551,7 @@ async function appRoutes(req, res, url) {
     const o = getDb().getOrderByRef(mPdf[1]);
     if (!o || o.customer_id !== String(account.customerId) || o.status === "cancelled") return void sendJson(res, 404, { error: "No encontramos ese pedido." });
     const c = customerDirectory.getById(account.customerId);
-    const buf = pdfPedido(datosPdf(o, { ...datosPdfComunes(), cliente: c?.name ?? "", codigoCliente: String(account.customerId ?? ""), telefonoCliente: c?.phone ?? c?.phones?.[0] ?? "" }));
+    const buf = pdfPedido(datosPdf(o, { ...datosPdfComunes(), cliente: c?.name ?? "", telefonoCliente: c?.phone ?? c?.phones?.[0] ?? "" }));
     return void res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `${url.searchParams.has("descargar") ? "attachment" : "inline"}; filename="pedido-${o.ref}.pdf"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": buf.length }).end(buf);
   }
   // PDF de un pedido del historial que viene de a3ERP (sin precios guardados): importes con los precios de hoy, avisado en el propio PDF
@@ -565,7 +565,7 @@ async function appRoutes(req, res, url) {
     if (!o || !items.length) return void sendJson(res, 404, { error: "No encontramos ese pedido." });
     const priced = priceOrder({ items }, customer, catalog), t = totals(priced.items, !!customer.recargoEquivalencia);
     const buf = pdfPedido({
-      ...datosPdfComunes(), cliente: customer.name ?? "", codigoCliente: String(account.customerId ?? ""), telefonoCliente: customer.phone ?? "", ref: "Pedido " + doc, fecha: o.date, entrega: null, direccion: customer.address, conRe: !!customer.recargoEquivalencia, totales: t,
+      ...datosPdfComunes(), cliente: customer.name ?? "", telefonoCliente: customer.phone ?? "", ref: "Pedido " + doc, fecha: o.date, entrega: null, direccion: customer.address, conRe: !!customer.recargoEquivalencia, totales: t,
       nota: "Importes con los precios de hoy: este pedido es anterior y no guarda los precios de ese día, así que son orientativos.",
       lineas: priced.items.map((i) => lineaPdf({ ...i, unit: "ud" })),
     });
@@ -681,7 +681,7 @@ async function appRoutes(req, res, url) {
       };
     });
     return void sendJson(res, 200, {
-      cliente: { nombre: c.name, razonSocial: c.legalName && c.legalName !== c.name ? c.legalName : "", codigo: c.id, direccion: c.address, poblacion: c.city, telefono: account.phone ?? "", correo: account.email ?? "" },
+      cliente: { nombre: c.name, razonSocial: c.legalName && c.legalName !== c.name ? c.legalName : "", direccion: c.address, poblacion: c.city, telefono: account.phone ?? "", correo: account.email ?? "" },
       pedidos, ayuda: ayudaPublica(),
     });
   }

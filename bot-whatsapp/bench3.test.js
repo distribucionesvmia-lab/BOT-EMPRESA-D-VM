@@ -21,11 +21,14 @@ test("1. nombre visible: sin comillas ni «´», en tipo frase y con la añada a
   assert.match(p, /h\.textContent = nombreVisible\(p\); h\.title = p\.name/); assert.match(p, /n\.textContent = nombreVisible\(l\); n\.title = l\.name/); // ficha y carrito
   assert.match(p, /el\.setAttribute\("aria-label", p\.name\)/); // el nombre original sigue para lectores de pantalla y búsqueda
 });
-test("2. código del artículo en la tarjeta, en el carrito y en el PDF", () => {
-  assert.match(p, /cod\.className = "pf-cod"; cod\.textContent = "Cód\. " \+ p\.id;/); assert.match(p, /cod\.className = "cod"; cod\.textContent = "Cód\. " \+ l\.id;/);
-  assert.equal(lineaPdf({ product_id: "58127", name: "CUENCO", unit: "ud", qty: 6, units: 6, price: 1, amount: 6 }).codigo, "58127");
+test("2. el código del artículo y el del cliente NO se ven en la aplicación del cliente (tarjeta, carrito, Mi cuenta ni PDF)", () => {
+  assert.equal(/pf-cod|"Cód\. "|Cód\. \$\{/.test(p), false);
+  const c = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.equal(/Cliente nº/.test(c), false);
   const o = { ref: "VM-2026-000009", created_at: "2026-11-14T10:00:00Z", delivery_date: "2026-11-16", address: "x", note: "", re: 0, items: [{ product_id: "58127", name: "CUENCO REDONDO 9 X 6", unit: "ud", qty: 6, units: 6, price: 1, vat: 21, amount: 6 }] };
-  assert.ok(pdfPedido(datosPdf(o, { empresa: "VM", cliente: "BAR" })).toString("latin1").includes("Cód. 58127"));
+  const t = pdfPedido(datosPdf(o, { empresa: "VM", cliente: "BAR", codigoCliente: "T0818" })).toString("latin1");
+  assert.equal(t.includes("58127") || t.includes("Cód.") || t.includes("T0818") || t.includes("Nº de cliente"), false);
+  assert.equal("codigo" in lineaPdf(o.items[0]), false);
 });
 test("3. precio claro: 17 px en negrita seguido de «/ud» o «/caja (N ud)»; con descuento, el original tachado y el neto al lado", () => {
   assert.match(p, /\.pf-pr b \{ font-size:calc\(17px \/ var\(--k,1\)\); font-weight:700; \}/);

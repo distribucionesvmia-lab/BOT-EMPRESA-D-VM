@@ -59,18 +59,18 @@ test("Bench 1.8, 1.10 y T16 3: orderKey nuevo tras cada envío, carrito 7 días 
   assert.match(ped, /const HORAS = 168;/); assert.match(ped, /"c_" \+ \(data\.customer\.codigo \|\| data\.customer\.name\)/); assert.match(ped, /vm_carrito_c_" \+ data\.customer\.name; if \(data\.customer\.codigo/); // y migra el guardado con la clave antigua
   assert.match(ped, /addEventListener\("storage", \(e\) => \{ try \{ if \(e\.key === clave\(\)\) releerCarrito\(\)/); assert.match(ped, /document\.addEventListener\("visibilitychange", \(\) => \{ if \(!document\.hidden\) releerCarrito\(\); \}\)/);
   assert.match(ped, /function guardar\(\) \{ if \(sinGuardar\) return;/); // al aplicar lo de otra pestaña no se vuelve a escribir (sin bucles)
-  const s = leer("./server.js"); assert.equal((s.match(/codigo: String\(/g) ?? []).length, 2);
+  const s = leer("./server.js"); assert.equal((s.match(/codigoCliente/g) ?? []).length, 0);
 });
 
 import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
 test("T16 1-2 y Bench 1.13-1.14: el PDF enseña formato, unidades por caja, precio ud., descuento e importe, y los datos fiscales de la empresa", () => {
   const l = lineaPdf({ name: "ROSCA VERDEJO", unit: "caja", boxes: 1, units: 6, qty: 1, price: 5, discount: 25.07, amount: 22.48 });
-  assert.deepEqual(l, { cant: "1 caja", formato: "Caja de 6 · 6 uds", nombre: "ROSCA VERDEJO", codigo: "", precio: 5, dto: 25.07, importe: 22.48 });
-  assert.deepEqual(lineaPdf({ name: "AGUA", unit: "ud", qty: 6, units: 6, price: 0.4, amount: 2.4 }), { cant: "6 uds", formato: "Unidades", nombre: "AGUA", codigo: "", precio: 0.4, dto: 0, importe: 2.4 });
+  assert.deepEqual(l, { cant: "1 caja", formato: "Caja de 6 · 6 uds", nombre: "ROSCA VERDEJO", precio: 5, dto: 25.07, importe: 22.48 });
+  assert.deepEqual(lineaPdf({ name: "AGUA", unit: "ud", qty: 6, units: 6, price: 0.4, amount: 2.4 }), { cant: "6 uds", formato: "Unidades", nombre: "AGUA", precio: 0.4, dto: 0, importe: 2.4 });
   const o = { ref: "VM-2026-000004", created_at: "2026-11-13T10:00:00Z", delivery_date: "2026-11-16", address: "Calle Mayor 1", note: "", re: 0, items: [{ product_id: "1", name: "ROSCA VERDEJO", unit: "caja", boxes: 1, units: 6, qty: 1, price: 5, discount: 25.07, vat: 10, amount: 22.48 }] };
-  const buf = pdfPedido(datosPdf(o, { empresa: "Distribuciones Valentín Martín", datosEmpresa: ["CIF B12345674 · Calle Ejemplo 1, Medina del Campo", "Tel. 983 000 000 · info@vm.es"], cliente: "BAR UNO", codigoCliente: "T0818", telefonoCliente: "600000001" }));
+  const buf = pdfPedido(datosPdf(o, { empresa: "Distribuciones Valentín Martín", datosEmpresa: ["CIF B12345674 · Calle Ejemplo 1, Medina del Campo", "Tel. 983 000 000 · info@vm.es"], cliente: "BAR UNO", telefonoCliente: "600000001" }));
   const t = buf.toString("latin1");
-  for (const x of ["Formato", "Dto.", "Precio ud.", "Importe", "Caja de 6", "25,07 %", "CIF B12345674", "Tel. 983 000 000", "T0818", "600000001", "22,48"]) assert.ok(t.includes(x), x);
+  for (const x of ["Formato", "Dto.", "Precio ud.", "Importe", "Caja de 6", "25,07 %", "CIF B12345674", "Tel. 983 000 000", "600000001", "22,48"]) assert.ok(t.includes(x), x);
   assert.equal(buf.subarray(0, 5).toString(), "%PDF-"); assert.match(buf.subarray(-6).toString(), /%%EOF/);
   const s = leer("./server.js"); assert.match(s, /function datosPdfComunes\(\)/); assert.match(s, /cant: cajas \? `\$\{cajas\} \$\{cajas === 1 \? "caja" : "cajas"\} \(\$\{l\.qty\} uds\)`/);
   assert.match(cli, /\$\{l\.cant \|\| l\.uds\} \$\{l\.nombre\}/); // Mi cuenta usa el mismo formato

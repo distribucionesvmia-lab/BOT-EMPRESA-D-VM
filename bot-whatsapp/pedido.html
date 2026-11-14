@@ -1267,7 +1267,6 @@
 
   /* ═══ Bench 3: que se entienda ═══ */
   .pf-pr b { font-size:calc(17px / var(--k,1)); font-weight:700; }
-  .pf-cod, .tl .cod { font-size:calc(var(--t-micro) / var(--k,1)); color:var(--text-2); font-variant-numeric:tabular-nums; line-height:1.2; }
   /* corazón: icono de 20 px dentro de un círculo de 32 px (la zona de toque sigue siendo de 44 px) */
   @media (max-width:1023px) { .pf-fav { position:relative !important; } } /* para que el círculo se centre en el propio botón */
   .pf-fav::before { display:block !important; width:32px; height:32px; background:var(--fill); }
@@ -1735,8 +1734,7 @@ function row(p) {
   if (p.discount) { const dto = document.createElement("span"); dto.className = "pf-dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} %`; pr.appendChild(dto); }
   if (p.oferta) { const of = document.createElement("span"); of.className = "pf-oferta"; of.textContent = "OFERTA" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().slice(0, 2).join("/") : ""); pr.appendChild(of); }
   if (tab === "all" && p.count > 0) { const lc = document.createElement("span"); lc.className = "pf-compras"; lc.textContent = "Lo compras"; pr.appendChild(lc); } // etiqueta aparte del nombre, junto al precio
-  const cod = document.createElement("div"); cod.className = "pf-cod"; cod.textContent = "Cód. " + p.id;
-  info.append(n, c, cod, pr);
+  info.append(n, c, pr);
   if (p.ia) { const ia = document.createElement("div"); ia.className = "pf-ia"; ia.textContent = "Imagen orientativa"; av.appendChild(ia); }
   if (data.favs) {
     const f = document.createElement("button"); f.type = "button"; f.className = "pf-fav"; const on = favs.has(p.id);
@@ -2114,10 +2112,9 @@ function tablaLineas(ls) {
     if (l.img) { const im = document.createElement("img"); im.src = l.img; im.alt = ""; im.onerror = () => im.remove(); av.appendChild(im); av.onclick = () => verFoto(l); } else av.style.cursor = "default";
     const tx = document.createElement("div"); tx.className = "tl-txt";
     const n = document.createElement("div"); n.className = "cn"; n.textContent = nombreVisible(l); n.title = l.name;
-    const cod = document.createElement("div"); cod.className = "cod"; cod.textContent = "Cód. " + l.id; // el código distingue artículos que se llaman casi igual
     const pr = document.createElement("div"); pr.className = "cp";
     pr.textContent = eurp(l.price) + " / ud" + (l.discount ? ` · −${String(l.discount).replace(".", ",")} %` : "") + (l.unitsPerBox ? ` · caja de ${l.unitsPerBox}` : "");
-    tx.append(n, cod, pr); a.append(av, tx);
+    tx.append(n, pr); a.append(av, tx);
     // Cantidad: Cajas|Uds + − 1 +
     const q = tr.insertCell(); q.className = "tl-cant";
     const box = document.createElement("div"); box.className = "tl-ctl";

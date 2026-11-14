@@ -944,7 +944,7 @@ test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repet
   assert.equal(rr.status, 200, JSON.stringify(rr.json));
   const a = (await call("GET", "/api/mi-cuenta", { cookie: A })).json;
   assert.equal(a.cliente.nombre, "CAFETERIA IMPORTADA");
-  assert.equal(typeof a.cliente.codigo, "string");
+  assert.equal("codigo" in a.cliente, false); // el número de cliente no se enseña al cliente
   const suyo = a.pedidos.find((p) => p.doc === rr.json.ref);
   assert.ok(suyo, "su pedido recién hecho aparece");
   assert.equal(suyo.origen, "app"); assert.match(suyo.fecha, /^\d{4}-\d{2}-\d{2}$/);

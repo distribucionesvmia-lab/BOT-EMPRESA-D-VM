@@ -1060,7 +1060,7 @@ async function abrirCuenta(irAPedidos) {
   B.appendChild(nodo("h3", "Mis datos", "cu-tit"));
   const dl = nodo("dl", null, "cu-datos"), fila = (k, v) => { if (!v) return; dl.append(nodo("dt", k), nodo("dd", v)); };
   fila("Nombre", j.cliente.nombre); fila("Razón social", j.cliente.razonSocial); fila("Dirección", j.cliente.direccion || "Sin dirección registrada"); fila("Población", j.cliente.poblacion);
-  fila("Teléfono", j.cliente.telefono); fila("Correo", j.cliente.correo); fila("Cliente nº", j.cliente.codigo);
+  fila("Teléfono", j.cliente.telefono); fila("Correo", j.cliente.correo);
   B.appendChild(dl);
   const corr = nodo("button", "Algo no es correcto: avisar a la empresa", "vm-btn ghost"); corr.type = "button";
   corr.onclick = () => { $("m-cuenta").hidden = true; $("misdatos").onclick(); $("d-tipo").value = "corregir"; $("d-texto").focus(); };
