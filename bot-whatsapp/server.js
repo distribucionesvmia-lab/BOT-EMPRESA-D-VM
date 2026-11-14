@@ -43,6 +43,7 @@ import { BUSINESS, AYUDA, ayudaPublica, condicionesPedido, envTexto } from "./co
 import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
 import { categorizar } from "./categorias.js";
 import { empaquetar, estatico } from "./estaticos.js";
+import { avisarCortes, horaAviso } from "./avisocorte.js";
 import { puedeEditarPedido, plazoModificacion, longDate, weekday, addDays } from "./delivery.js";
 const DIAS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 
@@ -784,6 +785,17 @@ async function appRoutes(req, res, url) {
       pedidos, hayMas: !mas && todosH.length > HISTORIAL_MAX, ayuda: ayudaPublica(),
     });
   }
+  if (p === "/api/avisos/corte" && req.method === "GET") { // «Avisarme antes de la hora límite»
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const m = horaAviso(process.env.AVISO_CORTE_HORA);
+    return void sendJson(res, 200, { activo: getAccountsDb().corteActivo(account.customerId), hora: `${Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`, tieneFijo: !!getAccountsDb().getStanding(account.customerId) });
+  }
+  if (p === "/api/avisos/corte" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const body = await readJson(req); getAccountsDb().corteSet(account.customerId, body?.activo !== false);
+    return void sendJson(res, 200, { ok: true, activo: body?.activo !== false });
+  }
   if (p === "/api/push/clave" && req.method === "GET") { // clave pública para que el móvil pueda activar los avisos
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     return void sendJson(res, 200, { publica: avisosPush().publica() });
@@ -917,6 +929,10 @@ http
     if (process.env.DEMO !== "1" && adminEnabled && process.env.EXPORT_AUTO !== "0") scheduleDailyExport(getDb());
     if (process.env.DEMO !== "1") sync?.start();
     notificador?.start(); // reintenta los avisos que no salieron
+    // «Hoy es tu día»: aviso al móvil antes de la hora límite a quien tenga pedido fijo (AVISO_CORTE_HORA, por defecto 8:30; AVISO_CORTE=0 lo desactiva). Nunca envía ningún pedido.
+    if (process.env.DEMO !== "1" && !process.env.VM_TEST && clientEnabled && process.env.AVISO_CORTE !== "0") {
+      setInterval(() => { avisarCortes({ accounts: getAccountsDb(), db: getDb(), customers: customerDirectory, avisos: avisosPush() }).catch((e) => console.error("Aviso de hora límite:", e.message)); }, 60e3).unref();
+    }
     // Vigilancia: avisa por correo de problemas nuevos y manda un informe diario (VIGILANCIA=0 la desactiva)
     if (process.env.DEMO !== "1" && adminEnabled && process.env.VIGILANCIA !== "0") {
       const cfg = mailConfigFromEnv();

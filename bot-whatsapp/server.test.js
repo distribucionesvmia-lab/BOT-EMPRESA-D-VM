@@ -1040,6 +1040,16 @@ test("BENCH 6: el HTML de /cliente y de /catalogo pesa poco, el CSS/JS/logo van 
   assert.equal((await fetch(`${BASE}/catalogo/datos`, { headers: { "If-None-Match": et } })).status, 401); // sin sesión no hay 304 que valga
 });
 
+test("BENCH 8: «Avisarme antes de la hora límite» se puede leer y cambiar (por defecto activado) y solo lo toca su dueño", async () => {
+  assert.equal((await call("GET", "/api/avisos/corte")).status, 401); assert.equal((await call("POST", "/api/avisos/corte", { body: { activo: false } })).status, 401);
+  const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar dos"));
+  const g = (await call("GET", "/api/avisos/corte", { cookie: A })).json; assert.equal(g.activo, true); assert.match(g.hora, /^\d{1,2}:\d{2}$/); assert.equal(typeof g.tieneFijo, "boolean");
+  assert.equal((await call("POST", "/api/avisos/corte", { cookie: A, body: { activo: false } })).json.activo, false);
+  assert.equal((await call("GET", "/api/avisos/corte", { cookie: A })).json.activo, false);
+  assert.equal((await call("GET", "/api/avisos/corte", { cookie: B })).json.activo, true); // el otro cliente, intacto
+  await call("POST", "/api/avisos/corte", { cookie: A, body: { activo: true } }); assert.equal((await call("GET", "/api/avisos/corte", { cookie: A })).json.activo, true);
+});
+
 test("MI CUENTA: cada cliente ve SUS datos y SUS pedidos (con líneas para repetir o añadir), nunca los de otro ni su NIF", async () => {
   assert.equal((await call("GET", "/api/mi-cuenta")).status, 401);
   const A = cookieOf(await entrarNif("111111"));

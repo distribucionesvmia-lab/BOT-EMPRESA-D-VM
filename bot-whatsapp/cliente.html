@@ -405,6 +405,12 @@
   .pw { position:relative; display:block; } .pw input { width:100%; padding-right:52px !important; }
   .pw .pw-ojo { position:absolute; right:2px; top:50%; transform:translateY(-50%); width:44px; height:44px; padding:0; border:0; border-radius:var(--r-field); background:transparent; color:var(--text-2); display:grid; place-items:center; cursor:pointer; }
   .pw .pw-ojo svg { width:22px; height:22px; } .pw .pw-ojo[aria-pressed="true"] { color:var(--accent); } .pw .pw-ojo:focus-visible { outline:3px solid var(--accent); outline-offset:-3px; }
+  .cu-interruptor { display:flex !important; flex-direction:row !important; align-items:flex-start; gap:var(--s3); padding:var(--s3) 0; font-weight:400 !important; }
+  .cu-interruptor input { appearance:none; -webkit-appearance:none; flex:none; width:48px; height:28px; margin:2px 0 0; border:0; border-radius:14px; background:var(--text-2); position:relative; cursor:pointer; padding:0; min-height:0; }
+  .cu-interruptor input::after { content:""; position:absolute; top:3px; left:3px; width:22px; height:22px; border-radius:50%; background:var(--surface); transition:transform .2s var(--ease); }
+  .cu-interruptor input:checked { background:var(--accent); } .cu-interruptor input:checked::after { transform:translateX(20px); }
+  .cu-interruptor input:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+  @media (prefers-reduced-motion:reduce) { .cu-interruptor input::after { transition:none; } } .cu-interruptor b { display:block; font-weight:600; font-size:calc(var(--t-body) / var(--k,1)); } .cu-interruptor small { display:block; color:var(--text-2); font-size:calc(var(--t-cap) / var(--k,1)); line-height:1.3; }
   .carga-fallo { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s3); padding:var(--s3) var(--s4); border-radius:var(--r-field); background:var(--fill); color:var(--text); font-size:calc(var(--t-sec) / var(--k,1)); }
   .carga-fallo .vm-btn { width:auto; min-height:44px; padding:0 var(--s4); background:var(--surface); color:var(--accent); }
   .vm-inicio .in-total { color:var(--text) !important; font-weight:600; font-variant-numeric:tabular-nums; }
@@ -1080,6 +1086,14 @@ async function pintarAvisos(box) {
   if (sub && Notification.permission === "granted") {
     p("Avisos activados en este móvil: te avisamos cuando recibimos tus pedidos y cuando tengamos novedades."); 
     boton("Desactivar avisos", "ghost", async () => { await fetch("/api/push/baja", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }); await sub.unsubscribe(); await pintarAvisos(box); });
+    // «Avisarme antes de la hora límite»: el día que toca tu pedido fijo, un aviso antes de las 10:00 (activado por defecto; solo avisa, nunca envía nada)
+    const cj = await fetch("/api/avisos/corte").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (cj) {
+      const fila = nodo("label", null, "cu-interruptor"), cb = document.createElement("input"); cb.type = "checkbox"; cb.setAttribute("role", "switch"); cb.checked = !!cj.activo; cb.id = "corte-sw";
+      const tx = nodo("span"); tx.append(nodo("b", "Avisarme antes de la hora límite"), nodo("small", cj.tieneFijo ? `El día que toca tu pedido fijo te avisamos a las ${cj.hora}, antes de las 10:00. Solo es un aviso: no se envía nada.` : "Funciona si tienes un pedido fijo. Solo es un aviso: no se envía nada."));
+      cb.onchange = async () => { cb.disabled = true; const r = await post("/api/avisos/corte", { activo: cb.checked }).catch(() => null); if (!r?.ok) { cb.checked = !cb.checked; msg.textContent = "No se ha podido guardar. Inténtalo otra vez."; } else msg.textContent = ""; cb.disabled = false; };
+      fila.append(cb, tx); box.appendChild(fila);
+    }
   } else {
     p("Activa los avisos y recibirás una notificación en este móvil cuando recibamos tu pedido.");
     boton("Activar avisos", "primary", async () => { await activarAvisos(); await pintarAvisos(box); });
@@ -1569,7 +1583,13 @@ function ajustaCuenta() {
   b.classList.remove("solo-icono"); if (bar.scrollWidth > bar.clientWidth + 1) b.classList.add("solo-icono");
 }
 try { const bar = document.querySelector("#chatbox .bar"); if (bar) { new ResizeObserver(ajustaCuenta).observe(bar); new MutationObserver(ajustaCuenta).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] }); } } catch {}
-function entrar(nombre) { yoCache = null; $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
+// Al tocar el aviso «Hoy es tu día»: se abre el pedido fijo en «Revisar y enviar» (carrito para revisar; NUNCA se envía solo)
+async function revisarFijoDesdeAviso() {
+  try { history.replaceState(null, "", location.pathname); } catch {}
+  const j = await fetch("/api/pedido-fijo").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  if (j?.fijo?.lineas?.length) location.href = (window.__catUrl || "/catalogo") + "#c=" + j.fijo.lineas.map((l) => encodeURIComponent(l.id) + "." + l.uds).join(",") + "&r=1";
+}
+function entrar(nombre) { yoCache = null; $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (location.hash === "#revisar-fijo") { revisarFijoDesdeAviso(); } if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
 
 (async () => {
   const r = await fetch("/api/yo").catch(() => null);

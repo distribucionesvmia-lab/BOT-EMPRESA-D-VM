@@ -88,6 +88,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   // Favoritos del cliente (privados, por cliente; no los toca la sincronización con a3ERP)
   // Pedido fijo semanal (F-16): la plantilla de líneas y los días de reparto; NUNCA se envía solo, el cliente la revisa cada día que toca
   db.exec("CREATE TABLE IF NOT EXISTS usual_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, hidden INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)"); // «Tu pedido de siempre» editado o borrado por el cliente (sin fila = el último pedido, como siempre)
+  db.exec("CREATE TABLE IF NOT EXISTS corte_pref (customer_id TEXT PRIMARY KEY, activo INTEGER NOT NULL)"); // «Avisarme antes de la hora límite»: sin fila = activado (si tiene los avisos del móvil activados)
+  db.exec("CREATE TABLE IF NOT EXISTS corte_avisos (customer_id TEXT NOT NULL, day TEXT NOT NULL, PRIMARY KEY (customer_id, day))"); // un aviso por día y cliente como máximo
   db.exec("CREATE TABLE IF NOT EXISTS standing_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, days TEXT NOT NULL, paused INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)");
   db.exec("CREATE TABLE IF NOT EXISTS reminders (customer_id TEXT NOT NULL, day TEXT NOT NULL, state TEXT NOT NULL, PRIMARY KEY (customer_id, day))"); // day = '' para «no avisar más»
   db.exec("CREATE TABLE IF NOT EXISTS delivery_addresses (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, text TEXT NOT NULL, created_at TEXT NOT NULL)"); // direcciones de entrega que el cliente guarda para otras veces (máx. 5)
@@ -232,7 +234,12 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     },
     hideUsual(customerId, now = new Date().toISOString()) { db.prepare("INSERT INTO usual_orders (customer_id, lines, hidden, updated_at) VALUES (?, '[]', 1, ?) ON CONFLICT(customer_id) DO UPDATE SET lines = '[]', hidden = 1, updated_at = excluded.updated_at").run(String(customerId), now); return true; },
     resetUsual: (customerId) => db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(String(customerId)).changes === 1,
-    allStanding() { const m = new Map(); for (const r of db.prepare("SELECT customer_id, days, paused FROM standing_orders").all()) m.set(r.customer_id, { days: JSON.parse(r.days), paused: !!r.paused }); return m; },
+    allStanding() { const m = new Map(); for (const r of db.prepare("SELECT customer_id, days, paused, skip_week FROM standing_orders").all()) m.set(r.customer_id, { days: JSON.parse(r.days), paused: !!r.paused, skipWeek: r.skip_week ?? null }); return m; },
+    /** «Avisarme antes de la hora límite» (por defecto sí). */
+    corteActivo: (customerId) => (db.prepare("SELECT activo FROM corte_pref WHERE customer_id = ?").get(String(customerId))?.activo ?? 1) === 1,
+    corteSet: (customerId, activo) => { db.prepare("INSERT INTO corte_pref (customer_id, activo) VALUES (?, ?) ON CONFLICT(customer_id) DO UPDATE SET activo = excluded.activo").run(String(customerId), activo ? 1 : 0); return true; },
+    corteAvisado: (customerId, day) => !!db.prepare("SELECT 1 FROM corte_avisos WHERE customer_id = ? AND day = ?").get(String(customerId), String(day)),
+    corteMarcar(customerId, day) { db.prepare("INSERT OR IGNORE INTO corte_avisos (customer_id, day) VALUES (?, ?)").run(String(customerId), String(day)); db.prepare("DELETE FROM corte_avisos WHERE day < date(?, '-30 day')").run(String(day)); },
     /** «Ya avisado» (solo hoy) o «No avisar más» (siempre) para un cliente. */
     markReminder(customerId, state, day) { if (state === "nunca") db.prepare("INSERT OR REPLACE INTO reminders (customer_id, day, state) VALUES (?, '', 'nunca')").run(String(customerId)); else db.prepare("INSERT OR REPLACE INTO reminders (customer_id, day, state) VALUES (?, ?, 'avisado')").run(String(customerId), String(day)); return true; },
     reminderSets(day) { const r = db.prepare("SELECT customer_id, day, state FROM reminders WHERE day = '' OR day = ?").all(String(day)); return { avisadosHoy: new Set(r.filter((x) => x.state === "avisado").map((x) => x.customer_id)), nunca: new Set(r.filter((x) => x.state === "nunca").map((x) => x.customer_id)) }; },
@@ -440,6 +447,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         db.prepare("DELETE FROM delivery_addresses WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM standing_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM corte_pref WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM corte_avisos WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM push_subs WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM registrations WHERE customer_id = ? OR (phone = ? AND ? IS NOT NULL)").run(row.customer_id, row.phone, row.phone);
         db.prepare("UPDATE accounts SET phone = NULL, email = NULL, pin_hash = NULL, code_key = NULL, status = 'deleted', verified = 0, failed = 0, lock_count = 0, locked_until = NULL, deleted_at = ? WHERE id = ?").run(now, row.id);

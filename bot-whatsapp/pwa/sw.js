@@ -24,5 +24,5 @@ self.addEventListener("push", (e) => {
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
   const url = e.notification.data?.url || "/cliente";
-  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((ws) => { const w = ws.find((x) => new URL(x.url).origin === self.location.origin); return w ? w.focus() : self.clients.openWindow(url); }));
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((ws) => { const w = ws.find((x) => new URL(x.url).origin === self.location.origin); return w ? w.focus().then((c) => { try { return c.navigate ? c.navigate(url) : c; } catch { return c; } }) : self.clients.openWindow(url); }));
 });
