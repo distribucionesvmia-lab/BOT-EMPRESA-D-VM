@@ -51,3 +51,11 @@ test("PANEL: botón «Editar datos» en la ficha, formulario con teléfonos y co
   assert.match(h, /function seccionDatos\(f\)/); assert.match(h, /function editarDatos\(f, sec\)/); assert.match(h, /Editar datos/); assert.match(h, /Notas internas \(el cliente no las ve\)/); assert.match(h, /Viene de a3ERP: no se puede quitar desde aquí/);
   assert.match(a, /if \(mf && post\)/); assert.match(a, /validarEdicion/); assert.match(a, /también lo tiene/);
 });
+
+test("FICHA: dice a qué correo va la confirmación de pedido (el de su cuenta tiene prioridad) y si el cliente la quitó", async () => {
+  const { elegirDestino } = await import("./correo-cliente.js");
+  assert.equal(elegirDestino({ account: { email: "cuenta@ejemplo.es" }, customer: { emails: ["ficha@ejemplo.es"] } }), "cuenta@ejemplo.es");
+  assert.equal(elegirDestino({ account: { email: null }, customer: { emails: ["ficha@ejemplo.es"] } }), "ficha@ejemplo.es");
+  const h = leer("./empresa.html"), a = leer("./admin.js");
+  assert.match(h, /Confirmación de pedido por correo/); assert.match(h, /tiene prioridad sobre los de su ficha/); assert.match(a, /correoPedidos: \{ destino: elegirDestino/);
+});

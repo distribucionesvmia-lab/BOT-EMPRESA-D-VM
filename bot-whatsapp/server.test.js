@@ -1513,3 +1513,9 @@ test("EDITAR LA FICHA DE CLIENTE: solo con la clave, valida lo que se escribe y 
   assert.equal((await P(cli.id, { telefonos: [], correos: [] })).status, 200); // lo añadido a mano se puede quitar
   const g = (await call("GET", `/api/admin/cliente/${encodeURIComponent(cli.id)}/ficha`, { admin: true })).json; assert.deepEqual(g.manual.correos, []); assert.ok(!g.cliente.correos.includes("nuevo@ejemplo.es"));
 });
+
+test("FICHA DE CLIENTE: incluye adónde va la confirmación de pedido por correo", async () => {
+  const cli = (await call("GET", "/api/admin/clientes?q=a", { admin: true })).json[0];
+  const f = (await call("GET", `/api/admin/cliente/${encodeURIComponent(cli.id)}/ficha`, { admin: true })).json;
+  assert.ok(f.correoPedidos && "destino" in f.correoPedidos && typeof f.correoPedidos.activo === "boolean");
+});

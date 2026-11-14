@@ -16,6 +16,7 @@ import { backupDb } from "./backup.js";
 import { estadoCopias, comprobarCopias } from "./copias.js";
 import { validarProgramado, MAX_PENDIENTES } from "./avisos-programados.js";
 import { validarEdicion } from "./cliente-edicion.js";
+import { elegirDestino } from "./correo-cliente.js";
 import { detectarTipo } from "./actualizar-datos.js";
 import { crearAvisos } from "./avisos.js";
 import { execFile } from "node:child_process";
@@ -459,6 +460,7 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
             manual: c0 ? { telefonos: customers.manualOf(id).phones ?? [], correos: customers.manualOf(id).emails ?? [] } : null, notas: c0 ? (customers.manualOf(id).notes ?? "") : "",
             cliente: { id: c.id, nombre: c.name, razon: c.legalName, poblacion: c.city, municipio: c.municipio, direccion: c.address, telefonos: [...new Set([c.phone, ...c.phones].filter(Boolean))], correos: c.emails, recargo: c.recargoEquivalencia, activo: c.active },
             esPrueba: esPruebaId(id), sinFicha: !c0,
+            correoPedidos: { destino: elegirDestino({ account: cu, customer: c }), activo: accounts.correoPedidoActivo(id), delaCuenta: !!cu?.email && elegirDestino({ account: cu, customer: c }) === cu.email },
             cuenta: cu ? { estado: cu.status, confirmada: cu.verified, bloqueada: cu.locked, ultimoAcceso: cu.lastLogin, creada: cu.createdAt, codigoPropio: cu.ownCode } : null,
             totalPedidosApp: todos.length,
             pedidos: todos.slice(0, 12).map(orderView).map((o) => ({ ref: o.ref, fecha: o.fecha, entrega: o.entrega?.texto ?? "", total: o.total, estado: o.estado, modificado: o.modificado, lineas: o.lineas.slice(0, 30).map((l) => ({ nombre: l.nombre, unidades: l.unidades, cajas: l.unidad === "caja" ? l.cajas : 0 })) })),
