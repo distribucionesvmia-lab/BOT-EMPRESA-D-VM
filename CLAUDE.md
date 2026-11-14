@@ -162,3 +162,11 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - Tarjetas de pedido del chat (histórico, último pedido): cada línea en dos filas y la tarjeta ocupa todo el ancho en móvil; el atajo se llama «Histórico de pedidos». Cantidad con coma o punto: solo vale la parte entera («1,5» → 1), pase lo que pase con el teclado.
 - Pruebas: `tanda10.test.js`.
 - **Pruebas que fallaban «porque sí»**: `server.test.js` y `dos-aplicaciones.test.js` sorteaban puertos en rangos pequeños (y chocaban entre sí o con un programa que ya estuviera abierto): fallaban decenas de pruebas y luego pasaban al repetir. En la oficina eso hace que «VM Actualizar» VUELVA ATRÁS una versión buena y no la reintente. Ahora piden un puerto libre al sistema (`puerto-libre.js`). Nunca fijar ni sortear puertos en una prueba nueva: usar `libre()`.
+
+## Tanda 11 de QA (categorías, ficha, ofertas y red)
+- **PDF sobre otra ventana**: en el catálogo el PDF es una capa más del sistema de «Atrás»/Esc (`DINAMICAS` incluye `pdf-visor`); Esc se atiende en la fase de captura, así que cierra solo la ventana de arriba (PDF, ayuda, ficha, calendario o resumen) y no el pedido. En el chat el PDF conserva su entrada de historial y las ventanas (`.vm-modal`) ignoran el «Atrás» del PDF.
+- **Ficha de producto** (`abrirFicha` en `pedido.html`, hoja inferior; se abre al tocar la foto o el nombre): nombre completo, marca, formato, medidas, unidades por caja, precio por unidad (con el anterior tachado si hay descuento) y por caja, IVA y oferta; la foto se amplía desde ahí.
+- La tarjeta dice siempre la unidad de venta («Por unidades», «Caja de N», «Pack de N») y las medidas del nombre (`medidasDeNombre`); el precio por unidad es el YA descontado (`precioUd`) con el anterior tachado (`.pf-viejo`).
+- **Categorías grandes** (más de 30 artículos): «Ordenar» (lo que más pido, nombre, precio) y «Marca» (`ordenCat`, `marcaCat`; se reinician al cambiar de categoría). El número de artículos no se parte (`white-space:nowrap`).
+- **Red**: aviso «Cargando el catálogo…» si tarda más de 0,8 s; dos toques seguidos en «+» avisan «ahora llevas N»; sin conexión sale una banda fija (`#sinRed`) y «Enviar pedido» se bloquea hasta que vuelva la red (`pintaRed`).
+- Pruebas: `tanda11.test.js`.

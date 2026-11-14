@@ -258,7 +258,7 @@ test("PDF: se ve dentro de la app con botón «Cerrar» (y «Descargar»), «Atr
   const cli = leer("./cliente.html");
   for (const h of [cli, pedido]) {
     assert.match(h, /function abrirPdf\(url, nombre\)/); assert.match(h, /x\.setAttribute\("aria-label", "Cerrar el PDF"\)/); assert.match(h, /d\.setAttribute\("download", ""\)/);
-    assert.match(h, /navigator\.pdfViewerEnabled === false/); assert.match(h, /history\.pushState\(\{ pdf: 1 \}/); assert.match(h, /\.pdf-cerrar, \.pdf-desc, \.pdf-abre \{[^}]*min-height:44px/);
+    assert.match(h, /navigator\.pdfViewerEnabled === false/); assert.match(h, /\.pdf-cerrar, \.pdf-desc, \.pdf-abre \{[^}]*min-height:44px/);
   }
   assert.match(cli, /nodo\("button", "Ver \/ imprimir PDF", "vm-btn ghost"\)/); assert.match(cli, /pdf-imp/); assert.match(pedido, /id="donePdf" href="#" hidden>Ver PDF</);
 });
@@ -272,4 +272,11 @@ test("TANDA 5: pedido fijo con «Cancelar» y aparte de «Confirmar pedido»; co
   assert.match(p, /#cart \.tl \.cx \{ min-height:44px/);
   const c = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
   assert.match(c, /Histórico de pedidos/);
+});
+
+test("PDF sobre otra ventana (tanda 11): en el catálogo es una capa del sistema de «Atrás»/Esc (cierra solo la de arriba) y en el chat conserva su entrada de historial", () => {
+  const cli = leer("./cliente.html");
+  assert.match(cli, /history\.pushState\(\{ pdf: 1 \}/);
+  assert.match(pedido, /"pdf-visor"\]/); assert.doesNotMatch(pedido, /history\.pushState\(\{ pdf: 1 \}/);
+  assert.match(pedido, /\}, true\); \/\/ en captura \(antes que las ventanas\)/);
 });

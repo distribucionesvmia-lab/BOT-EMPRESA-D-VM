@@ -18,11 +18,11 @@ test("2. el menú ⋯ y el desplegable «Aa» no se quedan abiertos a la vez (en
 test("3. catálogo con la letra al máximo: el nombre del artículo ocupa hasta 4 líneas, se ve entero al tocarlo y el buscador no corta su texto", () => {
   assert.match(p, /html\[data-letra-grande\] \.pf-n \{ -webkit-line-clamp:4; \}/);
   assert.match(p, /\.pf-n\.completo \{ -webkit-line-clamp:unset !important/);
-  assert.match(p, /n\.addEventListener\("click", \(\) => n\.classList\.toggle\("completo"\)\)/);
+  assert.match(p, /n\.addEventListener\("click", \(\) => abrirFicha\(p\)\)/); // tanda 11: tocar el nombre abre la ficha con el nombre entero
   assert.match(p, /\$\("q"\)\.placeholder = g \? "Buscar" : "Buscar productos"/);
 });
 test("4. «Atrás» cierra primero la ventana abierta: ayuda, preguntas y foto ampliada en el catálogo; ayuda en el chat", () => {
-  assert.match(p, /const DINAMICAS = \["ayuda-fondo", "pregunta-fondo", "zoomFoto"\]/);
+  assert.match(p, /const DINAMICAS = \["ayuda-fondo", "pregunta-fondo", "ficha-fondo", "zoomFoto", "pdf-visor"\]/);
   assert.match(p, /obs\.observe\(document\.body, \{ childList: true \}\)/); assert.match(p, /obs\.observe\(z, \{ attributes: true, attributeFilter: \["style"\] \}\)/);
   assert.match(h, /const ayudaAb = \(\) => \[\.\.\.document\.querySelectorAll\("#ayuda-fondo"\)\]/);
 });
