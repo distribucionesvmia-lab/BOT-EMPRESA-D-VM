@@ -179,3 +179,9 @@ test("chat: atajos «Último pedido» e «Histórico» como dos tarjetas con ico
   assert.match(cli, /\.quick button \{ display:flex; align-items:center; gap:var\(--s3\); min-height:56px;/);
   assert.match(cli, /enviar\(b\.dataset\.q, b\.querySelector\("b"\)\?\.textContent \?\? b\.textContent\)/);
 });
+
+test("catálogo: botón «Mi cuenta» arriba (icono en móvil, con texto si hay sitio) que abre Mi cuenta en el chat", () => {
+  assert.match(pedido, /id="cuentaBtn" class="ds-circ cuenta"[^>]*aria-label="Mi cuenta: mis datos y mis pedidos"/);
+  assert.match(pedido, /\$\("cuentaBtn"\)\.onclick = \(\) => \{ location\.href = "\/cliente#cuenta"; \}/);
+  assert.match(pedido, /@media \(max-width:439px\) \{ header \.ds-circ\.cuenta \{ width:44px; padding:0; \}/);
+});
