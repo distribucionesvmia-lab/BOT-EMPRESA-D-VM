@@ -69,3 +69,12 @@ test("personas nuevas: el panel ofrece alta / ver / pedir, la ficha es obligator
   assert.match(au, /u\.tipo === "alta"/); assert.match(au, /"\/cliente#alta=" \+ encodeURIComponent/);
   assert.match(c, /\^#alta=\//); assert.match(c, /\$\("r-emp"\)\.value = nom/); assert.match(c, /ver\("registro"\)/);
 });
+
+test("panel de la empresa: ancho, menú lateral en pantalla grande, pestañas en fila en móvil y la pestaña elegida no se aclara al pasar el ratón", () => {
+  const e = leer("./empresa.html");
+  assert.match(e, /main \{ max-width:1840px;/); assert.match(e, /#app:not\(\[hidden\]\) \{ display:grid !important; grid-template-columns:248px minmax\(0, 1fr\)/); // el menú lateral no deja visible el panel antes de entrar
+  assert.match(e, /@media \(min-width: 1100px\)/); assert.match(e, /@media \(max-width: 1099px\)/); assert.match(e, /#app > \.tabs \.tab\[data-t="datos"\] \{ --ico:/);
+  assert.match(e, /button\.tab\[aria-selected="true"\]:hover:not\(:disabled\)/);
+  assert.match(e, /\.inv-grid \{ display:grid;/); assert.match(e, /prefers-color-scheme: dark/);
+  assert.doesNotMatch(e, /<link[^>]+href=|@import/); // sin recursos externos: el panel funciona sin internet
+});

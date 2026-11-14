@@ -55,6 +55,76 @@
   #inv-card label:not([style*="flex"]) { display:grid; gap:4px; min-width:0; } #inv-card label input:not([type="checkbox"]), #inv-card label select, #inv-card label textarea { width:100%; max-width:100%; min-width:0; } #inv-card p { overflow-wrap:anywhere; }
   .pasoDx { background:var(--accent-soft, #e8f4ee); color:var(--accent, #0b6e4f); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:700; }
   .dx-card h2 { text-transform:none; letter-spacing:0; font-size:18px; }
+
+  /* ═════════ Diseño de panel profesional (tipo gestión / contabilidad): barra lateral, tarjetas limpias, tablas legibles ═════════ */
+  :root { --bg:#f3f5f8; --panel:#fff; --fg:#0f172a; --muted:#64748b; --line:#e3e8ef; --line-2:#eef2f6; --accent:#0f7a4d; --accent-2:#0b6140; --soft:#e7f4ed; --th:#f8fafc; --hover:#f6f9fb; --shadow:0 1px 2px rgba(15,23,42,.05), 0 1px 3px rgba(15,23,42,.04); --nav:#0f1d2b; --nav-fg:#cbd5e1; --nav-on:#fff; --nav-hover:rgba(255,255,255,.07); --nav-act:rgba(55,195,130,.16); --nav-acc:#37c382; --r:12px; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0b1117; --panel:#131c25; --fg:#e8eef4; --muted:#8b9bab; --line:#223040; --line-2:#1a2733; --accent:#37c382; --accent-2:#2fae72; --soft:#12372a; --th:#17222d; --hover:#162330; --shadow:0 1px 2px rgba(0,0,0,.4); --nav:#111c27; --nav-fg:#a8b6c4; --nav-hover:rgba(255,255,255,.06); } }
+  body { background:var(--bg); font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size:14px; padding:0; -webkit-font-smoothing:antialiased; }
+  main { max-width:1840px; width:100%; margin:0 auto; padding:0 clamp(12px, 2vw, 32px) 40px; gap:0; }
+  /* barra superior */
+  header { position:sticky; top:0; z-index:30; margin:0 calc(-1 * clamp(12px, 2vw, 32px)); padding:12px clamp(12px, 2vw, 32px); background:var(--panel); border-bottom:1px solid var(--line); box-shadow:var(--shadow); align-items:center; }
+  header h1 { font-size:17px; font-weight:700; letter-spacing:-.01em; display:flex; align-items:center; gap:10px; }
+  header h1::before { content:""; width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg, var(--accent), var(--accent-2)); flex:none; box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }
+  header .muted { font-size:12.5px; display:inline-flex; align-items:center; gap:6px; } header .muted:not(:empty)::before { content:""; width:8px; height:8px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 3px rgba(34,197,94,.18); }
+  /* tarjetas */
+  .panel, .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--shadow); padding:20px 22px; }
+  .card { margin-bottom:16px; }
+  h2 { margin:0 0 10px; font-size:11.5px; font-weight:700; letter-spacing:.09em; color:var(--muted); }
+  h3 { margin:0 0 6px; font-size:16px; font-weight:700; letter-spacing:-.01em; } h4 { font-size:14px; }
+  #app > div:not(.tabs):not(.pin):not(.panel):not([hidden]), #p-pedidos, #p-cuentas { display:grid; gap:16px; align-content:start; }
+  /* campos y botones */
+  input, select, textarea { font:inherit; color:var(--fg); background:var(--panel); border:1px solid #cdd6e0; border-radius:8px; padding:0 12px; min-height:40px; transition:border-color .15s, box-shadow .15s; }
+  textarea { padding:10px 12px; }
+  input:hover, select:hover, textarea:hover { border-color:#aab6c4; } input:focus, select:focus, textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); outline:none; }
+  @media (prefers-color-scheme: dark) { input, select, textarea { border-color:#2c3d4f; background:#0e1720; } input:hover, select:hover, textarea:hover { border-color:#41566b; } }
+  input[type=checkbox] { min-height:0; width:16px; height:16px; accent-color:var(--accent); }
+  button { min-height:38px; padding:0 14px; border-radius:8px; border:1px solid #cdd6e0; background:var(--panel); font-weight:600; transition:background .15s, border-color .15s, box-shadow .15s; }
+  button:hover:not(:disabled) { background:var(--hover); border-color:#aab6c4; }
+  button.main { background:var(--accent); border-color:var(--accent); color:var(--accent-fg); box-shadow:0 1px 2px rgba(15,122,77,.35); } button.main:hover:not(:disabled) { background:var(--accent-2); border-color:var(--accent-2); }
+  @media (prefers-color-scheme: dark) { button { border-color:#2c3d4f; } button:hover:not(:disabled) { border-color:#41566b; } }
+  /* tablas */
+  table { font-size:13.5px; } th { background:var(--th); font-size:11px; font-weight:700; padding:10px 12px; border-bottom:1px solid var(--line); position:sticky; top:0; } th:first-child { border-top-left-radius:8px; } th:last-child { border-top-right-radius:8px; }
+  td { padding:11px 12px; border-bottom:1px solid var(--line-2); } tbody tr:hover > td { background:var(--hover); } tbody tr:last-child > td { border-bottom:0; }
+  .scroll { border:1px solid var(--line); border-radius:10px; } .scroll table { margin:0; } .xl-hoja { border-color:#bfbfbf; }
+  .lines td { border:0; } .ar-editor td { background:var(--th); }
+  .badge { font-size:11.5px; padding:3px 10px; letter-spacing:.01em; } .n { background:var(--accent); color:var(--accent-fg); font-weight:700; }
+  .pin { border-radius:var(--r); border:1px solid color-mix(in srgb, var(--warn-fg) 30%, transparent); box-shadow:var(--shadow); }
+  details.panel > summary { font-weight:700; } #p-cuentas > h2 { margin-bottom:-8px; }
+  .req > span::after, .rojo { color:var(--err); } .req > span::after { content:" *"; }
+  /* formularios en cuadrícula (ancho) */
+  .inv-grid { display:grid; gap:14px 18px; grid-template-columns:repeat(auto-fit, minmax(min(100%, 280px), 1fr)); align-items:end; } .inv-grid > .inv-ancho, .inv-grid > button.main, .inv-grid > p { grid-column:1 / -1; } .inv-ancho { padding:14px; background:var(--th); border:1px solid var(--line); border-radius:10px; }
+  #inv-card .inv-grid > button.main { justify-self:start; min-width:260px; min-height:42px; }
+  #inv-card label:not([style*="flex"]) { font-size:12.5px; font-weight:600; color:var(--muted); } #inv-card label small { font-weight:400; }
+  #inv-card label input:not([type="checkbox"]), #inv-card label select, #inv-card label textarea { font-weight:400; color:var(--fg); }
+  #inv-card > details { margin-top:14px; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--th); }
+  #inv-url { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:12.5px; }
+  /* acceso */
+  #login { max-width:420px; margin:12vh auto 0; padding:28px; } #login h2 { font-size:13px; }
+  #login .row { flex-wrap:nowrap; } #login input { flex:1; }
+  /* ── escritorio: menú lateral oscuro + contenido ancho ── */
+  @media (min-width: 1100px) {
+    #app:not([hidden]) { display:grid !important; grid-template-columns:248px minmax(0, 1fr); column-gap:24px; align-items:start; padding-top:20px; }
+    #app > * { grid-column:2; } #app > .tabs { grid-column:1; grid-row:1 / span 30; position:sticky; top:76px; flex-direction:column; flex-wrap:nowrap; gap:2px; background:var(--nav); border-radius:14px; padding:10px; box-shadow:0 8px 24px rgba(8,17,26,.18); }
+    #app > .tabs::before { content:"MENÚ"; font-size:10.5px; letter-spacing:.14em; color:#7b8da0; padding:8px 12px 6px; font-weight:700; }
+    #app > .tabs .tab { display:flex; align-items:center; gap:11px; text-align:left; min-height:42px; padding:0 12px; background:transparent; border:0; border-radius:9px; color:var(--nav-fg); font-weight:600; box-shadow:none; position:relative; }
+    #app > .tabs .tab::before { content:""; width:18px; height:18px; flex:none; background:currentColor; opacity:.85; -webkit-mask:var(--ico) center/contain no-repeat; mask:var(--ico) center/contain no-repeat; }
+    #app > .tabs .tab:hover { background:var(--nav-hover); color:var(--nav-on); border:0; }
+    #app > .tabs .tab[aria-selected="true"] { background:var(--nav-act); color:var(--nav-on); border:0; } #app > .tabs .tab[aria-selected="true"]::after { content:""; position:absolute; left:-10px; top:9px; bottom:9px; width:3px; border-radius:0 3px 3px 0; background:var(--nav-acc); }
+    #app > .tabs .tab .n { margin-left:auto; background:var(--nav-acc); color:#06281a; }
+  }
+  #app > .tabs .tab[data-t="pedidos"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z'/><path d='M3 6h18'/><path d='M16 10a4 4 0 0 1-8 0'/></svg>"); }
+  #app > .tabs .tab[data-t="solicitudes"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M19 8v6M22 11h-6'/></svg>"); }
+  #app > .tabs .tab[data-t="cuentas"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'/><circle cx='9' cy='7' r='4'/><path d='M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75'/></svg>"); }
+  #app > .tabs .tab[data-t="articulos"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m21 8-9-5-9 5 9 5z'/><path d='M3 8v8l9 5 9-5V8'/><path d='M12 13v8'/></svg>"); }
+  #app > .tabs .tab[data-t="avisos"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9'/><path d='M13.7 21a2 2 0 0 1-3.4 0'/></svg>"); }
+  #app > .tabs .tab[data-t="datos"] { --ico:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><ellipse cx='12' cy='5' rx='9' ry='3'/><path d='M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5'/><path d='M3 12c0 1.7 4 3 9 3s9-1.3 9-3'/></svg>"); }
+  button.tab[aria-selected="true"]:hover:not(:disabled) { background:var(--accent); border-color:var(--accent); color:var(--accent-fg); } /* la pestaña elegida no se aclara al pasar el ratón */
+  @media (min-width: 1100px) { #app > .tabs .tab[aria-selected="true"]:hover:not(:disabled) { background:var(--nav-act); color:var(--nav-on); border:0; } }
+  #app, #app > *, #p-pedidos > *, #p-cuentas > *, .panel, .card { min-width:0; max-width:100%; } #p-pedidos, #p-cuentas, #app > div:not(.tabs):not(.pin):not(.panel) { grid-template-columns:minmax(0, 1fr); }
+  .row { min-width:0; } .row > * { max-width:100%; }
+  /* menos de 1100 px: pestañas en fila, deslizables */
+  @media (max-width: 1099px) { #app > .tabs { flex-wrap:nowrap; overflow-x:auto; gap:6px; padding:12px 0; position:sticky; top:58px; z-index:20; background:var(--bg); } #app > .tabs .tab { white-space:nowrap; border-radius:999px; } #app > .tabs .tab::before { display:none; } #app { padding-top:0; } }
+  @media (max-width: 640px) { .panel, .card { padding:16px; } .inv-grid { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
@@ -191,24 +261,24 @@
         <p class="muted" style="margin:0 0 8px">Crea un enlace para que un cliente entre sin escribir nada. Tú eliges cuánto vale, cuántas veces se puede usar y si solo puede mirar o también pedir. <b>Lo mandas tú</b>: el sistema no envía nada.</p>
         <label>Para quién es
           <select id="inv-para" aria-label="Para quién es el enlace"><option value="cliente" selected>Un cliente que ya tengo</option><option value="nuevo">Una persona nueva (aún sin alta)</option></select></label>
-        <div id="inv-cli" style="display:grid;gap:6px;margin-top:6px"><input id="inv-q" type="search" placeholder="Busca el cliente por nombre o código" aria-label="Buscar cliente para el enlace"><select id="inv-sel" aria-label="Cliente"></select></div>
-        <div id="inv-nuevo" hidden style="display:grid;gap:8px;margin-top:6px">
-          <label>Nombre de la persona o del negocio <b>*</b> <input id="inv-n-nombre" type="text" maxlength="80" autocomplete="off" aria-label="Nombre de la persona nueva"></label>
+        <div id="inv-cli" class="inv-grid" style="margin-top:10px"><input id="inv-q" type="search" placeholder="Busca el cliente por nombre o código" aria-label="Buscar cliente para el enlace"><select id="inv-sel" aria-label="Cliente"></select></div>
+        <div id="inv-nuevo" class="inv-grid" hidden style="margin-top:10px">
+          <label class="req"><span>Nombre de la persona o del negocio</span> <input id="inv-n-nombre" type="text" maxlength="80" autocomplete="off" aria-label="Nombre de la persona nueva"></label>
           <label>Qué quieres que pueda hacer
             <select id="inv-n-tipo" aria-label="Qué puede hacer la persona nueva"><option value="alta">Solo darse de alta (se le abre el formulario con su nombre)</option><option value="ver">Ver la app por dentro, sin pedir</option><option value="pedir">Pedir con normalidad (hay que rellenar su ficha)</option></select></label>
-          <label>Teléfono <span id="inv-n-tel-o" class="muted">(opcional: solo para abrir el WhatsApp)</span><b id="inv-n-tel-r" hidden>*</b> <input id="inv-n-tel" type="tel" inputmode="tel" autocomplete="off" aria-label="Teléfono"></label>
-          <div id="inv-n-ficha" hidden style="display:grid;gap:8px">
+          <label><span>Teléfono <small id="inv-n-tel-o" class="muted">(opcional: solo para abrir el WhatsApp)</small><b id="inv-n-tel-r" class="rojo" hidden>*</b></span> <input id="inv-n-tel" type="tel" inputmode="tel" autocomplete="off" aria-label="Teléfono"></label>
+          <div id="inv-n-ficha" class="inv-grid inv-ancho" hidden>
             <p class="muted" style="margin:0">Ficha del cliente: para que pueda pedir como cualquier cliente hay que rellenarla. Se crea como cliente provisional (código P0000x) hasta que le des su código de a3ERP.</p>
-            <label>DNI, NIE o CIF <b>*</b> <input id="inv-n-nif" type="text" maxlength="12" autocomplete="off" aria-label="DNI, NIE o CIF"></label>
-            <label>Dirección de entrega <b>*</b> <input id="inv-n-dir" type="text" maxlength="160" autocomplete="off" aria-label="Dirección"></label>
-            <label>Población <b>*</b> <input id="inv-n-pob" type="text" maxlength="60" autocomplete="off" aria-label="Población"></label>
+            <label class="req"><span>DNI, NIE o CIF</span> <input id="inv-n-nif" type="text" maxlength="12" autocomplete="off" aria-label="DNI, NIE o CIF"></label>
+            <label class="req"><span>Dirección de entrega</span> <input id="inv-n-dir" type="text" maxlength="160" autocomplete="off" aria-label="Dirección"></label>
+            <label class="req"><span>Población</span> <input id="inv-n-pob" type="text" maxlength="60" autocomplete="off" aria-label="Población"></label>
             <label>Código de municipio (Medina del Campo = 47085; opcional) <input id="inv-n-mun" type="text" maxlength="5" inputmode="numeric" autocomplete="off" aria-label="Código de municipio"></label>
             <label>Correo (opcional) <input id="inv-n-mail" type="email" autocomplete="off" aria-label="Correo"></label>
             <label>Razón social (opcional) <input id="inv-n-razon" type="text" maxlength="80" autocomplete="off" aria-label="Razón social"></label>
             <label style="display:flex;gap:8px;align-items:center"><input id="inv-n-re" type="checkbox"> Tiene recargo de equivalencia</label>
           </div>
         </div>
-        <div class="inv-opc" style="display:grid;gap:8px;margin-top:10px">
+        <div class="inv-opc inv-grid" style="margin-top:10px">
           <label>Cuánto vale el enlace
             <select id="inv-dias" aria-label="Días que vale el enlace"><option value="1">1 día</option><option value="3">3 días</option><option value="7" selected>7 días</option><option value="30">30 días</option><option value="fecha">Hasta una fecha…</option></select></label>
           <label id="inv-fecha-l" hidden>Fecha en la que caduca <input id="inv-fecha" type="date" aria-label="Fecha de caducidad"></label>
