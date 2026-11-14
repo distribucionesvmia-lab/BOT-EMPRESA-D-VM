@@ -1217,6 +1217,7 @@
   #confirm { line-height:1.2; padding-top:var(--s2); padding-bottom:var(--s2); }
   main, .app.sin-carrito main { padding-bottom:calc(var(--tb-h) + var(--pie-h, 88px) + 28px); } .app.sin-carrito main { padding-bottom:calc(var(--tb-h) + 16px); }
   @media (min-width:1024px) { #resumen .cartfoot { align-items:center; } #resumen .cartfoot .big { max-width:520px; } }
+  .ayuda-ver { margin:var(--s2) 0 0; font-size:calc(var(--t-micro) / var(--k,1)); color:var(--text-2); text-align:center; } .ayuda-ver:empty { display:none; }
 </style>
 </head>
 <body>
@@ -1380,6 +1381,8 @@ function abrirAyuda(a, nombre) {
   const pintaTema = () => grp.querySelectorAll("button").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.t === actual())); });
   for (const [k, t] of [["auto", "Automático"], ["claro", "Claro"], ["oscuro", "Oscuro"]]) { const b = document.createElement("button"); b.type = "button"; b.dataset.t = k; b.textContent = t; b.onclick = () => { const r = document.documentElement; r.classList.add("cambiando"); setTimeout(() => r.classList.remove("cambiando"), 320); try { if (k === "auto") localStorage.removeItem("vm:tema"); else localStorage.setItem("vm:tema", k); } catch {} if (k === "auto") r.removeAttribute("data-tema"); else r.setAttribute("data-tema", k); pintaTema(); }; grp.appendChild(b); }
   pintaTema(); aj.appendChild(grp); c.appendChild(aj);
+  { const v = document.createElement("p"); v.className = "ayuda-ver"; c.appendChild(v); // versión del programa que está funcionando (para saber qué se ha publicado)
+    fetch("/health", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (j && j.version) v.textContent = "Versión del programa: " + j.version + (j.reinicioPendiente ? " (hay otra más nueva pendiente de reiniciar)" : ""); }).catch(() => {}); }
   const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Cerrar";
   const cerrar = () => { f.remove(); document.removeEventListener("keydown", esc); }; const esc = (e) => { if (e.key === "Escape") cerrar(); };
   arrastrable(c, cerrar); x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
@@ -1484,16 +1487,17 @@ function preguntar({ titulo, texto, si = "Sí, continuar", no = "Cambiar" }) {
 function campoCantidad(id, q, nombre) {
   const inp = document.createElement("input"); inp.type = "text"; inp.inputMode = "numeric"; inp.autocomplete = "off"; inp.value = q; inp.setAttribute("aria-label", "Cantidad de " + nombre); inp.setAttribute("maxlength", "3");
   const sel = () => setTimeout(() => { try { inp.select(); } catch {} }, 0);
-  inp.onfocus = () => { sep = false; antes = inp.value; sel(); }; inp.onclick = sel; inp.addEventListener("mouseup", e => e.preventDefault()); // al tocar, se selecciona el número: escribir 999 sobre un 2 da 999 (el ratón no recoloca el cursor)
-  let antes = String(q), sep = false; // tras un punto o una coma se ignora lo que siga: «2.5» se queda en 2 (no pasa a 25) y se avisa
+  inp.onfocus = () => { sep = false; entero = null; antes = inp.value; sel(); }; inp.onclick = sel; inp.addEventListener("mouseup", e => e.preventDefault()); // al tocar, se selecciona el número: escribir 999 sobre un 2 da 999 (el ratón no recoloca el cursor)
+  let antes = String(q), sep = false, entero = null; // tras un punto o una coma se ignora lo que siga: «1,5» se queda en 1 (nunca pasa a 15) y se avisa
   inp.oninput = () => {
     let v = inp.value;
     if (sep) { inp.value = antes; return; }
-    if (/[.,]/.test(v)) { sep = true; aviso("Solo cantidades enteras."); v = v.split(/[.,]/)[0]; }
+    if (/[.,]/.test(v)) { sep = true; entero = parseInt(v.split(/[.,]/)[0].replace(/\D/g, ""), 10) || 0; aviso("Solo cantidades enteras."); v = v.split(/[.,]/)[0]; }
     const l = v.replace(/\D/g, "").slice(0, 3); if (l !== inp.value) inp.value = l; antes = l;
   };
   inp.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } };
   inp.onblur = async () => {
+    if (entero !== null) { const e = entero; entero = null; sep = false; inp.value = e > 0 ? String(Math.min(999, e)) : String(q); } // si se escribió un decimal, solo vale la parte entera, pase lo que pase con el teclado
     if (inp.value === "") { inp.value = q; return; } // vacío: vuelve al valor de antes (sin borrar la línea)
     const v = Math.min(999, parseInt(inp.value, 10) || 0);
     if (v === q) { inp.value = q; return; }

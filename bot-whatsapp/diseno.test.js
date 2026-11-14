@@ -239,7 +239,7 @@ test("tanda 3 (catálogo): barra de categoría con fondo, subcategorías como ch
 });
 
 test("tanda 4 (carrito y favoritos): cantidad solo entera y seleccionada al tocar, «¿Seguro?», aviso con el estilo de la app, líneas al final, recuperado una vez, IVA por tipo, botón sin partir", () => {
-  assert.match(pedido, /function campoCantidad\(id, q, nombre\)/); assert.match(pedido, /inp\.onfocus = \(\) => \{ sep = false; antes = inp\.value; sel\(\); \}/); assert.match(pedido, /Solo cantidades enteras\./); // 1, 2, 3
+  assert.match(pedido, /function campoCantidad\(id, q, nombre\)/); assert.match(pedido, /inp\.onfocus = \(\) => \{ sep = false; entero = null; antes = inp\.value; sel\(\); \}/); assert.match(pedido, /Solo cantidades enteras\./); // 1, 2, 3
   assert.match(pedido, /if \(inp\.value === ""\) \{ inp\.value = q; return; \}/); assert.match(pedido, /v\.split\(\/\[\.,\]\/\)\[0\]/);
   assert.match(pedido, /const LIM_CANTIDAD = 200, LIM_IMPORTE = 3000/); assert.match(pedido, /titulo: "¿Seguro\?"/); assert.match(pedido, /¿Seguro que quieres enviarlo\?/); // 4
   assert.match(pedido, /#cart \.tl td\.tl-imp \{ grid-column:1; display:flex; flex-wrap:wrap;/); // 5

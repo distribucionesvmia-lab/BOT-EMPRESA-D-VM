@@ -578,6 +578,19 @@
   .quick button, .quick button { flex:1 1 auto; min-width:min-content; max-width:100%; }
   .quick .q-tx b { overflow-wrap:normal; word-break:normal; hyphens:none; }
   @media (max-width:420px) { .quick button { flex:1 1 auto; } }
+  .ayuda-ver { margin:var(--s2) 0 0; font-size:calc(var(--t-micro) / var(--k,1)); color:var(--text-2); text-align:center; } .ayuda-ver:empty { display:none; }
+
+  /* Tarjeta de pedido del chat: cada línea en dos filas (nombre arriba; cantidad e importe abajo), sin ancho fijo: nada se corta por la derecha */
+  .tcard table, .tcard tbody, .tcard tfoot { display:block; width:100%; }
+  .tcard thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  .tcard tbody tr { display:grid; grid-template-columns:auto minmax(0, 1fr); column-gap:var(--s3); row-gap:var(--s1); padding:var(--s3); border-top:.5px solid var(--line); }
+  .tcard tbody td { display:block; padding:0; border:0; min-width:0; }
+  .tcard tbody td:nth-child(2) { grid-column:1 / -1; grid-row:1; overflow-wrap:anywhere; }
+  .tcard tbody td.c-cant { grid-column:1; grid-row:2; width:auto; }
+  .tcard tbody td.c-imp { grid-column:2; grid-row:2; text-align:right; }
+  .tcard tfoot tr { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:var(--s1) var(--s3); padding:var(--s3); background:var(--accent-soft); border-top:.5px solid var(--line); }
+  .tcard tfoot td { display:block; padding:0; background:none; } .tcard tfoot td:last-child { margin-left:auto; white-space:nowrap; }
+  @media (max-width:520px) { .tcard { margin-left:0; width:100%; } } /* en el móvil la tarjeta usa todo el ancho (no deja hueco para el avatar) */
 </style>
 </head>
 <body>
@@ -673,7 +686,7 @@
     <div class="sheet" id="sheet" hidden></div>
     <nav class="quick" id="quick" aria-label="Atajos">
       <button type="button" data-q="último pedido"><span class="q-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg></span><span class="q-tx"><b>Último pedido</b><small>Verlo y repetirlo</small></span></button>
-      <button type="button" data-q="histórico"><span class="q-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.600-5.900M4 4v4h4M12 8v4l2.500 1.500"/></svg></span><span class="q-tx"><b>Histórico</b><small>Tus 10 últimos</small></span></button>
+      <button type="button" data-q="histórico"><span class="q-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.600-5.900M4 4v4h4M12 8v4l2.500 1.500"/></svg></span><span class="q-tx"><b>Histórico de pedidos</b><small>Tus 10 últimos</small></span></button>
     </nav>
     <form class="send" id="f"><input id="t" autocomplete="off" placeholder="Escribe un mensaje" aria-label="Mensaje"><button aria-label="Enviar">➤</button></form>
   </section>
@@ -1275,6 +1288,8 @@ function abrirAyuda(a, nombre) {
   const pintaTema = () => grp.querySelectorAll("button").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.t === actual())); });
   for (const [k, t] of [["auto", "Automático"], ["claro", "Claro"], ["oscuro", "Oscuro"]]) { const b = document.createElement("button"); b.type = "button"; b.dataset.t = k; b.textContent = t; b.onclick = () => { const r = document.documentElement; r.classList.add("cambiando"); setTimeout(() => r.classList.remove("cambiando"), 320); try { if (k === "auto") localStorage.removeItem("vm:tema"); else localStorage.setItem("vm:tema", k); } catch {} if (k === "auto") r.removeAttribute("data-tema"); else r.setAttribute("data-tema", k); pintaTema(); }; grp.appendChild(b); }
   pintaTema(); aj.appendChild(grp); c.appendChild(aj);
+  { const v = document.createElement("p"); v.className = "ayuda-ver"; c.appendChild(v); // versión del programa que está funcionando (para saber qué se ha publicado)
+    fetch("/health", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (j && j.version) v.textContent = "Versión del programa: " + j.version + (j.reinicioPendiente ? " (hay otra más nueva pendiente de reiniciar)" : ""); }).catch(() => {}); }
   const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Cerrar";
   const cerrar = () => { f.remove(); document.removeEventListener("keydown", esc); }; const esc = (e) => { if (e.key === "Escape") cerrar(); };
   arrastrable(c, cerrar); x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);

@@ -14,6 +14,7 @@ import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
 import { estadoSistema, crearVigilante } from "./monitor.js";
 import { privacidadHtml, avisoLegalHtml } from "./privacidad.js";
+import { estadoVersion } from "./version.js";
 import { sendMail } from "./mailer.js";
 import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, accesosDe } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "./delivery.js";
@@ -746,7 +747,7 @@ http
     if (url.pathname === "/health") {
       // Para vigilar el servicio (UptimeRobot, Render…): responde 200 solo si la base de datos funciona
       try {
-        return getDb().ping() ? res.writeHead(200, { "Content-Type": "application/json" }).end('{"ok":true}') : res.writeHead(503).end('{"ok":false}');
+        return getDb().ping() ? res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(JSON.stringify({ ok: true, ...estadoVersion() })) : res.writeHead(503).end('{"ok":false}');
       } catch {
         return res.writeHead(503).end('{"ok":false}');
       }
