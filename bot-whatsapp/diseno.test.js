@@ -102,3 +102,25 @@ test("chat: Mi cuenta y Mi pedido fijo usan estados con un solo botón; la hoja 
   assert.match(cli, /boton: "Reintentar", onclick: \(\) => abrirCuenta\(irAPedidos\)/);
   assert.match(cli, /arrastrable\(c, cerrar\)/); assert.match(cli, /\.estado svg \{ width:48px; height:48px/);
 });
+
+test("modo oscuro: mismos colores en las dos páginas, contraste AA, tema guardado y Ajustes de pantalla en Ayuda", () => {
+  const cli = leer("./cliente.html");
+  const osc = (h) => (h.match(/:root\[data-tema="oscuro"\] \{([^}]*)\}/) || [])[1] || "";
+  assert.equal(osc(cli), osc(pedido)); assert.ok(osc(pedido).length > 200);
+  const v = (n) => (osc(pedido).match(new RegExp(`--${n}:\\s*(#[0-9A-Fa-f]{6})`)) || [])[1];
+  assert.equal(v("bg"), "#000000"); assert.equal(v("surface"), "#1C1C1E"); assert.equal(v("fill"), "#2C2C2E"); assert.equal(v("line"), "#38383A");
+  assert.equal(v("text"), "#F5F5F7"); assert.equal(v("text-2"), "#98989F"); assert.equal(v("accent"), "#FF4D63"); assert.equal(v("ok"), "#30D158"); assert.equal(v("warn"), "#FFD60A");
+  for (const [f, fo] of [["text", "bg"], ["text", "surface"], ["text-2", "surface"], ["text-2", "bg"], ["accent", "surface"], ["accent", "bg"], ["on-accent", "accent"], ["ok", "surface"], ["warn", "surface"]]) assert.ok(contraste(v(f), v(fo)) >= 4.5, `${f}/${fo} ${contraste(v(f), v(fo)).toFixed(2)}`);
+  assert.match(pedido, /@media \(prefers-color-scheme: dark\) \{ :root:not\(\[data-tema="claro"\]\)/);
+  for (const h of [cli, pedido]) { assert.match(h, /localStorage\.getItem\("vm:tema"\)/); assert.match(h, /Ajustes de pantalla/); assert.match(h, /"Automático"/); assert.match(h, /transition:background-color 250ms/); }
+  assert.match(pedido, /--foto-bg:#F2F2F7/); // las fotos siguen sobre baldosa clara
+});
+
+test("ordenador y tablet: panel «Tu pedido» fijo de 340 px, menú lateral de 220 px, cuadrícula de 2 y 3 columnas, sin carrito flotante; teclado y accesibilidad", () => {
+  assert.match(pedido, /@media \(min-width:1024px\) \{[\s\S]*grid-template-columns:220px minmax\(0, 1fr\) 340px/);
+  assert.match(pedido, /\.app > footer \{ display:none !important; \}/); assert.match(pedido, /\.tb\[data-nav="pedido"\] \{ display:none; \}/);
+  assert.match(pedido, /@media \(min-width:1440px\) \{ \.app > main#list \{ grid-template-columns:repeat\(3/); assert.match(pedido, /@media \(min-width:768px\) and \(max-width:1023px\)[\s\S]*max-width:720px/);
+  assert.match(pedido, /e\.key === "\/" && !escribiendo/); assert.match(pedido, /e\.key === "ArrowDown" \|\| e\.key === "ArrowUp"/); assert.match(pedido, /e\.key === "\+" \|\| e\.key === "="/); assert.match(pedido, /sugActiva >= 0/);
+  assert.match(pedido, /id="anuncio" class="solo-lector" role="status"/); assert.match(pedido, /aria-describedby="errDir"/); assert.match(pedido, /:focus-visible \{ outline:3px solid var\(--accent\)/);
+  assert.match(pedido, /@media \(prefers-contrast: more\) \{\s*\.pf, \.card/);
+});

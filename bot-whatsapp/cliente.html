@@ -87,13 +87,15 @@
 <meta name="apple-mobile-web-app-title" content="Pedidos VM">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="apple-touch-icon" href="/icono-192.png">
+<meta name="color-scheme" content="light dark">
+<script>try{var t=localStorage.getItem("vm:tema");if(t==="claro"||t==="oscuro")document.documentElement.setAttribute("data-tema",t)}catch(e){}</script>
 <title>Pedidos · Distribuciones VM</title>
 <style>
   /* ═══ SISTEMA DE DISEÑO · TOKENS (idénticos en cliente.html y pedido.html) ═══ */
   :root {
     /* color */
     --bg:#F5F5F7; --surface:#FFFFFF; --text:#1D1D1F; --text-2:#6E6E73; --fill:#F2F2F7; --line:#E5E5EA;
-    --accent:#C8102E; --accent-soft:#FBEAED; --on-accent:#FFFFFF;
+    --accent:#C8102E; --accent-soft:#FBEAED; --on-accent:#FFFFFF; --bar:#C8102E; --on-bar:#FFFFFF; --foto-bg:#F2F2F7;
     --ok:#1D7A45; --ok-bg:#E8F5EC; --warn:#8A5F00; --warn-bg:#FFF4DB;
     --field:rgba(118,118,128,.12); --tab-off:#8E8E93; --scrim:rgba(0,0,0,.4);
     --mat-bg:rgba(255,255,255,.78); --mat-line:rgba(0,0,0,.14);
@@ -109,6 +111,11 @@
     /* sombra: solo el botón flotante del carrito */
     --sombra-flot:0 8px 24px rgba(0,0,0,.18);
   }
+  /* Modo oscuro (Ajustes de pantalla en Ayuda: Automático / Claro / Oscuro). Las fotos siguen sobre baldosa clara. */
+  :root[data-tema="oscuro"] { --bg:#000000; --surface:#1C1C1E; --text:#F5F5F7; --text-2:#98989F; --fill:#2C2C2E; --line:#38383A; --accent:#FF4D63; --accent-soft:rgba(255,77,99,.16); --on-accent:#1D1D1F; --ok:#30D158; --ok-bg:rgba(48,209,88,.14); --warn:#FFD60A; --warn-bg:rgba(255,214,10,.14); --field:rgba(118,118,128,.24); --tab-off:#98989F; --scrim:rgba(0,0,0,.6); --mat-bg:rgba(28,28,30,.78); --mat-line:rgba(255,255,255,.14); --sombra-flot:0 8px 24px rgba(0,0,0,.5); color-scheme:dark; }
+  @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) { --bg:#000000; --surface:#1C1C1E; --text:#F5F5F7; --text-2:#98989F; --fill:#2C2C2E; --line:#38383A; --accent:#FF4D63; --accent-soft:rgba(255,77,99,.16); --on-accent:#1D1D1F; --ok:#30D158; --ok-bg:rgba(48,209,88,.14); --warn:#FFD60A; --warn-bg:rgba(255,214,10,.14); --field:rgba(118,118,128,.24); --tab-off:#98989F; --scrim:rgba(0,0,0,.6); --mat-bg:rgba(28,28,30,.78); --mat-line:rgba(255,255,255,.14); --sombra-flot:0 8px 24px rgba(0,0,0,.5); color-scheme:dark; } }
+  .cambiando, .cambiando *, .cambiando *::before, .cambiando *::after { transition:background-color 250ms ease, color 250ms ease, border-color 250ms ease, fill 250ms ease !important; }
+  @media (prefers-reduced-motion: reduce) { .cambiando, .cambiando * { transition:none !important; } }
   /* Escala tipográfica (cada tamaño se divide por --k: la letra A− / A+ del cliente sigue mandando) */
   .t-xl { font-size:calc(var(--t-xl) / var(--k,1)); line-height:1.1; font-weight:700; letter-spacing:-.022em; }
   .t-lg { font-size:calc(var(--t-lg) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; }
@@ -357,11 +364,11 @@
   /* Logo y cabecera rojos como los originales (el logo es un óvalo blanco con letras transparentes: solo se ve sobre rojo) */
   .ds-logo { background:transparent; padding:0; height:auto; border-radius:0; }
   .ds-logo img, .bar .ds-logo img { height:34px; width:auto; }
-  .bar, .phone.scrolled .bar { background:var(--accent); color:var(--on-accent); border-bottom-color:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; }
-  .bar .bar-titulo { color:var(--on-accent); }
+  .bar, .phone.scrolled .bar { background:var(--bar); color:var(--on-bar); border-bottom-color:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; }
+  .bar .bar-titulo { color:var(--on-bar); }
   @media (max-width:479px) { .bar-titulo { display:none; } .phone.scrolled .titulo-bloque { max-height:140px; opacity:1; padding-top:var(--s2); padding-bottom:var(--s2); } }
-  .vm .hero { background:var(--accent); color:var(--on-accent); margin-top:calc(-1 * (var(--s8) + env(safe-area-inset-top))); padding:calc(var(--s8) + env(safe-area-inset-top)) var(--gutter) var(--s8); clip-path:inset(0 -100vmax); box-shadow:0 0 0 100vmax var(--accent); }
-  .vm .hero h1, .vm .hero p { color:var(--on-accent); }
+  .vm .hero { background:var(--bar); color:var(--on-bar); margin-top:calc(-1 * (var(--s8) + env(safe-area-inset-top))); padding:calc(var(--s8) + env(safe-area-inset-top)) var(--gutter) var(--s8); clip-path:inset(0 -100vmax); box-shadow:0 0 0 100vmax var(--bar); }
+  .vm .hero h1, .vm .hero p { color:var(--on-bar); }
   .vm .hero .ds-logo.grande { padding:0; margin:0 auto var(--s5); }
   .vm .hero .ds-logo.grande img { width:min(220px, 56vw); height:auto; }
 
@@ -410,7 +417,7 @@
   .vm-inicio .in-pim img, .vm-inicio .in-foto img { position:absolute; inset:0; margin:auto; width:auto; height:auto; max-width:82%; max-height:82%; padding:0; object-fit:contain; background:none; opacity:0; transition:opacity 200ms ease; }
   .vm-inicio .in-foto { position:relative; }
   .vm-inicio .in-pim img.cargada, .vm-inicio .in-foto img.cargada { opacity:1; }
-  .vm-inicio .in-pim:has(img.cargada), .vm-inicio .in-foto:has(img.cargada) { color:transparent; }
+  .vm-inicio .in-pim:has(img.cargada), .vm-inicio .in-foto:has(img.cargada) { color:transparent; background:var(--foto-bg); }
   @media (prefers-reduced-motion: reduce) { .vm-inicio .in-pim img, .vm-inicio .in-foto img { transition:none; } }
 
   /* Estados vacíos y de error */
@@ -421,6 +428,13 @@
   .estado-bt { margin-top:var(--s4); min-height:50px; padding:0 var(--s8); border:0; border-radius:var(--r-pill); background:var(--accent); color:var(--on-accent); font:inherit; font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; cursor:pointer; transition:transform var(--t-press) var(--ease); }
   .estado-bt:active { transform:scale(.97); }
   @media (prefers-reduced-motion: reduce) { .estado-bt { transition:none; } .estado-bt:active { transform:none; } }
+
+  .ayuda-aj { margin-top:var(--s2); padding-top:var(--s3); border-top:.5px solid var(--line); }
+  .ayuda-aj h3 { margin:0 0 var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; color:var(--text-2); }
+  .ayuda-tema { display:flex; padding:2px; border-radius:var(--r-pill); background:var(--field); }
+  .ayuda-tema button { flex:1; min-height:44px; border:0; border-radius:var(--r-pill); background:transparent; color:var(--text-2); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; }
+  .ayuda-tema button[aria-pressed="true"] { background:var(--surface); color:var(--text); box-shadow:0 0 0 .5px var(--mat-line); }
+  .ayuda-caja h2:first-child { margin-bottom:var(--s1); }
 </style>
 </head>
 <body>
@@ -506,7 +520,7 @@
       <div class="bar-acciones">
         <button type="button" id="micuenta" class="ds-circ cuenta" aria-haspopup="dialog" aria-label="Mi cuenta: mis datos y mis pedidos"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Mi cuenta</span></button>
         <div id="letraChat"></div>
-        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar">Cambiar contraseña</button><button type="button" id="mispedidos">Mis pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu" hidden>¿Necesitas ayuda?</button><div class="letra-titulo">Tamaño de letra</div><div id="menu-letra"></div><button type="button" id="salir">Salir</button></div></div>
+        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar">Cambiar contraseña</button><button type="button" id="mispedidos">Mis pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><div class="letra-titulo">Tamaño de letra</div><div id="menu-letra"></div><button type="button" id="salir">Salir</button></div></div>
       </div>
     </div>
     <div class="titulo-bloque"><h1 class="titulo-grande">Asistente de pedidos</h1><p class="titulo-sub"><i class="dot"></i><span id="cli">Cliente</span></p></div>
@@ -959,7 +973,7 @@ async function enviar(texto, etiqueta, silencioso) {
 }
 // Hoja «¿Necesitas ayuda?»: «Llamar» y «WhatsApp» (solo lo que la empresa haya rellenado en config.js) y el horario
 function abrirAyuda(a, nombre) {
-  if (!a) return;
+  a = a || {};
   const viejo = document.getElementById("ayuda-fondo"); if (viejo) viejo.remove();
   const f = document.createElement("div"); f.id = "ayuda-fondo"; f.className = "ayuda-fondo"; f.setAttribute("role", "dialog"); f.setAttribute("aria-modal", "true"); f.setAttribute("aria-label", "¿Necesitas ayuda?");
   const c = document.createElement("div"); c.className = "ayuda-caja";
@@ -968,12 +982,19 @@ function abrirAyuda(a, nombre) {
   if (a.telHref) enlace("Llamar" + (a.tel ? " · " + a.tel : ""), a.telHref);
   if (a.whatsappHref) enlace("WhatsApp", a.whatsappHref + "?text=" + encodeURIComponent("Hola, necesito ayuda con mi pedido" + (nombre ? ". Soy " + nombre : "")), true);
   if (a.horario) { const p = document.createElement("p"); p.textContent = "" + a.horario; c.appendChild(p); }
+  // «Ajustes de pantalla»: Automático (como el móvil) / Claro / Oscuro; se recuerda en este móvil
+  const aj = document.createElement("div"); aj.className = "ayuda-aj"; const ajt = document.createElement("h3"); ajt.textContent = "Ajustes de pantalla"; aj.appendChild(ajt);
+  const grp = document.createElement("div"); grp.className = "ayuda-tema"; grp.setAttribute("role", "group"); grp.setAttribute("aria-label", "Aspecto de la pantalla");
+  const actual = () => { try { const t = localStorage.getItem("vm:tema"); return t === "claro" || t === "oscuro" ? t : "auto"; } catch { return "auto"; } };
+  const pintaTema = () => grp.querySelectorAll("button").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.t === actual())); });
+  for (const [k, t] of [["auto", "Automático"], ["claro", "Claro"], ["oscuro", "Oscuro"]]) { const b = document.createElement("button"); b.type = "button"; b.dataset.t = k; b.textContent = t; b.onclick = () => { const r = document.documentElement; r.classList.add("cambiando"); setTimeout(() => r.classList.remove("cambiando"), 320); try { if (k === "auto") localStorage.removeItem("vm:tema"); else localStorage.setItem("vm:tema", k); } catch {} if (k === "auto") r.removeAttribute("data-tema"); else r.setAttribute("data-tema", k); pintaTema(); }; grp.appendChild(b); }
+  pintaTema(); aj.appendChild(grp); c.appendChild(aj);
   const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Cerrar";
   const cerrar = () => { f.remove(); document.removeEventListener("keydown", esc); }; const esc = (e) => { if (e.key === "Escape") cerrar(); };
   arrastrable(c, cerrar); x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
   c.appendChild(x); f.appendChild(c); document.body.appendChild(f); (c.querySelector("a") || x).focus();
 }
-let AYUDA = null; fetch("/api/ayuda").then((r) => r.json()).then((j) => { AYUDA = j.ayuda; if (AYUDA) $("ayuda-menu").hidden = false; }).catch(() => {});
+let AYUDA = null; fetch("/api/ayuda").then((r) => r.json()).then((j) => { AYUDA = j.ayuda; }).catch(() => {});
 $("ayuda-menu").onclick = () => { menu(false); abrirAyuda(AYUDA, $("hola")?.textContent || ""); };
 window.vmLetra.control($("menu-letra")); // «Tamaño de letra» en el menú ⋮
 window.vmLetra.control($("letraChat"), "boton"); // botón circular «Aa» en la cabecera: abre el control de letra directamente
