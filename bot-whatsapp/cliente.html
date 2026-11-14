@@ -471,6 +471,16 @@
   @media (max-width:359px) { .quick .q-tx small { display:none; } .quick button { gap:var(--s2); padding:var(--s2); } .quick .q-ico { width:32px; height:32px; } }
   @media (min-width:1024px) { .quick { grid-template-columns:repeat(2, minmax(0, 260px)); } }
   @media (prefers-reduced-motion: reduce) { .quick button { transition:none; } .quick button:active { transform:none; } }
+
+  /* Atajos del chat (versión compacta): dos botones pequeños con icono, sin estirarse ni tocar la barra de escribir */
+  .quick { display:flex; flex-wrap:nowrap; justify-content:flex-start; gap:var(--s2); overflow:visible; padding:var(--s2) max(var(--gutter), calc((100% - 860px) / 2)) var(--s3); }
+  .quick button { flex:none; width:auto; min-height:44px; padding:0 var(--s4) 0 var(--s3); gap:var(--s2); border-radius:var(--r-pill); background:var(--surface); box-shadow:0 0 0 .5px var(--line); }
+  .quick .q-ico { width:24px; height:24px; background:none; border-radius:0; }
+  .quick .q-ico svg { width:22px; height:22px; }
+  .quick .q-tx small { display:none; }
+  .quick .q-tx b { font-size:calc(var(--t-sec) / var(--k,1)); white-space:nowrap; }
+  @media (max-width:359px) { .quick button { padding:0 var(--s3) 0 var(--s2); } }
+  @media (min-width:1024px) { .quick { grid-template-columns:none; } }
 </style>
 </head>
 <body>

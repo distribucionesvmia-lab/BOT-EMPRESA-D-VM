@@ -185,3 +185,9 @@ test("catálogo: botón «Mi cuenta» arriba (icono en móvil, con texto si hay 
   assert.match(pedido, /\$\("cuentaBtn"\)\.onclick = \(\) => \{ location\.href = "\/cliente#cuenta"; \}/);
   assert.match(pedido, /@media \(max-width:439px\) \{ header \.ds-circ\.cuenta \{ width:44px; padding:0; \}/);
 });
+
+test("chat: los atajos son botones pequeños (44 px, ancho a su texto), sin línea de ayuda y con aire sobre la barra de escribir", () => {
+  const cli = leer("./cliente.html");
+  assert.match(cli, /\.quick \{ display:flex; flex-wrap:nowrap; justify-content:flex-start;[^}]*padding:var\(--s2\) max\(var\(--gutter\)[^}]*var\(--s3\); \}/);
+  assert.match(cli, /\.quick button \{ flex:none; width:auto; min-height:44px;/); assert.match(cli, /\.quick \.q-tx small \{ display:none; \}/);
+});
