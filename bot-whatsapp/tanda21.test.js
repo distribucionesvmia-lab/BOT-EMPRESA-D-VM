@@ -35,7 +35,7 @@ test("2. /api/inicio y el catálogo ya no tardan por recalcular la fecha y las c
 test("3. página «Sin conexión» en el service worker: marca, Reintentar y «tu pedido sigue guardado»", () => {
   const sw = leer("./pwa/sw.js");
   for (const t of ["Distribuciones Valentín Martín", "Sin conexión", "Tu pedido sigue guardado en este móvil", ">Reintentar<", "location.reload()", "prefers-color-scheme:dark"]) assert.ok(sw.includes(t), t);
-  assert.match(sw, /if \(e\.request\.mode !== "navigate"\) return;/); // lo demás sigue su camino: sigue sin guardar precios ni pedidos en caché
+  assert.match(sw, /req\.method !== "GET"/); assert.doesNotMatch(sw, /\/api\//); // POST y datos siguen su camino: nunca se guardan precios ni pedidos en caché (Bench 13: solo /catalogo y /estatico/)
 });
 test("4. lo que no carga se dice y se ofrece «Reintentar» (nada de .catch(() => {}) mudos en datos)", () => {
   const c = leer("./cliente.html"), p = leer("./pedido.html");
@@ -43,7 +43,7 @@ test("4. lo que no carga se dice y se ofrece «Reintentar» (nada de .catch(() =
   for (const t of ["No hemos podido cargar tu pedido fijo.", "No hemos podido calcular hasta cuándo podrás modificarlo."]) assert.ok(p.includes(t), t);
   assert.match(c, /function falloCarga\(caja, texto, reintentar\)/); assert.match(p, /function falloCarga\(caja, texto, reintentar\)/);
   const mudos = (c.match(/catch\(\(\) => \{\}\)/g) ?? []).length + (p.match(/catch\(\(\) => \{\}\)/g) ?? []).length;
-  assert.ok(mudos <= 3, "solo quedan los que no tienen nada que enseñar (telemetría, instalar app, service worker): " + mudos);
+  assert.ok(mudos <= 5, "solo quedan los que no tienen nada que enseñar (telemetría, instalar app, service worker, y las 2 de la copia de precios del móvil, que es un extra): " + mudos);
 });
 test("5. las fotos de las listas llevan width y height fijos (la lista no salta)", () => {
   const p = leer("./pedido.html"), c = leer("./cliente.html");

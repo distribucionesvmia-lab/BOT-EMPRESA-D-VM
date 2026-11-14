@@ -1382,7 +1382,7 @@ $("d-confirmar").onclick = async () => {
   if (!r.ok) { $("d-err2").textContent = j.error || "No se pudo eliminar la cuenta."; return; }
   $("m-datos").hidden = true; $("d-eliminar").value = ""; chat.innerHTML = ""; modoAcceso(false); ver("acceso"); $("a-ok").textContent = "Tu cuenta se ha eliminado. Gracias por haber sido cliente.";
 };
-async function cerrarSesion() { await post("/api/salir", {}); chat.innerHTML = ""; modoAcceso(false); ver("acceso"); }
+async function cerrarSesion() { try { indexedDB.deleteDatabase("vm-catalogo"); } catch {} await post("/api/salir", {}); chat.innerHTML = ""; modoAcceso(false); ver("acceso"); }
 $("salir").onclick = cerrarSesion;
 
 const hora = () => new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });

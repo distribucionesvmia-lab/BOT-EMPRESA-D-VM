@@ -38,3 +38,19 @@ test("Bench 12: las dos pantallas mandan los fallos (fetch, onerror, unhandledre
   const s = leer("./server.js"); assert.match(s, /p === "\/api\/log-error" && req\.method === "POST"/); assert.match(s, /\.writeHead\(204\)\.end\(\)/); assert.match(s, /content-length"\] \?\? 0\) > 4096/);
   const e = leer("./empresa.html"); assert.match(e, /Errores de la app \(últimos 7 días\)/); assert.match(e, /async function erroresApp\(\)/);
 });
+
+// ===== BENCH 13: catálogo y carrito usables sin cobertura =====
+test("BENCH 13: el catálogo abre sin red con la última copia, avisa de la fecha y nunca envía solo", () => {
+  const leerSrc = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const p = leerSrc("./pedido.html"), sw = leerSrc("./pwa/sw.js"), c = leerSrc("./cliente.html");
+  for (const t of ["copiaCat", "guardarCopia", "recargarDatos", "pendienteSinRed", "pintarCopia", "cambioPrecios", "Sin conexión: tu pedido está guardado", "Revisar y enviar", "Precios de "]) assert.ok(p.includes(t), t);
+  assert.match(p, /id="copiaPrecios"/); assert.match(p, /id="pendiente"/);
+  // al volver la red se recargan los precios y se avisa dentro de la app (nada se envía solo)
+  assert.match(p, /addEventListener\("online", async \(\) => \{/);
+  // el service worker solo guarda la página /catalogo (igual para todos) y los archivos con huella: ni datos, ni precios, ni fotos, ni pedidos
+  assert.match(sw, /vm-paginas-v1/); assert.match(sw, /\/catalogo/); assert.match(sw, /startsWith\("\/estatico\/"\)/);
+  assert.match(sw, /req\.method !== "GET"/); assert.doesNotMatch(sw, /\/api\/|\/img\//);
+  // la copia de precios del móvil se borra al cerrar sesión
+  assert.match(c, /indexedDB\.deleteDatabase\("vm-catalogo"\)/);
+  assert.match(p, /copiaCat\.borrar\(\)/);
+});

@@ -168,7 +168,7 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **Ficha de producto** (`abrirFicha` en `pedido.html`, hoja inferior; se abre al tocar la foto o el nombre): nombre completo, marca, formato, medidas, unidades por caja, precio por unidad (con el anterior tachado si hay descuento) y por caja, IVA y oferta; la foto se amplía desde ahí.
 - La tarjeta dice siempre la unidad de venta («Por unidades», «Caja de N», «Pack de N») y las medidas del nombre (`medidasDeNombre`); el precio por unidad es el YA descontado (`precioUd`) con el anterior tachado (`.pf-viejo`).
 - **Categorías grandes** (más de 30 artículos): «Ordenar» (lo que más pido, nombre, precio) y «Marca» (`ordenCat`, `marcaCat`; se reinician al cambiar de categoría). El número de artículos no se parte (`white-space:nowrap`).
-- **Red**: aviso «Cargando el catálogo…» si tarda más de 0,8 s; dos toques seguidos en «+» avisan «ahora llevas N»; sin conexión sale una banda fija (`#sinRed`) y «Enviar pedido» se bloquea hasta que vuelva la red (`pintaRed`).
+- **Red**: aviso «Cargando el catálogo…» si tarda más de 0,8 s; dos toques seguidos en «+» avisan «ahora llevas N»; sin conexión sale una banda fija (`#sinRed`) y «Enviar pedido» sin red NO envía: guarda el pedido (ver Bench 13; `pintaRed`).
 - Pruebas: `tanda11.test.js`.
 
 ## Tanda 12 de QA (pedido semanal real de un bar)
@@ -306,3 +306,9 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **En las dos pantallas** (script de cabecera, `vmLogError`): se envían los fallos de `fetch` (error de red o respuesta 5xx; los de «No hemos podido cargar esto»), `window.onerror` y `unhandledrejection`; máximo 8 por sesión y sin repetir el mismo; nada si no hay red o se está saliendo de la página; con `sendBeacon` (aparte, sin esperar) y el `fetch` envuelto solo observa: devuelve lo mismo que el original. Comprobado: 30 llamadas con el registro activo = 109 ms.
 - **Panel** (pestaña «Cuentas de clientes» → «Errores de la app (últimos 7 días)», `GET /api/admin/errores`): recuento por tipo, por cliente y por dirección que falló, y los últimos 25.
 - Pruebas: «BENCH 12» en `server.test.js` y `tanda28.test.js`.
+
+## Bench 13 (catálogo y carrito sin cobertura)
+- **Abrir sin red**: el service worker (`pwa/sw.js`, `vm-paginas-v1`) guarda SOLO la página `/catalogo` (igual para todos) y `/estatico/*`; nunca datos, precios, fotos ni pedidos. Los datos del cliente los guarda la propia página en IndexedDB (`vm-catalogo`, `copiaCat`), se borran al cerrar sesión o con un 401. Funciona tras UNA visita con red con esta versión.
+- **Aviso** «Precios de <fecha y hora>; se actualizarán al enviar» (`#copiaPrecios`); fotos que faltan = baldosa neutra. Buscar y poner cantidades funcionan sin red (carrito en localStorage).
+- **Enviar sin red NO envía**: guarda el pedido (`vm_pend_<clave>`) y dice «Sin conexión: tu pedido está guardado. Cuando vuelva la cobertura te avisamos para que lo revises y lo envíes». Al volver la red (`online`) recarga los precios del servidor y avisa DENTRO de la app (no hay push) con «Revisar y enviar». Si los precios cambiaron, al enviar se recargan y se para para que el cliente vea el total nuevo; nunca se manda un precio viejo sin verlo.
+- Límites: el aviso es en la app (no push); las opciones de entrega pueden estar anticuadas hasta que vuelva la red. Probado en Chromium real con servidor de prueba, no en un móvil. Pruebas: `tanda28.test.js`.

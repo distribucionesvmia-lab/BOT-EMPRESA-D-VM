@@ -337,7 +337,8 @@ test("AVISOS AL MÓVIL (app del cliente): botón «Activar avisos» en Mi cuenta
   for (const t of ["Activar avisos", "Desactivar avisos", "Añadir a pantalla de inicio", "/api/push/clave", "/api/push/suscribir", "/api/push/baja", "userVisibleOnly: true", "Notification.requestPermission"]) assert.ok(cli.includes(t), t);
   assert.match(cli, /\(await permiso\) !== "granted"/); // pide permiso al pulsar el botón (los móviles lo exigen), no al abrir
   assert.match(sw, /addEventListener\("push"/); assert.match(sw, /showNotification/); assert.match(sw, /addEventListener\("notificationclick"/);
-  assert.doesNotMatch(sw, /caches\.(open|put)/); // sigue sin guardar nada en caché
+  assert.doesNotMatch(sw, /\/api\/|\/img\//); // el service worker no guarda ni toca datos, precios, pedidos ni fotos (Bench 13: solo la página /catalogo y /estatico/)
+  assert.match(sw, /startsWith\("\/estatico\/"\)/);
   assert.match(sw, /startsWith\("\/"\)/); // el aviso solo puede abrir páginas de la propia aplicación
 });
 

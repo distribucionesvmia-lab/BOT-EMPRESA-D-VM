@@ -1353,6 +1353,8 @@
   </header>
   <div class="titulo-bloque"><h1 class="titulo-grande">Catálogo</h1><p class="titulo-sub" id="ttl">Cargando…</p><small id="sub" hidden></small></div>
   <div class="aviso" id="avisoHoy" role="status" aria-live="polite" hidden>Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
+  <div class="aviso" id="copiaPrecios" role="status" aria-live="polite" hidden></div>
+  <div class="aviso abierto" id="pendiente" role="status" aria-live="polite" hidden></div>
   <div class="aviso abierto" id="recuperado" role="status" aria-live="polite" hidden></div>
   <div class="aviso abierto" id="abierto" role="status" aria-live="polite" hidden></div>
   <div class="guia" id="guia" aria-live="polite">Toca <b>«+»</b> en lo que necesites. Cuando termines, pulsa el botón rojo de abajo.</div>
@@ -1374,6 +1376,8 @@
   <section class="screen" id="cart" hidden aria-label="Pedido">
     <div class="ped-cab"><h2 class="ped-tit">Pedido</h2><p class="ped-sub" id="cartCount"></p></div>
     <div class="aviso" id="modBanner" role="status" aria-live="polite" hidden></div>
+    <div class="aviso" id="copiaPrecios2" role="status" aria-live="polite" hidden></div>
+    <div class="aviso abierto" id="pendiente2" role="status" aria-live="polite" hidden></div>
     <div class="aviso abierto" id="recuperado2" role="status" aria-live="polite" hidden></div>
     <div class="aviso abierto" id="abierto2" role="status" aria-live="polite" hidden></div>
     <div class="aviso" id="avisoHoy2" role="status" aria-live="polite" hidden>Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
@@ -2459,7 +2463,7 @@ function falloCarga(caja, texto, reintentar) {
   const d = document.createElement("div"); d.className = "carga-fallo"; d.dataset.k = String(texto); d.setAttribute("role", "status"); const s = document.createElement("span"); s.textContent = texto || "No hemos podido cargar esto.";
   const b = document.createElement("button"); b.type = "button"; b.className = "keepbtn"; b.textContent = "Reintentar"; b.onclick = () => { d.remove(); reintentar(); }; d.append(s, b); caja.appendChild(d);
 }
-const cargaFijoCard = () => fetch("/api/pedido-fijo").then(r => { if (r.status === 401) return null; if (!r.ok) throw new Error("fijo"); return r.json(); }).then(j => { if (!j) return; fijoInfo = j; if (j.fijo) fijoDias = new Set(j.fijo.dias); $("fijoCard").hidden = false; pintarFijoCard(); }).catch(() => { $("fijoCard").hidden = false; $("fijoPanel").hidden = true; $("fijoAbrir").hidden = true; falloCarga($("fijoCard"), "No hemos podido cargar tu pedido fijo.", () => { $("fijoAbrir").hidden = false; cargaFijoCard(); }); });
+const cargaFijoCard = () => fetch("/api/pedido-fijo").then(r => { if (r.status === 401) return null; if (!r.ok) throw new Error("fijo"); return r.json(); }).then(j => { if (!j) return; fijoInfo = j; if (j.fijo) fijoDias = new Set(j.fijo.dias); $("fijoCard").hidden = false; pintarFijoCard(); }).catch(() => { if (navigator.onLine === false || data?.__copia) return; $("fijoCard").hidden = false; $("fijoPanel").hidden = true; $("fijoAbrir").hidden = true; falloCarga($("fijoCard"), "No hemos podido cargar tu pedido fijo.", () => { $("fijoAbrir").hidden = false; cargaFijoCard(); }); });
 cargaFijoCard();
 function abrirFijo(abrir) { $("fijoPanel").hidden = !abrir; $("fijoAbrir").hidden = abrir; if (!abrir) $("fijoMsg").textContent = ""; }
 $("fijoAbrir").onclick = () => { abrirFijo(true); $("fijoPanel").scrollIntoView({ block: "center", behavior: sinMovimiento() ? "auto" : "smooth" }); };
@@ -2758,6 +2762,12 @@ $("revisar").onclick = () => {
 $("resVolver").onclick = () => ($("resumen").hidden = true);
 $("confirm").onclick = async () => {
   const eb = $("errRes"); eb.textContent = "";
+  if (navigator.onLine === false) return pendienteSinRed(eb); // sin cobertura: no se envía
+  if (data.__copia || huboCorte) { // los precios en pantalla pueden ser viejos: se recargan y, si algo ha cambiado, se enseña y NO se envía hasta que lo vea
+    const btn = $("confirm"), tb = btn.textContent; btn.disabled = true; btn.textContent = "Actualizando precios…";
+    try { const r = await recargarDatos(); btn.disabled = false; btn.textContent = tb; pintarPasoResumen(); if (cambioPrecios(r)) { eb.textContent = `Hemos actualizado los precios: el total pasa de ${eur(r.antes)} a ${eur(r.despues)}${r.quitados ? ` y ${r.quitados} artículo${r.quitados === 1 ? "" : "s"} ya no está${r.quitados === 1 ? "" : "n"}` : ""}. Revisa el pedido y pulsa Enviar otra vez.`; return; } }
+    catch (e) { btn.disabled = false; btn.textContent = tb; eb.textContent = e.message; return; }
+  }
   if (!validaCierre($("err"))) { $("resumen").hidden = true; return; } // algo cambió: se vuelve al pedido para corregirlo
   const c = calc(), mayor = Math.max(0, ...lines().map(l => l.qty));
   if ((c.total > LIM_IMPORTE || mayor >= LIM_CANTIDAD) && !(await preguntar({ titulo: "¿Seguro que quieres enviarlo?", texto: `El pedido es de ${eur(c.total)}${mayor >= LIM_CANTIDAD ? " y lleva una cantidad muy alta de un artículo" : ""}: es bastante más de lo habitual. Revisa las cantidades antes de enviarlo.`, si: "Sí, enviar", no: "Revisar el pedido" }))) return;
@@ -2924,7 +2934,7 @@ async function enviarPedido(delivery, errBox) {
     btn.classList.remove("hecho"); btn.disabled = false;
     pedidoEnviado = true; uso("pedido", Math.round((Date.now() - tAbierto) / 1000));
     if (modoDir() === "otra" && $("dirGuardar").checked && dirEntrega().length >= 5) { try { fetch("/api/direcciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texto: dirEntrega() }) }).then(cargarDirs); } catch {} $("dirGuardar").checked = false; }
-    qty.clear(); unitOf.clear(); notes.clear(); try { localStorage.removeItem(clave()); } catch {}
+    qty.clear(); unitOf.clear(); notes.clear(); try { localStorage.removeItem(clave()); localStorage.removeItem(clavePend()); } catch {}
     $("doneT").textContent = j.modificado ? "¡Pedido modificado!" : "¡Pedido recibido!";
     $("modInfo").hidden = !j.modificable; $("modInfo").textContent = j.modificable ? j.modificable + "." : ""; $("modBtn").hidden = !(j.modificable && j.ref); if (j.ref) $("modBtn").onclick = () => modificar(j.ref);
     modificando = null; $("modBanner").hidden = true; orderKey = nuevaClave();
@@ -2991,28 +3001,71 @@ function capasCambian() {
   } catch {}
 }
 addEventListener("popstate", () => { if (silencio) { silencio = false; return; } if (prof > 0) { prof--; cerrarArriba(); } });
-function pintaRed() { // banda fija «Sin conexión» y «Enviar» bloqueado mientras no haya red
-  const off = !navigator.onLine; $("sinRed").hidden = !off;
-  const bt = $("confirm");
-  if (off) { bt.disabled = true; bt.dataset.red = "1"; bt.textContent = "Sin conexión: no se puede enviar ahora"; }
-  else if (bt.dataset.red) { delete bt.dataset.red; bt.disabled = false; try { pintarResumen(); } catch {} }
-}
-addEventListener("offline", () => { pintaRed(); aviso("Sin conexión. Tu pedido se guarda en este móvil."); });
+function pintaRed() { $("sinRed").hidden = navigator.onLine !== false; } // banda fija «Sin conexión»; «Enviar» sin red NO envía: guarda el pedido (ver pendienteSinRed)
+addEventListener("offline", () => { huboCorte = true; pintaRed(); aviso("Sin conexión. Tu pedido se guarda en este móvil."); });
 pintaRed();
-addEventListener("online", () => { pintaRed(); aviso("Conexión recuperada: ya puedes enviar el pedido."); });
+addEventListener("online", async () => { // vuelve la cobertura: se recargan los precios del servidor y se avisa DENTRO de la app; nada se envía solo
+  pintaRed(); const pend = pendienteGuardado();
+  if (!pend && !data?.__copia && !huboCorte) { aviso("Conexión recuperada."); return; }
+  try { const r = await recargarDatos(); pintarPendiente(pend, r); if (!$("resumen").hidden) { const eb = $("errRes"); eb.replaceChildren(); eb.textContent = (cambioPrecios(r) ? `Ya hay cobertura. Los precios han cambiado: el total pasa de ${eur(r.antes)} a ${eur(r.despues)}.` : "Ya hay cobertura: los precios están al día.") + " Revisa el pedido y pulsa Enviar."; } } catch (e) { aviso("Ya hay cobertura, pero no se han podido actualizar los precios. Inténtalo en un momento."); }
+});
 addEventListener("keydown", e => { if (e.key === "Escape" && !e.defaultPrevented && abiertas().length) { e.preventDefault(); e.stopImmediatePropagation(); cerrarArriba(); } }, true); // en captura (antes que las ventanas): una sola capa por pulsación; con el calendario o el PDF abiertos, Esc cierra solo eso
 const obs = new MutationObserver(capasCambian);
 [...CAPAS, "calFondo"].forEach(id => obs.observe($(id), { attributes: true, attributeFilter: ["hidden"] }));
 obs.observe(document.body, { childList: true }); // ayuda y preguntas aparecen y desaparecen del documento
 
+// ── Sin cobertura: el catálogo y los precios del último rato se guardan en el móvil (IndexedDB) y se borran al cerrar sesión. Con red, siempre manda el servidor. ──
+const copiaCat = (() => {
+  const nada = typeof indexedDB === "undefined";
+  const abre = () => new Promise((ok, ko) => { const q = indexedDB.open("vm-catalogo", 1); q.onupgradeneeded = () => q.result.createObjectStore("datos"); q.onsuccess = () => ok(q.result); q.onerror = () => ko(q.error); });
+  const tx = async (modo, fn) => { const db = await abre(); return new Promise((ok, ko) => { const t = db.transaction("datos", modo), r = fn(t.objectStore("datos")); t.oncomplete = () => { db.close(); ok(r && r.result); }; t.onerror = t.onabort = () => { db.close(); ko(t.error); }; }); };
+  return { leer: () => (nada ? Promise.resolve(null) : tx("readonly", (s) => s.get("ultimo"))), guardar: (o) => (nada ? Promise.resolve() : tx("readwrite", (s) => s.put(o, "ultimo"))), borrar: () => (nada ? Promise.resolve() : tx("readwrite", (s) => s.delete("ultimo"))) };
+})();
+let huboCorte = false; // se perdió la cobertura en algún momento: los precios en pantalla pueden ser viejos
+const clavePend = () => "vm_pend_" + clave();
+const pendienteGuardado = () => { try { return JSON.parse(localStorage.getItem(clavePend()) || "null"); } catch { return null; } };
+const guardarCopia = () => { try { const { __copia, ...resto } = data; copiaCat.guardar({ guardado: Date.now(), data: resto }).catch(() => {}); } catch {} };
+function pintarCopia() { for (const id of ["copiaPrecios", "copiaPrecios2"]) { const b = $(id); b.hidden = !data.__copia; b.textContent = data.__copia ? `Precios de ${new Date(data.__copia).toLocaleString("es-ES", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}; se actualizarán al enviar.` : ""; } }
+// Mete en pantalla unos datos nuevos del servidor sin perder el pedido: lo que ya no existe se quita (y se dice)
+function aplicarDatos(nuevo) {
+  const antes = qty.size ? calc().total : null;
+  data = nuevo; productoPorId.clear(); data.products.forEach(p => productoPorId.set(p.id, p)); indiceBusq = null; _dupCorto = null; plazoCache.clear();
+  let quitados = 0; for (const id of [...qty.keys()]) if (!productoPorId.has(id)) { qty.delete(id); unitOf.delete(id); notes.delete(id); quitados++; }
+  favs.clear(); (data.favs || []).forEach(id => favs.add(id));
+  pintarCopia(); pintarAviso(); pintarAbierto(); try { pintarDias(); } catch {}
+  refresh(); renderList(); if (!$("cart").hidden || escritorio()) renderCart(); if (!$("resumen").hidden) pintarPasoResumen();
+  return { antes, despues: qty.size ? calc().total : null, quitados };
+}
+async function recargarDatos() {
+  const r = await fetch(location.pathname + "/datos", { cache: "no-store" });
+  if (!r.ok) throw new Error(r.status === 401 ? "Tu sesión ha caducado: vuelve a entrar para enviar el pedido." : "No se han podido actualizar los precios. Inténtalo en un momento.");
+  const nuevo = await r.json(); nuevo.__cargado = Date.now(); const res = aplicarDatos(nuevo); huboCorte = false; guardarCopia(); cargarDirs(); return res;
+}
+const cambioPrecios = (r) => (r.antes != null && r.despues != null && Math.abs(r.despues - r.antes) > 0.004) || r.quitados > 0;
+function pintarPendiente(pend, r) { // aviso dentro de la app: «Revisar y enviar» solo ABRE el resumen; enviar lo hace la persona
+  for (const id of ["pendiente", "pendiente2"]) {
+    const box = $(id); box.textContent = ""; if (!pend && !(r && cambioPrecios(r))) { box.hidden = true; continue; }
+    const t = document.createElement("span"), cambio = r && cambioPrecios(r) ? ` Los precios han cambiado: el total pasa de ${eur(r.antes)} a ${eur(r.despues)}${r.quitados ? ` y ${r.quitados} artículo${r.quitados === 1 ? "" : "s"} ya no está${r.quitados === 1 ? "" : "n"}` : ""}.` : "";
+    t.textContent = (pend ? "Ya hay cobertura: tu pedido está guardado y los precios están al día." : "Conexión recuperada: precios al día.") + cambio + " Revísalo antes de enviarlo.";
+    box.appendChild(t); if (count()) { const b = document.createElement("button"); b.type = "button"; b.className = "vm-lnk"; b.textContent = "Revisar y enviar"; b.onclick = () => { try { localStorage.removeItem(clavePend()); } catch {} box.hidden = true; $("revisar").click(); }; box.appendChild(b); }
+    box.hidden = false;
+  }
+}
+// «Enviar» sin cobertura: NO se envía; el pedido queda guardado en el móvil y, al volver la red, se avisa para que lo revise
+function pendienteSinRed(eb) {
+  guardarYa(); try { localStorage.setItem(clavePend(), JSON.stringify({ t: Date.now() })); } catch {}
+  eb.replaceChildren(estadoVacio({ icono: "nube", titulo: "Sin conexión", texto: "Sin conexión: tu pedido está guardado. Cuando vuelva la cobertura te avisamos para que lo revises y lo envíes." }));
+  eb.scrollIntoView({ block: "center", behavior: sinMovimiento() ? "auto" : "smooth" });
+}
 (async () => {
   const lenta = setTimeout(() => { if (!data) { const m = document.createElement("p"); m.id = "cargaLenta"; m.className = "carga-lenta"; m.setAttribute("role", "status"); m.textContent = "Cargando el catálogo… con poca cobertura puede tardar un poco."; $("list").prepend(m); } }, 800); // red lenta: se dice que se está cargando
-  const r = await fetch(location.pathname + "/datos").catch(() => null); clearTimeout(lenta); document.getElementById("cargaLenta")?.remove();
+  let r = await fetch(location.pathname + "/datos").catch(() => null), copia = null; clearTimeout(lenta); document.getElementById("cargaLenta")?.remove();
+  if (!r || r.status >= 500) { copia = await copiaCat.leer().catch(() => null); if (copia?.data?.products) r = { ok: true, status: 200, json: async () => copia.data }; } // sin cobertura: la última copia guardada
   if (!r) { $("ttl").textContent = ""; $("list").innerHTML = ""; $("list").appendChild(estadoVacio({ icono: "nube", titulo: "Sin conexión", texto: "No podemos cargar el catálogo ahora mismo. Comprueba tu conexión e inténtalo de nuevo.", boton: "Reintentar", onclick: () => location.reload() })); return; }
-  if (!r.ok) { $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 primeros dígitos de tu DNI</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
-  data = await r.json();
+  if (!r.ok) { if (r.status === 401) copiaCat.borrar().catch(() => {}); $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 primeros dígitos de tu DNI</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
+  data = await r.json(); if (copia) { data.__copia = copia.guardado; huboCorte = true; } else { data.__cargado = Date.now(); setTimeout(guardarCopia, 1500); }
   data.products.forEach(p => productoPorId.set(p.id, p));
-  pintarAviso(); pintarAbierto();
+  pintarAviso(); pintarAbierto(); pintarCopia();
   window.vmLetra.control($("letraBox"), "boton");
   if (data.ayuda) { $("ayudaBtn").hidden = false; $("ayudaBtn").onclick = () => abrirAyuda(data.ayuda, data.customer.name); }
   
@@ -3024,11 +3077,12 @@ obs.observe(document.body, { childList: true }); // ayuda y preguntas aparecen y
   if (data.used) { $("doneT").textContent = "Este pedido ya se envió"; $("doneP").textContent = "Vuelve al chat para hacer otro pedido."; $("done").hidden = false; return; }
   if (!data.products.some(p => p.count > 0)) { tab = "all"; try { history.replaceState({ vmTab: "all" }, ""); } catch {} }
   (data.favs || []).forEach(id => favs.add(id));
-  cargarDirs();
+  if (!copia) cargarDirs();
   recuperar();
   const pre = precargar(); // si hay que preguntar (ya hay un pedido empezado), la pantalla se pinta mientras tanto
   refresh();
   await pre; refresh();
+  if (!copia && pendienteGuardado()) pintarPendiente(pendienteGuardado(), null); // lo dejó guardado sin cobertura: se avisa al abrir con red
   if (estadoInicial && !/[#&](?:c|m|cat|tab)=/.test(String(window.vmPrecarga ?? location.hash))) setTimeout(() => { restaurando = true; try { tab = estadoInicial.vmTab === "hab" ? "hab" : "all"; restauraDe(estadoInicial); } finally { restaurando = false; } }, 0); // recargar o volver con «Adelante»: la búsqueda y el punto de la lista
 })();
 </script>

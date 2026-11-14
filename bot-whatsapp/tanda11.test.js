@@ -26,9 +26,9 @@ test("4. categorías grandes: ordenar (lo que más pido, nombre, precio) y filtr
 test("5. red lenta: se dice que se está cargando y dos toques seguidos en «+» avisan «ahora llevas N»", () => {
   assert.match(p, /Cargando el catálogo… con poca cobertura/); assert.match(p, /ahora llevas \$\{/); assert.match(p, /Date\.now\(\); if \(t - \(setQty\.ult \|\| 0\) < 900\)/);
 });
-test("6. sin conexión: banda fija y «Enviar» bloqueado hasta que vuelva la red", () => {
-  assert.match(p, /id="sinRed" class="sin-red"/); assert.match(p, /function pintaRed\(\)/); assert.match(p, /Sin conexión: no se puede enviar ahora/);
-  assert.match(p, /addEventListener\("online", \(\) => \{ pintaRed\(\)/);
+test("6. sin conexión: banda fija y «Enviar» NO envía (Bench 13: guarda el pedido y avisa al volver la red)", () => {
+  assert.match(p, /id="sinRed" class="sin-red"/); assert.match(p, /function pintaRed\(\)/); assert.match(p, /function pendienteSinRed/); assert.match(p, /Sin conexión: tu pedido está guardado/);
+  assert.match(p, /addEventListener\("online", async \(\) => \{/);
 });
 test("7. el listado enseña el precio por unidad YA descontado y el anterior tachado (también en la ficha)", () => {
   assert.match(p, /const precioUd = p => Number\(p\.price\) \* \(1 - \(Number\(p\.discount\) \|\| 0\) \/ 100\)/);
