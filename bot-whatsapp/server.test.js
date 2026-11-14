@@ -1459,3 +1459,19 @@ test("COPIAS Y EXPORTAR ESTADÍSTICAS: rutas del panel (solo con la clave, solo 
   const crudo = Buffer.from(await t.arrayBuffer()); assert.deepEqual([...crudo.subarray(0, 3)], [0xEF, 0xBB, 0xBF]); const txt = crudo.toString("utf8").replace(/^\uFEFF/, ""); assert.ok(txt.startsWith("RESUMEN")); assert.match(txt, /Pedidos de prueba excluidos/);
   assert.equal((await get("rango=todo&formato=pdf")).status, 400); assert.equal((await get("rango=nada")).status, 400);
 });
+
+test("PANEL «HOY», FICHA DE CLIENTE Y BUSCADOR: solo con la clave, solo lectura y sin NIF", async () => {
+  for (const u of ["/api/admin/hoy", "/api/admin/buscar?q=ab", "/api/admin/cliente/9001/ficha"]) assert.ok([401, 403].includes((await call("GET", u)).status), u);
+  const h = (await call("GET", "/api/admin/hoy", { admin: true })).json;
+  for (const k of ["dia", "pedidos", "altas", "atrasados", "recordatorios", "problemas", "copias", "cuentasSinConfirmar"]) assert.ok(k in h, k);
+  for (const k of ["pendientes", "retenidos", "masAntiguoHoras", "listos", "retenidosLista"]) assert.ok(k in h.pedidos, k);
+  assert.equal((await call("GET", "/api/admin/cliente/NOEXISTE9/ficha", { admin: true })).status, 404);
+  const ped = (await call("GET", "/api/admin/pedidos", { admin: true })).json.find((o) => o.codigo);
+  assert.ok(ped, "hace falta algún pedido con cliente");
+  const f = (await call("GET", `/api/admin/cliente/${encodeURIComponent(ped.codigo)}/ficha`, { admin: true })); assert.equal(f.status, 200, JSON.stringify(f.json));
+  assert.equal(f.json.cliente.id, String(ped.codigo)); assert.ok(f.json.totalPedidosApp >= 1 && f.json.pedidos.length >= 1); assert.ok("patrones" in f.json && "enlaces" in f.json && "erp" in f.json);
+  assert.ok(!/"nif/i.test(JSON.stringify(f.json)), "la ficha nunca lleva el NIF");
+  assert.deepEqual((await call("GET", "/api/admin/buscar?q=a", { admin: true })).json, { clientes: [], pedidos: [], articulos: [] }); // menos de 2 letras: nada
+  const b = (await call("GET", "/api/admin/buscar?q=" + encodeURIComponent(ped.ref.slice(0, 8)), { admin: true })).json; assert.ok(b.pedidos.some((o) => o.ref === ped.ref));
+  assert.ok((await call("GET", "/api/admin/buscar?q=agua", { admin: true })).json.articulos.length >= 1);
+});

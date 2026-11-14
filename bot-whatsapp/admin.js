@@ -69,7 +69,7 @@ function filtroPedidos(q) {
     if ((diaHasta || dia) && d > (diaHasta ?? dia)) return false;
     if (h1 && hm < h1) return false;
     if (h2 && hm > h2) return false;
-    if (cli && !sinTildes(`${o.name} ${o.customer_id ?? ""} ${o.phone ?? ""}`).includes(cli)) return false;
+    if (cli && !sinTildes(`${o.name} ${o.customer_id ?? ""} ${o.phone ?? ""} ${o.ref ?? ""}`).includes(cli)) return false;
     return true;
   };
 }
@@ -172,12 +172,13 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
       return true;
     }
     // ---- Recordatorios de hoy (F-17): a quién le toca reponer; la empresa envía a mano por WhatsApp ----
-    if (p === "/api/admin/recordatorios" && get) {
+    const recordatorios = () => {
       const hoy = madridDay(), fechas = customers.fechasPedidos?.() ?? new Map(), app = orders.orderDays?.() ?? new Map();
       const clientes = customers.list().filter((c) => c.active !== false).map((c) => ({ id: c.id, name: c.name, phone: c.phone, fechas: [...(fechas.get(c.id) ?? []), ...(app.get(c.id) ?? [])] }));
       const { avisadosHoy, nunca } = accounts.reminderSets(hoy);
-      return send(res, 200, { hoy, filas: recordatoriosDeHoy({ hoy, clientes, fijos: accounts.allStanding(), avisadosHoy, nunca, enlace: process.env.PUBLIC_URL ?? "" }) }), true;
-    }
+      return { hoy, filas: recordatoriosDeHoy({ hoy, clientes, fijos: accounts.allStanding(), avisadosHoy, nunca, enlace: process.env.PUBLIC_URL ?? "" }) };
+    };
+    if (p === "/api/admin/recordatorios" && get) return send(res, 200, recordatorios()), true;
     if (post && (p === "/api/admin/recordatorios/avisado" || p === "/api/admin/recordatorios/no-avisar")) {
       const body = (await readJson(req)) ?? {};
       if (typeof body.id !== "string" || !body.id) return send(res, 400, { error: "Falta el cliente." }), true;
@@ -347,7 +348,7 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
     if (p === "/api/admin/copias" && get) return send(res, 200, estadoCopias(process.env.BACKUP_DIR ?? "respaldos")), true;
     if (p === "/api/admin/copias/comprobar" && post) return send(res, 200, comprobarCopias(process.env.BACKUP_DIR ?? "respaldos")), true;
     // ---- Estadísticas y patrones: se calcula aquí, se guarda unos segundos y solo LEE los pedidos (nunca cambia ni borra nada) ----
-    if (p.startsWith("/api/admin/estadisticas")) {
+    if (p.startsWith("/api/admin/estadisticas") || p === "/api/admin/hoy" || p === "/api/admin/buscar" || /^\/api\/admin\/cliente\/[\w-]{1,20}\/ficha$/.test(p)) {
       const ahora = new Date().toISOString(), hoy = madridDay(ahora), recuento = () => accounts.ajuste("stats_desde") || null;
       const exCfg = leerExcluidos(accounts), rev = orders.ordersRevision(), exK = JSON.stringify(exCfg) + "|" + rev;
       let exRes = estCache.get("ex"); // quién es de prueba: se vuelve a resolver cuando entra, cambia o se cancela un pedido o cuando se cambia la lista
@@ -415,6 +416,53 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
         const v = excluidosValidos((await readJson(req)) ?? {}); if (v.error) return send(res, 400, { error: v.error }), true;
         accounts.ajusteGuardar("stats_excluidos", JSON.stringify(v.excluidos)); estCache.delete("base"); estCache.delete("calc"); estCache.delete("ex");
         return send(res, 200, { ok: true, excluidos: v.excluidos }), true;
+      }
+      // ---- «Hoy»: lo que hay que mirar al abrir el panel (solo lee) ----
+      if (p === "/api/admin/hoy" && get) {
+        const pend = orders.listOrders({ exportStatus: "pending", limit: 500 }).map(orderView), b = base(), r = rangoDe({ rango: "hoy" }, ahora, b.rec);
+        const listos = pend.filter((o) => o.estado === "pendiente"), ret = pend.filter((o) => o.estado === "retenido");
+        const dia = r.error ? null : calcular(b.validos, b.excluidos, r, () => null, 0);
+        const horasDesde = (iso) => Math.max(0, Math.floor((Date.now() - Date.parse(iso)) / 3600000));
+        const regs = accounts.listRegistrations("pending"), vista = (o) => ({ ref: o.ref, cliente: o.cliente, codigo: o.codigo, total: o.total, fecha: o.fecha, motivo: o.motivo });
+        let problemas = []; try { problemas = estado?.().problemas ?? []; } catch { /* sin vigilancia */ }
+        return send(res, 200, {
+          fecha: ahora, hoy,
+          dia: dia && { pedidos: dia.resumen.actual.pedidos, importe: dia.resumen.actual.importe, ayer: dia.resumen.anterior ? { pedidos: dia.resumen.anterior.pedidos, importe: dia.resumen.anterior.importe } : null },
+          pedidos: { pendientes: listos.length, retenidos: ret.length, masAntiguoHoras: pend.length ? Math.max(...pend.map((o) => horasDesde(o.fecha))) : 0, listos: listos.slice(0, 6).map(vista), retenidosLista: ret.slice(0, 6).map(vista) },
+          altas: { pendientes: regs.length, lista: regs.slice(0, 5).map((x) => ({ id: x.id, negocio: x.business, telefono: x.phone, creada: x.createdAt })) },
+          cuentasSinConfirmar: accounts.listAccounts().filter((a) => !a.verified && a.status !== "deleted").length, derechosPendientes: accounts.listRightsRequests("pendiente").length,
+          atrasados: atrasados(b.validos, ahora, 6), recordatorios: recordatorios().filas.length, problemas, copias: { ok: estadoCopias(process.env.BACKUP_DIR ?? "respaldos").ok },
+        }), true;
+      }
+      // ---- Ficha de un cliente: todo lo suyo en un sitio (sin NIF: no se guarda) ----
+      { const mf = /^\/api\/admin\/cliente\/([\w-]{1,20})\/ficha$/.exec(p);
+        if (mf && get) {
+          const id = mf[1], c0 = customers.getById(id), cu = accounts.listAccounts().find((a) => String(a.customerId) === id), todos = orders.listOrders({ limit: 5000 }).filter((o) => String(o.customer_id) === id), fijo = accounts.getStanding(id);
+          if (!c0 && !todos.length && !cu) return send(res, 404, { error: "No existe ese cliente." }), true;
+          // un cliente puede tener pedidos y no estar ya en la base de clientes (borrado o aún sin importar): se enseña lo que haya
+          const c = c0 ?? { id, name: todos[0]?.name ?? "Cliente " + id, legalName: "", city: "", municipio: "", address: "", phone: "", phones: [], emails: [], recargoEquivalencia: false, active: false, orders: [] };
+          const compra = c.orders?.[0] ?? null;
+          return send(res, 200, {
+            cliente: { id: c.id, nombre: c.name, razon: c.legalName, poblacion: c.city, municipio: c.municipio, direccion: c.address, telefonos: [...new Set([c.phone, ...c.phones].filter(Boolean))], correos: c.emails, recargo: c.recargoEquivalencia, activo: c.active },
+            esPrueba: esPruebaId(id), sinFicha: !c0,
+            cuenta: cu ? { estado: cu.status, confirmada: cu.verified, bloqueada: cu.locked, ultimoAcceso: cu.lastLogin, creada: cu.createdAt, codigoPropio: cu.ownCode } : null,
+            totalPedidosApp: todos.length,
+            pedidos: todos.slice(0, 12).map(orderView).map((o) => ({ ref: o.ref, fecha: o.fecha, entrega: o.entrega?.texto ?? "", total: o.total, estado: o.estado, modificado: o.modificado, lineas: o.lineas.slice(0, 30).map((l) => ({ nombre: l.nombre, unidades: l.unidades, cajas: l.unidad === "caja" ? l.cajas : 0 })) })),
+            erp: { pedidos: c.orders?.length ?? 0, ultimo: compra?.date ?? null },
+            patrones: patronesCliente(base().validos.filter((o) => String(o.customer_id) === id), ahora),
+            fijo: fijo && { dias: fijo.days, pausado: fijo.paused, saltaSemana: fijo.skipWeek, articulos: fijo.lines?.length ?? 0 },
+            enlaces: accounts.invitacionesLista().filter((x) => String(x.cliente) === id).slice(0, 5),
+          }), true;
+        } }
+      // ---- Buscador general (clientes, pedidos por referencia y artículos) ----
+      if (p === "/api/admin/buscar" && get) {
+        const q = String(url.searchParams.get("q") ?? "").trim().slice(0, 60), vacio = { clientes: [], pedidos: [], articulos: [] };
+        if (q.length < 2) return send(res, 200, vacio), true;
+        const nq = sinTildes(q), ql = q.toLowerCase();
+        const clientes = customers.search({ q, limit: 40 }).rows.filter((c) => !esPruebaId(c.id)).slice(0, 6).map((c) => ({ id: c.id, nombre: c.name, poblacion: c.city ?? "", telefono: c.phone ?? "" }));
+        const pedidos = /\d/.test(q) ? orders.listOrders({ limit: 5000 }).filter((o) => String(o.ref).toLowerCase().includes(ql)).slice(0, 5).map((o) => ({ ref: o.ref, cliente: o.name, codigo: o.customer_id, fecha: o.created_at })) : [];
+        let articulos = []; try { articulos = catalogDb ? catalogDb.list({ activeOnly: false }).filter((x) => sinTildes(`${x.id} ${x.name}`).includes(nq)).slice(0, 6).map((x) => ({ id: x.id, nombre: x.name, precio: x.price, activo: x.active })) : []; } catch { /* sin catálogo */ }
+        return send(res, 200, { clientes, pedidos, articulos }), true;
       }
     }
     // ---- Errores de la app del cliente (últimos 7 días): recuento por tipo, por cliente y por API ----

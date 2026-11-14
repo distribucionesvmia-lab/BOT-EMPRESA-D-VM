@@ -100,7 +100,7 @@ test("EXPORTAR: el CSV va en UTF-8 con BOM, «;», decimales con coma, comillas 
 test("PANEL: botones de descarga y tarjeta de copias en empresa.html; rutas de solo lectura en admin.js", () => {
   const h = leer("./empresa.html"), a = leer("./admin.js");
   assert.match(h, /id="est-xlsx"/); assert.match(h, /id="est-csv"/); assert.match(h, /estadisticas\/exportar\?/);
-  assert.match(h, /id="copias-panel"/); assert.match(h, /Comprobar copias ahora/); assert.match(h, /Comprobar no cambia nada/); assert.match(h, /copias\(\)\]/);
+  assert.match(h, /id="copias-panel"/); assert.match(h, /Comprobar copias ahora/); assert.match(h, /Comprobar no cambia nada/); assert.match(h, /entrada\(\), copias\(\), /); // la tarjeta de copias se recarga con el resto del panel
   assert.match(a, /"\/api\/admin\/copias" && get/); assert.match(a, /"\/api\/admin\/copias\/comprobar" && post/); assert.match(a, /"\/api\/admin\/estadisticas\/exportar" && get/);
   assert.ok(!/copias.*(restaurar|unlink|rmSync)/.test(leer("./copias.js").replace(/\/\/.*$/gm, "")), "copias.js no borra ni restaura");
   assert.ok(!leer("./exporter.js").includes("estadisticas-export"), "el Excel de a3ERP no se toca");
@@ -125,4 +125,15 @@ test("PANEL: el formulario de enlaces va en 4 pasos con resumen antes de crear y
   for (const id of ["inv-para", "inv-q", "inv-sel", "inv-n-tipo", "inv-n-nombre", "inv-n-tel", "inv-n-nif", "inv-n-dir", "inv-n-pob", "inv-n-re", "inv-modo", "inv-codigo", "inv-dias", "inv-fecha", "inv-hora", "inv-usos", "inv-msg-b", "inv-crear", "inv-res", "inv-url", "inv-copiar", "inv-wa", "inv-plantilla"]) assert.ok(h.includes(`id="${id}"`), id);
   assert.match(h, /id="inv-resumen"/); assert.match(h, /function invResumen\(\)/); assert.match(h, /Se creará un enlace para/);
   assert.match(h, /#inv-card \[hidden\] \{ display:none !important; \}/); // lo oculto no se ve (ni el cliente vacío ni la ficha)
+});
+
+test("PANEL: pestaña «Hoy» por defecto, ficha de cliente (fuera de la pestaña oculta) y buscador general en la cabecera", () => {
+  const h = leer("./empresa.html");
+  assert.match(h, /data-t="hoy" aria-selected="true"/); assert.match(h, /<div id="p-pedidos" hidden>/); assert.match(h, /id="p-hoy"/);
+  assert.match(h, /id="bg-q"/); assert.match(h, /async function hoy\(\)/); assert.match(h, /async function abrirFicha\(/); assert.match(h, /function irA\(t\)/);
+  const iFicha = h.indexOf('<dialog id="ficha"'), iEst = h.indexOf('id="p-estadisticas"'), iEstFin = h.indexOf('id="p-avisos"');
+  assert.ok(iFicha > 0 && (iFicha < iEst || iFicha > iEstFin), "la ficha no puede ir dentro de la pestaña de Estadísticas (se vería con tamaño 0)");
+  assert.match(h, /\$\("p-hoy"\)\.hidden \? Promise\.resolve\(\) : hoy\(\)/); // se refresca sola mientras se mira
+  assert.match(h, /e\.key === "\/"/); // atajo «/»
+  for (const f of ["verCliente(o.codigo, o.cliente)", "verCliente(a.customerId", "verCliente(c.id, c.nombre"]) assert.ok(h.includes(f), f); // nombres de cliente que abren la ficha
 });
