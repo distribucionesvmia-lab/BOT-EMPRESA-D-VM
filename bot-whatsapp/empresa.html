@@ -52,6 +52,7 @@
   .rec-plegable > :not(summary) { margin-left:16px; margin-right:16px; } .rec-plegable[open] { padding-bottom:16px; }
   .datos-wrap { display:grid; gap:14px; }
   .datos-wrap[hidden] { display:none; }
+  #inv-card label:not([style*="flex"]) { display:grid; gap:4px; min-width:0; } #inv-card label input:not([type="checkbox"]), #inv-card label select, #inv-card label textarea { width:100%; max-width:100%; min-width:0; } #inv-card p { overflow-wrap:anywhere; }
   .pasoDx { background:var(--accent-soft, #e8f4ee); color:var(--accent, #0b6e4f); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:700; }
   .dx-card h2 { text-transform:none; letter-spacing:0; font-size:18px; }
 </style>
@@ -188,16 +189,34 @@
       <div class="card" id="inv-card" style="margin:0 0 14px">
         <h3 style="margin:0 0 4px">Enlace de acceso para un cliente</h3>
         <p class="muted" style="margin:0 0 8px">Crea un enlace para que un cliente entre sin escribir nada. Tú eliges cuánto vale, cuántas veces se puede usar y si solo puede mirar o también pedir. <b>Lo mandas tú</b>: el sistema no envía nada.</p>
-        <div style="display:grid;gap:6px"><input id="inv-q" type="search" placeholder="Busca el cliente por nombre o código" aria-label="Buscar cliente para el enlace"><select id="inv-sel" aria-label="Cliente"></select></div>
+        <label>Para quién es
+          <select id="inv-para" aria-label="Para quién es el enlace"><option value="cliente" selected>Un cliente que ya tengo</option><option value="nuevo">Una persona nueva (aún sin alta)</option></select></label>
+        <div id="inv-cli" style="display:grid;gap:6px;margin-top:6px"><input id="inv-q" type="search" placeholder="Busca el cliente por nombre o código" aria-label="Buscar cliente para el enlace"><select id="inv-sel" aria-label="Cliente"></select></div>
+        <div id="inv-nuevo" hidden style="display:grid;gap:8px;margin-top:6px">
+          <label>Nombre de la persona o del negocio <b>*</b> <input id="inv-n-nombre" type="text" maxlength="80" autocomplete="off" aria-label="Nombre de la persona nueva"></label>
+          <label>Qué quieres que pueda hacer
+            <select id="inv-n-tipo" aria-label="Qué puede hacer la persona nueva"><option value="alta">Solo darse de alta (se le abre el formulario con su nombre)</option><option value="ver">Ver la app por dentro, sin pedir</option><option value="pedir">Pedir con normalidad (hay que rellenar su ficha)</option></select></label>
+          <label>Teléfono <span id="inv-n-tel-o" class="muted">(opcional: solo para abrir el WhatsApp)</span><b id="inv-n-tel-r" hidden>*</b> <input id="inv-n-tel" type="tel" inputmode="tel" autocomplete="off" aria-label="Teléfono"></label>
+          <div id="inv-n-ficha" hidden style="display:grid;gap:8px">
+            <p class="muted" style="margin:0">Ficha del cliente: para que pueda pedir como cualquier cliente hay que rellenarla. Se crea como cliente provisional (código P0000x) hasta que le des su código de a3ERP.</p>
+            <label>DNI, NIE o CIF <b>*</b> <input id="inv-n-nif" type="text" maxlength="12" autocomplete="off" aria-label="DNI, NIE o CIF"></label>
+            <label>Dirección de entrega <b>*</b> <input id="inv-n-dir" type="text" maxlength="160" autocomplete="off" aria-label="Dirección"></label>
+            <label>Población <b>*</b> <input id="inv-n-pob" type="text" maxlength="60" autocomplete="off" aria-label="Población"></label>
+            <label>Código de municipio (Medina del Campo = 47085; opcional) <input id="inv-n-mun" type="text" maxlength="5" inputmode="numeric" autocomplete="off" aria-label="Código de municipio"></label>
+            <label>Correo (opcional) <input id="inv-n-mail" type="email" autocomplete="off" aria-label="Correo"></label>
+            <label>Razón social (opcional) <input id="inv-n-razon" type="text" maxlength="80" autocomplete="off" aria-label="Razón social"></label>
+            <label style="display:flex;gap:8px;align-items:center"><input id="inv-n-re" type="checkbox"> Tiene recargo de equivalencia</label>
+          </div>
+        </div>
         <div class="inv-opc" style="display:grid;gap:8px;margin-top:10px">
           <label>Cuánto vale el enlace
             <select id="inv-dias" aria-label="Días que vale el enlace"><option value="1">1 día</option><option value="3">3 días</option><option value="7" selected>7 días</option><option value="30">30 días</option><option value="fecha">Hasta una fecha…</option></select></label>
           <label id="inv-fecha-l" hidden>Fecha en la que caduca <input id="inv-fecha" type="date" aria-label="Fecha de caducidad"></label>
           <label>Hora de caducidad (opcional, hora de Madrid) <input id="inv-hora" type="time" aria-label="Hora de caducidad"></label>
           <label>Cuántas veces se puede usar (de 1 a 20) <input id="inv-usos" type="number" min="1" max="20" step="1" value="1" inputmode="numeric" aria-label="Usos del enlace"></label>
-          <label>Qué puede hacer el cliente
+          <label id="inv-modo-l">Qué puede hacer el cliente
             <select id="inv-modo" aria-label="Qué puede hacer"><option value="pedir" selected>Ver el catálogo y pedir</option><option value="ver">Solo ver el catálogo (no puede enviar pedidos)</option></select></label>
-          <label style="display:flex;gap:8px;align-items:center"><input id="inv-codigo" type="checkbox" checked> Pedirle que ponga su código de entrada al entrar</label>
+          <label id="inv-codigo-l" style="display:flex;gap:8px;align-items:center"><input id="inv-codigo" type="checkbox" checked> Pedirle que ponga su código de entrada al entrar</label>
           <label>Mensaje de bienvenida (opcional; lo ve al entrar) <input id="inv-msg-b" type="text" maxlength="300" placeholder="Hola Pablo, aquí tienes tu enlace" aria-label="Mensaje de bienvenida"></label>
           <button class="main" id="inv-crear" type="button">Crear enlace de acceso</button>
         </div>
@@ -209,7 +228,7 @@
         <div id="inv-res" hidden style="margin-top:10px;display:grid;gap:6px"><input id="inv-url" readonly aria-label="Enlace creado"><div class="muted" id="inv-info"></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="main" id="inv-copiar" type="button">Copiar enlace</button><button id="inv-wa" type="button">Abrir en WhatsApp</button></div><div class="muted" id="inv-msg" role="status"></div></div>
         <h4 style="margin:14px 0 6px">Enlaces creados</h4>
         <p class="muted" id="inv-vacio" hidden style="margin:0">Todavía no has creado ningún enlace.</p>
-        <div class="scroll"><table><thead><tr><th>Cliente</th><th>Estado</th><th>Usos</th><th>Caduca</th><th>Qué puede hacer</th><th></th></tr></thead><tbody id="inv-lista"></tbody></table></div>
+        <div class="scroll"><table><thead><tr><th>Para</th><th>Estado</th><th>Usos</th><th>Caduca</th><th>Qué puede hacer</th><th></th></tr></thead><tbody id="inv-lista"></tbody></table></div>
       </div>
       <div class="scroll"><table><thead><tr><th>Cliente</th><th>Teléfono</th><th>Correo</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead><tbody id="cue"></tbody></table></div>
       <h2 style="margin-top:22px">Uso de la aplicación (últimos 30 días)</h2>
@@ -751,6 +770,14 @@ $("av-destino").onchange = () => { $("av-uno").hidden = $("av-destino").value !=
 let tInv = 0, invActual = null;
 $("inv-q").oninput = () => { clearTimeout(tInv); tInv = setTimeout(async () => { const q = $("inv-q").value.trim(), sel = $("inv-sel"); sel.innerHTML = ""; if (q.length < 2) return; const r = await call("/api/admin/clientes?q=" + encodeURIComponent(q)).catch(() => []); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); if (!r.length) sel.appendChild(el("option", "Ningún cliente con ese nombre", { value: "" })); }, 300); };
 const fechaEs = (iso) => new Date(iso).toLocaleString("es-ES", { timeZone: "Europe/Madrid", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+function invPara() {
+  const nuevo = $("inv-para").value === "nuevo", tipo = $("inv-n-tipo").value;
+  $("inv-cli").hidden = nuevo; $("inv-nuevo").hidden = !nuevo; $("inv-n-ficha").hidden = !(nuevo && tipo === "pedir");
+  $("inv-n-tel-o").hidden = tipo === "pedir"; $("inv-n-tel-r").hidden = tipo !== "pedir";
+  $("inv-modo-l").hidden = nuevo; $("inv-codigo-l").hidden = nuevo && tipo !== "pedir";
+  $("inv-crear").textContent = nuevo ? "Crear enlace para la persona nueva" : "Crear enlace de acceso";
+}
+$("inv-para").onchange = $("inv-n-tipo").onchange = invPara;
 $("inv-dias").onchange = () => { $("inv-fecha-l").hidden = $("inv-dias").value !== "fecha"; };
 async function invitaciones() {
   const r = await call("/api/admin/invitaciones").catch(() => null); if (!r) return;
@@ -760,18 +787,19 @@ async function invitaciones() {
   for (const x of r.enlaces) {
     const tr = document.createElement("tr"), acc = el("td");
     if (x.estado === "activo") { const b = el("button", "Anular"); b.type = "button"; b.onclick = async () => { if (!confirm(`¿Anular el enlace de ${x.nombre}? Dejará de funcionar ahora mismo.`)) return; const a = await call(`/api/admin/invitaciones/${x.id}/anular`, {}).catch((e) => ({ error: e.message })); if (a?.error) alert(a.error); invitaciones(); }; acc.append(b); }
-    tr.append(el("td", x.nombre), el("td", ESTADO[x.estado] ?? x.estado), el("td", `${x.usos} de ${x.usosMax}`), el("td", fechaEs(x.caduca)), el("td", (x.soloVer ? "Solo ver" : "Ver y pedir") + (x.pedirCodigo ? "" : " · sin pedir código") + (x.conMensaje ? " · con mensaje" : "")), acc); tb.appendChild(tr);
+    tr.append(el("td", x.nombre), el("td", ESTADO[x.estado] ?? x.estado), el("td", `${x.usos} de ${x.usosMax}`), el("td", fechaEs(x.caduca)), el("td", (x.tipo === "alta" ? "Solo darse de alta" : x.soloVer ? "Solo ver" : "Ver y pedir") + (x.pedirCodigo ? "" : " · sin pedir código") + (x.conMensaje ? " · con mensaje" : "")), acc); tb.appendChild(tr);
   }
 }
 $("inv-pl-g").onclick = async () => { const r = await call("/api/admin/invitaciones/plantilla", { texto: $("inv-plantilla").value }).catch((e) => ({ error: e.message })); $("inv-pl-msg").textContent = r?.error || "Texto guardado."; };
 $("inv-pl-r").onclick = async () => { const r = await call("/api/admin/invitaciones/plantilla", { restaurar: true }).catch((e) => ({ error: e.message })); if (r?.plantilla) $("inv-plantilla").value = r.plantilla; $("inv-pl-msg").textContent = r?.error || "Vuelve a estar el texto de siempre."; };
 $("inv-crear").onclick = async () => {
-  const id = $("inv-sel").value, m = $("inv-msg"); m.textContent = ""; if (!id) { m.textContent = "Busca y elige un cliente."; $("inv-res").hidden = false; return; }
+  const nuevo = $("inv-para").value === "nuevo", id = nuevo ? "nuevo" : $("inv-sel").value, m = $("inv-msg"); m.textContent = ""; if (!id) { m.textContent = "Busca y elige un cliente."; $("inv-res").hidden = false; return; }
   const dias = $("inv-dias").value, cuerpo = { hora: $("inv-hora").value || "", usos: Number($("inv-usos").value), modo: $("inv-modo").value, pedirCodigo: $("inv-codigo").checked, mensaje: $("inv-msg-b").value };
   if (dias === "fecha") { cuerpo.fecha = $("inv-fecha").value; if (!cuerpo.fecha) { $("inv-res").hidden = false; $("inv-url").value = ""; $("inv-info").textContent = ""; m.textContent = "Elige la fecha en la que caduca."; return; } } else cuerpo.dias = Number(dias);
-  const r = await call("/api/admin/clientes/" + encodeURIComponent(id) + "/invitacion", cuerpo).catch((e) => ({ error: e.message }));
+  if (nuevo) Object.assign(cuerpo, { tipo: $("inv-n-tipo").value, nombre: $("inv-n-nombre").value, telefono: $("inv-n-tel").value, nif: $("inv-n-nif").value, direccion: $("inv-n-dir").value, poblacion: $("inv-n-pob").value, municipio: $("inv-n-mun").value, correo: $("inv-n-mail").value, razonSocial: $("inv-n-razon").value, recargo: $("inv-n-re").checked });
+  const r = await call(nuevo ? "/api/admin/invitaciones/persona-nueva" : "/api/admin/clientes/" + encodeURIComponent(id) + "/invitacion", cuerpo).catch((e) => ({ error: e.message }));
   if (!r || r.error) { $("inv-res").hidden = false; $("inv-url").value = ""; $("inv-info").textContent = ""; m.textContent = (r && r.error) || "No se ha podido crear el enlace."; return; }
-  invActual = r; $("inv-res").hidden = false; $("inv-url").value = r.url; $("inv-info").textContent = `Para ${r.cliente}. ${r.usos === 1 ? "Un solo uso" : "Hasta " + r.usos + " usos"}; caduca el ${fechaEs(r.caduca)}. ${r.soloVer ? "Solo puede ver el catálogo. " : ""}Si creas otro para este cliente, este deja de valer.`;
+  invActual = r; $("inv-res").hidden = false; $("inv-url").value = r.url; $("inv-info").textContent = `Para ${r.cliente}. ${r.usos === 1 ? "Un solo uso" : "Hasta " + r.usos + " usos"}; caduca el ${fechaEs(r.caduca)}. ${r.tipo === "alta" ? "Solo puede darse de alta (se le abre el formulario con su nombre). " : r.soloVer ? "Solo puede ver el catálogo. " : ""}${r.codigoCliente ? `Se ha creado como cliente provisional ${r.codigoCliente}. ` : ""}${r.tipo === "alta" ? "" : "Si creas otro para este cliente, este deja de valer."}`;
   $("inv-wa").disabled = !r.tieneTelefono; $("inv-wa").title = r.tieneTelefono ? "" : "Este cliente no tiene teléfono guardado: copia el enlace y mándalo tú";
   invitaciones();
 };

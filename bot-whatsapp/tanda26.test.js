@@ -14,7 +14,7 @@ test("invitaciones: token largo y aleatorio, solo se guarda su huella, un solo u
   assert.match(token, /^[\w-]{43}$/); assert.equal(caduca, "2026-11-23T10:00:00.000Z"); assert.notEqual(a.invitacionCrear("C1", { now: t0 }).token, token);
   // ya se anuló la primera al crear la segunda (solo vale la última sin usar)
   assert.deepEqual(a.invitacionVer(token, t0), { ok: false, motivo: "usada" });
-  const v = a.invitacionCrear("C2", { dias: 7, now: t0 }); assert.deepEqual(a.invitacionVer(v.token, "2026-11-20T00:00:00Z"), { ok: true, customerId: "C2", soloVer: false, mensaje: "", pedirCodigo: true, usosMax: 1 });
+  const v = a.invitacionCrear("C2", { dias: 7, now: t0 }); assert.deepEqual(a.invitacionVer(v.token, "2026-11-20T00:00:00Z"), { ok: true, customerId: "C2", soloVer: false, mensaje: "", pedirCodigo: true, usosMax: 1, tipo: "cliente", nombre: "" });
   // caduca
   assert.deepEqual(a.invitacionVer(v.token, "2026-11-23T10:00:00.000Z"), { ok: false, motivo: "caducada" }); assert.deepEqual(a.invitacionUsar(v.token, "2026-12-01T00:00:00Z"), { ok: false, motivo: "caducada" });
   // un solo uso

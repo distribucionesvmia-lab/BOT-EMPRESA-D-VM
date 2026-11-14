@@ -1106,6 +1106,36 @@ test("ENLACES CONFIGURABLES: varios usos con tope, solo ver (el servidor no deja
   await call("POST", "/api/admin/invitaciones/plantilla", { admin: true, body: { restaurar: true } });
 });
 
+test("ENLACES PARA PERSONAS NUEVAS: alta con su nombre, ver sin pedir y pedir con la ficha obligatoria", async () => {
+  const nueva = (body) => call("POST", "/api/admin/invitaciones/persona-nueva", { admin: true, body });
+  assert.ok([401, 403].includes((await call("POST", "/api/admin/invitaciones/persona-nueva", { body: { tipo: "alta", nombre: "Bar Nuevo" } })).status)); // sin la clave, nada
+  assert.equal((await nueva({ tipo: "otro", nombre: "Bar Nuevo" })).status, 400); assert.equal((await nueva({ tipo: "alta", nombre: "a" })).status, 400);
+  // 1) alta: no crea cliente ni sesión; abre el formulario con el nombre puesto
+  const antes = (await call("GET", "/api/admin/clientes?q=Bar Nuevo Alta", { admin: true })).json.length;
+  const a = (await nueva({ tipo: "alta", nombre: "Bar Nuevo Alta", usos: 3, telefono: "600123456" })).json; assert.equal(a.ok, true); assert.equal(a.codigoCliente, null); assert.match(a.texto, /darte de alta como cliente/); assert.match(a.whatsapp, /wa\.me\/34600123456/);
+  assert.equal((await call("GET", "/api/admin/clientes?q=Bar Nuevo Alta", { admin: true })).json.length, antes); // no se creó ningún cliente
+  const ra = new URL(a.url).pathname; assert.match(await (await fetch(BASE + ra)).text(), /Solicitar mi alta/);
+  const pa = await fetch(BASE + ra, { method: "POST", redirect: "manual" }); assert.equal(pa.status, 303); assert.equal(pa.headers.get("location"), "/cliente#alta=" + encodeURIComponent("Bar Nuevo Alta")); assert.equal(pa.headers.get("set-cookie"), null); // sin sesión
+  const a2 = (await nueva({ tipo: "alta", nombre: "Otro Bar Alta" })).json; assert.equal((await fetch(BASE + new URL(a.url).pathname)).status, 200); assert.ok(a2.ok); // crear otro de alta NO anula el anterior
+  // 2) ver: se crea un cliente provisional solo con el nombre; entra solo para ver
+  const v = (await nueva({ tipo: "ver", nombre: "Bar Nuevo Ver", mensaje: "Mira la app" })).json; assert.equal(v.ok, true); assert.match(v.codigoCliente, /^P\d{5}$/); assert.equal(v.soloVer, true);
+  const pv = await fetch(BASE + new URL(v.url).pathname, { method: "POST", redirect: "manual" }); assert.equal(pv.status, 303); const ckv = (pv.headers.get("set-cookie") ?? "").split(";")[0];
+  const yv = (await call("GET", "/api/yo", { cookie: ckv })).json.cliente; assert.equal(yv.nombre, "Bar Nuevo Ver"); assert.equal(yv.soloVer, true);
+  assert.equal((await call("POST", "/catalogo", { cookie: ckv, body: { key: "nuevo-ver-0001", items: [] } })).status, 403);
+  assert.equal((await nueva({ tipo: "ver", nombre: "bar nuevo ver" })).status, 409); // mismo nombre: no se duplica
+  // 3) pedir: la ficha es obligatoria
+  const f = await nueva({ tipo: "pedir", nombre: "Bar Nuevo Pedir" }); assert.equal(f.status, 400); assert.match(f.json.error, /ficha.*teléfono.*DNI.*dirección.*población/);
+  assert.equal((await nueva({ tipo: "pedir", nombre: "Bar Nuevo Pedir", telefono: "600111222", nif: "123", direccion: "Calle Mayor 1", poblacion: "Medina del Campo" })).status, 400); // DNI no válido: no se crea nada
+  assert.equal((await call("GET", "/api/admin/clientes?q=Bar Nuevo Pedir", { admin: true })).json.length, 0);
+  const p = (await nueva({ tipo: "pedir", nombre: "Bar Nuevo Pedir", telefono: "600111222", nif: "B47123456", direccion: "Calle Mayor 1", poblacion: "Medina del Campo", municipio: "47085", dias: 3 })).json;
+  assert.equal(p.ok, true); assert.equal(p.soloVer, false); assert.match(p.codigoCliente, /^P\d{5}$/);
+  const pp = await fetch(BASE + new URL(p.url).pathname, { method: "POST", redirect: "manual" }); assert.equal(pp.status, 303); assert.equal(pp.headers.get("location"), "/cliente#invitacion");
+  const ckp = (pp.headers.get("set-cookie") ?? "").split(";")[0]; const yp = (await call("GET", "/api/yo", { cookie: ckp })).json.cliente; assert.equal(yp.nombre, "Bar Nuevo Pedir"); assert.equal(yp.soloVer, false);
+  assert.equal((await nueva({ tipo: "pedir", nombre: "Otro Distinto", telefono: "600111223", nif: "B47123456", direccion: "Calle 2", poblacion: "Medina" })).status, 409); // ese CIF ya es de otro cliente
+  // lista: aparecen con su nombre y qué pueden hacer
+  const lista = (await call("GET", "/api/admin/invitaciones", { admin: true })).json.enlaces; const la = lista.find((x) => x.tipo === "alta" && x.nombre === "Bar Nuevo Alta"); assert.ok(la); assert.equal(la.estado, "activo");
+});
+
 test("BENCH 10: enlace de invitación de la oficina: un solo uso, caduca, se guarda solo su huella y entra como ESE cliente", async () => {
   const lista = (await call("GET", "/api/admin/clientes?q=ejemplo", { admin: true })).json; assert.ok(lista.length >= 1);
   const id = lista[0].id;

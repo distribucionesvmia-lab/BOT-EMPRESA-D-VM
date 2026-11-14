@@ -98,6 +98,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   // Opciones del enlace (días y hora ya van en expires_at): cuántos usos, mensaje de bienvenida, solo ver o también pedir, y si se le pide poner su código
   addCol("invitaciones", "max_uses", "INTEGER NOT NULL DEFAULT 1"); addCol("invitaciones", "uses", "INTEGER NOT NULL DEFAULT 0");
   addCol("invitaciones", "welcome", "TEXT"); addCol("invitaciones", "solo_ver", "INTEGER NOT NULL DEFAULT 0"); addCol("invitaciones", "pedir_codigo", "INTEGER NOT NULL DEFAULT 1");
+  addCol("invitaciones", "tipo", "TEXT NOT NULL DEFAULT 'cliente'"); addCol("invitaciones", "nombre", "TEXT"); // tipo 'alta' = enlace para una persona nueva que solo rellena su solicitud de alta (sin cliente ni sesión)
   addCol("sessions", "solo_ver", "INTEGER NOT NULL DEFAULT 0"); addCol("sessions", "welcome", "TEXT"); addCol("sessions", "pedir_codigo", "INTEGER NOT NULL DEFAULT 1"); // la sesión abierta con un enlace recuerda con qué condiciones
   db.exec("CREATE TABLE IF NOT EXISTS bienvenida_vista (customer_id TEXT PRIMARY KEY, at TEXT NOT NULL)"); // la tarjeta de bienvenida ya cerrada («Entendido»), por cliente
   db.exec("CREATE TABLE IF NOT EXISTS corte_pref (customer_id TEXT PRIMARY KEY, activo INTEGER NOT NULL)"); // «Avisarme antes de la hora límite»: sin fila = activado (si tiene los avisos del móvil activados)
@@ -266,23 +267,23 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     },
     /** Crea un enlace de invitación (32 bytes aleatorios) para un cliente. Los anteriores sin usar de ese cliente dejan de valer. Devuelve { token, caduca }; el token no se guarda.
      *  Opciones ya validadas (invitaciones.js): expiresAt, usos (tope), mensaje, soloVer, pedirCodigo. */
-    invitacionCrear(customerId, { dias = 7, expiresAt = null, usos = 1, mensaje = "", soloVer = false, pedirCodigo = true, now = new Date().toISOString() } = {}) {
+    invitacionCrear(customerId, { dias = 7, expiresAt = null, usos = 1, mensaje = "", soloVer = false, pedirCodigo = true, tipo = "cliente", nombre = "", now = new Date().toISOString() } = {}) {
       const token = crypto.randomBytes(32).toString("base64url"), caduca = expiresAt ?? new Date(new Date(now).getTime() + dias * 86_400_000).toISOString();
       db.exec("BEGIN IMMEDIATE");
       try {
-        db.prepare("UPDATE invitaciones SET used_at = ?, motivo = 'sustituida' WHERE customer_id = ? AND used_at IS NULL").run(now, String(customerId));
-        db.prepare("INSERT INTO invitaciones (token_hash, customer_id, created_at, expires_at, max_uses, welcome, solo_ver, pedir_codigo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(huellaInv(token), String(customerId), now, caduca, usos, mensaje || null, soloVer ? 1 : 0, pedirCodigo ? 1 : 0);
+        if (tipo !== "alta") db.prepare("UPDATE invitaciones SET used_at = ?, motivo = 'sustituida' WHERE customer_id = ? AND used_at IS NULL AND tipo != 'alta'").run(now, String(customerId)); // los de «alta» no tienen cliente: no se sustituyen entre sí
+        db.prepare("INSERT INTO invitaciones (token_hash, customer_id, created_at, expires_at, max_uses, welcome, solo_ver, pedir_codigo, tipo, nombre) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(huellaInv(token), tipo === "alta" ? "" : String(customerId), now, caduca, usos, mensaje || null, soloVer ? 1 : 0, pedirCodigo ? 1 : 0, tipo === "alta" ? "alta" : "cliente", nombre || null);
         db.exec("COMMIT");
       } catch (e) { db.exec("ROLLBACK"); throw e; }
       return { token, caduca };
     },
     /** Sin gastarlo: { ok:true, customerId, soloVer, mensaje, pedirCodigo, usosMax } o { ok:false, motivo:'desconocida'|'usada'|'caducada' }. */
     invitacionVer(token, now = new Date().toISOString()) {
-      const r = db.prepare("SELECT customer_id, expires_at, used_at, uses, max_uses, welcome, solo_ver, pedir_codigo FROM invitaciones WHERE token_hash = ?").get(huellaInv(token));
+      const r = db.prepare("SELECT customer_id, expires_at, used_at, uses, max_uses, welcome, solo_ver, pedir_codigo, tipo, nombre FROM invitaciones WHERE token_hash = ?").get(huellaInv(token));
       if (!r) return { ok: false, motivo: "desconocida" };
       if (r.used_at || r.uses >= r.max_uses) return { ok: false, motivo: "usada" };
       if (r.expires_at <= now) return { ok: false, motivo: "caducada" };
-      return { ok: true, customerId: r.customer_id, soloVer: !!r.solo_ver, mensaje: r.welcome ?? "", pedirCodigo: !!r.pedir_codigo, usosMax: r.max_uses };
+      return { ok: true, customerId: r.customer_id, soloVer: !!r.solo_ver, mensaje: r.welcome ?? "", pedirCodigo: !!r.pedir_codigo, usosMax: r.max_uses, tipo: r.tipo ?? "cliente", nombre: r.nombre ?? "" };
     },
     /** La gasta (atómico): con un solo uso, dos personas con el mismo enlace no pueden entrar las dos; con varios, nunca más del tope. */
     invitacionUsar(token, now = new Date().toISOString()) {
@@ -292,8 +293,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     },
     /** Lista para el panel (nunca el enlace): estado = activo | agotado | caducado | anulado | sustituido. */
     invitacionesLista({ limite = 100, now = new Date().toISOString() } = {}) {
-      return db.prepare("SELECT id, customer_id, created_at, expires_at, used_at, motivo, uses, max_uses, solo_ver, pedir_codigo, welcome FROM invitaciones ORDER BY id DESC LIMIT ?").all(Math.min(300, limite)).map((r) => ({
-        id: r.id, cliente: r.customer_id, creado: r.created_at, caduca: r.expires_at, usos: r.uses, usosMax: r.max_uses, soloVer: !!r.solo_ver, pedirCodigo: !!r.pedir_codigo, conMensaje: !!r.welcome,
+      return db.prepare("SELECT id, customer_id, created_at, expires_at, used_at, motivo, uses, max_uses, solo_ver, pedir_codigo, welcome, tipo, nombre FROM invitaciones ORDER BY id DESC LIMIT ?").all(Math.min(300, limite)).map((r) => ({
+        id: r.id, cliente: r.customer_id, creado: r.created_at, caduca: r.expires_at, usos: r.uses, usosMax: r.max_uses, soloVer: !!r.solo_ver, pedirCodigo: !!r.pedir_codigo, conMensaje: !!r.welcome, tipo: r.tipo ?? "cliente", nombre: r.nombre ?? "",
         estado: r.motivo === "anulada" ? "anulado" : r.motivo === "sustituida" ? "sustituido" : r.used_at ? "agotado" : r.expires_at <= now ? "caducado" : "activo",
       }));
     },

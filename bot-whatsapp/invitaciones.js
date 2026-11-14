@@ -3,6 +3,8 @@
 import { madridDay, addDays } from "./delivery.js";
 
 export const MAX_DIAS = 60, MAX_USOS = 20, MAX_MENSAJE = 300, MAX_PLANTILLA = 500;
+export const PLANTILLA_ALTA = "Hola {nombre}, este es tu enlace para darte de alta como cliente de Distribuciones Valentín Martín: {enlace}\n(Sirve {usos} y hasta el {caduca}.)";
+export const PLANTILLA_VER = "Hola {nombre}, este es tu enlace para ver el catálogo de Distribuciones Valentín Martín: {enlace}\n(Sirve {usos} y hasta el {caduca}.)";
 export const PLANTILLA_DEFECTO = "Hola {nombre}, este es tu enlace para pedir a Distribuciones Valentín Martín: {enlace}\n(Sirve {usos} y hasta el {caduca}.)";
 
 const partes = (d) => Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(d).map((x) => [x.type, x.value]));

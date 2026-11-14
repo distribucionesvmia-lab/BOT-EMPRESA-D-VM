@@ -1732,7 +1732,7 @@ function entrar(nombre) { yoCache = null; $("cli").textContent = nombre; chat.in
 (async () => {
   const r = await fetch("/api/yo").catch(() => null);
   const j = r && r.ok ? await r.json().catch(() => null) : null; // sin sesión responde 200 con cliente nulo (invitado)
-  if (j && j.cliente) entrar(j.cliente.nombre); else { ver("acceso"); if (location.hash === "#enlace-caducado") { try { history.replaceState(null, "", location.pathname); } catch {} $("a-err").textContent = "Ese enlace ya no sirve (se usa una sola vez y caduca). Entra como siempre o pídele otro a la oficina."; } }
+  if (j && j.cliente) entrar(j.cliente.nombre); else if (/^#alta=/.test(location.hash)) { const nom = (() => { try { return decodeURIComponent(location.hash.slice(6)).slice(0, 80); } catch { return ""; } })(); try { history.replaceState(null, "", location.pathname); } catch {} ver("registro"); if (nom) $("r-emp").value = nom; setTimeout(() => { try { $("r-tel").focus(); } catch {} }, 200); } else { ver("acceso"); if (location.hash === "#enlace-caducado") { try { history.replaceState(null, "", location.pathname); } catch {} $("a-err").textContent = "Ese enlace ya no sirve (se usa una sola vez y caduca). Entra como siempre o pídele otro a la oficina."; } }
 })();
 </script>
 <script>

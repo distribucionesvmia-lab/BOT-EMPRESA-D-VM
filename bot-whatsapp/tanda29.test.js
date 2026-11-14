@@ -35,7 +35,7 @@ test("base de datos: varios usos con tope, anular, lista sin el enlace, y la ses
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-inv-")), a = openAccountsDb(path.join(dir, "c.sqlite"));
   try {
     const op = opcionesInvitacion({ usos: 2, modo: "ver", mensaje: "Hola, Pablo", pedirCodigo: false }, T0), v = a.invitacionCrear("C2", { ...op, now: T0 });
-    assert.deepEqual(a.invitacionVer(v.token, T0), { ok: true, customerId: "C2", soloVer: true, mensaje: "Hola, Pablo", pedirCodigo: false, usosMax: 2 });
+    assert.deepEqual(a.invitacionVer(v.token, T0), { ok: true, customerId: "C2", soloVer: true, mensaje: "Hola, Pablo", pedirCodigo: false, usosMax: 2, tipo: "cliente", nombre: "" });
     assert.equal(a.invitacionUsar(v.token, T0).ok, true); assert.equal(a.invitacionUsar(v.token, T0).ok, true); // 2 usos
     assert.deepEqual(a.invitacionUsar(v.token, T0), { ok: false, motivo: "usada" }); // el tercero, no
     assert.equal(a.invitacionesLista({ now: T0 })[0].estado, "agotado"); assert.equal(a.invitacionesLista({ now: T0 })[0].usos, 2);
@@ -59,4 +59,13 @@ test("servidor: «solo ver» no deja enviar pedidos (catálogo ni chat), el pane
   for (const t of ["inv-dias", "inv-fecha", "inv-hora", "inv-usos", "inv-modo", "inv-codigo", "inv-msg-b", "inv-plantilla", "inv-lista", "Anular", "Solo ver el catálogo"]) assert.ok(e.includes(t), t);
   assert.match(e, /erroresApp\(\), invitaciones\(\)/);
   assert.match(ped, /function pintarSoloVer\(\)/); assert.match(ped, /data\.soloVer/); assert.match(cli, /y\?\.mensajeEnlace/); assert.match(cli, /in-enlace/);
+});
+
+test("personas nuevas: el panel ofrece alta / ver / pedir, la ficha es obligatoria para pedir y la pantalla de alta se abre con el nombre", () => {
+  const e = leer("./empresa.html"), c = leer("./cliente.html"), au = leer("./auth.js"), ad = leer("./admin.js");
+  for (const t of ["inv-para", "Una persona nueva (aún sin alta)", "inv-n-nombre", "inv-n-tipo", "Solo darse de alta", "Ver la app por dentro, sin pedir", "Pedir con normalidad (hay que rellenar su ficha)", "inv-n-nif", "inv-n-dir", "inv-n-pob", "/api/admin/invitaciones/persona-nueva"]) assert.ok(e.includes(t), t);
+  assert.match(ad, /Para que pueda pedir hay que rellenar su ficha/); assert.match(ad, /Ya hay un cliente llamado/); assert.match(ad, /Ese DNI o CIF ya es de otro cliente/);
+  assert.doesNotMatch(ad.slice(ad.indexOf("persona-nueva"), ad.indexOf("// Lista de enlaces")), /sendMail|enviarPush|fetch\(/); // el sistema no envía nada
+  assert.match(au, /u\.tipo === "alta"/); assert.match(au, /"\/cliente#alta=" \+ encodeURIComponent/);
+  assert.match(c, /\^#alta=\//); assert.match(c, /\$\("r-emp"\)\.value = nom/); assert.match(c, /ver\("registro"\)/);
 });

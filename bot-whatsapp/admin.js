@@ -1,7 +1,7 @@
 // Rutas HTTP de la EMPRESA (el empresario): pedidos recibidos y su exportación a Excel, solicitudes de alta de
 // clientes y cuentas. Es una aplicación aparte de la del cliente: todo va bajo /api/admin y exige la clave de la empresa.
 import { deliveryInfo, madridDay } from "./delivery.js";
-import { opcionesInvitacion, plantillaValida, textoWhatsapp, PLANTILLA_DEFECTO } from "./invitaciones.js";
+import { opcionesInvitacion, plantillaValida, textoWhatsapp, PLANTILLA_DEFECTO, PLANTILLA_ALTA, PLANTILLA_VER } from "./invitaciones.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -292,18 +292,52 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
         const texto = textoWhatsapp(accounts.ajuste("plantilla_enlace"), { nombre: cli.name, url, usos: op.usos, expiresAt: caduca });
         return send(res, 200, { ok: true, cliente: cli.name, url, caduca, usos: op.usos, soloVer: op.soloVer, pedirCodigo: op.pedirCodigo, texto, whatsapp: `https://wa.me/${/^\d{9}$/.test(tel) ? "34" + tel : ""}?text=${encodeURIComponent(texto)}`, tieneTelefono: /^\d{9}$/.test(tel) }), true;
       } }
+    // Enlace para una PERSONA NUEVA (aún sin alta). Tres tipos: «alta» (abre su solicitud con el nombre puesto; no crea nada),
+    // «ver» (entra a ver la app sin poder pedir; se crea un cliente provisional solo con el nombre) y «pedir» (como un cliente normal:
+    // por obligación hay que rellenar su ficha —teléfono, DNI/CIF, dirección y población— y se crea como cliente provisional P0000x).
+    if (p === "/api/admin/invitaciones/persona-nueva" && post) {
+      const b = (await readJson(req)) ?? {}, tipo = ["alta", "ver", "pedir"].includes(b.tipo) ? b.tipo : null;
+      if (!tipo) return send(res, 400, { error: "Elige qué quieres que pueda hacer: darse de alta, ver la app o pedir." }), true;
+      const nombre = String(b.nombre ?? "").replace(/\s+/g, " ").trim();
+      if (nombre.length < 2 || nombre.length > 80) return send(res, 400, { error: "Escribe el nombre de la persona o del negocio (de 2 a 80 letras)." }), true;
+      const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/\/$/, "");
+      if (!/^https?:\/\//.test(base)) return send(res, 409, { error: "Falta la dirección pública de la aplicación del cliente: ponla en CLIENTE_URL (en C:\\vm\\config) o abre una vez la aplicación del cliente desde su dirección pública." }), true;
+      const op = opcionesInvitacion({ ...b, modo: tipo === "pedir" ? "pedir" : "ver", pedirCodigo: tipo === "pedir" ? b.pedirCodigo : false });
+      if (op.error) return send(res, 400, { error: op.error }), true;
+      const sinTildes = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+      let customerId = "", telefono = String(b.telefono ?? "");
+      if (tipo !== "alta") {
+        if (!actualizador) return send(res, 404, { error: "No disponible." }), true;
+        if (customers.search({ q: nombre, limit: 30 }).rows.some((c) => sinTildes(c.name) === sinTildes(nombre))) return send(res, 409, { error: `Ya hay un cliente llamado «${nombre}». Usa su enlace normal (elige «Un cliente que ya tengo») para no duplicarlo.` }), true;
+        if (tipo === "pedir") { // con permiso para pedir hace falta la ficha completa
+          const falta = [["telefono", "el teléfono"], ["nif", "el DNI, NIE o CIF"], ["direccion", "la dirección"], ["poblacion", "la población"]].filter(([k]) => !String(b[k] ?? "").trim()).map(([, t]) => t);
+          if (falta.length) return send(res, 400, { error: `Para que pueda pedir hay que rellenar su ficha: falta ${falta.join(", ")}.` }), true;
+          const seis = String(b.nif).toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/\D/g, "").slice(0, 6);
+          if (seis.length === 6 && customers.findByNif(seis).length) return send(res, 409, { error: "Ese DNI o CIF ya es de otro cliente. Usa el enlace de ese cliente." }), true;
+        }
+        try {
+          const c = actualizador.anadirCliente({ nombre, telefono: b.telefono, nif: tipo === "pedir" ? b.nif : "", direccion: b.direccion, poblacion: b.poblacion, municipio: b.municipio, correo: b.correo, razonSocial: b.razonSocial, recargo: b.recargo === true }, { actualizar: false });
+          customerId = c.id;
+        } catch (e) { return send(res, 400, { error: e.message }), true; }
+      }
+      const { token, caduca } = accounts.invitacionCrear(customerId, { ...op, tipo: tipo === "alta" ? "alta" : "cliente", nombre });
+      const url = `${base}/entrar/${token}`, tel = telefono.replace(/\D/g, "").replace(/^(0034|34)/, "");
+      const plantilla = accounts.ajuste("plantilla_enlace") || (tipo === "alta" ? PLANTILLA_ALTA : tipo === "ver" ? PLANTILLA_VER : PLANTILLA_DEFECTO);
+      const texto = textoWhatsapp(plantilla, { nombre, url, usos: op.usos, expiresAt: caduca });
+      return send(res, 200, { ok: true, cliente: nombre, codigoCliente: customerId || null, tipo, url, caduca, usos: op.usos, soloVer: tipo !== "pedir", pedirCodigo: op.pedirCodigo, texto, whatsapp: `https://wa.me/${/^\d{9}$/.test(tel) ? "34" + tel : ""}?text=${encodeURIComponent(texto)}`, tieneTelefono: /^\d{9}$/.test(tel) }), true;
+    }
     // Lista de enlaces (sin el enlace en sí: no se guarda) y «Anular»
     if (p === "/api/admin/invitaciones" && get) {
-      const nom = (id) => customers.getById(id)?.name ?? "Cliente " + id;
-      return send(res, 200, { enlaces: accounts.invitacionesLista().map((x) => ({ ...x, nombre: nom(x.cliente) })), plantilla: accounts.ajuste("plantilla_enlace") || PLANTILLA_DEFECTO, plantillaDefecto: PLANTILLA_DEFECTO }), true;
+      const nom = (x) => (x.tipo === "alta" ? x.nombre : customers.getById(x.cliente)?.name ?? x.nombre ?? "Cliente " + x.cliente);
+      return send(res, 200, { enlaces: accounts.invitacionesLista().map((x) => ({ ...x, nombre: nom(x) })), plantilla: accounts.ajuste("plantilla_enlace") || PLANTILLA_DEFECTO, plantillaDefecto: PLANTILLA_DEFECTO }), true;
     }
     { const ma = /^\/api\/admin\/invitaciones\/(\d+)\/anular$/.exec(p);
       if (ma && post) return accounts.invitacionAnular(ma[1]) ? send(res, 200, { ok: true }) : send(res, 409, { error: "Ese enlace ya estaba usado, caducado o anulado." }), true; }
     if (p === "/api/admin/invitaciones/plantilla" && post) {
-      const b = (await readJson(req)) ?? {}, v = b?.restaurar ? { texto: PLANTILLA_DEFECTO } : plantillaValida(b?.texto);
+      const b = (await readJson(req)) ?? {}, v = b?.restaurar ? { texto: "" } : plantillaValida(b?.texto); // «volver al de siempre» = sin texto propio (así cada tipo de enlace usa el suyo)
       if (v.error) return send(res, 400, { error: v.error }), true;
       accounts.ajusteGuardar("plantilla_enlace", v.texto);
-      return send(res, 200, { ok: true, plantilla: v.texto }), true;
+      return send(res, 200, { ok: true, plantilla: v.texto || PLANTILLA_DEFECTO }), true;
     }
     // ---- Errores de la app del cliente (últimos 7 días): recuento por tipo, por cliente y por API ----
     if (p === "/api/admin/errores" && get) {
