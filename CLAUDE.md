@@ -170,3 +170,9 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 - **Categorías grandes** (más de 30 artículos): «Ordenar» (lo que más pido, nombre, precio) y «Marca» (`ordenCat`, `marcaCat`; se reinician al cambiar de categoría). El número de artículos no se parte (`white-space:nowrap`).
 - **Red**: aviso «Cargando el catálogo…» si tarda más de 0,8 s; dos toques seguidos en «+» avisan «ahora llevas N»; sin conexión sale una banda fija (`#sinRed`) y «Enviar pedido» se bloquea hasta que vuelva la red (`pintaRed`).
 - Pruebas: `tanda11.test.js`.
+
+## Tanda 12 de QA (pedido semanal real de un bar)
+- **«Repetir y revisar» / «Repetir pedido» con un pedido ya empezado** (`precargar` + `elegirAnterior` en `pedido.html`): nunca se mezcla sin preguntar. Sale «Ya tienes un pedido empezado» con el total actual, el del pedido anterior y cómo queda si se SUSTITUYE o se AÑADE; si al añadir pasa de 3.000 € lo avisa y, si el resultado supera `LIM_IMPORTE`, pregunta «¿Seguro?» y deshace si se dice que no. «Añadir al carrito» (`a=1`) suma como siempre (con el mismo «¿Seguro?»). La orden del enlace (`#c=…`) se borra de la dirección tras usarla (al recargar no se repite).
+- **Buscador** (`buscarOrden`): palabras pegadas («cocacola» = «coca-cola», `b2`), sinónimos del sector (tercio, caña, botín → cerveza), «hielo bolsa» se resuelve sin la palabra de formato (bolsa, lata, caja, pack…) y lo dice («No hay … tal cual»), «barril» avisa «No vendemos barril… pregunta a tu comercial» y sin resultados el texto remite al comercial (`busquedaAviso`).
+- «Lo que sueles pedir» del Inicio: nombre entero hasta 4 líneas y «Caja de N». El aviso («Quitado…») va encima de la barra inferior y de «Ver pedido» (no tapa categorías) y se quita con un toque si no lleva «Deshacer».
+- Pruebas: `tanda12.test.js`.

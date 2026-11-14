@@ -591,6 +591,7 @@
   .tcard tfoot tr { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:var(--s1) var(--s3); padding:var(--s3); background:var(--accent-soft); border-top:.5px solid var(--line); }
   .tcard tfoot td { display:block; padding:0; background:none; } .tcard tfoot td:last-child { margin-left:auto; white-space:nowrap; }
   @media (max-width:520px) { .tcard { margin-left:0; width:100%; } } /* en el móvil la tarjeta usa todo el ancho (no deja hueco para el avatar) */
+  .vm-inicio .in-pn { -webkit-line-clamp:4; min-height:calc(2 * 1.2em); } .vm-inicio .in-fmt { color:var(--text-2); }
 </style>
 </head>
 <body>
@@ -1180,7 +1181,7 @@ function inicio(ui) {
       if (etiqueta) im.appendChild(el("span", "in-oferta", etiqueta));
       const mas = el("span", "in-mas"); mas.setAttribute("aria-hidden", "true"); mas.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
       const pie = el("span", "in-pie"); pie.append(el("small", null, eur(p.price) + " /ud"), mas);
-      t.append(im, el("b", "in-pn", p.name), pie); return t;
+      t.append(im, el("b", "in-pn", p.name), ...(p.unitsPerBox ? [el("small", "in-fmt", "Caja de " + p.unitsPerBox)] : []), pie); return t; // nombre entero (hasta 4 líneas) y el formato
     };
     if (j.ofertas?.length) { // ofertas vigentes que le cambian el precio (la empresa las pone desde el panel)
       const sec = el("section", "in-sec"); sec.setAttribute("aria-label", "Ofertas"); sec.appendChild(el("h3", null, "Ofertas"));

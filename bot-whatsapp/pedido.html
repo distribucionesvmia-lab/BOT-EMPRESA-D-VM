@@ -1406,6 +1406,9 @@ function aviso(texto, deshacer) {
   const t = $("toast"); t.innerHTML = ""; t.append(Object.assign(document.createElement("span"), { textContent: texto }));
   if (deshacer) { const b = document.createElement("button"); b.type = "button"; b.textContent = "Deshacer"; b.setAttribute("aria-label", "Deshacer: " + texto); b.onclick = () => { t.hidden = true; clearTimeout(toastT); deshacer(); }; t.appendChild(b); }
   t.classList.toggle("arriba", !$("cart").hidden); // con el carrito abierto el aviso va arriba: no tapa «Elegir el día de entrega»
+  { const tb = document.querySelector(".tabbar"), pie = document.querySelector("footer"); // en el catálogo va justo ENCIMA de la barra inferior (y de «Ver pedido»): no tapa categorías ni botones
+    t.style.bottom = $("cart").hidden ? ((tb && tb.offsetHeight) + (pie && !pie.hidden ? pie.offsetHeight : 0) + 8) + "px" : ""; }
+  t.onclick = deshacer ? null : () => { t.hidden = true; clearTimeout(toastT); }; // un aviso sin «Deshacer» se quita con un toque
   t.hidden = false; clearTimeout(toastT);
   const cierra = () => { clearTimeout(toastT); toastT = setTimeout(() => (t.hidden = true), deshacer ? 8000 : 4000); };
   const pausa = () => clearTimeout(toastT); // mientras se toca o tiene el foco, no desaparece
@@ -1772,7 +1775,7 @@ const dist = (a, b) => { const d = Array.from({ length: a.length + 1 }, (_, i) =
 // ── Buscador: entiende plurales y tildes, sinónimos y nombres de categoría; el producto va antes que el accesorio y lo que el cliente compra, arriba ──
 const PALABRAS_VACIAS_B = new Set(["de", "del", "la", "las", "el", "los", "y", "e", "en", "con", "sin", "para", "por", "un", "una", "al"]);
 const ACCESORIOS = new Set(["cuchara", "cucharilla", "cucharon", "copa", "vaso", "jarra", "estuche", "pinza", "taza", "plato", "cubierto", "tenedor", "cuchillo", "bandeja", "dispensador", "soporte", "abridor", "abrebotellas", "set", "juego", "molinillo", "cafetera", "azucarero", "servilletero", "cubitera", "pala", "colador", "termo", "expositor", "cesta", "mantel", "delantal", "espatula", "cazo", "olla", "sarten"]);
-const SINONIMOS = { refresco: ["cola", "fanta", "sprite", "kas", "tonica", "gaseosa", "limonada", "naranjada", "bitter"], hielo: ["cubito"], limpieza: ["limpiador", "lejia", "fregasuelos", "friegasuelos", "detergente", "desinfectante", "estropajo", "bayeta", "jabon", "amoniaco"], barril: ["keg", "barrica"], cafe: ["capsula"], vino: ["rioja", "ribera", "rueda", "verdejo", "crianza"], servilleta: ["servilleta"], desechable: ["desechable"] };
+const SINONIMOS = { tercio: ["cerveza", "vidrio", "botellin"], cana: ["cerveza"], botin: ["cerveza", "botellin"], barril: ["cerveza"], cocacola: ["coca", "cola"],  refresco: ["cola", "fanta", "sprite", "kas", "tonica", "gaseosa", "limonada", "naranjada", "bitter"], hielo: ["cubito"], limpieza: ["limpiador", "lejia", "fregasuelos", "friegasuelos", "detergente", "desinfectante", "estropajo", "bayeta", "jabon", "amoniaco"], barril: ["keg", "barrica"], cafe: ["capsula"], vino: ["rioja", "ribera", "rueda", "verdejo", "crianza"], servilleta: ["servilleta"], desechable: ["desechable"] };
 const stemB = w => { w = norm(w).replace(/[^a-z0-9]/g, ""); if (w.length > 4) { if (w.endsWith("ces")) return w.slice(0, -3) + "z"; if (/[^aeiou]es$/.test(w)) return w.slice(0, -2); } return w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w; };
 const tokensB = t => norm(String(t)).split(/[^a-z0-9]+/).filter(w => w && !PALABRAS_VACIAS_B.has(w));
 let indiceBusq = null;
@@ -1780,31 +1783,46 @@ function indiceBusqueda() {
   if (indiceBusq) return indiceBusq;
   const cats = new Map();
   for (const c of data.tree || []) { cats.set(c.id, tokensB(c.nombre).map(stemB)); for (const sb of c.subs) cats.set(c.id + "/" + sb.id, tokensB(sb.nombre).map(stemB)); }
-  return (indiceBusq = data.products.map(p => ({ p, t: tokensB(p.name).map(stemB), ct: [...(cats.get(p.cat) || []), ...(cats.get(p.cat + "/" + p.sub) || [])], n: norm(p.name) })));
+  return (indiceBusq = data.products.map(p => ({ p, t: tokensB(p.name).map(stemB), b2: new Set(tokensB(p.name).slice(0, -1).map((w, i, a) => stemB(w + tokensB(p.name)[i + 1]))), ct: [...(cats.get(p.cat) || []), ...(cats.get(p.cat + "/" + p.sub) || [])], n: norm(p.name) })));
 }
 /** Devuelve un Map código → puntos, ya ordenado (más puntos primero), o null si no hay nada que buscar. */
+let busquedaAviso = null; // si la búsqueda se resolvió «a medias» (sin una palabra, o sin el formato pedido), qué decirle al cliente
+const PALABRAS_FORMATO_B = new Set(["bolsa", "bolsas", "botella", "botellas", "lata", "latas", "caja", "cajas", "pack", "packs", "paquete", "paquetes", "saco", "sacos", "bote", "botes", "botellin", "botellines"]);
 function buscarOrden(raw) {
+  busquedaAviso = null;
   const qt = tokensB(raw).map(stemB).filter(Boolean); if (!qt.length) return null;
-  const res = [];
-  for (const e of indiceBusqueda()) {
-    let total = 0, ok = true;
-    for (const w of qt) {
-      const alts = SINONIMOS[w] || []; let sc = 0;
-      for (let i = 0; i < e.t.length; i++) {
-        const t = e.t[i]; let pts = 0;
-        if (t === w) pts = i === 0 ? 10 : 6; else if (t.startsWith(w)) pts = i === 0 ? 8 : 4;
-        else if (w.length >= 6 && t[0] === w[0] && Math.abs(t.length - w.length) <= 1 && dist(w, t) <= 1) pts = 2;
-        else if (alts.some(x => t === x || t.startsWith(x))) pts = 3;
-        if (pts && i > 0 && ACCESORIOS.has(e.t[0])) pts = Math.max(pts - 8, 0.5); // «copas de vino», «cucharas de café»: el accesorio va detrás del producto
-        sc = Math.max(sc, pts);
+  const idx = indiceBusqueda();
+  const puntua = (qs) => {
+    const res = [];
+    for (const e of idx) {
+      let total = 0, ok = true;
+      for (const w of qs) {
+        const alts = SINONIMOS[w] || []; let sc = 0;
+        for (let i = 0; i < e.t.length; i++) {
+          const t = e.t[i]; let pts = 0;
+          if (t === w) pts = i === 0 ? 10 : 6; else if (t.startsWith(w)) pts = i === 0 ? 8 : 4;
+          else if (w.length >= 6 && t[0] === w[0] && Math.abs(t.length - w.length) <= 1 && dist(w, t) <= 1) pts = 2;
+          else if (alts.some(x => t === x || t.startsWith(x))) pts = 3;
+          if (pts && i > 0 && ACCESORIOS.has(e.t[0])) pts = Math.max(pts - 8, 0.5); // «copas de vino», «cucharas de café»: el accesorio va detrás del producto
+          sc = Math.max(sc, pts);
+        }
+        if (!sc && w.length >= 6 && e.b2.has(w)) sc = 7; // palabras pegadas: «cocacola» = «coca-cola»
+        if (!sc && e.ct.some(c => c === w || c.startsWith(w) || alts.includes(c))) sc = 2; // nombre de la categoría o subcategoría («refrescos», «limpieza»)
+        if (!sc && /\d/.test(w) && e.p.id.includes(w)) sc = 8; // código de producto
+        if (!sc && w.length >= 3 && e.n.includes(w)) sc = 1; // trozo dentro de una palabra («33cl»)
+        if (!sc) { ok = false; break; }
+        total += sc;
       }
-      if (!sc && e.ct.some(c => c === w || c.startsWith(w) || alts.includes(c))) sc = 2; // nombre de la categoría o subcategoría («refrescos», «limpieza»)
-      if (!sc && /\d/.test(w) && e.p.id.includes(w)) sc = 8; // código de producto
-      if (!sc && w.length >= 3 && e.n.includes(w)) sc = 1; // trozo dentro de una palabra («33cl»)
-      if (!sc) { ok = false; break; }
-      total += sc;
+      if (ok) res.push([e.p, total + (e.p.count > 0 ? 3 + Math.min(e.p.count, 10) / 10 : 0)]);
     }
-    if (ok) res.push([e.p, total + (e.p.count > 0 ? 3 + Math.min(e.p.count, 10) / 10 : 0)]);
+    return res;
+  };
+  let res = puntua(qt);
+  // «barril»: si ninguna ficha lo lleva, no se vende; se dice y se enseña lo más parecido (cerveza en otros formatos)
+  if (qt.includes("barril") && !idx.some(e => e.t.includes("barril"))) { busquedaAviso = "No vendemos barril. Esto es lo más parecido (cerveza en otros formatos). Si necesitas barril, pregunta a tu comercial."; }
+  else if (!res.length && qt.length > 1) { // nada con TODAS las palabras: se prueba sin las de formato («hielo bolsa») y, si no, sin la palabra que menos encaja
+    const quitar = [...qt.filter(w => PALABRAS_FORMATO_B.has(w)), ...[...qt].sort((x, y) => idx.filter(e => e.t.some(t => t.startsWith(x))).length - idx.filter(e => e.t.some(t => t.startsWith(y))).length)];
+    for (const w of quitar) { const resto = qt.filter(x => x !== w); if (!resto.length) continue; const r = puntua(resto); if (r.length) { res = r; busquedaAviso = `No hay «${raw.trim()}» tal cual. Te enseño lo más parecido: «${resto.join(" ")}».`; break; } }
   }
   res.sort((a, b) => b[1] - a[1] || a[0].name.localeCompare(b[0].name));
   return new Map(res.map(([p, v]) => [p.id, v]));
@@ -1940,7 +1958,7 @@ function renderList() {
     const base = items; pintarFiltrosBusqueda(base);
     if (fMarca) items = items.filter(p => marcaDe(p) === fMarca); if (fFormato) items = items.filter(p => formatoDe(p) === fFormato);
     items.sort((a, b) => orden.get(b.id) - orden.get(a.id) || a.name.localeCompare(b.name)); // lo mejor primero: el producto antes que el accesorio, y lo que compra el cliente arriba
-    $("filbar").hidden = false; $("filinfo").hidden = false; $("filinfo").textContent = items.length === 1 ? "1 resultado" : `${items.length} resultados`;
+    $("filbar").hidden = false; $("filinfo").hidden = false; $("filinfo").textContent = (busquedaAviso ? busquedaAviso + " " : "") + (items.length === 1 ? "1 resultado" : `${items.length} resultados`);
   }
   $("fil").setAttribute("aria-pressed", String(soloCantidad));
   if (!enBusqueda) $("filinfo").textContent = filtra ? `Mostrando ${items.length} con cantidad` : "";
@@ -1952,7 +1970,7 @@ function renderList() {
     else if (q) {
       let extra = null;
       if (data.ayuda) { extra = document.createElement("button"); extra.type = "button"; extra.className = "estado-lnk"; extra.textContent = "¿No lo encuentras? Habla con una persona"; extra.onclick = () => abrirAyuda(data.ayuda, data.customer.name); }
-      d = estadoVacio({ icono: "buscar", titulo: "Sin resultados", texto: `No hemos encontrado «${query.trim()}». Prueba con menos palabras o revisa cómo está escrito.`, boton: "Borrar la búsqueda", onclick: () => { $("q").value = ""; query = ""; renderList(); $("q").focus(); }, extra });
+      d = estadoVacio({ icono: "buscar", titulo: "Sin resultados", texto: `No hemos encontrado «${query.trim()}». Prueba con menos palabras o revisa cómo está escrito. Si no lo ves, puede que no lo tengamos: pregunta a tu comercial.`, boton: "Borrar la búsqueda", onclick: () => { $("q").value = ""; query = ""; renderList(); $("q").focus(); }, extra });
     } else d = estadoVacio({ icono: "caja", titulo: "Aquí no hay artículos", texto: "Esta sección está vacía ahora mismo.", boton: "Volver al catálogo", onclick: () => irA(null, null) });
     list.appendChild(d); return;
   }
