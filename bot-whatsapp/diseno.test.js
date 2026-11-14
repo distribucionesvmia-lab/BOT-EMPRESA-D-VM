@@ -124,3 +124,8 @@ test("ordenador y tablet: panel «Tu pedido» fijo de 340 px, menú lateral de 2
   assert.match(pedido, /id="anuncio" class="solo-lector" role="status"/); assert.match(pedido, /aria-describedby="errDir"/); assert.match(pedido, /:focus-visible \{ outline:3px solid var\(--accent\)/);
   assert.match(pedido, /@media \(prefers-contrast: more\) \{\s*\.pf, \.card/);
 });
+
+test("fotos: cada baldosa con foto está colocada (position:relative) para que la foto nunca se estire por toda la tarjeta", () => {
+  assert.match(pedido, /\.falta-av, \.tl-av, \.pf-av, \.sug-im, \.av \{ position:relative; overflow:hidden; \}/);
+  const cli = leer("./cliente.html"); assert.match(cli, /\.vm-inicio \.in-pim \{ position:relative;/); assert.match(cli, /\.vm-inicio \.in-foto \{ position:relative; \}/);
+});

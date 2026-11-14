@@ -922,6 +922,7 @@
 
   /* ═══ Fotos: baldosa cuadrada #F2F2F7, la foto «contenida» al 82 % (nunca más grande de lo que es) y fundido de 200 ms ═══ */
   .av img, .pf-av img, .tl-av img, .falta-av img, .sug-im img { position:absolute; inset:0; margin:auto; width:auto; height:auto; max-width:82%; max-height:82%; padding:0; object-fit:contain; background:none; border-radius:0; opacity:0; transition:opacity 200ms ease; }
+  .falta-av, .tl-av, .pf-av, .sug-im, .av { position:relative; overflow:hidden; } /* la foto va dentro de su baldosa: si la baldosa no está «colocada», la foto se estira por toda la tarjeta */
   .av img.cargada, .pf-av img.cargada, .tl-av img.cargada, .falta-av img.cargada, .sug-im img.cargada { opacity:1; }
   .pf-av:has(img.cargada), .tl-av:has(img.cargada), .falta-av:has(img.cargada), .sug-im:has(img.cargada) { background:var(--foto-bg) !important; color:transparent; }
   @media (prefers-reduced-motion: reduce) { .av img, .pf-av img, .tl-av img, .falta-av img, .sug-im img { transition:none; } }
