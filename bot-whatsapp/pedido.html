@@ -1355,7 +1355,8 @@ const eurp = n => { n = Number(n); const t = Math.round(n * 1000); return (n < 1
 let data = null, tab = "all", query = "";
 const favs = new Set(); // favoritos del cliente (solo con sesión; en el enlace de pedido del chat no hay)
 // Clave de este pedido: si se reenvía (doble clic, fallo de red), el servidor no lo duplica
-const orderKey = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+const nuevaClave = () => (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2);
+let orderKey = nuevaClave(); // identifica UN envío (si se reintenta no se duplica); tras cada envío correcto se cambia, para que el siguiente pedido sin recargar no se confunda con el anterior
 const qty = new Map(); // id -> cantidad (en cajas o en unidades, según unitOf)
 const unitOf = new Map(); // id -> "ud" | "caja"
 const notes = new Map(); // id -> observación de la línea
@@ -1485,21 +1486,39 @@ async function cambiarUnidad(p, nueva) {
   unitOf.set(p.id, "caja"); setQty(p.id, cajas);
 }
 // Carrito guardado en este navegador (24 h) para no perderlo al recargar
-const HORAS = 24;
-const clave = () => "vm_carrito_" + (location.pathname.startsWith("/pedido/") ? token : "c_" + data.customer.name);
+const HORAS = 168; // el pedido sin terminar se guarda 7 días en este móvil
+const clave = () => "vm_carrito_" + (location.pathname.startsWith("/pedido/") ? token : "c_" + (data.customer.codigo || data.customer.name)); // por código de cliente (el nombre puede cambiar o repetirse)
 let tGuardar = 0;
-function guardar() { clearTimeout(tGuardar); tGuardar = setTimeout(guardarYa, 300); } // no se escribe en el móvil con cada pulsación
+let sinGuardar = false, ultimoT = 0; // sinGuardar: se está aplicando lo que vino de otra pestaña (no se vuelve a escribir)
+function guardar() { if (sinGuardar) return; clearTimeout(tGuardar); tGuardar = setTimeout(guardarYa, 300); } // no se escribe en el móvil con cada pulsación
 addEventListener("pagehide", () => guardarYa());
 document.addEventListener("visibilitychange", () => { if (document.hidden) guardarYa(); });
 function guardarYa() {
   clearTimeout(tGuardar);
   try {
     if (!qty.size) return localStorage.removeItem(clave());
-    localStorage.setItem(clave(), JSON.stringify({ t: Date.now(), q: [...qty], u: [...unitOf], n: [...notes] }));
+    ultimoT = Date.now(); localStorage.setItem(clave(), JSON.stringify({ t: ultimoT, q: [...qty], u: [...unitOf], n: [...notes] }));
   } catch {}
 }
+// Varias pestañas: el pedido guardado en el móvil manda. Al volver a una pestaña (o cuando otra lo cambia) se vuelve a leer, así lo que se quitó en una no reaparece en la otra
+function releerCarrito() {
+  try {
+    if (!data || !data.products) return;
+    const g = JSON.parse(localStorage.getItem(clave()) || "null");
+    const nuevo = !g ? new Map() : new Map((g.q || []).filter(([id, n]) => productoPorId.has(id) && n > 0).map(([id, n]) => [id, Math.min(999, n)]));
+    if (g && g.t <= ultimoT && JSON.stringify([...nuevo]) === JSON.stringify([...qty])) return; // nada nuevo
+    if (g && JSON.stringify([...nuevo]) === JSON.stringify([...qty])) { ultimoT = g.t; return; }
+    sinGuardar = true;
+    try { qty.clear(); unitOf.clear(); notes.clear(); if (g) { for (const [id, n] of nuevo) qty.set(id, n); for (const [id, u] of g.u || []) if (qty.has(id) && (u === "ud" || u === "caja")) unitOf.set(id, u); for (const [id, t] of g.n || []) if (qty.has(id)) notes.set(id, String(t).slice(0, 120)); ultimoT = g.t; } refresh(); }
+    finally { sinGuardar = false; }
+    aviso("Tu pedido se ha actualizado desde otra pestaña.");
+  } catch { sinGuardar = false; }
+}
+addEventListener("storage", (e) => { try { if (e.key === clave()) releerCarrito(); } catch {} });
+document.addEventListener("visibilitychange", () => { if (!document.hidden) releerCarrito(); });
 function recuperar() {
   try {
+    { const viejo = "vm_carrito_c_" + data.customer.name; if (data.customer.codigo && !localStorage.getItem(clave()) && localStorage.getItem(viejo)) { localStorage.setItem(clave(), localStorage.getItem(viejo)); localStorage.removeItem(viejo); } } // el pedido guardado con la clave antigua (por nombre) pasa a la nueva (por código)
     const g = JSON.parse(localStorage.getItem(clave()) || "null");
     if (!g || Date.now() - g.t > HORAS * 3600e3) return localStorage.removeItem(clave());
     const ids = new Set(data.products.map(p => p.id));
@@ -1800,7 +1819,7 @@ const dist = (a, b) => { const d = Array.from({ length: a.length + 1 }, (_, i) =
 // ── Buscador: entiende plurales y tildes, sinónimos y nombres de categoría; el producto va antes que el accesorio y lo que el cliente compra, arriba ──
 const PALABRAS_VACIAS_B = new Set(["de", "del", "la", "las", "el", "los", "y", "e", "en", "con", "sin", "para", "por", "un", "una", "al"]);
 const ACCESORIOS = new Set(["cuchara", "cucharilla", "cucharon", "copa", "vaso", "jarra", "estuche", "pinza", "taza", "plato", "cubierto", "tenedor", "cuchillo", "bandeja", "dispensador", "soporte", "abridor", "abrebotellas", "set", "juego", "molinillo", "cafetera", "azucarero", "servilletero", "cubitera", "pala", "colador", "termo", "expositor", "cesta", "mantel", "delantal", "espatula", "cazo", "olla", "sarten"]);
-const SINONIMOS = { tercio: ["cerveza", "vidrio", "botellin"], cana: ["cerveza"], botin: ["cerveza", "botellin"], barril: ["cerveza"], cocacola: ["coca", "cola"],  refresco: ["cola", "fanta", "sprite", "kas", "tonica", "gaseosa", "limonada", "naranjada", "bitter"], hielo: ["cubito"], limpieza: ["limpiador", "lejia", "fregasuelos", "friegasuelos", "detergente", "desinfectante", "estropajo", "bayeta", "jabon", "amoniaco"], barril: ["keg", "barrica"], cafe: ["capsula"], vino: ["rioja", "ribera", "rueda", "verdejo", "crianza"], servilleta: ["servilleta"], desechable: ["desechable"] };
+const SINONIMOS = { tercio: ["cerveza", "vidrio", "botellin"], cana: ["cerveza"], botin: ["cerveza", "botellin"], barril: ["cerveza"],  refresco: ["cola", "fanta", "sprite", "kas", "tonica", "gaseosa", "limonada", "naranjada", "bitter"], hielo: ["cubito"], limpieza: ["limpiador", "lejia", "fregasuelos", "friegasuelos", "detergente", "desinfectante", "estropajo", "bayeta", "jabon", "amoniaco"], barril: ["keg", "barrica"], cafe: ["capsula"], vino: ["rioja", "ribera", "rueda", "verdejo", "crianza"], servilleta: ["servilleta"], desechable: ["desechable"] };
 const stemB = w => { w = norm(w).replace(/[^a-z0-9]/g, ""); if (w.length > 4) { if (w.endsWith("ces")) return w.slice(0, -3) + "z"; if (/[^aeiou]es$/.test(w)) return w.slice(0, -2); } return w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w; };
 const tokensB = t => norm(String(t)).split(/[^a-z0-9]+/).filter(w => w && !PALABRAS_VACIAS_B.has(w));
 let indiceBusq = null;
@@ -1808,7 +1827,7 @@ function indiceBusqueda() {
   if (indiceBusq) return indiceBusq;
   const cats = new Map();
   for (const c of data.tree || []) { cats.set(c.id, tokensB(c.nombre).map(stemB)); for (const sb of c.subs) cats.set(c.id + "/" + sb.id, tokensB(sb.nombre).map(stemB)); }
-  return (indiceBusq = data.products.map(p => ({ p, t: tokensB(p.name).map(stemB), b2: new Set(tokensB(p.name).slice(0, -1).map((w, i, a) => stemB(w + tokensB(p.name)[i + 1]))), ct: [...(cats.get(p.cat) || []), ...(cats.get(p.cat + "/" + p.sub) || [])], n: norm(p.name) })));
+  return (indiceBusq = data.products.map(p => ({ p, compact: norm(p.name).replace(/[^a-z0-9]/g, ""), t: tokensB(p.name).map(stemB), b2: new Set(tokensB(p.name).slice(0, -1).map((w, i, a) => stemB(w + tokensB(p.name)[i + 1]))), ct: [...(cats.get(p.cat) || []), ...(cats.get(p.cat + "/" + p.sub) || [])], n: norm(p.name) })));
 }
 /** Devuelve un Map código → puntos, ya ordenado (más puntos primero), o null si no hay nada que buscar. */
 let busquedaAviso = null; // si la búsqueda se resolvió «a medias» (sin una palabra, o sin el formato pedido), qué decirle al cliente
@@ -1821,11 +1840,12 @@ function buscarOrden(raw) {
     const res = [];
     for (const e of idx) {
       let total = 0, ok = true;
+      if (qs.length > 1 && qs.join("").length >= 5 && e.compact.includes(qs.join(""))) { res.push([e.p, 12 + (e.p.count > 0 ? 3 + Math.min(e.p.count, 10) / 10 : 0)]); continue; } // «coca cola» = «cocacola», «cola cao» = «colacao»
       for (const w of qs) {
         const alts = SINONIMOS[w] || []; let sc = 0;
         for (let i = 0; i < e.t.length; i++) {
           const t = e.t[i]; let pts = 0;
-          if (t === w) pts = i === 0 ? 10 : 6; else if (t.startsWith(w)) pts = i === 0 ? 8 : 4;
+          if (t === w) pts = i === 0 ? 10 : 6; else if (t.startsWith(w)) pts = w.length <= 3 ? 2 : (i === 0 ? 8 : 4); // palabras cortas («sal»): solo por inicio de palabra y por detrás de la palabra exacta
           else if (w.length >= 6 && t[0] === w[0] && Math.abs(t.length - w.length) <= 1 && dist(w, t) <= 1) pts = 2;
           else if (alts.some(x => t === x || t.startsWith(x))) pts = 3;
           if (pts && i > 0 && ACCESORIOS.has(e.t[0])) pts = Math.max(pts - 8, 0.5); // «copas de vino», «cucharas de café»: el accesorio va detrás del producto
@@ -1833,8 +1853,8 @@ function buscarOrden(raw) {
         }
         if (!sc && w.length >= 6 && e.b2.has(w)) sc = 7; // palabras pegadas: «cocacola» = «coca-cola»
         if (!sc && e.ct.some(c => c === w || c.startsWith(w) || alts.includes(c))) sc = 2; // nombre de la categoría o subcategoría («refrescos», «limpieza»)
-        if (!sc && /\d/.test(w) && e.p.id.includes(w)) sc = 8; // código de producto
-        if (!sc && w.length >= 3 && e.n.includes(w)) sc = 1; // trozo dentro de una palabra («33cl»)
+        if (!sc && /^\d+$/.test(w) && e.p.id.startsWith(w)) sc = 8; // código de producto: solo si lo escrito son números y es el INICIO del código
+        if (!sc && w.length >= 4 && e.n.includes(w)) sc = 1; // trozo dentro de una palabra («33cl»), solo con 4 letras o más
         if (!sc) { ok = false; break; }
         total += sc;
       }
@@ -1874,7 +1894,7 @@ function pintarFiltrosBusqueda(base) { // base: todos los resultados de la búsq
     }
     box.appendChild(g);
   };
-  grupo("Marca:", cuenta(marcaDe), fMarca, v => (fMarca = v));
+  grupo("Tipo:", cuenta(marcaDe), fMarca, v => (fMarca = v)); // son subcategorías (tipos de producto), no marcas
   const conFormato = base.filter(p => formatoDe(p)).length;
   if (conFormato >= base.length * 0.4) grupo("Formato:", cuenta(formatoDe), fFormato, v => (fFormato = v)); // solo si el formato sale de forma fiable en los nombres
 }
@@ -2396,7 +2416,7 @@ function pintarSugs() {
     const fila = document.createElement("div"); fila.className = "sug"; fila.setAttribute("role", "option"); fila.dataset.id = p.id; fila.id = "sug-" + p.id;
     const im = document.createElement("span"); im.className = "sug-im"; im.style.background = hue(p.name); im.textContent = initials(p.name);
     if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.onerror = () => i.remove(); im.appendChild(i); }
-    const tx = document.createElement("span"); tx.className = "sug-tx"; const n = document.createElement("b"); n.textContent = p.name; const pr = document.createElement("small"); pr.textContent = eurp(p.price) + " /ud";
+    const tx = document.createElement("span"); tx.className = "sug-tx"; const n = document.createElement("b"); n.textContent = p.name; const pr = document.createElement("small"); pr.textContent = p.soloCaja && p.unitsPerBox ? `Solo cajas de ${p.unitsPerBox} · ${eur(precioCaja(p))} la caja` : eurp(p.price) + " /ud";
     tx.append(n, pr);
     const mas = document.createElement("button"); mas.type = "button"; mas.className = "sug-mas"; mas.setAttribute("aria-label", "Añadir " + p.name);
     mas.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round"/></svg>';
@@ -2657,7 +2677,7 @@ async function enviarPedido(delivery, errBox) {
     qty.clear(); unitOf.clear(); notes.clear(); try { localStorage.removeItem(clave()); } catch {}
     $("doneT").textContent = j.modificado ? "¡Pedido modificado!" : "¡Pedido recibido!";
     $("modInfo").hidden = !j.modificable; $("modInfo").textContent = j.modificable ? j.modificable + "." : ""; $("modBtn").hidden = !(j.modificable && j.ref); if (j.ref) $("modBtn").onclick = () => modificar(j.ref);
-    modificando = null; $("modBanner").hidden = true;
+    modificando = null; $("modBanner").hidden = true; orderKey = nuevaClave();
     $("doneP").textContent = String(j.message || "").replace(/\*/g, "").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, "").replace(/[ \t]{2,}/g, " ").replace(/^[ \t]+/gm, "").trim(); $("cart").hidden = true; $("resumen").hidden = true; diaElegido = null; diaPersonal = false; $("done").hidden = false; marcaNav();
     $("doneRef").hidden = !j.ref; $("doneRef").textContent = j.ref ? "Referencia " + j.ref : ""; $("donePdf").hidden = !j.ref; if (j.ref) { const u = "/api/pedido/" + encodeURIComponent(j.ref) + "/pdf"; $("donePdf").href = u; $("donePdf").onclick = ev => { ev.preventDefault(); abrirPdf(u, "Pedido " + j.ref); }; } $("doneVer").hidden = false; $("doneVer").onclick = () => { location.href = "/cliente#cuenta"; };
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");

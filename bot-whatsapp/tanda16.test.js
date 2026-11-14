@@ -34,3 +34,30 @@ test("Bench 1.9: texto de precios sin contradicción", () => {
   assert.equal(BUSINESS.priceNote, "Precios sin IVA; abajo tienes el total con IVA. Los confirmamos al preparar el pedido.");
   assert.match(ped, /\$\("priceNote"\)\.textContent = data\.priceNote \|\| ""/); assert.equal(condicionesPedido().minimo >= 0, true);
 });
+
+import vm from "node:vm";
+const trozo = (ini, fin) => { const a = ped.indexOf(ini), b = ped.indexOf(fin, a); assert.ok(a >= 0 && b > a, ini); return ped.slice(a, b); };
+const motor = [ped.match(/const norm = [^\n]*\n/)[0], ped.match(/const dist = [^\n]*\n/)[0], trozo("const PALABRAS_VACIAS_B", "// ── Búsqueda: filtros por marca")].join("");
+const buscador = (productos, tree) => { const ctx = vm.createContext({ data: { products: productos, tree } }); vm.runInContext(motor + "\nthis.buscar = buscarOrden;", ctx); return (q) => { const m = ctx.buscar(q); return m ? [...m.keys()] : []; }; };
+test("Bench 1.3-1.6: relevancia, categorías, nombres pegados, sin ruido de códigos ni trozos, «Tipo:» y precio de solo cajas", () => {
+  const P = (id, name, cat, sub, count = 0) => ({ id, name, cat, sub, count });
+  const productos = [P("1", "JARRA LECHE 1 L", "hos", "menaje"), P("2", "LECHE ENTERA PASCUAL 1 L", "lac", "leche"), P("3", "LECHE PASCUAL SIN LACTOSA 1 L", "lac", "sl"), P("4", "COCA-COLA LATA 33 CL", "beb", "ref"),
+    P("5", "COLA CAO ORIGINAL 383 G", "des", "cacao"), P("6", "SAL FINA 1 KG", "ali", "sal"), P("7", "SALFUMANT 1 L", "lim", "lej", 5), P("1330", "VASO 25 CL", "hos", "menaje"), P("8", "LECHE DESNATADA 1 L", "lac", "sl")];
+  const tree = [{ id: "hos", nombre: "Hostelería", subs: [{ id: "menaje", nombre: "Menaje" }] }, { id: "lac", nombre: "Lácteos", subs: [{ id: "leche", nombre: "Leche" }, { id: "sl", nombre: "Leche sin lactosa" }] }, { id: "beb", nombre: "Bebidas", subs: [{ id: "ref", nombre: "Refrescos" }] },
+    { id: "des", nombre: "Desayuno", subs: [{ id: "cacao", nombre: "Cacao" }] }, { id: "ali", nombre: "Alimentación", subs: [{ id: "sal", nombre: "Sal" }] }, { id: "lim", nombre: "Limpieza", subs: [{ id: "lej", nombre: "Lejías" }] }];
+  const q = buscador(productos, tree);
+  const l = q("leche"); assert.ok(l.indexOf("2") < l.indexOf("1") && l.indexOf("3") < l.indexOf("1"), "las leches antes que la jarra: " + l);
+  assert.equal(q("leche sin lactosa")[0], "3"); assert.ok(q("refresco").includes("4")); assert.deepEqual(q("cocacola"), ["4"]); assert.deepEqual(q("colacao"), ["5"]); assert.deepEqual(q("pascual").sort(), ["2", "3"]);
+  assert.ok(!q("33").includes("1330")); assert.ok(q("33").includes("4")); assert.deepEqual(buscador([P("3300", "VASO 25 CL", "hos", "menaje")], tree)("33"), ["3300"]); // «33»: lo que lleva «33» en el nombre; un código solo si EMPIEZA por 33, nunca si lo lleva en medio
+  const s = q("sal"); assert.equal(s[0], "6"); // «sal»: la palabra «SAL» antes que «SALFUMANT»
+  assert.match(ped, /grupo\("Tipo:", cuenta\(marcaDe\)/); assert.doesNotMatch(ped, /grupo\("Marca:"/);
+  assert.match(ped, /p\.soloCaja && p\.unitsPerBox \? `Solo cajas de \$\{p\.unitsPerBox\}/);
+});
+
+test("Bench 1.8, 1.10 y T16 3: orderKey nuevo tras cada envío, carrito 7 días por código de cliente y sincronizado entre pestañas", () => {
+  assert.match(ped, /let orderKey = nuevaClave\(\)/); assert.match(ped, /modificando = null; \$\("modBanner"\)\.hidden = true; orderKey = nuevaClave\(\);/);
+  assert.match(ped, /const HORAS = 168;/); assert.match(ped, /"c_" \+ \(data\.customer\.codigo \|\| data\.customer\.name\)/); assert.match(ped, /vm_carrito_c_" \+ data\.customer\.name; if \(data\.customer\.codigo/); // y migra el guardado con la clave antigua
+  assert.match(ped, /addEventListener\("storage", \(e\) => \{ try \{ if \(e\.key === clave\(\)\) releerCarrito\(\)/); assert.match(ped, /document\.addEventListener\("visibilitychange", \(\) => \{ if \(!document\.hidden\) releerCarrito\(\); \}\)/);
+  assert.match(ped, /function guardar\(\) \{ if \(sinGuardar\) return;/); // al aplicar lo de otra pestaña no se vuelve a escribir (sin bucles)
+  const s = leer("./server.js"); assert.equal((s.match(/codigo: String\(/g) ?? []).length, 2);
+});
