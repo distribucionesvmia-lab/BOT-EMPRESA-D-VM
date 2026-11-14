@@ -45,6 +45,7 @@ import { categorizar } from "./categorias.js";
 import { empaquetar, estatico } from "./estaticos.js";
 import { avisarCortes, horaAviso } from "./avisocorte.js";
 import { enviarProgramados } from "./avisos-programados.js";
+import { crearCorreoCliente, smtpDesdeEntorno, elegirDestino, tapar } from "./correo-cliente.js";
 import { zip as zipNode } from "./zip.js";
 import { limpiaError, navegadorCorto } from "./errores.js";
 const latidoLimite = rateLimiter(Number(process.env.LATIDO_LIMIT ?? 20), 60e3); // latidos por minuto y cliente (el normal es 1 cada 45 s)
@@ -497,8 +498,16 @@ function retiradosDe(customer) {
 let _avisos = null, _origenAt = 0;
 const avisosPush = () => (_avisos ??= crearAvisos({ accountsDb: getAccountsDb() }));
 if (clientEnabled) avisosPush(); // crea ya los avisos: así deja guardado el contacto (PUBLIC_URL) para que también lo use la aplicación de la empresa
+// Correo de confirmación al cliente (solo si hay SMTP_HOST; CORREO_CLIENTES=0 lo apaga)
+let _correoCliente;
+const correoCliente = () => {
+  if (_correoCliente !== undefined) return _correoCliente;
+  const c = process.env.CORREO_CLIENTES === "0" ? null : smtpDesdeEntorno();
+  return (_correoCliente = c ? crearCorreoCliente({ accounts: getAccountsDb(), smtp: c.smtp, from: c.from, customers: customerDirectory, negocio: BUSINESS.name, telefono: AYUDA.telefono }) : null);
+};
 function avisoPedido(account, guardado, modificado = false) {
   if (!guardado?.ref) return;
+  correoCliente()?.notificar(account, guardado, { modificado });
   const pe = puedeEditarPedido(guardado);
   void avisosPush().aCliente(account.customerId, {
     title: modificado ? "Pedido modificado" : "Pedido recibido",
@@ -838,6 +847,17 @@ async function appRoutes(req, res, url) {
       if (e && (cid ? errLimitCliente(cid) : errLimitIp(req.socket.remoteAddress ?? "?"))) getAccountsDb().errorRegistrar(e, { customerId: cid, navegador: navegadorCorto(req.headers["user-agent"]) });
     } catch { /* un fallo al apuntar un fallo no se cuenta a nadie */ }
     return void res.writeHead(204).end();
+  }
+  if (p === "/api/correo/pedidos" && req.method === "GET") { // «Recibir por correo la confirmación de mis pedidos»: solo se ofrece si hay correo del servidor y un correo suyo
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const dest = correoCliente() ? elegirDestino({ account, customer: customerDirectory.getById(account.customerId) }) : null;
+    return void sendJson(res, 200, { disponible: !!dest, activo: getAccountsDb().correoPedidoActivo(account.customerId), destino: dest ? tapar(dest) : null });
+  }
+  if (p === "/api/correo/pedidos" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const body = await readJson(req); getAccountsDb().correoPedidoSet(account.customerId, body?.activo !== false);
+    return void sendJson(res, 200, { ok: true, activo: body?.activo !== false });
   }
   if (p === "/api/avisos/corte" && req.method === "GET") { // «Avisarme antes de la hora límite»
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });

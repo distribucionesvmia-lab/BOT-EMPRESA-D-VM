@@ -1489,3 +1489,14 @@ test("AVISOS PROGRAMADOS: programar con confirmación, verlos, cancelarlos y que
   assert.equal((await call("POST", `/api/admin/avisos/programados/${r.json.id}/cancelar`, { admin: true, body: {} })).status, 409); // ya cancelado
   const l2 = (await call("GET", "/api/admin/avisos/programados", { admin: true })).json; assert.ok(!l2.pendientes.some((a) => a.id === r.json.id)); assert.ok(l2.historial.some((a) => a.id === r.json.id && a.estado === "cancelado"));
 });
+
+test("CORREO AL CLIENTE: la preferencia necesita sesión; sin correo del servidor no se ofrece; el panel cuenta los envíos", async () => {
+  assert.equal((await call("GET", "/api/correo/pedidos")).status, 401); assert.equal((await call("POST", "/api/correo/pedidos", { body: { activo: false } })).status, 401);
+  const A = cookieOf(await entrarNif("111111")), g = await call("GET", "/api/correo/pedidos", { cookie: A });
+  assert.equal(g.status, 200); assert.equal(g.json.disponible, false); assert.equal(g.json.destino, null); // el servidor de pruebas no tiene SMTP: el interruptor no se enseña
+  const p = await call("POST", "/api/correo/pedidos", { cookie: A, body: { activo: false } }); assert.equal(p.status, 200); assert.equal(p.json.activo, false);
+  assert.equal((await call("GET", "/api/correo/pedidos", { cookie: A })).json.activo, false);
+  await call("POST", "/api/correo/pedidos", { cookie: A, body: { activo: true } });
+  assert.ok([401, 403].includes((await call("GET", "/api/admin/correo-clientes")).status));
+  const r = (await call("GET", "/api/admin/correo-clientes", { admin: true })).json; for (const k of ["enviados", "sinCorreo", "errores", "ultimoError"]) assert.ok(k in r, k);
+});

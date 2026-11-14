@@ -121,6 +121,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   db.exec("CREATE TABLE IF NOT EXISTS rights (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, tipo TEXT NOT NULL, texto TEXT, estado TEXT NOT NULL DEFAULT 'pendiente', created_at TEXT NOT NULL, resolved_at TEXT)");
   addCol("accounts", "deleted_at", "TEXT");
   addCol("push_log", "detalle", "TEXT");
+  db.exec("CREATE TABLE IF NOT EXISTS correo_pref (customer_id TEXT PRIMARY KEY, activo INTEGER NOT NULL)"); // «Recibir por correo la confirmación de mis pedidos»: sin fila = activado
+  db.exec("CREATE TABLE IF NOT EXISTS correo_pedidos (clave TEXT PRIMARY KEY, ref TEXT NOT NULL, at TEXT NOT NULL, estado TEXT NOT NULL DEFAULT 'enviando', error TEXT)"); // un correo por pedido (o por modificación): sin direcciones ni datos del cliente
   db.exec("CREATE TABLE IF NOT EXISTS avisos_programados (id INTEGER PRIMARY KEY AUTOINCREMENT, titulo TEXT NOT NULL, texto TEXT NOT NULL, destino TEXT NOT NULL, cliente_id TEXT, dia TEXT NOT NULL, hora TEXT NOT NULL, cuando TEXT NOT NULL, repetir TEXT NOT NULL DEFAULT 'no', abre TEXT NOT NULL DEFAULT 'inicio', estado TEXT NOT NULL DEFAULT 'pendiente', resultado TEXT, creado TEXT NOT NULL, resuelto TEXT)");
   addCol("standing_orders", "skip_week", "TEXT"); // lunes de la semana que el cliente ha saltado («Saltar esta semana»)
   addCol("registrations", "pin_hash", "TEXT");
@@ -525,6 +527,12 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     ajusteBorrar: (clave) => db.prepare("DELETE FROM ajustes WHERE clave = ?").run(clave),
     ajusteSiFalta(clave, crearValor) { db.prepare("INSERT OR IGNORE INTO ajustes (clave, valor) VALUES (?, ?)").run(clave, crearValor()); return db.prepare("SELECT valor FROM ajustes WHERE clave = ?").get(clave).valor; },
     pushLogAdd: (x, now = new Date().toISOString()) => db.prepare("INSERT INTO push_log (at, titulo, texto, destino, enviados, fallidos, detalle) VALUES (?, ?, ?, ?, ?, ?, ?)").run(now, x.titulo, x.texto, x.destino, x.enviados, x.fallidos, x.detalle ?? null),
+    // ---- Correo de confirmación de pedido al cliente ----
+    correoPedidoActivo: (customerId) => (db.prepare("SELECT activo FROM correo_pref WHERE customer_id = ?").get(String(customerId))?.activo ?? 1) === 1,
+    correoPedidoSet: (customerId, activo) => { db.prepare("INSERT INTO correo_pref (customer_id, activo) VALUES (?, ?) ON CONFLICT(customer_id) DO UPDATE SET activo = excluded.activo").run(String(customerId), activo ? 1 : 0); },
+    correoPedidoReservar: (clave, ref, now = new Date().toISOString()) => db.prepare("INSERT OR IGNORE INTO correo_pedidos (clave, ref, at) VALUES (?, ?, ?)").run(clave, ref, now).changes === 1,
+    correoPedidoMarcar: (clave, estado, error = null) => { db.prepare("UPDATE correo_pedidos SET estado = ?, error = ? WHERE clave = ?").run(estado, error, clave); },
+    correoPedidosResumen: (desde) => { const r = Object.fromEntries(db.prepare("SELECT estado, COUNT(*) AS n FROM correo_pedidos WHERE at >= ? GROUP BY estado").all(desde).map((x) => [x.estado, x.n])); const e = db.prepare("SELECT at, error FROM correo_pedidos WHERE estado = 'error' ORDER BY at DESC LIMIT 1").get(); return { enviados: r.enviado ?? 0, sinCorreo: r["sin-correo"] ?? 0, errores: r.error ?? 0, ultimoError: e ? { at: e.at, mensaje: e.error } : null }; },
     // ---- Avisos programados (promociones y descuentos que se mandan solos a su hora) ----
     avisoProgAdd: (x) => Number(db.prepare("INSERT INTO avisos_programados (titulo, texto, destino, cliente_id, dia, hora, cuando, repetir, abre, creado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(x.titulo, x.texto, x.destino, x.clienteId ?? x.cliente_id ?? null, x.dia, x.hora, x.cuando, x.repetir ?? "no", x.abre ?? "inicio", x.creado ?? new Date().toISOString()).lastInsertRowid),
     avisoProgPendientes: () => db.prepare("SELECT * FROM avisos_programados WHERE estado = 'pendiente' ORDER BY cuando, id").all().map(avisoProgOut),
@@ -548,6 +556,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         db.prepare("DELETE FROM standing_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM corte_pref WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM correo_pref WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM bienvenida_vista WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM invitaciones WHERE customer_id = ?").run(row.customer_id); db.prepare("DELETE FROM presencia WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM corte_avisos WHERE customer_id = ?").run(row.customer_id);

@@ -373,6 +373,7 @@
       <div class="panel">
         <h2>Pedidos recibidos</h2>
         <p class="muted" id="correo-estado" style="margin:0 0 8px"></p>
+        <p class="muted" id="correo-clientes" style="margin:0 0 8px"></p>
         <div class="acciones" id="ped-acciones"><div class="grupo"><button class="main" id="exportar-sel" disabled>Exportar seleccionados (0)</button><button id="exportar">Exportar todos los pendientes</button><button id="ver-excel" type="button" title="Enseña cómo quedará el Excel sin exportar nada">Ver cómo queda el Excel</button></div><div class="grupo der"><button type="button" id="marcar-todos" title="Marca todos los pedidos que se ven ahora (sean del estado que sean)">Marcar todos los que se ven</button><button type="button" id="borrar-sel" class="peligro" disabled>Borrar seleccionados (0)</button></div><span class="muted" id="expmsg" role="status"></span></div>
         <form class="filtros" id="f-filtro" aria-label="Filtrar pedidos">
           <label class="campo"><span>Día</span><input type="date" id="fl-dia"></label>
@@ -710,6 +711,12 @@ function mostrarAviso(texto) { const p = $("pin"); p.hidden = false; p.textConte
 function mostrarPin(texto, pin) { const p = $("pin"); p.hidden = false; p.textContent = texto + " "; p.appendChild(el("b", pin)); p.appendChild(el("span", " — anótalo ahora y díselo al cliente: no se volverá a mostrar.")); }
 
 // ---- Aviso por correo de cada pedido ----
+async function correoClientes() {
+  const r = await call("/api/admin/correo-clientes"), n = $("correo-clientes"); n.replaceChildren();
+  if (!r.enviados && !r.sinCorreo && !r.errores) { n.textContent = "Confirmaciones de pedido por correo a los clientes: todavía no se ha enviado ninguna. Se activan poniendo SMTP_HOST, SMTP_USER, SMTP_PASS y MAIL_FROM en la configuración del programa de los clientes (cliente.env)."; return; }
+  n.append(`Confirmaciones de pedido por correo a los clientes (últimos 7 días): ${r.enviados} enviada${r.enviados === 1 ? "" : "s"}, ${r.sinCorreo} sin correo guardado, ${r.errores} con error.`);
+  if (r.ultimoError) n.append(el("div", `Último error: ${r.ultimoError.mensaje}`, { className: "muted" }));
+}
 async function correo() {
   const r = await call("/api/admin/correo"), el0 = $("correo-estado");
   el0.innerHTML = "";
@@ -1367,7 +1374,7 @@ async function copias(comprobar = false) {
   finally { if (comprobar) { b.disabled = false; b.textContent = "Comprobar copias ahora"; } }
 }
 $("copias-comprobar").onclick = () => copias(true);
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), correoClientes(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 // ═════════ Estadísticas y patrones ═════════
 const est = { rango: "30d", d0: "", d1: "", datos: null, modo: "uds", mas: false, timerVivo: 0, timerDatos: 0, cliente: null };

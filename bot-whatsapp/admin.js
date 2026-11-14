@@ -264,6 +264,7 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
     }
     // ---- Aviso por correo de cada pedido ----
     if (p === "/api/admin/correo" && get) return send(res, 200, mail ? mail.status() : { configurado: false }), true;
+    if (p === "/api/admin/correo-clientes" && get) return send(res, 200, accounts.correoPedidosResumen(new Date(Date.now() - 7 * 86400_000).toISOString())), true; // confirmaciones de pedido por correo a los clientes (últimos 7 días)
     if (p === "/api/admin/correo/prueba" && post) {
       if (!mail) return send(res, 400, { error: "Los avisos por correo no están configurados (ver .env.example: SMTP_HOST y MAIL_TO)." }), true;
       try { await mail.prueba(); return send(res, 200, { ok: true }), true; } catch (e) { return send(res, 502, { error: e.message }), true; }
