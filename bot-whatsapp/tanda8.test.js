@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 test("atajos «Último pedido» / «Histórico» con la letra al máximo: no se parte ninguna palabra y, si no caben juntos, pasan uno debajo del otro", () => {
   assert.match(h, /\.quick \{ flex-wrap:wrap; \}/);
@@ -10,7 +10,7 @@ test("atajos «Último pedido» / «Histórico» con la letra al máximo: no se 
   assert.match(h, /\.quick \.q-tx b \{ overflow-wrap:normal; word-break:normal; hyphens:none; \}/);
 });
 
-const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 test("2. el menú ⋯ y el desplegable «Aa» no se quedan abiertos a la vez (en el chat y en el catálogo)", () => {
   for (const f of [h, p]) { assert.match(f, /dispatchEvent\(new CustomEvent\("vm:abre-panel", \{ detail: "letra" \}\)\)/); assert.match(f, /ev\.detail !== "letra"\) cerrar\(\)/); }
   assert.match(h, /detail: "menu"/); assert.match(h, /e\.detail !== "menu" && !mpop\.hidden/);

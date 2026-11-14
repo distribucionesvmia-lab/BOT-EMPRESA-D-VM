@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const visible = h.replace(/<script[\s\S]*?<\/script>/g, " ");
 
 test("un solo término: «código de entrada» en la pantalla del cliente (ya no «contraseña»)", () => {

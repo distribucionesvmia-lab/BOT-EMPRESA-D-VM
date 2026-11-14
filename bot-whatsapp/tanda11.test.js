@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 test("1. ficha de producto: foto y nombre abren una hoja con nombre completo, formato, unidades por caja, precio por unidad y caja e IVA", () => {
   assert.match(p, /function abrirFicha\(p\)/);

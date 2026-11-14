@@ -3,8 +3,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { condicionesPedido } from "./config.js";
-const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
-const s = fs.readFileSync(new URL("./server.js", import.meta.url), "utf8");
+const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const s = fs.readFileSync(new URL("./server.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 test("1. paso de resumen: el pedido se revisa y SOLO desde el resumen se envía, con un texto claro", () => {
   assert.match(p, /id="revisar" type="button">Revisar pedido</);

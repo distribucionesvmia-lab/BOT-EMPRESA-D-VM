@@ -5,7 +5,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 import { catalogoSinDuplicados, webProducts, accesosDe } from "./weborder.js";
 
-const html = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+const html = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const trozo = (ini, fin) => { const a = html.indexOf(ini), b = html.indexOf(fin, a); assert.ok(a >= 0 && b > a, ini); return html.slice(a, b); };
 const motor = [html.match(/const norm = [^\n]*\n/)[0], html.match(/const dist = [^\n]*\n/)[0], trozo("const PALABRAS_VACIAS_B", "// ── Búsqueda: filtros por marca")].join("");
 

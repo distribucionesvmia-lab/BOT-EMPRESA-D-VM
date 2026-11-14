@@ -120,7 +120,7 @@ test("10. un emoji suelto: 🍺 se entiende como cerveza; uno que no conocemos r
 });
 
 test("11. pantalla: el mensaje propio conserva el emoji y una respuesta larga se lee desde su principio", () => {
-  const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(h, /clase === "in" \? sinEmoji\(esc\) : esc/);
   assert.match(h, /function alFinal\(\)/); assert.match(h, /ancla/);
 });

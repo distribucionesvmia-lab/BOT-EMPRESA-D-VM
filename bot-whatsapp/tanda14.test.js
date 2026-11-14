@@ -4,8 +4,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 import { privacidadHtml } from "./privacidad.js";
-const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
-const cuentas = fs.readFileSync(new URL("./cuentas-db.js", import.meta.url), "utf8");
+const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const cuentas = fs.readFileSync(new URL("./cuentas-db.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 test("1. el código de entrada se guarda cifrado (scrypt con sal propia, no en claro) y el texto de privacidad lo dice bien", () => {
   assert.match(cuentas, /const hashPin = \(pin\) => \{\s*const salt = crypto\.randomBytes\(16\);\s*return `scrypt\$/);

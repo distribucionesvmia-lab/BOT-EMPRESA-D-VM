@@ -91,13 +91,13 @@
 <link rel="apple-touch-icon" href="/icono-192.png">
 <meta name="color-scheme" content="light dark">
 <script>document.documentElement.classList.add("cargando");setTimeout(function(){document.documentElement.classList.remove("cargando")},2500);document.addEventListener("DOMContentLoaded",function(){document.documentElement.classList.remove("cargando")})</script>
-<script>try{var t=localStorage.getItem("vm:tema");if(t==="claro"||t==="oscuro")document.documentElement.setAttribute("data-tema",t)}catch(e){}</script>
+<script>try{var t=localStorage.getItem("vm:tema");if(t==="claro"||t==="oscuro")document.documentElement.setAttribute("data-tema",t);var c=localStorage.getItem("vm:contraste");if(c==="alto"||c==="normal")document.documentElement.setAttribute("data-contraste",c)}catch(e){}</script>
 <title>Pedidos · Distribuciones VM</title>
 <style>
   /* ═══ SISTEMA DE DISEÑO · TOKENS (idénticos en cliente.html y pedido.html) ═══ */
   :root {
     /* color */
-    --bg:#F5F5F7; --surface:#FFFFFF; --text:#1D1D1F; --text-2:#6E6E73; --fill:#F2F2F7; --line:#E5E5EA;
+    --bg:#F5F5F7; --surface:#FFFFFF; --text:#1D1D1F; --text-2:#636366; --fill:#F2F2F7; --line:#E5E5EA;
     --accent:#C8102E; --accent-soft:#FBEAED; --on-accent:#FFFFFF; --bar:#C8102E; --on-bar:#FFFFFF; --foto-bg:#F2F2F7;
     --ok:#1D7A45; --ok-bg:#E8F5EC; --warn:#8A5F00; --warn-bg:#FFF4DB;
     --field:rgba(118,118,128,.12); --tab-off:#8E8E93; --scrim:rgba(0,0,0,.4);
@@ -597,6 +597,24 @@
   .err-campo { color:var(--accent); font-weight:600; font-size:calc(var(--t-cap) / var(--k,1)); min-height:0; } .err-campo:empty { display:none; }
   .vm input[aria-invalid="true"], .vm-modal input[aria-invalid="true"] { box-shadow:0 0 0 2px var(--accent); }
   .acc-ayuda { display:flex; flex-direction:column; gap:var(--s1); margin:0; } .acc-ayuda .vm-link { min-height:44px; text-align:left; padding:0; }
+
+  /* ═══ Tanda 15: contraste del tema oscuro (≥ 4,5:1) y contraste alto ═══ */
+  :root[data-tema="oscuro"] { --accent:#FF6B7D; --accent-soft:rgba(255,107,125,.14); --text-2:#A8A8B0; --tab-off:#A8A8B0; --on-ok:#06210E; }
+  @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) { --accent:#FF6B7D; --accent-soft:rgba(255,107,125,.14); --text-2:#A8A8B0; --tab-off:#A8A8B0; --on-ok:#06210E; } }
+  .pf-compras { color:var(--on-ok, #fff); }
+  /* los botones redondos de la cabecera roja siguen siendo blancos con icono rojo también en oscuro (si no, no se distinguen de la barra) */
+  :root[data-tema="oscuro"] .bar .ds-circ, :root[data-tema="oscuro"] header .ds-circ, :root[data-tema="oscuro"] .letra .letra-bt { background:#FFFFFF; color:#B30D28; border-color:transparent; }
+  @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) .bar .ds-circ, :root:not([data-tema="claro"]) header .ds-circ, :root:not([data-tema="claro"]) .letra .letra-bt { background:#FFFFFF; color:#B30D28; border-color:transparent; } }
+  /* el texto que se escribe y el de ayuda de los campos siempre legibles */
+  input, textarea, select { color:var(--text); } input::placeholder, textarea::placeholder { color:var(--text-2); opacity:1; }
+  /* contraste alto (opción en Ayuda y preferencia del móvil) */
+  :root[data-contraste="alto"] { --text:#000000; --text-2:#3A3A3C; --line:#6E6E73; --accent:#A00D25; --accent-soft:#F3D3D9; --tab-off:#48484A; }
+  :root[data-contraste="alto"][data-tema="oscuro"] { --text:#FFFFFF; --text-2:#D8D8DD; --line:#9A9AA0; --accent:#FF8A98; --accent-soft:rgba(255,138,152,.2); --tab-off:#D8D8DD; }
+  @media (prefers-color-scheme: dark) { :root[data-contraste="alto"]:not([data-tema="claro"]) { --text:#FFFFFF; --text-2:#D8D8DD; --line:#9A9AA0; --accent:#FF8A98; --accent-soft:rgba(255,138,152,.2); --tab-off:#D8D8DD; } }
+  @media (prefers-contrast: more) { :root:not([data-contraste="normal"]) { --text-2:#3A3A3C; --line:#6E6E73; --tab-off:#48484A; } }
+  @media (prefers-contrast: more) and (prefers-color-scheme: dark) { :root:not([data-tema="claro"]):not([data-contraste="normal"]) { --text:#FFFFFF; --text-2:#D8D8DD; --line:#9A9AA0; --accent:#FF8A98; --accent-soft:rgba(255,138,152,.2); --tab-off:#D8D8DD; } }
+  :root[data-contraste="alto"] *:focus-visible { outline:3px solid currentColor; outline-offset:2px; }
+  .ayuda-contraste { display:flex; align-items:center; gap:var(--s2); min-height:44px; margin-top:var(--s2); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; } .ayuda-contraste input { width:22px; height:22px; accent-color:var(--accent); flex:none; }
 </style>
 </head>
 <body>
@@ -1334,9 +1352,14 @@ function abrirAyuda(a, nombre) {
   const actual = () => { try { const t = localStorage.getItem("vm:tema"); return t === "claro" || t === "oscuro" ? t : "auto"; } catch { return "auto"; } };
   const pintaTema = () => grp.querySelectorAll("button").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.t === actual())); });
   for (const [k, t] of [["auto", "Automático"], ["claro", "Claro"], ["oscuro", "Oscuro"]]) { const b = document.createElement("button"); b.type = "button"; b.dataset.t = k; b.textContent = t; b.onclick = () => { const r = document.documentElement; r.classList.add("cambiando"); setTimeout(() => r.classList.remove("cambiando"), 320); try { if (k === "auto") localStorage.removeItem("vm:tema"); else localStorage.setItem("vm:tema", k); } catch {} if (k === "auto") r.removeAttribute("data-tema"); else r.setAttribute("data-tema", k); pintaTema(); }; grp.appendChild(b); }
-  pintaTema(); aj.appendChild(grp); c.appendChild(aj);
+  pintaTema(); aj.appendChild(grp);
+  { const l = document.createElement("label"); l.className = "ayuda-contraste"; const cb = document.createElement("input"); cb.type = "checkbox"; // contraste alto: textos y bordes más marcados (se recuerda en este móvil)
+    try { cb.checked = localStorage.getItem("vm:contraste") === "alto"; } catch {}
+    cb.onchange = () => { try { if (cb.checked) localStorage.setItem("vm:contraste", "alto"); else localStorage.setItem("vm:contraste", "normal"); } catch {} document.documentElement.setAttribute("data-contraste", cb.checked ? "alto" : "normal"); };
+    l.append(cb, document.createTextNode("Contraste alto (textos y bordes más marcados)")); aj.appendChild(l); }
+  c.appendChild(aj);
   { const v = document.createElement("p"); v.className = "ayuda-ver"; c.appendChild(v); // versión del programa que está funcionando (para saber qué se ha publicado)
-    fetch("/health", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (j && j.version) v.textContent = "Versión del programa: " + j.version + (j.reinicioPendiente ? " (hay otra más nueva pendiente de reiniciar)" : ""); }).catch(() => {}); }
+    fetch("/health", { cache: "no-store" }).then((r) => r.json()).then((j) => { if (j && j.version) v.textContent = "Versión del programa: " + j.version + (j.commitFecha ? " · " + new Date(j.commitFecha).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" }) : "") + (j.reinicioPendiente ? " (hay otra más nueva pendiente de reiniciar)" : ""); }).catch(() => {}); }
   const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Cerrar";
   const cerrar = () => { f.remove(); document.removeEventListener("keydown", esc); }; const esc = (e) => { if (e.key === "Escape") cerrar(); };
   arrastrable(c, cerrar); x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);

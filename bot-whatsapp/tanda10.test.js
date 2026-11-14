@@ -3,9 +3,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { estadoVersion, commitEnDisco, COMMIT_ARRANQUE } from "./version.js";
-const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
-const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
-const s = fs.readFileSync(new URL("./server.js", import.meta.url), "utf8");
+const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+const s = fs.readFileSync(new URL("./server.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 test("versión: se lee el commit del disco (7 caracteres), y si coincide con el del arranque no falta reiniciar", () => {
   const c = commitEnDisco();

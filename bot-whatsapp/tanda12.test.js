@@ -2,7 +2,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 test("1. «Repetir y revisar» con un pedido ya empezado: nunca se mezcla sin preguntar (sustituir / añadir / cancelar), enseñando antes cómo cambia el total", () => {
   assert.match(p, /async function precargar\(\)/); assert.match(p, /function elegirAnterior\(ops, aplicar\)/);
@@ -37,7 +37,7 @@ test("2. buscador del sector: «cocacola» pegado, «tercios», «hielo bolsa» 
 });
 
 test("3. «Lo que sueles pedir» (Inicio): nombre entero (hasta 4 líneas) y el formato", () => {
-  const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(h, /\.vm-inicio \.in-pn \{ -webkit-line-clamp:4;/); assert.match(h, /el\("small", "in-fmt", "Caja de " \+ p\.unitsPerBox\)/);
 });
 test("4. el aviso («Quitado…») va encima de la barra inferior y de «Ver pedido», no sobre la rejilla, y los avisos sin «Deshacer» se quitan con un toque", () => {

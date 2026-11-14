@@ -70,7 +70,7 @@ test("priceOrder: la base del pedido es la suma exacta de sus líneas", () => {
 });
 
 test("la página del cliente (pedido.html) calcula EXACTAMENTE lo mismo que el servidor", () => {
-  const html = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const html = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   const trozo = html.slice(html.indexOf("// Importes EXACTOS"), html.indexOf("const total = () => calc().total;") + "const total = () => calc().total;".length);
   assert.ok(trozo.includes("importeCent") && trozo.includes("function calc"), "no se encuentra el cálculo en pedido.html");
   for (let n = 0; n < 3000; n++) {
@@ -91,7 +91,7 @@ test("la página del cliente (pedido.html) calcula EXACTAMENTE lo mismo que el s
 
 test("PEDIDO WEB: los artículos que se venden en cajas se piden por cajas por defecto y sin animar el −/+", async () => {
   const fs = await import("node:fs");
-  const html = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const html = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(html, /const unit = id => productoPorId\.get\(id\)\?\.soloCaja \? "caja" : unitOf\.get\(id\) \|\| \(productoPorId\.get\(id\)\?\.unitsPerBox \? "caja" : "ud"\)/);
   assert.match(html, /\[\["caja", "Cajas"\], \["ud", "Uds"\]\]/); // Cajas primero
   assert.match(html, /\.ctl \.bump, \.hstep\.bump, \.step\.bump \{ animation:none !important; \}/);
@@ -99,9 +99,9 @@ test("PEDIDO WEB: los artículos que se venden en cajas se piden por cajas por d
 
 test("MÓVIL: «Mostrar más» no se sale del ancho y el código y la contraseña de entrada admiten solo letras y números, máximo 6", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /m\.style\.width = "calc\(100% - 28px\)"/);
-  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   for (const id of ["a-pin", "r-pin", "r-pin2", "c-nuevo", "c-nuevo2"]) assert.match(cli, new RegExp(`id="${id}"[^>]*maxlength="6"`), id);
   assert.match(cli, /id="a-nif"[^>]*maxlength="12"/); // el NIF no se corta a los 6 en silencio: se avisa de que solo cuentan los 6 primeros dígitos
   assert.match(cli, /replace\(\/\[\^A-Za-z0-9\]\/g, ""\); avisoLetras = false;[\s\S]*v = v\.slice\(0, id === "a-nif" \? 12 : 6\)/); // solo letras y números; el NIF admite hasta 12 para poder avisar
@@ -109,7 +109,7 @@ test("MÓVIL: «Mostrar más» no se sale del ancho y el código y la contraseñ
 
 test("MÓVIL con letra grande (Samsung): ninguna caja de altura fija corta los textos y las categorías caben en 2 columnas", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /header \{ max-height:280px; flex-wrap:wrap/);
   assert.match(ped, /\.paso \{ max-height:160px; \}/);
   assert.match(ped, /grid-template-columns:repeat\(2, minmax\(0, 1fr\)\)/);
@@ -118,7 +118,7 @@ test("MÓVIL con letra grande (Samsung): ninguna caja de altura fija corta los t
 
 test("PRECIOS DE ARTÍCULO: se enseñan con 2 decimales, y con 3 solo si cuestan menos de 1 € y el tercero no es cero (catálogo web); los importes y totales, con 2", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /const eurp = n => \{ n = Number\(n\); const t = Math\.round\(n \* 1000\)/); // 2 decimales; 3 solo si <1 € y el tercero no es 0
   assert.match(ped, /price\.textContent = eurp\(p\.price\)/);
   assert.match(ped, /pr\.textContent = eurp\(l\.price\) \+ " \/ ud"/);
@@ -134,7 +134,7 @@ test("PRECIOS DE ARTÍCULO: se enseñan con 2 decimales, y con 3 solo si cuestan
 test("MÓVIL: el tamaño de letra del sistema (Samsung) se compensa: ningún font-size en px sin dividir entre --k", async () => {
   const fs = await import("node:fs");
   for (const f of ["pedido.html", "cliente.html", "demo-web/page.html"]) {
-    const html = fs.readFileSync(new URL("./" + f, import.meta.url), "utf8");
+    const html = fs.readFileSync(new URL("./" + f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
     assert.match(html, /function medir\(\)/, f + ": falta la medición de --k");
     assert.equal((html.match(/font-size: *\d+(\.\d+)?px/g) ?? []).filter((x) => !x.endsWith("100px")).length, 0, f + ": hay tamaños de letra sin compensar"); // (100px es la sonda que mide --k)
     assert.ok((html.match(/var\(--k,1\)/g) ?? []).length > 20, f);
@@ -143,7 +143,7 @@ test("MÓVIL: el tamaño de letra del sistema (Samsung) se compensa: ningún fon
 
 test("CATÁLOGO WEB: «+ Añadir» y el contador miden igual en todas las filas, zonas de toque de 44 px o más, móvil apaisado y ordenador en filas anchas", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /className = "pf-fijo"/); // los artículos sueltos ocupan el mismo hueco que los de cajas
   assert.match(ped, /\.pf-slot \{ height:44px;/); assert.match(ped, /\.pf-add \{ width:44px; height:44px;/); // «+» redondo y contador miden 44 px: la fila no cambia de alto
   assert.match(ped, /\.pf-fav \{ position:absolute; left:0; top:0; width:44px; height:44px/);
@@ -155,7 +155,7 @@ test("CATÁLOGO WEB: «+ Añadir» y el contador miden igual en todas las filas,
 
 test("CATÁLOGO WEB: sin «Última vez», carrito y «solo lo marcado» en tabla, foto ampliable también en el carrito, zoom nítido", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.doesNotMatch(ped, /Última vez/); // se quitó el botón «↻ Última vez: N uds» de cada producto
   assert.match(ped, /function tablaLineas\(ls\)/);
   assert.match(ped, /box\.appendChild\(tablaLineas\(ls\)\)/); // el carrito es una tabla…
@@ -167,22 +167,22 @@ test("CATÁLOGO WEB: sin «Última vez», carrito y «solo lo marcado» en tabla
 
 test("CATÁLOGO WEB: controles del carrito a 48 px, sin barra fija con el carrito vacío, precio de la caja en la fila y un solo «Hacer pedido» en el chat", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /\.tl \.ud \{ min-width:112px; height:48px; \} \.tl \.ud button \{ min-height:48px; \}/);
   assert.match(ped, /\.tl \.hstep button \{ width:48px; height:100%;/);
   assert.match(ped, /<footer hidden role="status"/); // «Añade productos para empezar» solo existe cuando hay algo en el carrito
   assert.match(ped, /document\.querySelector\("footer"\)\.hidden = !n/);
   assert.match(ped, /"Caja de " \+ p\.unitsPerBox \+ " · " \+ eur\(precioCaja\(p\)\)/); // el precio de la caja, calculado como el importe de línea
   assert.match(ped, /\.app\.compacto \.buscar \{ max-height:0;/); // en apaisado se pliega también el buscador al bajar
-  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.doesNotMatch(cli, /data-q="hacer pedido"/); // el atajo de abajo se quitó…
   assert.match(cli, /el\("button", "vm-btn primary in-hacer", "Hacer pedido"\)/); assert.match(cli, /enviar\("h:open", "Hacer pedido"\)/); // un solo «Hacer pedido» en la tarjeta de inicio
 });
 
 test("LETRA: nivel elegido 100/115/130 % con A− / A+ y «Automático» (tope +30 %), el mismo en el chat y el catálogo; controles táctiles de 48 px", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
-  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   for (const [n, html] of [["pedido", ped], ["cliente", cli]]) {
     assert.match(html, /NIVELES = \[1, 1\.15, 1\.3\], TOPE = 1\.3/, n); // nunca más de +30 %
     assert.match(html, /nivel \|\| Math\.min\(TOPE, ksist\)/, n); // automático: respeta la letra del móvil hasta el tope
@@ -200,8 +200,8 @@ test("LETRA: nivel elegido 100/115/130 % con A− / A+ y «Automático» (tope +
 
 test("«¿Te falta algo?» antes de enviar, aviso de entrega hoy renovable y medidas de uso sin datos personales", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
-  const srv = fs.readFileSync(new URL("./server.js", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const srv = fs.readFileSync(new URL("./server.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /function pintarFalta\(box\)/);
   assert.match(ped, /data\.products\.filter\(p => p\.count > 0 && !qty\.has\(p\.id\)\)[^;]*\.slice\(0, 4\)/); // solo habituales que todavía no lleva, hasta 4
   assert.match(srv, /\/catalogo\/aviso/); // rutas ligeras para volver a comprobar la hora…
@@ -213,7 +213,7 @@ test("«¿Te falta algo?» antes de enviar, aviso de entrega hoy renovable y med
 
 test("«¿Te falta algo?» con foto del artículo y entrega: dirección de siempre u otra distinta (obligatoria sin dirección guardada)", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /className = "falta-av"/); assert.match(ped, /\.falta-fila \.falta-av \{ flex:none; width:56px; height:56px/);
   assert.match(ped, /name="addrmode" value="otra"/); assert.match(ped, /deliveryAddress: dirEntrega\(\)/);
   assert.match(ped, /const sinDireccion = \(\) => !String\(data\.customer\.address/);
@@ -222,20 +222,20 @@ test("«¿Te falta algo?» con foto del artículo y entrega: dirección de siemp
 
 test("ACTUALIZACIÓN AUTOMÁTICA: cada 10 minutos, con pruebas, comprobación de arranque, vuelta atrás y botón «Actualizar ahora»", async () => {
   const fs = await import("node:fs");
-  const bat = fs.readFileSync(new URL("./deploy/windows/actualizar-auto.bat", import.meta.url), "utf8");
+  const bat = fs.readFileSync(new URL("./deploy/windows/actualizar-auto.bat", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(bat, /node --test/); assert.match(bat, /localhost:3000\/health/); assert.match(bat, /localhost:3001\/health/);
   assert.match(bat, /git reset --hard %ANTES%/); assert.match(bat, /actualizar\.mala/); // no reintenta una versión que ya falló
   assert.doesNotMatch(bat, /\(sin internet\?\)/); // un paréntesis dentro de un bloque rompería el .bat
-  const tareas = fs.readFileSync(new URL("./deploy/windows/instalar-tareas.bat", import.meta.url), "utf8");
+  const tareas = fs.readFileSync(new URL("./deploy/windows/instalar-tareas.bat", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(tareas, /\/TN "VM Actualizar".*\/SC MINUTE \/MO 10/);
-  const emp = fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8");
+  const emp = fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(emp, /id="act-ahora"/); assert.match(emp, /\/api\/admin\/actualizar"/);
 });
 
 test("PAQUETE «COMPRAR MÁS FÁCIL» A+B: lo que ya compra arriba, «Lo más pedido», atajos, deshacer con pausa y ayuda con datos de la empresa", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
-  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   // F-21
   assert.match(ped, /"Lo compras"/); assert.match(ped, /else if \(arbol\) items = \[\.\.\.items\.filter\(p => p\.count > 0\)/);
   assert.match(ped, /Lo más pedido/); assert.match(ped, /data\.top/);
@@ -263,7 +263,7 @@ test("AYUDA: sin datos rellenados no hay botón; con teléfono o WhatsApp se ofr
 
 test("DIRECCIÓN DE ENTREGA: lo oculto se oculta de verdad y solo se obliga a escribirla si el cliente no tiene dirección guardada", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /\[hidden\] \{ display:none !important; \}/); // sin esto, .addropc { display:flex } pisaba el atributo hidden
   assert.match(ped, /const modoDir = \(\) => \(sinDireccion\(\) \? "otra" : document\.querySelector/); // con dirección guardada manda lo que elija (de siempre = puede seguir)
   assert.match(ped, /if \(modoDir\(\) === "otra" && dirEntrega\(\)\.length < 5\)/); // solo se exige texto si es «otra» o no hay dirección
@@ -271,7 +271,7 @@ test("DIRECCIÓN DE ENTREGA: lo oculto se oculta de verdad y solo se obliga a es
 
 test("CABECERA DEL CATÁLOGO: compacta (logo, nombre, «Aa» y carrito en una fila) y en vertical no se pliega al bajar, para que el logo no se mueva", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /\.app\.compacto \.paso \{ max-height:0;/); // al bajar solo se pliega el rótulo «Paso 1 de 3»
   assert.doesNotMatch(ped, /\.app\.compacto header, \.app\.compacto \.paso, \.app\.compacto \.tabs \{/); // la cabecera ya no se pliega en vertical
   assert.match(ped, /\.app\.compacto header, \.app\.compacto \.tabs, \.app\.compacto \.buscar \{ max-height:0;/); // solo en apaisado se pliega todo
@@ -280,14 +280,14 @@ test("CABECERA DEL CATÁLOGO: compacta (logo, nombre, «Aa» y carrito en una fi
 
 test("BIENVENIDA: el saludo va dentro de la tarjeta de inicio (un solo mensaje alineado, con los 3 pasos) y no se pierde la tarjeta", async () => {
   const fs = await import("node:fs");
-  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(cli, /if \(j\.ui\?\.home\) window\.__saludo = String\(j\.reply\)\.split\("\\n\\n"\)\[0\]; else burbuja\([^;]*"in"\); \(j\.cards \?\? \[\]\)\.forEach\(tarjetaTabla\); if \(j\.ui\) interactivo\(j\.ui\);/); // un comentario en esa línea se comía la tarjeta
   assert.match(cli, /saludoMadrid\(\) \+ \(nombre \? ", " \+ nombre : ""\)/); assert.match(cli, /fila\.className = "mrow in"; fila\.appendChild\(c\)/); // saludo por la hora de Madrid y nombre comercial
 });
 
 test("ALTAS A MANO Y CLIENTE NUEVO: formularios en el panel (producto, cliente y «crear su ficha» al aceptar una solicitud) y dirección en el alta del cliente", async () => {
   const fs = await import("node:fs");
-  const emp = fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8"), cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const emp = fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8").replace(/\r\n/g, "\n"), cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(emp, /id="alta-prod"/); assert.match(emp, /id="alta-cli"/);
   assert.match(emp, /\/api\/admin\/productos\/nuevo/); assert.match(emp, /\/api\/admin\/clientes\/nuevo/);
   assert.match(emp, /Es cliente nuevo: crear su ficha/); assert.match(emp, /\{ nuevo: form\.valores\(\) \}/);
@@ -297,7 +297,7 @@ test("ALTAS A MANO Y CLIENTE NUEVO: formularios en el panel (producto, cliente y
 
 test("TOTALES EN EL CATÁLOGO: la barra flotante va SIN IVA; la pantalla Pedido enseña base, IVA, recargo y total con IVA y el botón confirma con ese total", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /\$\("pcT"\)\.textContent = n \? `\$\{eur\(calc\(\)\.base\)\} sin IVA`/); // carrito flotante: sin IVA
   assert.match(ped, /\$\("sumBase"\)\.textContent = eur\(c\.base\); \$\("sumIva"\)\.textContent = eur\(c\.iva\)/); // resumen: base + IVA
   assert.match(ped, /\$\("sumRe"\)\.textContent = eur\(c\.re\); \$\("sumTotal"\)\.textContent = eur\(c\.total\)/); // recargo de equivalencia y total
@@ -307,20 +307,20 @@ test("TOTALES EN EL CATÁLOGO: la barra flotante va SIN IVA; la pantalla Pedido 
 
 test("CÓDIGOS CON PUNTO (157.10, 151.21…): «repetir pedido» separa bien el código de la cantidad", async () => {
   const fs = await import("node:fs");
-  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(ped, /par\.lastIndexOf\("\."\)/); assert.doesNotMatch(ped, /par\.split\("\."\)/);
 });
 
 test("TU PEDIDO DE SIEMPRE en el móvil: el texto a todo el ancho y los botones debajo, sin una columna estrecha", async () => {
   const fs = await import("node:fs");
-  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(cli, /\.vm-inicio \.in-card \.vm-btn \{ width:100%; \}/); // botones a todo el ancho, debajo
   assert.match(cli, /principal\.append\(rep, sem\);/); assert.match(cli, /"Repetir cada " \+ dia/); assert.match(cli, /"Repetir y revisar"/);
 });
 
 test("MI CUENTA (app del cliente): botón arriba, datos del cliente y pedidos por meses con «Repetir» y «Añadir al carrito»", () => {
-  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
-  const cat = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const cat = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(cli, /<button type="button" id="micuenta" class="ds-circ cuenta"[^>]*>[\s\S]*?<span>Mi cuenta<\/span><\/button>/); // botón visible en la cabecera, sin emojis
   assert.match(cli, /\/api\/mi-cuenta/);
   for (const t of ["Mis datos", "Dirección", "Repetir pedido", "Añadir al carrito", "Modificar pedido", "Algo no es correcto"]) assert.ok(cli.includes(t), t);
@@ -332,8 +332,8 @@ test("MI CUENTA (app del cliente): botón arriba, datos del cliente y pedidos po
 });
 
 test("AVISOS AL MÓVIL (app del cliente): botón «Activar avisos» en Mi cuenta, ayuda para iPhone y el service worker muestra los avisos", () => {
-  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
-  const sw = fs.readFileSync(new URL("./pwa/sw.js", import.meta.url), "utf8");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const sw = fs.readFileSync(new URL("./pwa/sw.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   for (const t of ["Activar avisos", "Desactivar avisos", "Añadir a pantalla de inicio", "/api/push/clave", "/api/push/suscribir", "/api/push/baja", "userVisibleOnly: true", "Notification.requestPermission"]) assert.ok(cli.includes(t), t);
   assert.match(cli, /\(await permiso\) !== "granted"/); // pide permiso al pulsar el botón (los móviles lo exigen), no al abrir
   assert.match(sw, /addEventListener\("push"/); assert.match(sw, /showNotification/); assert.match(sw, /addEventListener\("notificationclick"/);
@@ -342,7 +342,7 @@ test("AVISOS AL MÓVIL (app del cliente): botón «Activar avisos» en Mi cuenta
 });
 
 test("AVISOS AL MÓVIL: la primera vez que se abre la app instalada se pregunta una sola vez si quiere los avisos", () => {
-  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(cli, /id="m-avisos"[\s\S]*¿Quieres recibir avisos\?[\s\S]*ofertas[\s\S]*precios[\s\S]*Sí, activar avisos[\s\S]*Ahora no/);
   assert.match(cli, /display-mode: standalone/); // solo en el acceso directo (app instalada)
   assert.match(cli, /localStorage\.getItem\("vm:avisos-preguntado"\)/); assert.match(cli, /localStorage\.setItem\("vm:avisos-preguntado", "1"\)/); // una sola vez
@@ -353,8 +353,8 @@ test("AVISOS AL MÓVIL: la primera vez que se abre la app instalada se pregunta 
 });
 
 test("PANEL DE LA EMPRESA: sin pestaña «Clientes», con «Artículos» (precio, ofertas, filtros, campana) y la oferta se ve en el catálogo del cliente", () => {
-  const emp = fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8");
-  const cat = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const emp = fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const cat = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.doesNotMatch(emp, /data-t="clientes"/); assert.doesNotMatch(emp, /id="p-clientes"/);
   assert.match(emp, /data-t="cuentas"[^>]*>Cuentas de clientes/); assert.match(emp, /data-t="articulos"[^>]*>Artículos/);
   for (const t of ["ar-q", "ar-cat", "ar-filtro", "Cambiar precio", "Guardar oferta", "Quitar oferta", "% de descuento", "€ de descuento por unidad", "Hasta el día (opcional)", "className: \"campana\"", "/avisar"]) assert.ok(emp.includes(t), t);

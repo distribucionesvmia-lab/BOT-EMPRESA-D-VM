@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { categorizar, arbolCategorias, clasificar, CATEGORIAS } from "./categorias.js";
 
-const familias = JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8"));
+const familias = JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8").replace(/\r\n/g, "\n"));
 const k = (name, extra = {}) => { const r = categorizar({ name, ...extra }); return `${r.cat}/${r.sub}`; };
 const f = (name, family) => { const r = clasificar({ name, family }, familias); return `${r.category} › ${r.subcategory}`; };
 

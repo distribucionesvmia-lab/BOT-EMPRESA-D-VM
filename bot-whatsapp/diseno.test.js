@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const leer = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8");
+const leer = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const cliente = leer("./cliente.html"), pedido = leer("./pedido.html");
 const tokens = (h) => (h.match(/:root\s*\{[\s\S]*?--bg:[\s\S]*?\n  \}/) || [""])[0];
 const hex = (h, n) => (h.match(new RegExp(`--${n}:\\s*(#[0-9A-Fa-f]{6})`)) || [])[1];
@@ -264,13 +264,13 @@ test("PDF: se ve dentro de la app con botón «Cerrar» (y «Descargar»), «Atr
 });
 
 test("TANDA 5: pedido fijo con «Cancelar» y aparte de «Confirmar pedido»; controles del carrito de 44 px; nombres de los dos «Mis pedidos»", () => {
-  const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8");
+  const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(p, /id="fijoCancelar"[^>]*>Cancelar</);
   assert.match(p, /No envía este pedido/);
   assert.ok(p.indexOf('id="fijoCard"') > p.indexOf('id="pedDias"'));
   assert.match(p, /#cart \.tl \.hstep button \{ min-width:44px; min-height:44px/);
   assert.match(p, /#cart \.tl \.cx \{ min-height:44px/);
-  const c = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8");
+  const c = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(c, /Histórico de pedidos/);
 });
 
