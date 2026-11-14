@@ -30,7 +30,15 @@ function fechaDelCommit() {
 }
 const COMMIT_FECHA = fechaDelCommit();
 /** Lo que enseña /health: versión en marcha, versión en disco y si falta reiniciar. */
+/** Lo que dice el actualizador de la oficina («VM Actualizar»): última comprobación, versión rechazada y última frase relevante del registro. Sin datos de clientes. */
+export function estadoActualizador(dir = process.env.ACTUALIZAR_LOGS || (process.platform === "win32" ? "C:\\vm\\logs" : "")) {
+  if (!dir) return null;
+  const leer = (f, max = 200) => { try { return fs.readFileSync(path.join(dir, f), "utf8").replace(/\r/g, "").trim().slice(0, max); } catch { return null; } };
+  const ultima = leer("actualizar.ultima"), mala = leer("actualizar.mala", 64);
+  let ultimoAviso = null; try { const l = fs.readFileSync(path.join(dir, "actualizar.log"), "utf8").replace(/\r/g, "").split("\n").filter((x) => /LAS PRUEBAS FALLAN|NO ARRANCA|Actualizado de|No se pudo/.test(x)); ultimoAviso = l.length ? l[l.length - 1].slice(0, 200) : null; } catch { /* sin registro */ }
+  return ultima || mala || ultimoAviso ? { ultimaComprobacion: ultima, versionRechazada: mala, ultimoAviso } : null;
+}
 export function estadoVersion() {
   const enDisco = commitEnDisco();
-  return { version: COMMIT_ARRANQUE, commitFecha: COMMIT_FECHA, desplegado: ARRANCADO, enDisco, reinicioPendiente: !!(COMMIT_ARRANQUE && enDisco && COMMIT_ARRANQUE !== enDisco) };
+  return { version: COMMIT_ARRANQUE, commitFecha: COMMIT_FECHA, desplegado: ARRANCADO, enDisco, reinicioPendiente: !!(COMMIT_ARRANQUE && enDisco && COMMIT_ARRANQUE !== enDisco), ruta: path.dirname(fileURLToPath(import.meta.url)), pid: process.pid, node: process.version, actualizacion: estadoActualizador() };
 }

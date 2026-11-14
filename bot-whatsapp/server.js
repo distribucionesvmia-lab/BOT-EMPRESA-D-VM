@@ -802,6 +802,17 @@ http
   // HOST=127.0.0.1 hace que solo se pueda entrar desde el propio servidor (la aplicación de la empresa); sin HOST escucha en todas las interfaces
   .listen(PORT, process.env.HOST || undefined, () => {
     console.log(`Bot escuchando en http://localhost:${PORT}` + (process.env.HOST ? ` (solo ${process.env.HOST})` : ""));
+    // Si la oficina actualiza los archivos y el programa se queda con el código antiguo (no se reinició), se reinicia solo: el archivo iniciar-*.bat lo vuelve a arrancar a los 10 s.
+    // Se espera 8 minutos desde que se nota la diferencia para no adelantarse a las pruebas de «VM Actualizar» (si fallan, vuelve atrás y no hace falta reiniciar).
+    if (process.env.DEMO !== "1" && process.env.AUTO_REINICIO !== "0" && !process.env.VM_TEST) {
+      let desde = 0;
+      setInterval(() => {
+        const e = estadoVersion();
+        if (!e.reinicioPendiente) { desde = 0; return; }
+        if (!desde) { desde = Date.now(); console.log(`Hay una versión nueva en el disco (${e.enDisco}); este programa corre la ${e.version}. Si sigue así, se reinicia en 8 minutos.`); return; }
+        if (Date.now() - desde >= 8 * 60e3) { console.log(`Reinicio automático para cargar la versión ${e.enDisco}.`); process.exit(0); }
+      }, 60e3).unref();
+    }
     // Exportación diaria a Excel (EXPORT_TIME, por defecto 21:00 hora de Madrid). En modo demo no se programa.
     // EXPORT_AUTO=0 desactiva la exportación diaria automática: la empresa exporta cuando quiere y elige qué pedidos
     if (process.env.DEMO !== "1" && adminEnabled && process.env.EXPORT_AUTO !== "0") scheduleDailyExport(getDb());
