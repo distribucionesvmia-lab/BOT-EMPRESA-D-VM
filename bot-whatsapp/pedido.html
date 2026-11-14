@@ -193,6 +193,7 @@
   @keyframes entrar { from { opacity:.6; transform:translateX(36px); } to { opacity:1; transform:none; } }
   @keyframes aparecer { from { opacity:0; } to { opacity:1; } }
   @keyframes pop { 0% { transform:scale(1); } 40% { transform:scale(1.16); } 100% { transform:scale(1); } }
+  @keyframes pulso { 0% { transform:scale(1); } 50% { transform:scale(1.15); } 100% { transform:scale(1); } }
   @keyframes latido { 0% { transform:scale(1); } 30% { transform:scale(1.32); } 60% { transform:scale(.92); } 100% { transform:scale(1); } }
   @keyframes tic { 0% { transform:scale(.2); opacity:0; } 60% { transform:scale(1.12); opacity:1; } 100% { transform:scale(1); } }
   @keyframes onda { 0% { box-shadow:0 0 0 0 rgba(11,122,62,.45); } 100% { box-shadow:0 0 0 28px rgba(11,122,62,0); } }
@@ -827,7 +828,7 @@
   .tb.on { color:var(--accent); }
   .tb-dot { position:absolute; top:4px; left:calc(50% + 6px); min-width:18px; height:18px; padding:0 5px; border-radius:var(--r-pill); background:var(--accent); color:var(--on-accent); font-size:calc(var(--t-micro) / var(--k,1)); font-weight:700; display:grid; place-items:center; line-height:1; font-variant-numeric:tabular-nums; box-shadow:0 0 0 2px var(--surface); }
   .tb-dot[hidden] { display:none; }
-  .tb-dot.pulse { animation:latido var(--t-norm) var(--ease); }
+  .tb-dot.pulse { animation:pulso var(--t-norm) var(--ease); }
   @media (prefers-reduced-motion: reduce) { .tb, .tb-dot.pulse { transition:none; animation:none; } .tb:active { transform:none; } }
   main, .app.sin-carrito main { padding-bottom:calc(var(--tb-h) + 88px); }
   .app.sin-carrito main { padding-bottom:calc(var(--tb-h) + 16px); }
@@ -844,7 +845,7 @@
   .pc-info b { font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; font-variant-numeric:tabular-nums; }
   .pc-info small { font-size:calc(var(--t-cap) / var(--k,1)); opacity:.9; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .pc-ver { font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; flex:none; }
-  .pill-cart.pulse { animation:latido var(--t-norm) var(--ease); }
+  .pill-cart.pulse { animation:pulso var(--t-norm) var(--ease); }
   @media (prefers-reduced-motion: reduce) { .pill-cart, .pill-cart.pulse { transition:none; animation:none; } .pill-cart:active { transform:none; } }
   /* Buscador siempre visible con lupa y sugerencias */
   .buscar { position:relative; }
@@ -911,6 +912,23 @@
   .done-ref { margin:0; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; color:var(--text-2); font-variant-numeric:tabular-nums; }
   .done-btns { display:flex; flex-direction:column; gap:var(--s2); width:100%; max-width:360px; margin-top:var(--s4); }
   .done-btns .big { display:flex; align-items:center; justify-content:center; text-decoration:none; width:100%; min-height:50px; border-radius:var(--r-pill); }
+
+  /* ═══ Fotos: baldosa cuadrada #F2F2F7, la foto «contenida» al 82 % (nunca más grande de lo que es) y fundido de 200 ms ═══ */
+  .av img, .pf-av img, .tl-av img, .falta-av img, .sug-im img { position:absolute; inset:0; margin:auto; width:auto; height:auto; max-width:82%; max-height:82%; padding:0; object-fit:contain; background:none; border-radius:0; opacity:0; transition:opacity 200ms ease; }
+  .av img.cargada, .pf-av img.cargada, .tl-av img.cargada, .falta-av img.cargada, .sug-im img.cargada { opacity:1; }
+  .pf-av:has(img.cargada), .tl-av:has(img.cargada), .falta-av:has(img.cargada), .sug-im:has(img.cargada) { background:var(--fill) !important; color:transparent; }
+  @media (prefers-reduced-motion: reduce) { .av img, .pf-av img, .tl-av img, .falta-av img, .sug-im img { transition:none; } }
+  /* Estados vacíos y de error */
+  .estado { display:flex; flex-direction:column; align-items:center; text-align:center; gap:var(--s2); padding:var(--s10) var(--s6); max-width:420px; margin:0 auto; }
+  .estado svg { width:48px; height:48px; color:var(--text-2); margin-bottom:var(--s2); }
+  .estado h3 { margin:0; font-size:calc(var(--t-md) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; color:var(--text); }
+  .estado p { margin:0; font-size:calc(var(--t-sec) / var(--k,1)); line-height:1.4; color:var(--text-2); }
+  .estado-bt { margin-top:var(--s4); min-height:50px; padding:0 var(--s8); border:0; border-radius:var(--r-pill); background:var(--accent); color:var(--on-accent); font:inherit; font-size:calc(var(--t-body) / var(--k,1)); font-weight:600; cursor:pointer; transition:transform var(--t-press) var(--ease); }
+  .estado-bt:active { transform:scale(.97); }
+  .estado-lnk { min-height:44px; margin-top:var(--s1); padding:0 var(--s3); border:0; background:none; color:var(--accent); font:inherit; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; cursor:pointer; }
+  #cart.sin-lineas .cartfoot, #cart.sin-lineas .vaciar, #cart.sin-lineas .keepbtn, #cart.sin-lineas .ped-h, #cart.sin-lineas #entregaCard, #cart.sin-lineas #pedDias, #cart.sin-lineas #fijoCard, #cart.sin-lineas .cartbody > .card, #cart.sin-lineas #pedRes, #cart.sin-lineas #priceNote { display:none; }
+  #err .estado { padding:var(--s6) var(--s4); }
+  @media (prefers-reduced-motion: reduce) { .estado-bt { transition:none; } .estado-bt:active { transform:none; } }
 </style>
 </head>
 <body>
@@ -1038,7 +1056,7 @@ function abrirAyuda(a, nombre) {
   if (a.horario) { const p = document.createElement("p"); p.textContent = "" + a.horario; c.appendChild(p); }
   const x = document.createElement("button"); x.type = "button"; x.className = "ayuda-cerrar"; x.textContent = "Cerrar";
   const cerrar = () => { f.remove(); document.removeEventListener("keydown", esc); }; const esc = (e) => { if (e.key === "Escape") cerrar(); };
-  x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
+  arrastrable(c, cerrar); x.onclick = cerrar; f.onclick = (e) => { if (e.target === f) cerrar(); }; document.addEventListener("keydown", esc);
   c.appendChild(x); f.appendChild(c); document.body.appendChild(f); (c.querySelector("a") || x).focus();
 }
 function aviso(texto, deshacer) {
@@ -1051,9 +1069,13 @@ function aviso(texto, deshacer) {
   t.onpointerenter = t.onfocusin = t.onpointerdown = deshacer ? pausa : null; t.onpointerleave = t.onfocusout = deshacer ? cierra : null;
   cierra();
 }
+// ── Detalles de movimiento (todos ≤ 400 ms, nada si el móvil pide «reducir movimiento») ──
+const sinMovimiento = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const vibra = () => { try { if (!sinMovimiento() && navigator.vibrate) navigator.vibrate(8); } catch {} };
+document.addEventListener("load", e => { if (e.target && e.target.tagName === "IMG") e.target.classList.add("cargada"); }, true); // las fotos aparecen con un fundido de 200 ms
 function setQty(id, n) {
   const antes = qty.get(id) || 0, u = unitOf.get(id), nota = notes.get(id);
-  bumpId = id;
+  bumpId = id; if (n > antes) vibra();
   n = Math.max(0, Math.floor(Number(n) || 0));
   if (n > 999) { n = 999; aviso("La cantidad máxima por artículo es 999."); }
   if (n) qty.set(id, n); else {
@@ -1153,11 +1175,11 @@ function verFoto(p) {
     document.addEventListener("keydown", (e) => { if (e.key === "Escape" && z.style.display !== "none") { z.style.display = "none"; e.stopImmediatePropagation(); } }, true);
   }
   const im = z.querySelector("img");
-  im.style.width = "auto"; im.onload = () => { const w = Math.min(im.naturalWidth * 1.6, innerWidth * 0.9, 720); if (w > 0) im.style.width = Math.max(w, Math.min(240, im.naturalWidth)) + "px"; };
+  im.style.width = "auto"; im.onload = () => { const nat = im.naturalWidth; if (nat > 0) im.style.width = (nat < 160 ? nat : Math.min(nat * 1.6, innerWidth * 0.9, 720)) + "px"; }; // una foto de menos de 160 px nunca se agranda
   im.src = p.img;
   z.querySelector(".znom").textContent = p.name;
   z.querySelector(".zinfo").textContent = [p.price != null ? eurp(p.price) : "", p.unitsPerBox ? "caja de " + p.unitsPerBox + " uds" : ""].filter(Boolean).join(" · ");
-  z.querySelector(".zia").textContent = p.ia ? "Foto orientativa creada con IA" : "";
+  z.querySelector(".zia").textContent = p.ia ? "Imagen orientativa" : "";
   z.style.display = "flex";
 }
 
@@ -1343,6 +1365,41 @@ function entrada(list, sel) {
   animarLista = false;
   [...list.querySelectorAll(sel)].slice(0, 12).forEach((e, i) => { e.style.setProperty("--i", i); e.classList.add("in"); });
 }
+// ── Estados vacíos y de error: icono de línea de 48 px, título, una frase y UN botón ──
+const ICONOS_ESTADO = {
+  reloj: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  buscar: '<circle cx="11" cy="11" r="6.500"/><path d="M16 16l4.500 4.500M9 11h4"/>',
+  carro: '<path d="M3 4h2.200l2 11h10.300l1.800-7.500H6.400M9.500 20a1 1 0 1 0 0 .01M16.500 20a1 1 0 1 0 0 .01"/>',
+  nube: '<path d="M7 18a4 4 0 0 1-.5-7.970A5.500 5.500 0 0 1 17 8.500a4.500 4.500 0 0 1 .5 9.500zM4 4l16 16"/>',
+  alerta: '<path d="M12 4l9 16H3zM12 10v4M12 17v.01"/>',
+  caja: '<path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/>',
+  marca: '<circle cx="12" cy="12" r="9"/><path d="M8 12.500l2.500 2.500L16 9.500"/>'
+};
+function estadoVacio({ icono = "caja", titulo, texto, boton, onclick, extra }) {
+  const d = document.createElement("div"); d.className = "estado";
+  d.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.700" stroke-linecap="round" stroke-linejoin="round">${ICONOS_ESTADO[icono] || ICONOS_ESTADO.caja}</svg>`;
+  const h = document.createElement("h3"); h.textContent = titulo; const p = document.createElement("p"); p.textContent = texto; d.append(h, p);
+  if (boton) { const b = document.createElement("button"); b.type = "button"; b.className = "estado-bt"; b.textContent = boton; b.onclick = onclick; d.appendChild(b); }
+  if (extra) d.appendChild(extra);
+  return d;
+}
+// Paneles que bajan: el dedo los arrastra 1:1, se pueden volver a coger a mitad de camino y se cierran con 90 px o un gesto rápido
+function arrastrable(caja, cerrar) {
+  if (!caja || caja.dataset.arr) return; caja.dataset.arr = "1";
+  let y0 = null, ty = 0, t0 = 0, y1 = 0;
+  const actual = () => { const m = /matrix\(.*, (-?[\d.]+)\)$/.exec(getComputedStyle(caja).transform); return m ? Number(m[1]) : 0; };
+  caja.style.touchAction = "pan-x";
+  caja.addEventListener("pointerdown", e => { if (e.pointerType === "mouse" || e.target.closest("input, textarea, select, a")) return; ty = actual(); caja.style.transition = "none"; caja.style.transform = `translateY(${ty}px)`; y0 = e.clientY - ty; t0 = e.timeStamp; y1 = e.clientY; try { caja.setPointerCapture(e.pointerId); } catch {} });
+  caja.addEventListener("pointermove", e => { if (y0 == null) return; ty = Math.max(0, e.clientY - y0); y1 = e.clientY; caja.style.transform = `translateY(${ty}px)`; });
+  const suelta = e => {
+    if (y0 == null) return; const v = (e.clientY - (y0 + 0)) / Math.max(1, e.timeStamp - t0); y0 = null;
+    const rapido = v > 0.6, cierra = ty > 90 || (rapido && ty > 20);
+    caja.style.transition = sinMovimiento() ? "none" : "transform 250ms cubic-bezier(.2,.8,.2,1)";
+    if (cierra) { caja.style.transform = "translateY(110%)"; setTimeout(() => { cerrar(); caja.style.transition = "none"; caja.style.transform = ""; }, sinMovimiento() ? 0 : 250); }
+    else caja.style.transform = "";
+  };
+  caja.addEventListener("pointerup", suelta); caja.addEventListener("pointercancel", suelta);
+}
 function renderList() {
   const list = $("list"); list.innerHTML = "";
   const q = norm(query.trim());
@@ -1373,10 +1430,14 @@ function renderList() {
   if (!enBusqueda) $("filinfo").textContent = filtra ? `Mostrando ${items.length} con cantidad` : "";
   if (cabecera) cabecera();
   if (!items.length) {
-    const d = document.createElement("div"); d.className = "vacio";
-    d.textContent = filtra ? "Aún no has marcado ninguna cantidad. Pulsa «Ver solo lo que he marcado» para volver a ver todos." : tab === "hab" && !q ? "Aún no tienes histórico ni favoritos. Mira el catálogo y pulsa ♡ en lo que más pidas." : q ? `No hemos encontrado «${query.trim()}». Prueba con menos palabras o revisa cómo está escrito.` : "No hay resultados.";
-    if (q) { const b = document.createElement("button"); b.type = "button"; b.className = "lnk"; b.textContent = "Borrar la búsqueda"; b.onclick = () => { $("q").value = ""; query = ""; renderList(); $("q").focus(); }; d.append(document.createElement("br"), b); }
-    if (q && data.ayuda) { const h = document.createElement("button"); h.type = "button"; h.className = "big sec"; h.style.cssText = "margin:12px 0 0;width:100%"; h.textContent = "Hablar con una persona"; h.onclick = () => abrirAyuda(data.ayuda, data.customer.name); d.appendChild(h); }
+    let d;
+    if (filtra) d = estadoVacio({ icono: "marca", titulo: "Aún no has marcado nada", texto: "Pulsa «+» en lo que necesites y aparecerá aquí.", boton: "Ver todos", onclick: () => $("fil").click() });
+    else if (tab === "hab" && !q) d = estadoVacio({ icono: "reloj", titulo: "Aún no tienes histórico", texto: "Cuando hagas tu primer pedido, aquí verás lo que sueles pedir. Mientras tanto, mira el catálogo.", boton: "Ver el catálogo", onclick: () => cambiarTab("all") });
+    else if (q) {
+      let extra = null;
+      if (data.ayuda) { extra = document.createElement("button"); extra.type = "button"; extra.className = "estado-lnk"; extra.textContent = "¿No lo encuentras? Habla con una persona"; extra.onclick = () => abrirAyuda(data.ayuda, data.customer.name); }
+      d = estadoVacio({ icono: "buscar", titulo: "Sin resultados", texto: `No hemos encontrado «${query.trim()}». Prueba con menos palabras o revisa cómo está escrito.`, boton: "Borrar la búsqueda", onclick: () => { $("q").value = ""; query = ""; renderList(); $("q").focus(); }, extra });
+    } else d = estadoVacio({ icono: "caja", titulo: "Aquí no hay artículos", texto: "Esta sección está vacía ahora mismo.", boton: "Volver al catálogo", onclick: () => irA(null, null) });
     list.appendChild(d); return;
   }
   if (tab === "hab" && !q) items = [...items.filter(p => favs.has(p.id)), ...items.filter(p => !favs.has(p.id))]; // los favoritos van primero
@@ -1493,9 +1554,10 @@ function renderCart() {
   const box = $("cartLines"); box.innerHTML = "";
   const ls = lines(), nUds = ls.reduce((t, l) => t + uds(l), 0);
   $("cartCount").textContent = `${ls.length} artículo${ls.length === 1 ? "" : "s"} · ${nUds} unidad${nUds === 1 ? "" : "es"}`;
-  box.appendChild(tablaLineas(ls)); pintarFalta(box);
+  if (ls.length) { box.appendChild(tablaLineas(ls)); pintarFalta(box); }
+  $("cart").classList.toggle("sin-lineas", !ls.length);
+  if (!ls.length) { box.appendChild(estadoVacio({ icono: "carro", titulo: "Tu pedido está vacío", texto: "Añade lo que necesites desde el catálogo y aquí podrás revisarlo y confirmarlo.", boton: "Ver el catálogo", onclick: () => { showCart(false); cambiarTab("all"); } })); return; }
   pintarResumen(); pintarDias();
-  if (!count()) showCart(false);
 }
 
 
@@ -1546,7 +1608,7 @@ document.querySelectorAll(".tabbar .tb").forEach(b => b.onclick = () => {
   const k = b.dataset.nav;
   if (k === "inicio") { location.href = "/cliente"; return; }
   if (k === "ayuda") { if (data.ayuda) abrirAyuda(data.ayuda, data.customer.name); else location.href = "/cliente"; return; }
-  if (k === "pedido") { if (count()) showCart(true); else { aviso("Aún no has añadido nada. Elige productos en el catálogo."); } return; }
+  if (k === "pedido") { showCart(true); return; }
   cambiarTab(b.dataset.t);
 });
 // La altura real de la barra (letra grande, 2 líneas) manda: todo lo que va encima se coloca según ella
@@ -1741,7 +1803,13 @@ function abrirCal() {
 $("calAnt").onclick = () => { cal.m--; if (cal.m < 0) { cal.m = 11; cal.y--; } pintarCal(); };
 $("calSig").onclick = () => { cal.m++; if (cal.m > 11) { cal.m = 0; cal.y++; } pintarCal(); };
 $("calCerrar").onclick = () => ($("calFondo").hidden = true);
+arrastrable(document.querySelector(".cal"), () => ($("calFondo").hidden = true));
 $("calOk").onclick = () => { if (cal.sel) { $("calFondo").hidden = true; diaPersonal = !(data.delivery || []).some(o => o.date === cal.sel); elegirDia(cal.sel); } };
+function mostrarErrorEnvio(errBox, mensaje, reintentar) {
+  const sinRed = /failed to fetch|networkerror|load failed|network/i.test(mensaje);
+  errBox.replaceChildren(estadoVacio({ icono: sinRed ? "nube" : "alerta", titulo: sinRed ? "Sin conexión" : "No se ha podido enviar", texto: sinRed ? "Tu pedido sigue guardado en este móvil. Comprueba tu conexión e inténtalo de nuevo." : mensaje, boton: "Reintentar", onclick: () => { errBox.textContent = ""; reintentar(); } }));
+  errBox.scrollIntoView({ block: "center", behavior: sinMovimiento() ? "auto" : "smooth" });
+}
 async function enviarPedido(delivery, errBox) {
   if (delivery) { await refrescarEntrega(); if (delivery === data.today && !(data.delivery || []).some(o => o.kind === "hoy")) { errBox.textContent = "Ya no llegamos a entregarlo hoy: elige otro día."; return; } } // «hoy» solo vale antes de las 10:00
   const btn = $("confirm"), textoBtn = btn.textContent;
@@ -1759,7 +1827,7 @@ async function enviarPedido(delivery, errBox) {
     $("doneRef").hidden = !j.ref; $("doneRef").textContent = j.ref ? "Referencia " + j.ref : ""; $("doneVer").hidden = false; $("doneVer").onclick = () => { location.href = "/cliente#cuenta"; };
     if (parent !== window) parent.postMessage({ tipo: "pedido", mensaje: j.message }, "*");
   } catch (e) {
-    errBox.textContent = e.message; btn.disabled = false; btn.textContent = textoBtn;
+    btn.disabled = false; btn.textContent = textoBtn; errBox.textContent = ""; mostrarErrorEnvio(errBox, e.message, () => enviarPedido(delivery, errBox));
     if (/10:00|día|fecha/i.test(e.message)) { diaElegido = null; diaPersonal = false; pintarDias(); errBox.textContent = e.message; } // el día ya no vale: hay que elegir otro
     if (/10:00/.test(e.message)) { // pasó la hora de corte mientras elegía: se actualizan las opciones
       const r2 = await fetch(location.pathname + "/datos").catch(() => null);
@@ -1813,13 +1881,16 @@ function capasCambian() {
   } catch {}
 }
 addEventListener("popstate", () => { if (silencio) { silencio = false; return; } if (prof > 0) { prof--; cerrarArriba(); } });
+addEventListener("offline", () => aviso("Sin conexión. Tu pedido se guarda en este móvil."));
+addEventListener("online", () => aviso("Conexión recuperada."));
 addEventListener("keydown", e => { if (e.key === "Escape" && abiertas().length) { e.preventDefault(); cerrarArriba(); } });
 const obs = new MutationObserver(capasCambian);
 [...CAPAS, "calFondo"].forEach(id => obs.observe($(id), { attributes: true, attributeFilter: ["hidden"] }));
 
 (async () => {
   const r = await fetch(location.pathname + "/datos").catch(() => null);
-  if (!r || !r.ok) { $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 primeros dígitos de tu DNI</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
+  if (!r) { $("ttl").textContent = ""; $("list").innerHTML = ""; $("list").appendChild(estadoVacio({ icono: "nube", titulo: "Sin conexión", texto: "No podemos cargar el catálogo ahora mismo. Comprueba tu conexión e inténtalo de nuevo.", boton: "Reintentar", onclick: () => location.reload() })); return; }
+  if (!r.ok) { $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 primeros dígitos de tu DNI</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
   data = await r.json();
   data.products.forEach(p => productoPorId.set(p.id, p));
   pintarAviso();

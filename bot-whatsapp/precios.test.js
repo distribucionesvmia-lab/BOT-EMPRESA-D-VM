@@ -161,7 +161,7 @@ test("CATÁLOGO WEB: sin «Última vez», carrito y «solo lo marcado» en tabla
   assert.match(ped, /list\.appendChild\(tablaLineas\(items\.map/); // …y «Ver solo lo que he marcado» también
   assert.match(ped, /av\.onclick = \(\) => verFoto\(l\)/); // tocar la foto en el carrito (o en la tabla) la amplía
   for (const col of ["Artículo", "Cantidad", "Importe"]) assert.ok(ped.includes(`"${col}"`), col);
-  assert.match(ped, /im\.naturalWidth \* 1\.6/); // la foto ampliada no se estira más de 1,6 veces su tamaño real
+  assert.match(ped, /nat < 160 \? nat : Math\.min\(nat \* 1\.6/); // la foto ampliada no pasa de 1,6 veces su tamaño real, y una de menos de 160 px no se agranda
 });
 
 test("CATÁLOGO WEB: controles del carrito a 48 px, sin barra fija con el carrito vacío, precio de la caja en la fila y un solo «Hacer pedido» en el chat", async () => {

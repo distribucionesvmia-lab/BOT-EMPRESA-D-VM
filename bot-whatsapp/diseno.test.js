@@ -84,3 +84,14 @@ test("Inicio: saludo por hora de Madrid, «hoy» solo con la regla de siempre, p
   assert.match(cli, /if \(!j\?\.fijo \|\| !j\.hoy\.toca \|\| j\.hoy\.yaPidio\) return;/); // «Revisar y enviar» solo el día que toca
   assert.doesNotMatch(cli, /Hoy toca[^\n]*enviar\(/); // nunca se envía solo
 });
+
+test("fotos y estados: baldosa con foto al 82 % sin agrandar, fundido de 200 ms, aviso «Imagen orientativa» y estados con un solo botón", () => {
+  const cli = leer("./cliente.html");
+  assert.match(pedido, /\.av img, \.pf-av img[^{]*\{[^}]*max-width:82%; max-height:82%;[^}]*opacity:0; transition:opacity 200ms/);
+  assert.match(pedido, /nat < 160 \? nat/); assert.match(pedido, /"Imagen orientativa"/);
+  assert.match(cli, /max-width:82%; max-height:82%/); assert.equal((cli.match(/data:image\/png;base64,/g) || []).length, 1); // el logo, una sola vez
+  for (const t of ["Aún no tienes histórico", "Sin resultados", "Tu pedido está vacío", "Sin conexión", "No se ha podido enviar"]) assert.ok(pedido.includes(t), t);
+  assert.match(pedido, /\.estado svg \{ width:48px; height:48px/); assert.match(pedido, /boton: "Reintentar"/);
+  assert.match(pedido, /navigator\.vibrate\(8\)/); assert.match(pedido, /sinMovimiento\(\)/); // vibración suave, nunca con «reducir movimiento»
+  assert.match(pedido, /@keyframes pulso \{ 0% \{ transform:scale\(1\); \} 50% \{ transform:scale\(1\.15\)/);
+});
