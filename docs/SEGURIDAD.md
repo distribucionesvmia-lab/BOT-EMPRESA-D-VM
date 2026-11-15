@@ -37,3 +37,18 @@ Es lo que más protege: no abres puertos del router, tienes HTTPS y Cloudflare f
 - Se apunta en el registro como `inundacion-de-peticiones` y `busca-rutas-de-ataque` (cuentan para el aviso por correo de «intentos sospechosos»). `/health` y el webhook de WhatsApp (que ya va firmado) no pasan por el escudo; la propia máquina tampoco.
 - **Tope de conexiones a la vez**: 2.000 (`MAX_CONEXIONES`).
 - **Importante**: con Cloudflare Tunnel hay que tener `TRUST_PROXY=1`; si no, todos los clientes parecen una sola dirección y el escudo podría bloquearlos a la vez. `ESCUDO=0` lo apaga.
+
+## Virus y fuga de información (cuarta tanda)
+**Qué protege el programa por sí mismo**
+- **Antivirus de entrada** (`xlsx-read.js`, `NOMBRE_PELIGROSO`): todo Excel o ZIP que se sube al panel (productos, clientes, historial, fotos, bandeja de entrada) se revisa ANTES de abrirlo. Si lleva programas (`.exe`, `.dll`, `.msi`…), scripts (`.bat`, `.ps1`, `.vbs`, `.js`…), accesos directos (`.lnk`), macros de Office (`vbaProject.bin`), objetos incrustados, páginas web o SVG, o rutas con `..`, se **rechaza entero** con un mensaje claro. Además: tope de 20.000 ficheros dentro, tope de tamaño descomprimido (contra «bombas» ZIP) y las fotos se comprueban por su contenido real, no por la extensión. Nada de lo que se sube se ejecuta nunca. (No sustituye a Windows Defender: es una capa más.)
+- **Escáner de secretos** (`node escaner-secretos.js`): mira todo lo que git sigue y falla si encuentra bases de datos, copias, Excel, ZIP, claves (`.pem`, `.key`), ficheros `*.env`, carpetas de datos reales o textos que parecen claves (GitHub, Google, AWS, Meta, `ADMIN_TOKEN=…` con valor, direcciones con usuario y clave…). Nunca enseña la clave entera. También está en las pruebas (`npm test`): si algo así llegara a GitHub, la actualización automática lo detectaría.
+- **Gancho antes de cada commit** (`.githooks/pre-commit`): bloquea el commit si lleva algo de eso (incluso con `git add -f`). **Hay que activarlo una vez en cada copia del repositorio**: `git config core.hooksPath .githooks` (en `C:\vm\bot` también).
+- **`.gitignore` reforzado**: `*.env` (salvo `*.env.example`), bases de datos, `*.bak`, Excel, ZIP, claves y las carpetas `config/`, `datos/`, `logs/`, `respaldos/`, `inicial/`, `entrada/`. Se comprobó que el historial de GitHub **nunca** ha contenido nada de esto.
+- El cliente solo ve lo suyo, el panel (3001) no se publica, el NIF no se guarda, los códigos van con `scrypt`, las claves nunca salen en respuestas, avisos ni registros (ya vigilado por pruebas anteriores).
+
+**Lo que tienes que hacer tú en el ordenador de la oficina** (el programa no puede hacerlo por ti)
+1. `git config core.hooksPath .githooks` en `C:\vm\bot`.
+2. Ejecutar `deploy\windows\proteger-equipo.bat` (primero sin nada: solo enseña quién puede entrar a `C:\vm\config`, `datos` y `respaldos`; luego, como administrador, con `aplicar`: deja entrar solo a tu usuario, al sistema y a los administradores, y pasa Defender). **Sin probar en Windows real**: si algo falla, `icacls C:\vm\datos /reset /T` lo deja como estaba.
+3. Windows Update y Defender activados; no navegar ni abrir correos en ese ordenador; no abrir adjuntos de nadie en él.
+4. **Copia fuera del ordenador** (disco USB desconectado después o nube) de `C:\vm\datos` y `BACKUP_DIR`: un virus que cifre el disco cifra también las copias del mismo disco (`BACKUP_DIR2`).
+5. Si alguna vez se sube una clave a GitHub por error: **cámbiala** (borrar el archivo no basta, queda en el historial). `NIF_PEPPER` es la excepción: no se cambia nunca (ver CLAUDE.md); avisa antes.

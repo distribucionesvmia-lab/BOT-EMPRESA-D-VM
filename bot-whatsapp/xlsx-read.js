@@ -4,6 +4,21 @@ import zlib from "node:zlib";
 
 /** Descomprime un ZIP en memoria: { "ruta": Buffer }. Solo lee los ficheros que se piden. */
 const MAX_ENTRADA = 120_000_000, MAX_TOTAL = 300_000_000; // lo descomprimido: por archivo y en total (contra «bombas» ZIP que se hinchan hasta llenar la memoria)
+/** Nombres que no tienen sitio en un Excel, unas fotos o un ZIP de datos: programas, scripts, accesos directos, macros de Office y objetos incrustados. */
+export const NOMBRE_PELIGROSO = /\.(exe|dll|com|scr|pif|bat|cmd|msi|msp|ps1|psm1|vbs|vbe|js|jse|wsf|wsh|hta|jar|lnk|reg|cpl|sys|drv|ocx|iso|img|apk|sh|py|php\d?|asp|aspx|jsp|cgi|svg|html?)$|(^|\/)vbaProject\.bin$|(^|\/)(macrosheets|embeddings|activeX)\//i;
+const MAX_ENTRADAS = 20000;
+/** Recorre los nombres del ZIP sin descomprimir nada y rechaza el archivo entero si hay algo peligroso o raro. */
+function revisarContenido(buf, p, n) {
+  if (n > MAX_ENTRADAS) throw new Error("El archivo tiene demasiados ficheros dentro y se rechaza por seguridad");
+  for (let i = 0; i < n; i++) {
+    if (p < 0 || p + 46 > buf.length || buf.readUInt32LE(p) !== 0x02014b50) throw new Error("El archivo está dañado o no es un .xlsx o .zip válido");
+    const nl = buf.readUInt16LE(p + 28), el = buf.readUInt16LE(p + 30), cl = buf.readUInt16LE(p + 32);
+    const name = buf.toString("utf8", p + 46, p + 46 + nl);
+    if (/(^|[\\/])\.\.([\\/]|$)|^[\\/]|^[a-z]:|\0/i.test(name)) throw new Error("El archivo lleva rutas sospechosas y se rechaza por seguridad");
+    if (NOMBRE_PELIGROSO.test(name)) throw new Error(`El archivo contiene algo que no debería (${name.split("/").pop().slice(0, 40)}): programas, scripts o macros. Se rechaza por seguridad`);
+    p += 46 + nl + el + cl;
+  }
+}
 export function unzip(buf, want) {
   const out = {};
   let total = 0;
@@ -12,6 +27,7 @@ export function unzip(buf, want) {
   if (eocd < 0) throw new Error("El archivo no es un .xlsx o .zip válido");
   const n = buf.readUInt16LE(eocd + 10);
   let p = buf.readUInt32LE(eocd + 16);
+  revisarContenido(buf, p, n); // antivirus de entrada: ni programas, ni scripts, ni macros dentro del archivo
   for (let i = 0; i < n; i++) {
     const method = buf.readUInt16LE(p + 10), csize = buf.readUInt32LE(p + 20), nl = buf.readUInt16LE(p + 28), el = buf.readUInt16LE(p + 30), cl = buf.readUInt16LE(p + 32), off = buf.readUInt32LE(p + 42);
     const name = buf.toString("utf8", p + 46, p + 46 + nl);

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Bloquea el commit si lleva claves, bases de datos, Excel o datos reales. Se activa con: git config core.hooksPath .githooks
+cd "$(git rev-parse --show-toplevel)/bot-whatsapp" && node escaner-secretos.js --staged
