@@ -433,7 +433,7 @@ const estadoDelSistema = adminEnabled ? () => {
 } : null;
 const ficheroActualizaciones = nodePath.join(nodePath.dirname(process.env.CUSTOMERS_DB ?? "clientes.sqlite"), "actualizaciones.log");
 const leerActualizaciones = () => { try { return fs.readFileSync(ficheroActualizaciones, "utf8").trim().split("\n").slice(-60).map((l) => JSON.parse(l)).reverse(); } catch { return []; } };
-const admin = createAdmin({ sync, mail: notificador, actualizador, estado: estadoDelSistema, actualizaciones: leerActualizaciones, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), catalogDb: dbsAdmin?.catalogDb ?? null, adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
+const admin = createAdmin({ imgDir: process.env.IMG_DIR ?? fileURLToPath(new URL("./imagenes/", import.meta.url)), sync, mail: notificador, actualizador, estado: estadoDelSistema, actualizaciones: leerActualizaciones, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), catalogDb: dbsAdmin?.catalogDb ?? null, adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
 /** Datos fiscales de la empresa para el PDF: los PRIVACY_* de la configuración (lo que esté vacío no se imprime) y el teléfono de ayuda. */
 function datosPdfComunes() {
   const titular = envTexto("PRIVACY_TITULAR") || "Distribuciones Valentín Martín", cif = envTexto("PRIVACY_CIF"), dir = envTexto("PRIVACY_DIRECCION"), tel = AYUDA.telefono, mail = envTexto("PRIVACY_EMAIL");
@@ -519,16 +519,16 @@ function avisoPedido(account, guardado, modificado = false, email = null) {
 // Fotos de producto: ficheros «<código>.png|jpg|webp» en la carpeta IMG_DIR (por defecto «imagenes»). Se listan al arrancar y cada 5 minutos.
 const IMG_DIR = process.env.IMG_DIR ?? fileURLToPath(new URL("./imagenes/", import.meta.url));
 const IMG_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
-let imgIndex = new Map(), imgAt = 0, imgIa = new Set(); // imgIa: códigos cuya foto está generada con IA (fotos-ia.json en la carpeta de fotos)
+let imgIndex = new Map(), imgVer = new Map(), imgAt = 0, imgIa = new Set(); // imgIa: códigos cuya foto está generada con IA (fotos-ia.json en la carpeta de fotos)
 function imgs() {
-  if (Date.now() - imgAt > 300_000) {
+  if (Date.now() - imgAt > 60_000) {
     imgAt = Date.now();
-    try { imgIndex = new Map(fs.readdirSync(IMG_DIR).map((f) => /^([\w.-]{1,40})\.(png|jpe?g|webp)$/i.exec(f)).filter(Boolean).map((m) => [m[1], m[0]])); } catch { imgIndex = new Map(); }
+    try { imgIndex = new Map(fs.readdirSync(IMG_DIR).map((f) => /^([\w.-]{1,40})\.(png|jpe?g|webp)$/i.exec(f)).filter(Boolean).map((m) => [m[1], m[0]])); imgVer = new Map([...imgIndex].map(([id, f]) => { try { return [id, Math.floor(fs.statSync(IMG_DIR + f).mtimeMs / 1000)]; } catch { return [id, 0]; } })); } catch { imgIndex = new Map(); imgVer = new Map(); }
     try { imgIa = new Set(JSON.parse(fs.readFileSync(IMG_DIR + "fotos-ia.json", "utf8")).map(String)); } catch { imgIa = new Set(); }
   }
   return imgIndex;
 }
-const imgUrl = (id) => (imgs().has(id) ? `/img/${encodeURIComponent(id)}` : null);
+const imgUrl = (id) => (imgs().has(id) ? `/img/${encodeURIComponent(id)}?v=${imgVer.get(id) ?? 0}` : null); // ?v= cambia al cambiar la foto: el móvil no se queda con la antigua guardada
 const imgEsIa = (id) => (imgs(), imgIa.has(String(id)));
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow" };
 const sendJson = (res, code, data) => enviar(res, code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify(data));

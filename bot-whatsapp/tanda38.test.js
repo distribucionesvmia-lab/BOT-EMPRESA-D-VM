@@ -7,8 +7,9 @@ const leer = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace
 test("FOTOS NÍTIDAS: al cargar una foto se limita su tamaño a píxeles de foto ≈ píxeles de pantalla, en el catálogo y en el chat", () => {
   for (const f of ["./pedido.html", "./cliente.html"]) {
     const h = leer(f);
-    assert.match(h, /function nitida\(img\)/, f); assert.match(h, /naturalWidth \/ dpr \* 1\.2/, f); assert.match(h, /devicePixelRatio/, f);
-    assert.match(h, /min\(82%, \$\{Math\.max\(24, Math\.round\(img\.naturalWidth/, f); // nunca por encima del 82 % de la baldosa
+    assert.match(h, /function nitida\(img\)/, f); assert.match(h, /devicePixelRatio/, f);
+    if (f === "./pedido.html") { assert.match(h, /naturalWidth \/ dpr \* k/, f); assert.match(h, /k = ficha \? 1\.6 : 1\.2/, f); assert.match(h, /closest\("\.ficha-foto"\)/, f); } // la foto de la ficha también se limita (con algo más de margen)
+    else { assert.match(h, /naturalWidth \/ dpr \* 1\.2/, f); assert.match(h, /min\(82%, \$\{Math\.max\(24, Math\.round\(img\.naturalWidth/, f); } // nunca por encima del 82 % de la baldosa
     assert.match(h, /\{ nitida\(e\.target\); e\.target\.classList\.add\("cargada"\); \}/, f); // se aplica en el mismo punto donde aparece la foto
     assert.match(h, /\.av, \.pf-av, \.tl-av, \.falta-av, \.sug-im/, f); // solo fotos de producto, no el logo
   }

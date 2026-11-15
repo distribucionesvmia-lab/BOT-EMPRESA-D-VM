@@ -17,6 +17,7 @@ import { estadoCopias, comprobarCopias } from "./copias.js";
 import { sendMail } from "./mailer.js";
 import { validarProgramado, MAX_PENDIENTES } from "./avisos-programados.js";
 import { validarEdicion } from "./cliente-edicion.js";
+import { crearFotos, MAX_BYTES as FOTO_MAX } from "./fotos-articulos.js";
 import { elegirDestino, smtpDesdeEntorno } from "./correo-cliente.js";
 import { validarCampana, audiencia, mensajeCampana, enviarCampanas, limiteDia, MAX_PENDIENTES as MAX_CAMPANAS, TIPOS as TIPOS_CORREO } from "./correo-campanas.js";
 import { detectarTipo } from "./actualizar-datos.js";
@@ -85,8 +86,9 @@ function vistaExcel(lista) {
   for (const sh of sheets) for (const row of sh.rows) for (const c of row) { const st = c && typeof c === "object" ? c.s ?? 0 : 0; if (st && !estilos[st]) estilos[st] = { css: estiloCss(st), dec: estiloDecimales(st) }; }
   return { orderCount: lista.length, lineCount, sheets, estilos };
 }
-export function createAdmin({ sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "", catalogDb = null }) {
+export function createAdmin({ imgDir = null, sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "", catalogDb = null }) {
   const isAdmin = makeAdminCheck(adminToken);
+  const fotos = crearFotos(imgDir);
   const avisos = crearAvisos({ accountsDb: accounts });
   const estCache = new Map(); // estadísticas ya calculadas (se renuevan solas cuando cambian los pedidos)
   // ---- Artículos: precio, ofertas y la campana que avisa a los clientes ----
@@ -524,10 +526,18 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
           oferta: vig ? { tipo: vig.tipo, valor: Number(vig.valor), hasta: vig.hasta ?? null } : null, ofertaCaducada: x.promo && !vig ? { tipo: x.promo.tipo, valor: Number(x.promo.valor), hasta: x.promo.hasta ?? null } : null,
           cambioPrecio: ch ? { antes: ch.antes, despues: ch.despues, at: ch.at } : null, campana: cp?.tipo ?? null, aviso: cp ? { titulo: cp.titulo, texto: cp.texto } : null, avisado: hecho };
       });
-      const filas = todas.filter((x) => (!q || sinTildes(`${x.id} ${x.nombre}`).includes(q)) && (!cat || x.categoriaId === cat) && (filtro !== "oferta" || x.oferta) && (filtro !== "bajada" || x.campana === "bajada") && (filtro !== "campana" || x.campana));
+      const filas = todas.filter((x) => (!q || sinTildes(`${x.id} ${x.nombre}`).includes(q)) && (!cat || x.categoriaId === cat) && (filtro !== "oferta" || x.oferta) && (filtro !== "bajada" || x.campana === "bajada") && (filtro !== "campana" || x.campana) && (filtro !== "fotopequena" || fotos.info(x.id).calidad === "pequena") && (filtro !== "sinfoto" || !fotos.info(x.id).existe));
       const categorias = [...new Map(todas.map((x) => [x.categoriaId, x.categoria])).entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre));
-      return send(res, 200, { total: filas.length, pagina, porPagina: por, categorias, conOferta: todas.filter((x) => x.oferta).length, filas: filas.slice(pagina * por, pagina * por + por) }), true;
+      return send(res, 200, { total: filas.length, pagina, porPagina: por, categorias, conOferta: todas.filter((x) => x.oferta).length, filas: filas.slice(pagina * por, pagina * por + por).map((x) => ({ ...x, foto: fotos.info(x.id) })) }), true;
     }
+    // ---- Cambiar la foto de un artículo (la anterior se guarda en «anteriores», nunca se borra) ----
+    { const mf = /^\/api\/admin\/articulos\/([\w.-]{1,40})\/foto$/.exec(p);
+      if (mf && post) {
+        if (!catalogDb?.get(mf[1])) return send(res, 404, { error: "No existe ese artículo." }), true;
+        const buf = await readBuffer(req, FOTO_MAX + 1000).catch(() => null); if (!buf) return send(res, 413, { error: `La foto pesa demasiado (máximo ${FOTO_MAX / 1_000_000} MB).` }), true;
+        const r = fotos.guardar(mf[1], buf, req.headers["content-type"]); if (r.error) return send(res, 400, { error: r.error }), true;
+        return send(res, 200, r), true;
+      } }
     m = /^\/api\/admin\/articulos\/([\w.-]{1,40})\/(precio|oferta|avisar)$/.exec(p);
     if (m && post && catalogDb) {
       const prod = catalogDb.get(m[1]);

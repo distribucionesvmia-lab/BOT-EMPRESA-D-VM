@@ -1554,3 +1554,12 @@ test("CORREOS A CLIENTES (panel): rutas solo con la clave, recuento de a quién 
   // enlace de baja que no existe
   const b = await fetch(BASE + "/baja/inventado", { redirect: "manual" }); assert.equal(b.status, 404); assert.match(await b.text(), /no es válido/);
 });
+
+test("FOTOS DE ARTÍCULOS (panel): solo con la clave, comprueba que es una foto y cambia la que hay", async () => {
+  const sube = (id, body, tipo, admin = true) => fetch(BASE + `/api/admin/articulos/${id}/foto`, { method: "POST", headers: { ...(admin ? { Authorization: `Bearer ${ADMIN}` } : {}), "Content-Type": tipo }, body });
+  assert.ok([401, 403].includes((await sube("1001", Buffer.from("x"), "image/png", false)).status));
+  assert.equal((await sube("NOEXISTE9", Buffer.from("x"), "image/png")).status, 404);
+  assert.equal((await sube("1001", Buffer.from("no es una foto"), "image/png")).status, 400);
+  const lista = (await call("GET", "/api/admin/articulos?q=1001", { admin: true })).json; assert.ok(lista.filas.length && "foto" in lista.filas[0] && "existe" in lista.filas[0].foto);
+  assert.equal((await call("GET", "/api/admin/articulos?filtro=sinfoto", { admin: true })).status, 200); assert.equal((await call("GET", "/api/admin/articulos?filtro=fotopequena", { admin: true })).status, 200);
+});

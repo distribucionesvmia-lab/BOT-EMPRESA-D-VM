@@ -1583,9 +1583,12 @@ const vibra = () => { try { if (!sinMovimiento() && navigator.vibrate) navigator
 // Nitidez: una foto nunca se enseña más grande de lo que la pantalla puede mostrar sin verse borrosa (1 píxel de la foto ≈ 1 píxel de la pantalla, con un 20 % de margen).
 // Las grandes siguen llenando su baldosa; las pequeñas se quedan en su tamaño nítido en vez de estirarse (en ordenador y tableta se estiraban y se veían borrosas).
 function nitida(img) {
-  if (!img.naturalWidth || !img.closest(".av, .pf-av, .tl-av, .falta-av, .sug-im")) return;
-  const dpr = window.devicePixelRatio || 1;
-  img.style.maxWidth = `min(82%, ${Math.max(24, Math.round(img.naturalWidth / dpr * 1.2))}px)`; img.style.maxHeight = `min(82%, ${Math.max(24, Math.round(img.naturalHeight / dpr * 1.2))}px)`;
+  if (!img.naturalWidth) return;
+  const ficha = !!img.closest(".ficha-foto"); // la foto de la ficha del artículo: más grande, pero tampoco se estira sin límite
+  if (!ficha && !img.closest(".av, .pf-av, .tl-av, .falta-av, .sug-im")) return;
+  const dpr = window.devicePixelRatio || 1, k = ficha ? 1.6 : 1.2, piso = ficha ? 120 : 24, tope = ficha ? "100%" : "82%";
+  img.style.maxWidth = `min(${tope}, ${Math.max(piso, Math.round(img.naturalWidth / dpr * k))}px)`; img.style.maxHeight = `min(${tope}, ${Math.max(piso, Math.round(img.naturalHeight / dpr * k))}px)`;
+  if (ficha) img.style.margin = "0 auto";
 }
 document.addEventListener("load", e => { if (e.target && e.target.tagName === "IMG") { nitida(e.target); e.target.classList.add("cargada"); } }, true); // las fotos aparecen con un fundido de 200 ms
 // La foto del artículo «vuela» hasta el carrito (pestaña Pedido o panel de la derecha) al añadirlo por primera vez

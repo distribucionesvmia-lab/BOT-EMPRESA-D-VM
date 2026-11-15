@@ -199,6 +199,7 @@
   .fi-ch button { min-height:22px; width:22px; padding:0; border-radius:50%; font-size:11px; line-height:1; } .fi-fila-add { display:flex; gap:8px; min-width:0; } .fi-fila-add input { flex:1 1 0; min-width:0; width:auto; } .fi-fila-add button { flex:none; } .fi-form .campo { min-width:0; }
   .fi-form label.inv-check { display:flex; flex-direction:row; align-items:flex-start; justify-content:flex-start; text-align:left; gap:10px; } .fi-form label.inv-check > span { text-align:left; } .ayuda.err { color:var(--accent); font-weight:600; }
   .av-seg { margin:0 0 14px; max-width:420px; } .co-vista { white-space:pre-wrap; word-break:break-word; margin:14px 0 0; padding:14px; border:1px dashed var(--line); border-radius:10px; background:var(--th); font:13px/1.5 ui-monospace, Menlo, Consolas, monospace; max-height:340px; overflow:auto; }
+  .foto-linea { margin-top:4px; } .foto-mala { color:var(--accent); font-weight:600; } .foto-btn { min-height:28px; padding:0 10px; font-size:12.5px; margin-left:6px; }
   .est-exp { display:inline-flex; gap:8px; margin-left:auto; }
   .est-exp button { height:40px; }
   .est-filtros { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; }
@@ -539,7 +540,7 @@
         <form class="filtros" id="f-articulos" aria-label="Filtrar artículos">
           <label class="campo campo-cliente"><span>Buscar</span><input type="search" id="ar-q" autocomplete="off" placeholder="Nombre o código del artículo"></label>
           <label class="campo"><span>Categoría</span><select id="ar-cat"><option value="">Todas</option></select></label>
-          <label class="campo"><span>Mostrar</span><select id="ar-filtro"><option value="">Todos</option><option value="oferta">Con oferta</option><option value="bajada">Con bajada de precio reciente</option><option value="campana">Con campana (oferta o bajada)</option><option value="retirados">Retirados (no se venden)</option></select></label>
+          <label class="campo"><span>Mostrar</span><select id="ar-filtro"><option value="">Todos</option><option value="oferta">Con oferta</option><option value="bajada">Con bajada de precio reciente</option><option value="campana">Con campana (oferta o bajada)</option><option value="retirados">Retirados (no se venden)</option><option value="fotopequena">Foto pequeña (se ve borrosa)</option><option value="sinfoto">Sin foto</option></select></label>
           <button type="button" id="ar-quitar" hidden>Quitar filtros</button>
         </form>
         <p class="muted" id="ar-estado" role="status" style="margin:0 0 8px"></p>
@@ -1184,6 +1185,23 @@ async function articulos() {
   if (!r.filas.length) { const tr = document.createElement("tr"); tr.appendChild(el("td", "Ningún artículo cumple estos filtros.", { className: "muted" })); tb.appendChild(tr); }
   for (const a of r.filas) {
     const tr = document.createElement("tr"), nom = el("td"); nom.append(el("b", a.nombre), el("div", `${a.id} · ${a.categoria}${a.unidadesPorCaja ? " · caja de " + a.unidadesPorCaja : ""}${a.activo ? "" : " · RETIRADO"}`, { className: "muted" }));
+    { // Foto del artículo: tamaño y botón para cambiarla (las pequeñas se ven borrosas en el móvil)
+      const f = a.foto ?? { existe: false }, txt = !f.existe ? "Sin foto" : f.w ? `Foto ${f.w}×${f.h} px` : "Foto", cal = { pequena: "pequeña: se ve borrosa", justa: "justa", buena: "buena" }[f.calidad] ?? "";
+      const linea = el("div", "", { className: "muted foto-linea" }), etq = el("span", txt + (cal ? " · " + cal : ""), { className: f.calidad === "pequena" || !f.existe ? "foto-mala" : "" });
+      const inp = el("input", "", { type: "file", accept: "image/jpeg,image/png,image/webp", hidden: true }), bt = el("button", f.existe ? "Cambiar foto" : "Poner foto", { type: "button", className: "foto-btn" });
+      bt.onclick = () => inp.click();
+      inp.onchange = async () => {
+        const fi = inp.files[0]; inp.value = ""; if (!fi) return;
+        if (f.existe && !confirm(`¿Cambiar la foto de «${a.nombre}»?\n\nLa foto actual no se borra: se guarda en la carpeta «anteriores».`)) return;
+        bt.disabled = true; etq.textContent = "Subiendo…";
+        try {
+          const r = await fetch(`/api/admin/articulos/${encodeURIComponent(a.id)}/foto`, { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": fi.type }, body: fi }), j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || "No se ha podido guardar la foto.");
+          etq.textContent = `Foto ${j.w}×${j.h} px · ${{ pequena: "pequeña: se ve borrosa", justa: "justa", buena: "buena" }[j.calidad]} · guardada (los clientes la verán en un minuto)`; etq.className = j.calidad === "pequena" ? "foto-mala" : "";
+        } catch (e) { etq.textContent = e.message; etq.className = "foto-mala"; } finally { bt.disabled = false; }
+      };
+      linea.append(etq, " ", bt, inp); nom.append(linea);
+    }
     const precio = el("td", eur3(a.precio), { className: "num" }); if (a.descuento) precio.appendChild(el("div", `−${String(a.descuento).replace(".", ",")} % habitual`, { className: "muted" })); if (a.cambioPrecio && Date.now() - Date.parse(a.cambioPrecio.at) < 7 * 86400e3) precio.appendChild(el("div", `antes ${eur3(a.cambioPrecio.antes)}`, { className: "muted" }));
     const of = el("td"); if (a.oferta) of.appendChild(el("span", ofertaTxt(a.oferta), { className: "oferta-tag" })); else if (a.ofertaCaducada) of.appendChild(el("span", "terminó: " + ofertaTxt(a.ofertaCaducada), { className: "oferta-tag vieja" }));
     const edi = el("td"), bEd = el("button", "Editar", { type: "button" }); bEd.onclick = () => abrirEditor(tr, a); edi.appendChild(bEd);
