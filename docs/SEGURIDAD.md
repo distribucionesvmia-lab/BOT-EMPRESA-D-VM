@@ -30,3 +30,10 @@ Es lo que más protege: no abres puertos del router, tienes HTTPS y Cloudflare f
 - **Panel → «Cuentas de clientes» → «Seguridad y actividad del panel»:** lo que el programa ha parado y lo que se ha hecho en el panel (precios, ofertas, borrados, enlaces…) con hora y dirección.
 - **Avisos por correo:** si en 24 h se paran 10 o más intentos sospechosos (`SEGURIDAD_AVISO_DESDE`), llega un `[VM vigilancia]`; también si la clave del panel (`ADMIN_TOKEN`) es corta o fácil (cámbiala por una de 20 letras y números como mínimo).
 - **Al cliente:** le llega un aviso al móvil si cambian su código de entrada o si alguien entra desde un aparato nuevo (solo si tiene los avisos activados).
+
+## Escudo general contra inundaciones y escáneres (tercera tanda)
+- **Límite por dirección** en la web pública (puerto 3000): 300 peticiones por minuto (`ESCUDO_POR_MINUTO`) y 1.500 de fotos y estilos (`ESCUDO_ESTATICO_POR_MINUTO`). Quien se pasa recibe «429 Demasiadas peticiones» y queda bloqueado 10 minutos; si reincide, el doble, el cuádruple… hasta 24 h.
+- **Escáneres**: quien pide rutas que este programa no tiene y que solo busca un bot (`/.env`, `/.git`, `/wp-login.php`, `phpmyadmin`, `*.php`, `*.sql`, `..`) queda bloqueado 30 minutos a la primera.
+- Se apunta en el registro como `inundacion-de-peticiones` y `busca-rutas-de-ataque` (cuentan para el aviso por correo de «intentos sospechosos»). `/health` y el webhook de WhatsApp (que ya va firmado) no pasan por el escudo; la propia máquina tampoco.
+- **Tope de conexiones a la vez**: 2.000 (`MAX_CONEXIONES`).
+- **Importante**: con Cloudflare Tunnel hay que tener `TRUST_PROXY=1`; si no, todos los clientes parecen una sola dirección y el escudo podría bloquearlos a la vez. `ESCUDO=0` lo apaga.

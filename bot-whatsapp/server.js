@@ -10,7 +10,7 @@ import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder, totals } from "./pricing.js";
 import { createAuth, rateLimiter } from "./auth.js";
-import { cabecerasSeguridad, CSP, eventoSeguridad, usarRegistro, ipDe, claveDebil } from "./seguridad.js";
+import { cabecerasSeguridad, CSP, eventoSeguridad, usarRegistro, ipDe, claveDebil, crearEscudo } from "./seguridad.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
 import { estadoSistema, crearVigilante } from "./monitor.js";
@@ -67,14 +67,14 @@ if (process.env.DEMO === "1") {
   process.env.EXPORT_DIR ??= "exportaciones-demo";
 }
 
-setCatalog((await getCatalog()).filter((p) => !sinCoste(p))); // catálogo (base de productos); si no hay, se usa el de config.js. Sin los artículos de precio 0 o con descuento del 100 %
+setCatalog((await getCatalog())?.filter((p) => !sinCoste(p)) ?? null); // catálogo (base de productos); si no hay, se usa el de config.js. Sin los artículos de precio 0 o con descuento del 100 %
 let catalogSeen = catalogVersion();
 // Si se actualizan los productos o precios, el bot los usa sin reiniciar
 async function refreshCatalog() {
   const v = catalogVersion();
   if (v !== catalogSeen) {
     catalogSeen = v;
-    setCatalog((await getCatalog()).filter((p) => !sinCoste(p)));
+    setCatalog((await getCatalog())?.filter((p) => !sinCoste(p)) ?? null);
   }
 }
 
@@ -966,9 +966,20 @@ async function appRoutes(req, res, url) {
   res.writeHead(404).end();
 }
 
+// Escudo general: en la app pública frena inundaciones y escáneres por dirección (ESCUDO=0 lo apaga; ESCUDO_POR_MINUTO cambia el tope). No actúa en la app de la empresa (red local) ni en pruebas.
+const escudo = clientEnabled && !adminEnabled && process.env.ESCUDO !== "0" && process.env.DEMO !== "1" && (!process.env.VM_TEST || process.env.ESCUDO === "1")
+  ? crearEscudo({ porMinuto: Number(process.env.ESCUDO_POR_MINUTO ?? 300), estaticoPorMinuto: Number(process.env.ESCUDO_ESTATICO_POR_MINUTO ?? 1500) }) : null;
 const servidorHttp = http
   .createServer((req, res) => {
-    const url = new URL(req.url, "http://x");
+    let url;
+    try { url = new URL(req.url, "http://x"); } catch { return void res.writeHead(400).end(); }
+    if (escudo && url.pathname !== "/health" && url.pathname !== "/webhook") {
+      const dir = ipDe(req, process.env.TRUST_PROXY === "1"), corte = escudo.revisa(dir, url.pathname + (url.search ? "?" : ""));
+      if (corte) {
+        if (corte.nuevo) eventoSeguridad(corte.motivo, `bloqueada ${Math.round(corte.espera / 60)} min`);
+        return void res.writeHead(429, { "Retry-After": String(corte.espera), "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", ...cabecerasSeguridad() }).end("Demasiadas peticiones. Inténtalo más tarde.");
+      }
+    }
     if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.png" || url.pathname.startsWith("/captura-") || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/estatico/") || url.pathname.startsWith("/entrar/") || url.pathname.startsWith("/baja/") || url.pathname.startsWith("/img/")) {
       appRoutes(req, res, url).catch((err) => {
         console.error(err);
@@ -1065,6 +1076,7 @@ const servidorHttp = http
 servidorHttp.headersTimeout = 20_000;
 servidorHttp.requestTimeout = clientEnabled && !adminEnabled ? 60_000 : 600_000;
 servidorHttp.maxRequestsPerSocket = 1000;
+servidorHttp.maxConnections = Number(process.env.MAX_CONEXIONES ?? 2000); // tope de conexiones a la vez: un bot no puede agotar el programa
 // Avisos al arrancar (solo en el registro): clave del panel débil y proxy sin configurar
 if (process.env.DEMO !== "1" && !process.env.VM_TEST) {
   if (adminEnabled && claveDebil(process.env.ADMIN_TOKEN)) console.warn("[VM seguridad] La clave del panel (ADMIN_TOKEN) es corta o fácil de adivinar. Cámbiala por una de 20 letras y números como mínimo.");

@@ -20,6 +20,6 @@ test("webProducts: no saca los artículos de precio 0 ni con descuento del 100 %
 
 test("el catálogo del programa (chat y pedido) se carga sin esos artículos", () => {
   const sv = src("./server.js");
-  assert.equal([...sv.matchAll(/setCatalog\(\(await getCatalog\(\)\)\.filter\(\(p\) => !sinCoste\(p\)\)\)/g)].length, 2); // al arrancar y al refrescar
+  assert.equal([...sv.matchAll(/setCatalog\(\(await getCatalog\(\)\)\?\.filter\(\(p\) => !sinCoste\(p\)\) \?\? null\)/g)].length, 2); // al arrancar y al refrescar
   assert.match(src("./weborder.js"), /\.filter\(\(p\) => !sinCoste\(p\)\)/);
 });

@@ -74,3 +74,38 @@ export function cabecerasSeguridad() {
     ...(process.env.HSTS === "1" ? { "Strict-Transport-Security": "max-age=31536000" } : {}),
   };
 }
+
+/** Rutas que solo busca un bot o un escáner de fallos (este programa no tiene nada de eso): quien las pide queda bloqueado un rato. */
+export const RUTA_DE_ESCANER = /(^|\/)\.(env|git|svn|aws|ssh|htaccess|htpasswd|DS_Store)|\.(php\d?|asp|aspx|jsp|cgi|sql|bak|old|ini|log|sh)(\/|$|\?)|wp-(admin|login|content|includes|json)|xmlrpc|phpmyadmin|cgi-bin|\/vendor\/|\/actuator|\.\.|%2e%2e|%00/i;
+const esLocal = (ip) => ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" || ip === "?";
+/**
+ * Escudo general contra inundaciones y escáneres. `revisa(ip, ruta)` devuelve null si puede pasar o
+ * { motivo, espera } (segundos) si hay que cortar. Cuenta peticiones por dirección y minuto; pasado el tope bloquea
+ * 10 min (y el doble, el cuádruple… si reincide, hasta 24 h). Lo estático (fotos, estilos) tiene su propio tope más alto.
+ */
+export function crearEscudo({ porMinuto = 300, estaticoPorMinuto = 1500, banMin = 10, ahora = () => Date.now(), maxIps = 20000 } = {}) {
+  const cuentas = new Map(), bloqueos = new Map(), castigos = new Map();
+  const limpia = (t) => { for (const [k, v] of cuentas) if (t - v.t > 60_000) cuentas.delete(k); for (const [k, v] of bloqueos) if (t > v.hasta) bloqueos.delete(k); };
+  const bloquea = (ip, motivo, t, base = banMin * 60_000) => {
+    const veces = (castigos.get(ip) ?? 0) + 1; castigos.set(ip, veces); if (castigos.size > maxIps) castigos.clear();
+    const dur = Math.min(base * 2 ** (veces - 1), 24 * 3600e3);
+    bloqueos.set(ip, { hasta: t + dur, motivo });
+    return { motivo, espera: Math.ceil(dur / 1000), nuevo: true };
+  };
+  return {
+    revisa(ip, ruta = "") {
+      if (esLocal(ip)) return null;
+      const t = ahora();
+      const b = bloqueos.get(ip);
+      if (b) { if (t < b.hasta) return { motivo: b.motivo, espera: Math.ceil((b.hasta - t) / 1000) }; bloqueos.delete(ip); }
+      if (RUTA_DE_ESCANER.test(ruta)) return bloquea(ip, "busca-rutas-de-ataque", t, 30 * 60_000);
+      if (cuentas.size > maxIps) limpia(t);
+      const estatico = /^\/(estatico|img|icono-|captura-|apple-touch|favicon)/.test(ruta);
+      const k = ip + (estatico ? "|e" : "|d"), tope = estatico ? estaticoPorMinuto : porMinuto;
+      let e = cuentas.get(k); if (!e || t - e.t > 60_000) { e = { n: 0, t }; cuentas.set(k, e); }
+      if (++e.n > tope) return bloquea(ip, "inundacion-de-peticiones", t);
+      return null;
+    },
+    bloqueadas: () => bloqueos.size,
+  };
+}
