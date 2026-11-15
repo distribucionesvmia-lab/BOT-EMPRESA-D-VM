@@ -44,6 +44,13 @@ Solo se usa la base de la empresa **VALENTIN** (Valentín Martín Gallego). Las 
    - **Historial:** líneas de factura de venta (`LINEFACT` + `CABEFACV`) de los últimos 12 meses desde la última factura de la copia, sin abonos.
 4. Los Excel llevan el NIF de los clientes: la carpeta de salida **no se sube a GitHub** (`salida-datos` está en `.gitignore`).
 
+### Exportación con el estilo del script de copias de a3 (recomendada si lo monta el programador de a3)
+El programador de a3 ya tiene un `.bat` que hace las copias con `osql`. Para la web hace falta lo mismo con tres consultas: `bot-whatsapp/deploy/windows/exportar-datos-web.bat` (con la misma estructura de variables arriba: servidor, base, carpeta) y la carpeta `sql` con `exportar-clientes.sql`, `exportar-productos.sql` y `exportar-historial.sql`. **Solo necesita `sqlcmd`** (viene con SQL Server): sin Node ni PowerShell. Deja `clientes.csv`, `productos.csv` e `historial.csv` en la carpeta de Drive; la web los lee igual que los Excel, y solo copia un fichero si ha cambiado.
+- Usa el usuario de solo lectura `vm_lectura` (cinco tablas, ver `consultas-a3erp.sql`), **no `sa`**.
+- Las consultas están generadas del mismo código que las pruebas (`node extraer-a3erp.js --escribir-sql deploy/windows/sql`); sus resultados coinciden fila a fila con los del Excel (probado con la copia real: 2.834 clientes, 4.655 artículos, 82.210 líneas de historial).
+- Se puede añadir al final del script de copias con `call exportar-datos-web.bat`, o programar cada hora.
+- El `.bat` no se ha podido probar en Windows (solo `sqlcmd` y las consultas, en Linux): la primera ejecución conviene mirarla a mano.
+
 ### Exportación automática desde a3ERP (sin copias a mano)
 En lugar de restaurar una copia cada vez, un script programado en el PC/servidor de a3ERP **lee la base en solo lectura cada hora** y deja los tres Excel en la carpeta de Drive para escritorio. Solo reescribe un Excel si sus datos han cambiado, así que Drive no sube nada si no hay novedades. Está probado contra la copia real de VALENTIN: da los mismos Excel que el procedimiento manual y la segunda pasada dice «sin cambios».
 1. **Instalar** (una vez): Node 22 (el servidor ya lo usa) y el proyecto en `C:\vm\bot`. No hace falta instalar nada de SQL: usa PowerShell, que viene con Windows (`deploy/windows/consulta-sql.ps1`).

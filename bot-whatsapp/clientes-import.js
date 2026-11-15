@@ -1,6 +1,6 @@
 // Importación de la lista de clientes que exporta a3ERP (Excel): código, nombre comercial, razón social, población,
 // dirección, teléfono(s), correo(s), bloqueado y obsoleto. El NIF se usa solo para calcular la huella de sus 6 últimos caracteres (acceso del cliente): no se guarda.
-import { readXlsx } from "./xlsx-read.js";
+import { leerFilas } from "./tabla-read.js";
 import { nifKeys } from "./nif-key.js";
 
 const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
@@ -57,4 +57,5 @@ export function parseClientes(rows) {
 }
 
 /** Lee el Excel (Buffer) y devuelve { customers, stats }. */
-export const parseClientesXlsx = (buf) => parseClientes(readXlsx(buf));
+/** El fichero puede ser Excel (.xlsx) o texto (.csv/.tsv); `nombre` dice cuál. */
+export const parseClientesXlsx = (buf, nombre = "") => parseClientes(leerFilas(buf, nombre));

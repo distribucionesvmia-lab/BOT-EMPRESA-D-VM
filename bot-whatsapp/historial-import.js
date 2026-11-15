@@ -1,7 +1,7 @@
 // Importación del historial de compras (Excel que prepara el servidor de la oficina a partir de la copia de a3ERP):
 // una fila por línea de pedido/albarán de venta → cliente, fecha, documento, artículo y cantidad. Con él el bot sabe qué suele comprar
 // cada cliente (pestaña «Histórico»). Se reconocen las columnas por su cabecera. Solo se guardan los últimos pedidos de cada cliente.
-import { readXlsx } from "./xlsx-read.js";
+import { leerFilas } from "./tabla-read.js";
 import { parseNumber } from "./productos-import.js";
 
 const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9%]+/g, " ").trim();
@@ -61,4 +61,5 @@ export function parseHistorial(rows) {
   return { byCustomer, stats: { ...stats, clientes: byCustomer.size } };
 }
 
-export const parseHistorialXlsx = (buf) => parseHistorial(readXlsx(buf));
+/** El fichero puede ser Excel (.xlsx) o texto (.csv/.tsv); `nombre` dice cuál. */
+export const parseHistorialXlsx = (buf, nombre = "") => parseHistorial(leerFilas(buf, nombre));

@@ -59,7 +59,7 @@ export async function sincronizar({ source, state, catalogDb, customersDb, accou
       const buf = await source.read(f);
       let detalle;
       if (tipo === "clientes") {
-        const { customers, stats } = parseClientesXlsx(buf);
+        const { customers, stats } = parseClientesXlsx(buf, f.name);
         if (!customers.length) throw new Error("El Excel no tiene clientes.");
         const have = customersDb.count();
         if (have >= 20 && customers.length < have * MIN_RATIO) throw new Error(`El fichero tiene ${customers.length} clientes y ya hay ${have}: parece incompleto, no se importa.`);
@@ -67,13 +67,13 @@ export async function sincronizar({ source, state, catalogDb, customersDb, accou
         const cuentas = accountsDb.ensureMany(customers.filter((c) => c.active !== false).map((c) => c.id));
         detalle = `${stats.importados} clientes (${r.added} nuevos, ${r.updated} actualizados), ${cuentas} cuentas nuevas`;
       } else if (tipo === "historial") {
-        const { byCustomer, stats } = parseHistorialXlsx(buf);
+        const { byCustomer, stats } = parseHistorialXlsx(buf, f.name);
         if (!byCustomer.size) throw new Error("El Excel del historial no tiene líneas válidas.");
         const r = customersDb.setPurchases(byCustomer);
         if (!r.clientes) throw new Error("Ningún cliente del historial existe en la base: ¿se importó antes el Excel de clientes?");
         detalle = `historial de ${r.clientes} clientes (${r.lineas} líneas)` + (r.desconocidos ? `; ${r.desconocidos} clientes desconocidos, ignorados` : "") + (stats.sinFecha ? `; ${stats.sinFecha} líneas sin fecha` : "");
       } else {
-        const { products, stats } = parseProductosXlsx(buf);
+        const { products, stats } = parseProductosXlsx(buf, f.name);
         if (!products.length) throw new Error("El Excel no tiene productos con precio.");
         const r = catalogDb.upsertProducts(products);
         detalle = `${stats.importados} productos (${r.added} nuevos, ${r.updated} con cambios, ${r.unchanged} iguales)` + (stats.sinPrecio ? `; ${stats.sinPrecio} sin precio, ignorados` : "");

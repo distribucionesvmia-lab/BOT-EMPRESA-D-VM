@@ -48,7 +48,7 @@ export function driveSource({ folderId, credentials, fetchFn = fetch, apiBase = 
       const fields = encodeURIComponent("files(id,name,mimeType,modifiedTime,md5Checksum,size)");
       const j = await (await api(`${apiBase}/drive/v3/files?q=${q}&fields=${fields}&orderBy=modifiedTime%20desc&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true`)).json();
       return (j.files ?? [])
-        .filter((f) => f.mimeType === SHEET || f.mimeType === XLSX || /\.xlsx$/i.test(f.name))
+        .filter((f) => f.mimeType === SHEET || f.mimeType === XLSX || /\.(xlsx|csv)$/i.test(f.name))
         .map((f) => ({ id: f.id, name: f.name, modified: f.modifiedTime, mime: f.mimeType, sig: f.md5Checksum || `${f.modifiedTime}|${f.size ?? ""}` }));
     },
     async read(f) {
@@ -64,7 +64,7 @@ export function localSource(dir) {
     name: `Carpeta ${dir}`,
     async list() {
       return fs.readdirSync(dir)
-        .filter((n) => /\.xlsx$/i.test(n) && !n.startsWith("~$"))
+        .filter((n) => /\.(xlsx|csv)$/i.test(n) && !n.startsWith("~$"))
         .map((n) => { const s = fs.statSync(path.join(dir, n)); return { id: n, name: n, modified: s.mtime.toISOString(), sig: `${s.mtimeMs}|${s.size}` }; })
         .sort((a, b) => (a.modified < b.modified ? 1 : -1));
     },

@@ -9,11 +9,13 @@ import { parseClientesXlsx } from "./clientes-import.js";
 import { parseProductosXlsx } from "./productos-import.js";
 import { parseHistorialXlsx } from "./historial-import.js";
 
+/** Cada entrada es un Buffer (Excel) o { buf, nombre } cuando puede ser texto (.csv). */
 export function prepararDatos({ clientesXlsx, productosXlsx, historialXlsx }) {
-  const prods = parseProductosXlsx(productosXlsx).products.filter((p) => p.active !== false);
-  const hist = parseHistorialXlsx(historialXlsx).byCustomer;
+  const f = (x) => (Buffer.isBuffer(x) ? [x, ""] : [x.buf, x.nombre]);
+  const prods = parseProductosXlsx(...f(productosXlsx)).products.filter((p) => p.active !== false);
+  const hist = parseHistorialXlsx(...f(historialXlsx)).byCustomer;
   const productos = prods.map((p) => ({ id: String(p.id), name: p.name, price: p.price, unitsPerBox: p.unitsPerBox ?? null, vat: p.vat ?? 21, discount: p.discount ?? 0, updatedAt: null, changes: [] }));
-  const clientes = parseClientesXlsx(clientesXlsx).customers.filter((c) => c.active !== false).map((c) => ({
+  const clientes = parseClientesXlsx(...f(clientesXlsx)).customers.filter((c) => c.active !== false).map((c) => ({
     id: String(c.id), name: c.name, legalName: c.legalName ?? "", city: c.city ?? "", municipio: c.municipio ?? "", phone: c.phone ?? "",
     phones: c.phones ?? [], emails: c.emails ?? [], address: c.address ?? "", active: true, recargoEquivalencia: false, specialPrices: {}, discounts: {},
     orders: hist.get(String(c.id)) ?? [],
@@ -34,8 +36,9 @@ export function diferencias(antes, ahora) {
 function main() {
   const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? process.argv[i + 1] : d; };
   const entrada = arg("entrada", "./salida-datos"), salida = arg("salida", "./salida-datos/artefacto/datos"), origen = arg("origen", "copia de a3ERP");
-  const rd = (f) => fs.readFileSync(path.join(entrada, f));
-  const { productos, clientes } = prepararDatos({ clientesXlsx: rd("clientes.xlsx"), productosXlsx: rd("productos.xlsx"), historialXlsx: rd("historial-ventas.xlsx") });
+  // Cada conjunto puede venir como Excel (.xlsx) o como texto de sqlcmd (.csv); si están los dos, vale el Excel
+  const rd = (...bases) => { for (const b of bases) for (const ext of [".xlsx", ".csv"]) { const f = path.join(entrada, b + ext); if (fs.existsSync(f)) return { buf: fs.readFileSync(f), nombre: b + ext }; } throw new Error(`No encuentro ${bases[0]}.xlsx ni .csv en ${entrada}`); };
+  const { productos, clientes } = prepararDatos({ clientesXlsx: rd("clientes"), productosXlsx: rd("productos"), historialXlsx: rd("historial-ventas", "historial") });
   fs.mkdirSync(salida, { recursive: true });
   // Si ya hay datos de la copia anterior, se muestra qué cambia antes de sobrescribirlos
   for (const [nombre, nuevos] of [["productos", productos], ["clientes", clientes]]) {

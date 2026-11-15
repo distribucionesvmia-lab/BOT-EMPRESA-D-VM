@@ -19,8 +19,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildXlsx } from "./xlsx.js";
 
-// Texto limpio: sin espacios sobrantes, sin NULL y sin saltos de línea ni tabuladores (que romperían el formato de salida).
-const T = (x) => `REPLACE(REPLACE(REPLACE(ISNULL(LTRIM(RTRIM(${x})),''),CHAR(9),' '),CHAR(13),' '),CHAR(10),' ')`;
+// Texto limpio: sin espacios sobrantes, sin NULL y sin saltos de línea, tabuladores ni «|» (que romperían el formato de salida).
+const T = (x) => `REPLACE(REPLACE(REPLACE(REPLACE(ISNULL(LTRIM(RTRIM(${x})),''),CHAR(9),' '),CHAR(13),' '),CHAR(10),' '),CHAR(124),' ')`; // también quita «|», el separador del texto de sqlcmd
 const SI_NO = (cond) => `CASE WHEN ${cond} THEN 'Sí' ELSE 'No' END`;
 
 export const CONSULTAS = {
@@ -58,6 +58,12 @@ export const CONSULTAS = {
   },
 };
 
+/** Consulta lista para ejecutar con sqlcmd (-h -1 -W -s "|" -f 65001 -i fichero -o salida.csv): primera línea con los títulos y después las filas. */
+export function sqlParaSqlcmd(tipo, meses = 12) {
+  const def = CONSULTAS[tipo];
+  return `SET NOCOUNT ON;\nSET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;\nPRINT '${def.cabecera.join("|").replace(/'/g, "''")}';\n${def.sql(meses).replace(/\n\s+/g, "\n")};\n`;
+}
+
 const PS1 = path.join(path.dirname(fileURLToPath(import.meta.url)), "deploy", "windows", "consulta-sql.ps1");
 const ANTES = "SET NOCOUNT ON;\nSET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;\n";
 
@@ -94,8 +100,15 @@ export function aExcel(def, filas, nombre) {
   return buildXlsx(rows, { sheetName: nombre, widths: def.cabecera.map(() => 18) });
 }
 
+function escribirSql(dir, meses) {
+  fs.mkdirSync(dir, { recursive: true });
+  for (const tipo of Object.keys(CONSULTAS)) fs.writeFileSync(path.join(dir, `exportar-${tipo}.sql`), "\uFEFF" + sqlParaSqlcmd(tipo, meses).replace(/\n/g, "\r\n"));
+  console.log(`Escritas ${Object.keys(CONSULTAS).length} consultas en ${dir}`);
+}
+
 function main() {
   const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? process.argv[i + 1] : d; };
+  if (process.argv.includes("--escribir-sql")) return escribirSql(arg("escribir-sql", "./sql"), Number(arg("meses", "12")));
   const db = arg("db", process.env.A3_DB ?? "VALENTIN");
   const salida = arg("salida", process.env.CARPETA_DATOS ?? "./salida-datos");
   const meses = Number(arg("meses", process.env.MESES_HISTORIAL ?? "12"));

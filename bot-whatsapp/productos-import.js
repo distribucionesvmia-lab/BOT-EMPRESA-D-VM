@@ -1,7 +1,7 @@
 // Importación de la lista de productos (Excel/Hoja de cálculo que exporta a3ERP o que prepara la empresa):
 // código, descripción, precio, unidades por caja, IVA, descuento y bloqueado/obsoleto. Se reconocen las columnas por su cabecera,
 // sin importar el orden, las tildes ni las mayúsculas. Solo hacen falta código, descripción y precio.
-import { readXlsx } from "./xlsx-read.js";
+import { leerFilas } from "./tabla-read.js";
 
 const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9%]+/g, " ").trim();
 const yes = (v) => /^(si|sí|s|true|1|x)$/i.test(String(v ?? "").trim());
@@ -86,4 +86,5 @@ export function parseProductos(rows) {
   return { products, stats, rowOf };
 }
 
-export const parseProductosXlsx = (buf) => parseProductos(readXlsx(buf));
+/** El fichero puede ser Excel (.xlsx) o texto (.csv/.tsv); `nombre` dice cuál. */
+export const parseProductosXlsx = (buf, nombre = "") => parseProductos(leerFilas(buf, nombre));
