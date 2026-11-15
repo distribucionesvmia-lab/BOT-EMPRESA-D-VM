@@ -5,7 +5,8 @@
 import crypto from "node:crypto";
 import { normalizePhone, validEmail, pinValido } from "./cuentas-db.js";
 import { nifCodes, nifClean } from "./nif-codes.js";
-import { codeKey, validCode } from "./nif-key.js";
+import { codeKey, validCode, claveCodigoCorreo } from "./nif-key.js";
+import { tapar } from "./correo-cliente.js";
 import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
 
 const COOKIE = "vm_session";
@@ -85,7 +86,7 @@ export { send, readJson };
  * secure: cookie solo por HTTPS · trustProxy: usar X-Forwarded-For para la IP
  */
 const paginaEntrar = (titulo, texto, boton) => `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${titulo} · Distribuciones Valentín Martín</title><style>:root{--bg:#F5F5F7;--card:#fff;--t:#1D1D1F;--t2:#5F5F65;--a:#C8102E;--on:#fff}@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1C1C1E;--t:#F5F5F7;--t2:#A8A8B0;--a:#FF6B7D;--on:#1D1D1F}}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--t);font:16px/1.45 system-ui,sans-serif}header{background:#C8102E;color:#fff;padding:20px 16px;text-align:center;font-weight:700;font-size:20px}main{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px}.c{background:var(--card);border-radius:20px;padding:28px 22px;max-width:420px;width:100%;text-align:center}h1{margin:0 0 8px;font-size:24px}p{margin:0 0 14px;color:var(--t2)}a.b,button{display:flex;align-items:center;justify-content:center;width:100%;min-height:52px;border:0;border-radius:26px;background:var(--a);color:var(--on);font:inherit;font-weight:700;font-size:17px;cursor:pointer;text-decoration:none}a.s{display:block;margin-top:8px;padding:12px 0;color:var(--a);font-weight:600;min-height:44px;line-height:1.35}</style><body><header>Distribuciones Valentín Martín</header><main><div class="c"><h1>${titulo}</h1><p>${texto}</p>${boton}</div></main></body></html>`;
-export function createAuth({ accounts, customers, misDatos = null, secure = false, trustProxy = false, onAcceso = null, onCodigo = null }) {
+export function createAuth({ accounts, customers, misDatos = null, secure = false, trustProxy = false, onAcceso = null, onCodigo = null, enviarCodigo = null }) {
   // Límites por IP (configurables para las pruebas): accesos cada 10 minutos y solicitudes de alta cada hora
   const loginLimit = rateLimiter(Number(process.env.LOGIN_LIMIT ?? 20), 10 * 60_000);
   // Acceso solo con NIF (sin nombre): no hay una cuenta a la que contar los fallos, así que se limita más por IP y en conjunto
@@ -94,6 +95,24 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const usoLimit = rateLimiter(300, 10 * 60_000); // contadores: muchos permitidos, pero no infinitos por IP
   const registerLimit = rateLimiter(Number(process.env.REGISTER_LIMIT ?? 20), 60 * 60_000);
   const intentosAcceso = contadorIntentos(Number(process.env.CAPTCHA_DESPUES_DE ?? 5), 10 * 60_000); // pasados N intentos en 10 min desde una dirección, se pide «no soy un robot»
+  // Entrada con código por correo: topes por dirección, por cliente+correo y en total (que nadie pueda usarlo para llenar buzones)
+  const codigoActivo = () => !!enviarCodigo && process.env.CODIGO_CORREO !== "0";
+  const soloCorreo = () => codigoActivo() && process.env.ACCESO_SOLO_CORREO === "1"; // cierra las otras formas de entrar (NIF solo y teléfono + código)
+  const correoIp = rateLimiter(Number(process.env.CODIGO_IP_LIMIT ?? 8), 10 * 60_000);
+  const correoClave = rateLimiter(Number(process.env.CODIGO_CLAVE_LIMIT ?? 3), 10 * 60_000);
+  const correoGlobal = rateLimiter(Number(process.env.CODIGO_GLOBAL_LIMIT ?? 120), 60 * 60_000);
+  const correoVerificar = rateLimiter(Number(process.env.CODIGO_VERIFICAR_LIMIT ?? 15), 10 * 60_000);
+  const MSG_CODIGO_ENVIADO = "Si los datos coinciden con un cliente, te hemos enviado un código a ese correo. Mira también la carpeta de spam. Vale 10 minutos.";
+  const cleanMail = (v) => String(v ?? "").trim().toLowerCase();
+  /** Clientes con ese NIF (o 6 primeros dígitos) que tienen ESE correo en su ficha o en su cuenta. El nombre de la empresa, si se escribe, estrecha la búsqueda. */
+  function clientesConCorreo(nif, correo, empresa) {
+    const nombre = String(empresa ?? "").trim().length >= 2 ? new Set(customers.candidates(empresa).map((c) => c.id)) : null;
+    return customers.findByNif(nif).filter((id) => {
+      if (nombre && !nombre.has(id)) return false;
+      const c = customers.getById(id);
+      return [...(c?.emails ?? []), accounts.emailDe(id)].map(cleanMail).includes(correo);
+    });
+  }
   const ip = (req) => ipDe(req, trustProxy);
   /** Aparato desde el que se entra: huella corta del navegador (nunca se guarda la cadena entera). Avisa al servidor para que pueda decirle al cliente «alguien ha entrado desde un aparato nuevo». */
   const huellaAparato = (req) => crypto.createHash("sha256").update(String(req.headers["user-agent"] ?? "")).digest("hex").slice(0, 16);
@@ -137,7 +156,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     }
     if (!p.startsWith("/api/")) return false;
 
-    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null }), true; // solo la clave PÚBLICA, si está activada
+    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null, codigoCorreo: codigoActivo(), soloCorreo: soloCorreo() }), true; // solo la clave PÚBLICA, si está activada
 
     if (p === "/api/registro" && req.method === "POST") {
       if (!registerLimit(ip(req))) return eventoSeguridad("muchas-solicitudes-de-alta", ip(req)), demasiados(res, registerLimit, ip(req)), true;
@@ -170,8 +189,52 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       return send(res, 200, { ok: true, estado: "pendiente", mensaje: "Hemos recibido tu solicitud. En un plazo de 24 a 48 horas nos pondremos en contacto contigo y se aceptará tu cuenta para que puedas hacer pedidos." }), true;
     }
 
+    // ── Entrar con NIF + correo + código que llega al correo ──
+    // Paso 1: el cliente escribe su NIF y su correo; si coinciden con su ficha, se le manda un código. La respuesta es SIEMPRE la misma (coincida o no):
+    // así nadie puede averiguar qué NIF o correos existen. El código solo va a un correo que ya consta en su ficha de a3ERP o en su cuenta.
+    if (p === "/api/acceso/correo/enviar" && req.method === "POST") {
+      if (!codigoActivo()) return send(res, 503, { error: "Esta forma de entrar no está disponible ahora. Entra de otra forma o llámanos." }), true;
+      if (!loginLimit(ip(req))) return demasiados(res, loginLimit, ip(req)), true;
+      const b = await readJson(req);
+      if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
+      if (!correoIp(ip(req))) return eventoSeguridad("codigo-correo-muchas-peticiones", ip(req)), demasiados(res, correoIp, ip(req)), true;
+      if (turnstileActivo() && intentosAcceso.pasado(intentosAcceso.suma(ip(req)))) {
+        if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
+      }
+      const correo = cleanMail(b.correo);
+      if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe tu NIF: los 6 primeros dígitos de tu DNI o CIF, o el NIF completo." }), true;
+      if (!validEmail(correo)) return send(res, 400, { error: "Escribe tu correo electrónico, el mismo que nos diste." }), true;
+      const clave = `${nifCodes(b.nif)[0]}|${correo}`;
+      if (!correoClave(clave)) return demasiados(res, correoClave, clave, "Ya te hemos enviado códigos hace poco. Espera unos minutos."), true;
+      const ids = clientesConCorreo(b.nif, correo, b.empresa);
+      if (ids.length === 1 && correoGlobal("todos")) {
+        const id = ids[0], codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+        const r = accounts.codigoCorreoCrear(id, claveCodigoCorreo(id, codigo));
+        if (r.ok) void Promise.resolve(enviarCodigo({ to: correo, nombre: customers.getById(id)?.name ?? "", codigo, minutos: 10 })).catch((e) => console.error("Código por correo:", e?.message));
+      } else if (ids.length === 1) eventoSeguridad("codigo-correo-tope-global", "se alcanzó el máximo de códigos por hora");
+      return send(res, 200, { ok: true, espera: 60, mensaje: MSG_CODIGO_ENVIADO, correo: tapar(correo) }), true;
+    }
+    // Paso 2: con el código recibido se entra. Vale una vez, caduca a los 10 minutos y se anula tras 5 fallos.
+    if (p === "/api/acceso/correo/entrar" && req.method === "POST") {
+      if (!codigoActivo()) return send(res, 503, { error: "Esta forma de entrar no está disponible ahora. Entra de otra forma o llámanos." }), true;
+      if (!loginLimit(ip(req)) || !correoVerificar(ip(req))) return demasiados(res, correoVerificar, ip(req)), true;
+      const b = await readJson(req);
+      if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
+      const correo = cleanMail(b.correo), codigo = String(b.codigo ?? "").replace(/\s/g, "");
+      if (nifCodes(b.nif).length === 0 || !validEmail(correo)) return send(res, 400, { error: "Escribe tu NIF y tu correo." }), true;
+      if (!/^\d{6}$/.test(codigo)) return send(res, 400, { error: "El código tiene 6 cifras. Míralo en el correo que te hemos enviado." }), true;
+      const ids = clientesConCorreo(b.nif, correo, b.empresa);
+      const c = ids.length === 1 ? accounts.codigoCorreoComprobar(ids, (id) => claveCodigoCorreo(id, codigo)) : { ok: false, reason: "invalid" };
+      if (!c.ok) return send(res, 401, { error: c.reason === "expired" ? "Ese código ha caducado. Pide uno nuevo." : c.reason === "agotado" ? "Has fallado demasiadas veces con ese código. Pide uno nuevo." : "Código incorrecto. Revísalo o pide uno nuevo." }), true;
+      const r = accounts.loginNif([c.customerId], () => true); // misma apertura de sesión que el resto (cuenta eliminada o bloqueada incluidas)
+      if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." }), true;
+      const customer = customers.getById(r.account.customerId);
+      return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400, req)) }), true;
+    }
+
     if (p === "/api/acceso" && req.method === "POST") {
       if (!loginLimit(ip(req))) return demasiados(res, loginLimit, ip(req)), true;
+      if (soloCorreo()) return send(res, 403, { error: "Para entrar, usa tu NIF, tu correo y el código que te enviamos por correo." }), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       if (turnstileActivo() && intentosAcceso.pasado(intentosAcceso.suma(ip(req)))) { // muchos intentos seguidos: a partir de aquí, «no soy un robot»

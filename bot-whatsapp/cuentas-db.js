@@ -125,6 +125,9 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   db.exec("CREATE TABLE IF NOT EXISTS rights (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT, tipo TEXT NOT NULL, texto TEXT, estado TEXT NOT NULL DEFAULT 'pendiente', created_at TEXT NOT NULL, resolved_at TEXT)");
   addCol("accounts", "deleted_at", "TEXT");
   addCol("push_log", "detalle", "TEXT");
+  // Código de un solo uso que se manda al correo del cliente para entrar (solo su huella: el código no se guarda). Un código vivo por cliente.
+  db.exec("CREATE TABLE IF NOT EXISTS login_codes (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, code_hash TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, used_at TEXT)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_login_codes_cliente ON login_codes(customer_id)");
   db.exec("CREATE TABLE IF NOT EXISTS correo_pref (customer_id TEXT PRIMARY KEY, activo INTEGER NOT NULL)"); // «Recibir por correo la confirmación de mis pedidos»: sin fila = activado
   db.exec("CREATE TABLE IF NOT EXISTS correo_pedidos (clave TEXT PRIMARY KEY, ref TEXT NOT NULL, at TEXT NOT NULL, estado TEXT NOT NULL DEFAULT 'enviando', error TEXT)"); // un correo por pedido (o por modificación): sin direcciones ni datos del cliente
   db.exec("CREATE TABLE IF NOT EXISTS correo_ofertas (customer_id TEXT PRIMARY KEY, acepta INTEGER NOT NULL, origen TEXT NOT NULL, at TEXT NOT NULL)"); // permiso para recibir OFERTAS por correo: sin fila = NO (hay que pedirlo); origen = cliente | empresa
@@ -372,6 +375,43 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     pauseStanding: (customerId, paused) => db.prepare("UPDATE standing_orders SET paused = ? WHERE customer_id = ?").run(paused ? 1 : 0, String(customerId)).changes === 1,
     deleteStanding: (customerId) => db.prepare("DELETE FROM standing_orders WHERE customer_id = ?").run(String(customerId)).changes === 1,
     hasOwnCode: (customerId) => !!byCustomer.get(String(customerId))?.code_key,
+    /** Correo guardado en la cuenta del cliente (si tiene cuenta y lo dio al darse de alta). */
+    emailDe: (customerId) => byCustomer.get(String(customerId))?.email || "",
+    /**
+     * Guarda un código nuevo para el cliente (la huella, nunca el código) y anula el anterior. No deja pedir otro antes de `esperaS` segundos
+     * (así nadie puede llenar un buzón). Devuelve { ok:true } o { ok:false, espera: segundos que faltan }.
+     */
+    codigoCorreoCrear(customerId, hash, { now = new Date().toISOString(), minutos = 10, esperaS = 60 } = {}) {
+      const id = String(customerId), ult = db.prepare("SELECT created_at FROM login_codes WHERE customer_id = ? ORDER BY id DESC LIMIT 1").get(id);
+      if (ult) { const falta = esperaS - Math.floor((new Date(now) - new Date(ult.created_at)) / 1000); if (falta > 0) return { ok: false, espera: falta }; }
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        db.prepare("DELETE FROM login_codes WHERE customer_id = ? OR created_at < ?").run(id, plus(now, -86_400_000)); // el anterior deja de valer; lo de hace más de un día se limpia
+        db.prepare("INSERT INTO login_codes (customer_id, code_hash, created_at, expires_at) VALUES (?, ?, ?, ?)").run(id, String(hash), now, plus(now, minutos * 60_000));
+        db.exec("COMMIT");
+      } catch (e) { db.exec("ROLLBACK"); throw e; }
+      return { ok: true };
+    },
+    /**
+     * ¿Es correcto el código escrito para alguno de estos clientes? `hashDe(customerId)` da la huella del código escrito para ese cliente.
+     * Vale una sola vez, caduca y se anula tras `maxIntentos` fallos. Devuelve { ok:true, customerId } o { ok:false, reason }.
+     */
+    codigoCorreoComprobar(customerIds, hashDe, { now = new Date().toISOString(), maxIntentos = 5 } = {}) {
+      let razon = "invalid";
+      for (const id of [...new Set(customerIds.map(String))]) {
+        const row = db.prepare("SELECT * FROM login_codes WHERE customer_id = ? AND used_at IS NULL ORDER BY id DESC LIMIT 1").get(id);
+        if (!row) continue;
+        if (row.expires_at <= now) { razon = "expired"; continue; }
+        if (row.attempts >= maxIntentos) { razon = "agotado"; continue; }
+        const a = Buffer.from(row.code_hash), b = Buffer.from(String(hashDe(id)));
+        if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+          if (db.prepare("UPDATE login_codes SET used_at = ? WHERE id = ? AND used_at IS NULL").run(now, row.id).changes !== 1) continue; // gastado a la vez por otra petición
+          return { ok: true, customerId: id };
+        }
+        db.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE id = ?").run(row.id);
+      }
+      return { ok: false, reason: razon };
+    },
     /** Guarda la huella del código personal de la cuenta. { ok:true } o { error } si otro cliente ya usa ese código. */
     setCodeKey(accountId, key) {
       try {
@@ -611,6 +651,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         db.prepare("DELETE FROM standing_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM corte_pref WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM login_codes WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM correo_pref WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM correo_ofertas WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM baja_tokens WHERE customer_id = ?").run(row.customer_id);

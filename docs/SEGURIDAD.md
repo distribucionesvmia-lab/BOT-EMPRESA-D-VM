@@ -66,3 +66,19 @@ Es lo que más protege: no abres puertos del router, tienes HTTPS y Cloudflare f
 - **Regla para quien toque el código**: no escribir `onclick=…`, `onerror=…` ni otros manejadores dentro del HTML (ni en plantillas de JavaScript): usar `addEventListener`. Una prueba lo vigila.
 - **Cookie de sesión siempre «segura» por HTTPS**: antes solo llevaba `Secure` si `PUBLIC_URL` empezaba por `https://`; ahora también si la petición llegó por HTTPS a través de Cloudflare (con `TRUST_PROXY=1`). Así nunca viaja sin cifrar aunque falte esa línea.
 - **Registro sin teléfonos enteros**: la línea «ATENCIÓN HUMANA solicitada por…» ya no escribe el número completo.
+
+## Séptima tanda: entrar con NIF + correo + código que llega al correo
+**Cómo lo ve el cliente**: en la pantalla de acceso escribe su **NIF** y su **correo electrónico**; le llega un **código de 6 cifras** y, al escribirlo, entra. La entrada de siempre (solo NIF, o teléfono + código) queda detrás del enlace «Entrar de otra forma (sin correo)».
+
+**Qué lo protege**
+- El código **solo se manda a un correo que ya consta** en la ficha del cliente (a3ERP o lo escrito a mano en el panel) o en su cuenta. Escribir el correo de otro no sirve: no recibe nada.
+- **No se puede averiguar qué NIF ni qué correos existen**: la respuesta es siempre la misma, coincida o no.
+- El código vale **10 minutos**, **una sola vez**, se **anula tras 5 fallos** y no se guarda (solo una huella atada al cliente). Entre un código y otro hay **60 segundos**.
+- **No se pueden llenar buzones**: máximo 3 peticiones por NIF+correo cada 10 minutos, 8 por dirección y 120 códigos por hora en total (`CODIGO_CLAVE_LIMIT`, `CODIGO_IP_LIMIT`, `CODIGO_GLOBAL_LIMIT`). Se apunta `codigo-correo-muchas-peticiones` / `codigo-correo-tope-global`.
+- Si el programa tiene «No soy un robot» (Turnstile), también se pide tras varios intentos.
+- El correo lleva solo el código: ni NIF, ni código de cliente, ni enlaces (no se puede imitar con un enlace falso) y avisa de que no se comparta.
+- Un NIF que corresponde a dos clientes con el mismo correo no se adivina: no se manda nada (esos clientes entran con «otra forma» o llaman).
+
+**Qué hace falta**: el correo de salida en **`cliente.env`**: `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (el mismo que usa la confirmación de pedido). **Sin él la opción no aparece** y todo queda como antes. `CODIGO_CORREO=0` la apaga.
+
+**Importante (qué NO cambia solo)**: la entrada con **solo el NIF** (los 6 primeros dígitos) sigue funcionando; es la parte débil. Cuando la mayoría de clientes tengan correo en su ficha, pon **`ACCESO_SOLO_CORREO=1`** en `cliente.env` y reinicia: se cierran el acceso con solo el NIF y con teléfono, y solo se entra con NIF + correo + código. **Antes de hacerlo** mira en «Datos y Excel» → Clientes → «Ver cambios» la lista **«sin correo»**: esos clientes no podrían entrar (hay que añadir su correo en la ficha del cliente → «Editar datos»).

@@ -705,6 +705,7 @@
   .autor-pie { margin:var(--s3, 12px) 0 0; font-size:calc(var(--t-micro, 12px) / var(--k,1)); color:var(--text-2); text-align:center; line-height:1.45; } .autor-pie b { font-weight:600; color:var(--text); }
   .autor-pie details { margin-top:4px; } .autor-pie summary { cursor:pointer; color:var(--accent); font-weight:600; display:block; text-align:center; padding:6px 4px; } .autor-pie .autor-txt { text-align:left; margin-top:6px; padding:10px 12px; background:var(--surface-2, var(--field, transparent)); border-radius:10px; } .autor-pie .autor-txt p { margin:0 0 6px; }
 .trampa{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}.ts-hueco{min-height:0;margin:8px 0}
+  #co-cod { font-size:calc(24px / var(--k,1)); letter-spacing:.35em; text-align:center; font-variant-numeric:tabular-nums; }
 </style>
 </head>
 <body>
@@ -719,10 +720,30 @@
         <p>Haz tu pedido en un momento, desde el móvil o el ordenador.</p>
       </header>
 
+      <form class="vm-card" id="f-correo" novalidate hidden>
+        <span class="tag">Cliente habitual</span>
+        <h2>Inicia sesión</h2>
+        <p id="co-intro">Escribe tu <b>NIF</b> y el <b>correo electrónico</b> que nos diste. Te enviaremos un <b>código de 6 cifras</b> a ese correo y con él entras.</p>
+        <div id="co-paso1">
+          <label>NIF (DNI, NIE o CIF)<input id="co-nif" type="text" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 12345678Z" aria-describedby="co-err"></label>
+          <label>Correo electrónico<input id="co-mail" type="email" inputmode="email" maxlength="120" autocomplete="email" placeholder="tucorreo@ejemplo.es" aria-describedby="co-err"></label>
+          <div class="ts-hueco" id="ts-correo" hidden></div>
+        </div>
+        <div id="co-paso2" hidden>
+          <div class="okmsg" id="co-ok" role="status"></div>
+          <label>Código de 6 cifras<input id="co-cod" type="text" inputmode="numeric" maxlength="7" autocomplete="one-time-code" placeholder="······" aria-describedby="co-err"></label>
+          <p class="acc-ayuda"><button class="vm-link" type="button" id="co-reenviar" disabled>Reenviar código</button><button class="vm-link" type="button" id="co-cambiar">Cambiar NIF o correo</button></p>
+        </div>
+        <div class="err" id="co-err" role="alert"></div>
+        <button class="vm-btn primary" id="co-boton">Enviar código</button>
+        <p class="acc-ayuda"><button class="vm-link" type="button" id="co-ayuda">¿No puedes entrar? Llámanos o escríbenos</button><button class="vm-link" type="button" id="co-registro">¿Cliente nuevo? Solicitar acceso</button><button class="vm-link" type="button" id="co-otra" hidden>Entrar de otra forma (sin correo)</button></p>
+      </form>
+
       <form class="vm-card" id="f-acceso" novalidate>
         <span class="tag">Cliente habitual</span>
         <h2>Inicia sesión</h2>
         <p class="acc-contacto" id="acc-contacto" hidden></p>
+        <p class="acc-ayuda" id="ac-volver-p" hidden><button class="vm-link" type="button" id="ac-volver">‹ Entrar con NIF, correo y código</button></p>
         <p class="acc-ayuda"><button class="vm-link" type="button" id="no-entro">¿No puedes entrar? Llámanos o escríbenos</button><button class="vm-link" type="button" id="ir-registro-2">¿Cliente nuevo? Solicitar acceso</button></p>
         <div class="acc-modo" role="group" aria-label="Cómo quieres entrar"><button type="button" id="m-nif" aria-pressed="true">Entrar con mi NIF</button><button type="button" id="m-tel" aria-pressed="false">Teléfono y código</button></div>
         <p id="t-tel">Entra con el <b>teléfono que usas habitualmente para contactar con nosotros</b> y tu código de entrada.</p>
@@ -1085,6 +1106,54 @@ $("f-acceso").onsubmit = (e) => {
   $("f-acceso").reset(); $("a-aviso").textContent = ""; entrar(j.cliente.nombre);
   }, "a-err");
 };
+// ── Entrar con NIF + correo + código (el código llega al correo que consta en la ficha del cliente) ──
+(() => {
+  const f = $("f-correo"), fa = $("f-acceso"); if (!f || !fa) return;
+  let paso = 1, cuenta = 0, reloj = 0, soloCorreo = false;
+  const err = (m, id) => { $("co-err").textContent = m || ""; for (const x of ["co-nif", "co-mail", "co-cod"]) $(x).removeAttribute("aria-invalid"); if (id) { $(id).setAttribute("aria-invalid", "true"); $(id).focus(); } };
+  const verPaso = (n) => { paso = n; $("co-paso1").hidden = n !== 1; $("co-paso2").hidden = n !== 2; $("co-intro").hidden = n !== 1; $("co-boton").textContent = n === 1 ? "Enviar código" : "Entrar"; err(""); if (n === 2) { $("co-cod").value = ""; $("co-cod").focus(); } };
+  const cuentaAtras = (s) => { clearInterval(reloj); cuenta = s; const b = $("co-reenviar"); const pinta = () => { b.disabled = cuenta > 0; b.textContent = cuenta > 0 ? `Reenviar código (${cuenta} s)` : "Reenviar código"; }; pinta(); reloj = setInterval(() => { cuenta--; pinta(); if (cuenta <= 0) clearInterval(reloj); }, 1000); };
+  const datos = () => ({ nif: $("co-nif").value.trim(), correo: $("co-mail").value.trim() });
+  const valida = () => {
+    const d = datos();
+    if ((d.nif.replace(/\D/g, "").length < 6)) { err("Escribe tu NIF: tu DNI, NIE o CIF (con 6 dígitos como mínimo).", "co-nif"); return false; }
+    if (!/^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]{2,}$/.test(d.correo)) { err("Escribe tu correo electrónico, el mismo que nos diste.", "co-mail"); return false; }
+    return true;
+  };
+  async function pedir() {
+    const body = datos(); if (tsToken["ts-correo"]) body.cf = tsToken["ts-correo"];
+    const r = await post("/api/acceso/correo/enviar", body); if (body.cf) { tsToken["ts-correo"] = null; tsPinta("ts-correo"); }
+    const j = await r.json().catch(() => ({}));
+    if (j.necesitaVerificacion) { err(j.error); tsPinta("ts-correo"); return false; }
+    if (!r.ok) { err(j.error || "No se pudo enviar el código."); return false; }
+    $("co-ok").textContent = (j.correo ? `Revisa tu correo (${j.correo}). ` : "") + "Si los datos coinciden, te hemos enviado un código de 6 cifras; mira también el spam. Vale 10 minutos.";
+    verPaso(2); cuentaAtras(j.espera || 60); return true;
+  }
+  f.onsubmit = (e) => {
+    e.preventDefault(); err("");
+    const rotulo = () => { $("co-boton").textContent = paso === 1 ? "Enviar código" : "Entrar"; }; // «enviando» devuelve el texto de antes: se pone el del paso en el que estamos
+    if (paso === 1) { if (!valida()) return; return Promise.resolve(enviando(f, $("co-boton"), pedir, "co-err")).then(rotulo); }
+    const cod = $("co-cod").value.replace(/\D/g, "");
+    if (cod.length !== 6) return err("El código tiene 6 cifras. Míralo en el correo que te hemos enviado.", "co-cod");
+    return Promise.resolve(enviando(f, $("co-boton"), async () => {
+      const r = await post("/api/acceso/correo/entrar", { ...datos(), codigo: cod }); const j = await r.json().catch(() => ({}));
+      if (!r.ok) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error || "No se pudo entrar.", "co-cod"); $("co-cod").value = ""; return; }
+      f.reset(); verPaso(1); clearInterval(reloj); entrar(j.cliente.nombre);
+    }, "co-err")).then(rotulo);
+  };
+  $("co-reenviar").onclick = async () => { // aparte de «enviando»: ese devolvería el texto y el botón activo antes de que pase la espera
+    if (cuenta > 0 || f.dataset.enviando) return; err(""); f.dataset.enviando = "1"; $("co-reenviar").disabled = true;
+    try { await pedir(); } catch { err(SIN_RED); } finally { delete f.dataset.enviando; $("co-reenviar").disabled = cuenta > 0; }
+  };
+  $("co-cambiar").onclick = () => { clearInterval(reloj); verPaso(1); $("co-mail").focus(); };
+  $("co-ayuda").onclick = () => $("no-entro").click(); $("co-registro").onclick = () => $("ir-registro-2").click();
+  const aOtra = (otra) => { f.hidden = otra; fa.hidden = !otra; $("ac-volver-p").hidden = !otra || soloCorreo; };
+  $("co-otra").onclick = () => aOtra(true); $("ac-volver").onclick = () => aOtra(false);
+  // Solo se enseña si el servidor tiene correo configurado (si no, queda la pantalla de siempre)
+  fetch("/api/seguridad").then((r) => r.json()).then((j) => {
+    if (!j.codigoCorreo) return; soloCorreo = !!j.soloCorreo; f.hidden = false; fa.hidden = true; $("co-otra").hidden = soloCorreo; $("ac-volver-p").hidden = true; if (soloCorreo) { fa.remove(); }
+  }).catch(() => { f.hidden = true; fa.hidden = false; }); // si no se puede saber, queda la pantalla de acceso de siempre
+})();
 $("cambiar").onclick = () => { $("c-err").textContent = ""; $("c-ok").textContent = ""; $("f-codigo").reset(); $("m-codigo").hidden = false; $("c-nuevo").focus(); };
 $("c-cerrar").onclick = () => { $("m-codigo").hidden = true; $("c-nota").hidden = true; };
 $("f-codigo").onsubmit = async (e) => {

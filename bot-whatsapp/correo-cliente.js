@@ -77,3 +77,20 @@ export function smtpDesdeEntorno(env = process.env) {
   if (!from) return null;
   return { smtp: { host: env.SMTP_HOST, port, secure: env.SMTP_SECURE ?? (port === 465 ? "tls" : "starttls"), user: env.SMTP_USER, pass: env.SMTP_PASS, rejectUnauthorized: env.SMTP_INSECURE !== "1" }, from };
 }
+
+/** Correo con el código de un solo uso para entrar. Solo lleva el código (nunca NIF, código de cliente ni enlaces: así no se puede imitar con un enlace falso). */
+export function correoCodigoAcceso({ nombre = "", codigo, minutos = 10, negocio = "Distribuciones Valentín Martín", telefono = "" }) {
+  const nom = String(nombre).trim().split(/\s+/).slice(0, 3).join(" ");
+  return {
+    subject: `Tu código para entrar · ${negocio}`,
+    text: [
+      nom ? `Hola, ${nom}:` : "Hola:", "",
+      `Tu código para entrar en ${negocio} es:`, "", `    ${codigo}`, "",
+      `Escríbelo en la pantalla de acceso. Vale ${minutos} minutos y solo se puede usar una vez.`, "",
+      "Si no has pedido entrar tú, ignora este correo: sin este código nadie puede entrar en tu cuenta.",
+      "No se lo des a nadie. Nosotros nunca te lo pediremos por teléfono ni por WhatsApp.",
+      ...(telefono ? ["", `¿Dudas? Llámanos al ${telefono}.`] : []), "",
+      negocio,
+    ].join("\n"),
+  };
+}

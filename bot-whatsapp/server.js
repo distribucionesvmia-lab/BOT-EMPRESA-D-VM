@@ -16,7 +16,6 @@ import { crearActualizador } from "./actualizar-datos.js";
 import { estadoSistema, crearVigilante } from "./monitor.js";
 import { privacidadHtml, avisoLegalHtml } from "./privacidad.js";
 import { estadoVersion } from "./version.js";
-import { sendMail } from "./mailer.js";
 import { sinCoste, webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, accesosDe, HISTORIAL_MAX, HISTORIAL_VER_MAS, HISTORIAL_ANALISIS } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "./delivery.js";
 // Lo que el catálogo necesita para el aviso «entrega hoy» y las opciones de día: se calcula SIEMPRE en el servidor con la hora de Madrid
@@ -36,7 +35,7 @@ import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { crearAvisos } from "./avisos.js";
 import { endpointValido, clavesValidas } from "./webpush.js";
 const FAM_NOMBRES = JSON.parse(fs.readFileSync(new URL("./familias-nombres.json", import.meta.url), "utf8")); // nombres de las familias y subfamilias de a3ERP (listado de familias)
-import { mailConfigFromEnv } from "./mailer.js";
+import { mailConfigFromEnv, sendMail } from "./mailer.js";
 import { crearNotificador } from "./notificaciones.js";
 import { scheduleBackups, backupAll } from "./backup.js";
 import { sourceFromEnv } from "./drive.js";
@@ -48,7 +47,7 @@ import { empaquetar, estatico } from "./estaticos.js";
 import { avisarCortes, horaAviso } from "./avisocorte.js";
 import { enviarProgramados } from "./avisos-programados.js";
 import { enviarCampanas } from "./correo-campanas.js";
-import { crearCorreoCliente, smtpDesdeEntorno, elegirDestino, tapar, emailValido } from "./correo-cliente.js";
+import { crearCorreoCliente, smtpDesdeEntorno, elegirDestino, tapar, emailValido, correoCodigoAcceso } from "./correo-cliente.js";
 import { zip as zipNode } from "./zip.js";
 import { limpiaError, navegadorCorto } from "./errores.js";
 const pedidosLimite = rateLimiter(Number(process.env.PEDIDOS_LIMIT ?? 30), 3600e3); // pedidos enviados por cliente y hora (aunque alguien robara un código, no podría mandar cientos)
@@ -393,7 +392,13 @@ const datosDelCliente = (acc) => {
   };
 };
 usarRegistro((tipo, detalle) => getAccountsDb().seguridadRegistrar(tipo, detalle)); // los hechos sospechosos quedan en la base: se ven en el panel y avisan por correo
+// Código de acceso por correo (NIF + correo + código): solo si hay SMTP (cliente.env: SMTP_HOST, SMTP_USER, SMTP_PASS, MAIL_FROM); CODIGO_CORREO=0 lo apaga
+const enviarCodigoAcceso = (() => {
+  const c = process.env.CODIGO_CORREO === "0" ? null : smtpDesdeEntorno();
+  return c ? async ({ to, nombre, codigo, minutos }) => { const m = correoCodigoAcceso({ nombre, codigo, minutos, negocio: BUSINESS.name, telefono: AYUDA.telefono }); await sendMail(c.smtp, { from: c.from, to, subject: m.subject, text: m.text }); } : null;
+})();
 const auth = createAuth({
+  enviarCodigo: enviarCodigoAcceso,
   onAcceso: (acc, huella) => { if (getAccountsDb().aparatoVisto(acc.id, huella).nuevo) void avisosPush().aCliente(acc.customerId, { title: "Nuevo acceso a tu cuenta", body: "Alguien ha entrado en tu cuenta desde un aparato nuevo. Si has sido tú, no tienes que hacer nada. Si no, llama a la oficina.", url: "/cliente", tag: "acceso-nuevo" }); },
   onCodigo: (acc) => { void avisosPush().aCliente(acc.customerId, { title: "Código de entrada cambiado", body: "Se ha cambiado el código de entrada de tu cuenta. Si no has sido tú, llama a la oficina.", url: "/cliente", tag: "codigo-cambiado" }); },
   accounts: getAccountsDb(),
