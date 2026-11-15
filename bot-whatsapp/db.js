@@ -7,6 +7,7 @@
 //   - key:     clave de idempotencia (UNIQUE). Si llega dos veces la misma clave, no se crea otro pedido.
 //              Chat: "wa:<id del mensaje de WhatsApp>"; mini-app: "web:<identificador del enlace>".
 
+import { ordenarLineas } from "./ordenfamilia.js";
 import { DatabaseSync } from "node:sqlite";
 import { madridDay } from "./delivery.js";
 
@@ -102,7 +103,7 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
   );
   const insertMsg = db.prepare("INSERT OR IGNORE INTO processed_messages (id, at) VALUES (?, ?)");
 
-  const withLines = (row) => row && { ...row, review: !!row.review, re: !!row.re, items: linesOf.all(row.id) };
+  const withLines = (row) => row && { ...row, review: !!row.review, re: !!row.re, items: ordenarLineas(linesOf.all(row.id)) };
 
 // Qué pedidos entrarían en una exportación (todos los listos, o los elegidos con `refs`, repetidos incluidos). No escribe nada.
 const seleccionExportacion = (refs) => {

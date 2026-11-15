@@ -34,6 +34,7 @@ import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { crearAvisos } from "./avisos.js";
 import { endpointValido, clavesValidas } from "./webpush.js";
+const FAM_NOMBRES = JSON.parse(fs.readFileSync(new URL("./familias-nombres.json", import.meta.url), "utf8")); // nombres de las familias y subfamilias de a3ERP (listado de familias)
 import { mailConfigFromEnv } from "./mailer.js";
 import { crearNotificador } from "./notificaciones.js";
 import { scheduleBackups } from "./backup.js";
@@ -323,7 +324,7 @@ function webOrderRoutes(req, res, url) {
         used: getDb().hasOrderKey(linkKey(link)),
         products,
         history: webHistory(view, catalogNow()),
-        tree: arbolEnlace, accesos: accesosDe(arbolEnlace),
+        tree: arbolEnlace, accesos: accesosDe(arbolEnlace), famNombres: FAM_NOMBRES,
         top: topIds(),
       ayuda: ayudaPublica(),
         ayuda: ayudaPublica(),
@@ -704,7 +705,7 @@ async function appRoutes(req, res, url) {
       favs: getAccountsDb().favorites(account.customerId),
       products: webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa),
       history: webHistory(customer, catalogNow()),
-      tree: arbol, accesos: accesosDe(arbol),
+      tree: arbol, accesos: accesosDe(arbol), famNombres: FAM_NOMBRES,
       top: topIds(),
       retirados: retiradosDe(customer),
       abiertos: abiertosDe(account),

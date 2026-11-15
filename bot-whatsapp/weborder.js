@@ -57,6 +57,7 @@ export function webProducts(customer, catalog, habitualProducts, imgOf = () => n
       vat: p.vat ?? 21, // tipo de IVA (para enseñar el total con IVA)
       unitsPerBox: Number.isInteger(p.unitsPerBox) && p.unitsPerBox > 1 ? p.unitsPerBox : null,
       ...(soloCaja(p) ? { soloCaja: true } : {}), // solo se vende por cajas enteras: en pantalla no hay «Uds»
+      ...(String(p.family ?? "").trim() ? { fam: String(p.family).trim().replace(/\.+$/, "") } : {}), // código de familia de a3ERP: el pedido y el histórico siguen su orden
       ...(({ cat, sub }) => ({ cat, sub }))(categorizar(p)), // categoría y subcategoría (ids) para navegar el catálogo
       ...((img) => (img ? { img } : {}))(imgOf(String(p.id))), // foto del producto (si hay)
       ...(imgOf(String(p.id)) && iaOf(String(p.id)) ? { ia: true } : {}), // la foto está generada con IA (se avisa en pequeño)

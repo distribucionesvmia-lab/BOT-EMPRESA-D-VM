@@ -73,6 +73,10 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const existentes = new Set(actual.map((p) => String(p.id)));
     const nuevos = lista.map((p) => ({ ...p, ...(p.category || (existentes.has(p.id) && !p.family) ? {} : clasificar(p, familias)) }));
     const cmp = compararProductos(actual, nuevos, { sinPrecioIds });
+    // Código de familia de a3ERP de cada artículo («1.1», «27.3»…): ordena los pedidos, el Excel para a3ERP y el histórico (ordenfamilia.js). Se guarda aparte, sin anotarlo en el historial de cambios del artículo.
+    const famDe = (p) => String(p.family ?? "").trim().replace(/\.+$/, "");
+    const famGuardada = new Map(actual.map((p) => [String(p.id), String(p.family ?? "")]));
+    const famCambian = lista.filter((p) => famDe(p) && famDe(p) !== (famGuardada.get(String(p.id)) ?? "")).length;
     const saltos = saltosDePrecio(cmp);
     const aviso = [];
     if (activos >= 20 && lista.length < activos * MIN_RATIO) aviso.push(`El Excel tiene ${lista.length} productos y hay ${activos} activos: parece incompleto. No se puede aplicar.`);
@@ -90,7 +94,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
       const d = dimensiones(f.data); if (d && Math.max(d.w, d.h) < POCA_RESOLUCION) fotosBajaCalidad++;
     }
     if (fotosBajaCalidad) aviso.push(`${fotosBajaCalidad} de las ${fotosNuevas} fotos nuevas del Excel son miniaturas de baja resolución (menos de ${POCA_RESOLUCION} px) y se verán borrosas: es mejor subir fotos grandes en un ZIP.`);
-    const resumen = { rechazados: rechazados.length, anadidos: cmp.anadidos.length, quitados: cmp.quitados.length, modificados: cmp.modificados.length, reactivados: cmp.reactivados.length, sinPrecio: cmp.sinPrecio.length, iguales: cmp.iguales, fotosNuevas, fotosBajaCalidad };
+    const resumen = { rechazados: rechazados.length, anadidos: cmp.anadidos.length, quitados: cmp.quitados.length, modificados: cmp.modificados.length, reactivados: cmp.reactivados.length, sinPrecio: cmp.sinPrecio.length, iguales: cmp.iguales, familias: famCambian, fotosNuevas, fotosBajaCalidad };
     const detalle = {
       modificados: cmp.modificados.slice(0, MUESTRA).map((m) => ({ id: m.id, nombre: m.name, cambios: m.cambios.map((c) => ({ campo: CAMPOS[c.campo] ?? c.campo, antes: c.antes, despues: c.despues })) })),
       anadidos: cmp.anadidos.slice(0, MUESTRA).map((p) => ({ id: p.id, nombre: p.name, precio: p.price })),
@@ -107,18 +111,20 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     if (rechazados.length) confirmar.push(`${rechazados.length} productos con datos raros NO se importan (precio disparatado o IVA que no existe).`);
     for (const x of avisosLectura.slice(0, 5)) aviso.push(x);
     if (avisosLectura.length > 5) aviso.push(`… y ${avisosLectura.length - 5} avisos más de datos raros.`);
-    const hayCambios = !!(cmp.anadidos.length || cmp.quitados.length || cmp.modificados.length || cmp.reactivados.length || fotosNuevas);
+    if (famCambian) aviso.push(`${famCambian} artículos guardarán su código de familia de a3ERP (es lo que ordena los pedidos, el Excel y el histórico: familia, subfamilia y artículo).`);
+    const hayCambios = !!(cmp.anadidos.length || cmp.quitados.length || cmp.modificados.length || cmp.reactivados.length || fotosNuevas || famCambian);
     return {
       resumen, detalle, aviso, lectura, confirmar, aplicable: hayCambios && !aviso.some((x) => /No se puede aplicar|no se pueden añadir/.test(x)),
       aplicar() {
         const resultado = aplicarProductos(actual, nuevos);
         const r = catalogDb.upsertProducts(resultado.map((p) => ({ ...p, unitsPerBox: p.unitsPerBox ?? null })), { partial: true, deactivateMissing: true });
+        const nFam = catalogDb.setFamilias(lista.map((p) => [p.id, famDe(p)]));
         let fotosGuardadas = 0;
         if (imgDir && fotosAGuardar.length) {
           fs.mkdirSync(imgDir, { recursive: true });
           for (const f of fotosAGuardar) { fs.writeFileSync(fotoRuta(f), f.data); fotosGuardadas++; }
         }
-        return { anadidos: r.added, modificados: r.updated, iguales: r.unchanged, desactivados: r.deactivated, fotosGuardadas };
+        return { anadidos: r.added, modificados: r.updated, iguales: r.unchanged, desactivados: r.deactivated, familias: nFam, fotosGuardadas };
       },
     };
   }

@@ -1,3 +1,4 @@
+import { ordenarLineas } from "./ordenfamilia.js";
 // Precios, descuentos, cajas/unidades e impuestos de un pedido, con las reglas de la empresa:
 //
 //  - Unidades: las que pide el cliente; si pide CAJAS, cajas × «unidades por caja» de la ficha del artículo.
@@ -82,7 +83,7 @@ export function priceOrder(order, customer, catalog) {
     return { ...it, ...fields };
   });
   const base = items.reduce((t, i) => t + Math.round(i.amount * 100), 0) / 100;
-  return { ...order, items, review, re: !!customer?.recargoEquivalencia, total: items.length ? base : order.total };
+  return { ...order, items: ordenarLineas(items.map((i) => ({ ...i, family: byId.get(String(i.id))?.family }))).map(({ family, ...i }) => i), review, re: !!customer?.recargoEquivalencia, total: items.length ? base : order.total };
 }
 
 /** Totales de un pedido: bases por tipo de IVA, IVA, R.E. y total del pedido. */

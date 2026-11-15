@@ -46,13 +46,13 @@ function normalize(p) {
 }
 
 /** Producto tal como lo usa el bot: { id, name, price, unitsPerBox?, vat, discount } */
-const toCatalog = (r) => ({ id: r.id, name: r.name, price: r.price, ...(r.units_per_box ? { unitsPerBox: r.units_per_box } : {}), vat: r.vat, discount: r.discount, ...(r.category ? { category: r.category } : {}), ...(r.subcategory ? { subcategory: r.subcategory } : {}), ...(r.sale_mode ? { saleMode: r.sale_mode } : {}), ...(r.promo_tipo ? { promo: { tipo: r.promo_tipo, valor: r.promo_valor, ...(r.promo_hasta ? { hasta: r.promo_hasta } : {}) } } : {}) });
+const toCatalog = (r) => ({ id: r.id, name: r.name, price: r.price, ...(r.units_per_box ? { unitsPerBox: r.units_per_box } : {}), vat: r.vat, discount: r.discount, ...(r.category ? { category: r.category } : {}), ...(r.subcategory ? { subcategory: r.subcategory } : {}), ...(r.sale_mode ? { saleMode: r.sale_mode } : {}), ...(r.family ? { family: r.family } : {}), ...(r.promo_tipo ? { promo: { tipo: r.promo_tipo, valor: r.promo_valor, ...(r.promo_hasta ? { hasta: r.promo_hasta } : {}) } } : {}) });
 
 export function openCatalogDb(path = process.env.CATALOG_DB ?? "catalogo.sqlite") {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
   db.exec(SCHEMA);
-  for (const col of ["category", "subcategory", "sale_mode", "promo_tipo", "promo_hasta"]) if (!db.prepare("PRAGMA table_info(products)").all().some((x) => x.name === col)) db.exec(`ALTER TABLE products ADD COLUMN ${col} TEXT`);
+  for (const col of ["category", "subcategory", "sale_mode", "promo_tipo", "promo_hasta", "family"]) if (!db.prepare("PRAGMA table_info(products)").all().some((x) => x.name === col)) db.exec(`ALTER TABLE products ADD COLUMN ${col} TEXT`);
   if (!db.prepare("PRAGMA table_info(products)").all().some((x) => x.name === "promo_valor")) db.exec("ALTER TABLE products ADD COLUMN promo_valor REAL"); // oferta de la empresa (no la toca la actualización desde a3ERP)
   db.exec("CREATE TABLE IF NOT EXISTS product_avisos (product_id TEXT PRIMARY KEY, clave TEXT NOT NULL, at TEXT NOT NULL)"); // el último aviso (campana) enviado de cada artículo
   const get = db.prepare("SELECT * FROM products WHERE id = ?");
@@ -112,6 +112,12 @@ export function openCatalogDb(path = process.env.CATALOG_DB ?? "catalogo.sqlite"
         }
         return out;
       });
+    },
+
+    /** Guarda el código de familia de a3ERP de cada artículo (pares [código, familia]). No toca nada más ni lo anota en el historial. Devuelve cuántos cambian. */
+    setFamilias(pares) {
+      const upd = db.prepare("UPDATE products SET family = ? WHERE id = ? AND COALESCE(family, '') <> ?");
+      return atomic(() => { let n = 0; for (const [id, fam] of pares) { const f = String(fam ?? "").trim(); if (f) n += Number(upd.run(f, String(id), f).changes); } return n; });
     },
 
     /** Cambia campos de un producto existente: update("1001", { price: 2.5 }). Devuelve "updated" o "unchanged". */

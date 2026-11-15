@@ -1522,12 +1522,38 @@ function nombreVisible(p) {
   }
   return limpiarNombre(base);
 }
-// Orden de familias y subfamilias: el MISMO del catálogo (data.tree), para que en el pedido y en el histórico no se mezclen huevos, margarinas, leches…
-let _rangoArbol = null, _rangoMapa = new Map();
-const rangoFam = p => { if (_rangoArbol !== data.tree) { _rangoArbol = data.tree; _rangoMapa = new Map(); (data.tree || []).forEach((c, i) => c.subs.forEach((sb, j) => _rangoMapa.set(c.id + "/" + sb.id, i * 1000 + j))); } return _rangoMapa.get(p.cat + "/" + p.sub) ?? 999999; };
-const porFamilia = (a, b) => rangoFam(a) - rangoFam(b) || cmpNombre(a, b);
-const nombreFam = p => { const c = (data.tree || []).find(x => x.id === p.cat), sb = c && c.subs.find(x => x.id === p.sub); return c && sb ? (sb.nombre === c.nombre ? c.nombre : c.nombre + " · " + sb.nombre) : "Otros"; };
-const lines = () => [...qty].filter(([id, n]) => n > 0 && productoPorId.has(id)).map(([id, n]) => ({ ...productoPorId.get(id), qty: n })).sort(porFamilia); // por familia y subfamilia, como el catálogo; dentro de cada una, por nombre
+// ORDEN-FAMILIA-INICIO
+const limpiaFam = (f) => String(f ?? "").trim().replace(/\.+$/, "");
+function compararFamilias(a, b) {
+  const x = limpiaFam(a), y = limpiaFam(b);
+  if (!x || !y) return !x && !y ? 0 : !x ? 1 : -1; // sin familia, al final
+  const [fa, ...sa] = x.split("."), [fb, ...sb] = y.split(".");
+  const na = Number(fa), nb = Number(fb);
+  if (Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
+  if (!(Number.isFinite(na) && Number.isFinite(nb)) && fa !== fb) return fa < fb ? -1 : 1;
+  const ta = sa.join("."), tb = sb.join(".");
+  return ta === tb ? 0 : ta < tb ? -1 : 1;
+}
+const compararCodigos = (a, b) => String(a ?? "").localeCompare(String(b ?? ""), "es", { numeric: true });
+/** a y b: { family, id }. */
+const compararArticulos = (a, b) => {
+  const x = limpiaFam(a.family), y = limpiaFam(b.family);
+  if (!x && !y) return 0; // los dos sin familia (datos sin importar de a3ERP todavía): se deja el orden que tenían
+  return compararFamilias(x, y) || compararCodigos(a.id, b.id);
+};
+/** Familia y subfamilia con el nombre de a3ERP: «LECHE» (1.0) o «LECHE › PSC BOTEL 1.5 Y HOSTELERIA» (1.1). */
+function nombreFamilia(codigo, nombres) {
+  const c = limpiaFam(codigo); if (!c) return "Sin familia";
+  const fam = nombres?.[`${c.split(".")[0]}.0`] ?? null, sub = nombres?.[c] ?? null;
+  if (/\.0$/.test(c) || !sub) return fam ?? sub ?? `Familia ${c}`;
+  return fam && sub !== fam ? `${fam} › ${sub}` : sub;
+}
+// ORDEN-FAMILIA-FIN
+// Orden de a3ERP: código de familia, de subfamilia y de artículo (los productos traen p.fam; sin él, al final y en el orden que tenían)
+const grupoFam = p => limpiaFam(p.fam);
+const porFamilia = (a, b) => compararArticulos({ family: a.fam, id: a.id }, { family: b.fam, id: b.id });
+const nombreFam = p => nombreFamilia(p.fam, data.famNombres);
+const lines = () => [...qty].filter(([id, n]) => n > 0 && productoPorId.has(id)).map(([id, n]) => ({ ...productoPorId.get(id), qty: n })).sort(porFamilia); // por familia, subfamilia y artículo, como en a3ERP
 const count = () => lines().length;
 // Importes EXACTOS (en céntimos, con enteros): el mismo cálculo que el servidor (pricing.js), sin errores de coma flotante
 const escala = (x, dec) => BigInt(Math.round(Number(x) * 10 ** dec));
@@ -2253,7 +2279,7 @@ function renderList() {
     }
     return;
   }
-  if (tab === "hab" && !q) items = items.slice().sort((a, b) => rangoFam(a) - rangoFam(b) || (b.count || 0) - (a.count || 0) || cmpNombre(a, b)); // por familia y subfamilia (como el catálogo); dentro de cada una, lo que más pide primero
+  if (tab === "hab" && !q) items = items.slice().sort((a, b) => compararFamilias(a.fam, b.fam) || (b.count || 0) - (a.count || 0) || compararCodigos(a.id, b.id)); // por familia, subfamilia y artículo (como en a3ERP); dentro de cada subfamilia, lo que más pide primero
   else if (arbol && ordenCat === "nombre") items = items.slice().sort(cmpNombre);
   else if (arbol && (ordenCat === "pa" || ordenCat === "pd")) items = items.slice().sort((a, b) => (ordenCat === "pa" ? 1 : -1) * (precioUd(a) - precioUd(b)) || cmpNombre(a, b));
   else if (arbol) items = [...items.filter(p => p.count > 0), ...items.filter(p => !(p.count > 0))]; // en cada categoría, lo que ya compra va arriba
@@ -2265,7 +2291,7 @@ function renderList() {
   const conGrupos = arbol && ordenCat === "hab" && items.some(p => p.count > 0) && items.some(p => !(p.count > 0)); // en una sección: primero lo que ya compra, con su título
   let grupo = null, famPrev = null;
   items.slice(0, limite).forEach(p => {
-    if (tab === "hab" && !q && rangoFam(p) !== famPrev) { famPrev = rangoFam(p); const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = nombreFam(p); list.appendChild(t); }
+    if (tab === "hab" && !q && items.some(x => grupoFam(x)) && grupoFam(p) !== famPrev) { famPrev = grupoFam(p); const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = nombreFam(p); list.appendChild(t); }
     if (conGrupos && (p.count > 0 ? "hab" : "resto") !== grupo) { grupo = p.count > 0 ? "hab" : "resto"; const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = grupo === "hab" ? "Lo que sueles pedir" : "Todo lo demás"; list.appendChild(t); }
     list.appendChild(row(p));
   });
@@ -2296,9 +2322,9 @@ function tablaLineas(ls) {
   const th = t.createTHead().insertRow();
   for (const x of ["Artículo", "Cantidad", "Importe"]) { const c = document.createElement("th"); c.scope = "col"; c.textContent = x; if (x === "Importe") c.className = "tl-imp"; th.appendChild(c); }
   const tb = t.createTBody();
-  const variasFam = ls.length > 1 && new Set(ls.map(rangoFam)).size > 1; let famPrev = null;
+  const variasFam = ls.length > 1 && ls.some(l => grupoFam(l)) && new Set(ls.map(grupoFam)).size > 1; let famPrev = null;
   ls.forEach(l => {
-    if (variasFam && rangoFam(l) !== famPrev) { famPrev = rangoFam(l); const hr = tb.insertRow(); hr.className = "tl-fam"; const hc = hr.insertCell(); hc.colSpan = 3; hc.textContent = nombreFam(l); }
+    if (variasFam && grupoFam(l) !== famPrev) { famPrev = grupoFam(l); const hr = tb.insertRow(); hr.className = "tl-fam"; const hc = hr.insertCell(); hc.colSpan = 3; hc.textContent = nombreFam(l); }
     const tr = tb.insertRow(); tr.className = "tl-fila";
     const cj = unit(l.id) === "caja";
     // Artículo: foto (toca para ampliarla) + nombre + precio por unidad

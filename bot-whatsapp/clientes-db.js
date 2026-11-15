@@ -3,6 +3,7 @@
 // El bot la consulta para identificar al cliente (por teléfono o por el nombre que escribe) y para proponerle
 // sus productos habituales. Se actualiza con upsertCustomers() (por ejemplo desde a3ERP).
 
+import { ordenarLineas } from "./ordenfamilia.js";
 import { DatabaseSync } from "node:sqlite";
 import { findCustomers } from "./identify.js";
 import { nifKeys, nifMatches } from "./nif-key.js";
@@ -79,6 +80,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       if (!orders.has(k)) orders.set(k, { doc: l.doc, date: l.date, lines: [] });
       orders.get(k).lines.push({ productId: l.product_id, qty: l.qty });
     }
+    for (const o of orders.values()) o.lines = ordenarLineas(o.lines);
     return {
       id: r.id, name: r.name, legalName: r.legal_name ?? "", city: r.city ?? "", municipio: r.municipio ?? "", phone: r.phone ?? "", address: r.address ?? "", recargoEquivalencia: !!r.recargo, active: !!r.active,
       phones: db.prepare("SELECT phone FROM customer_phones WHERE customer_id = ? ORDER BY phone").all(r.id).map((x) => x.phone),

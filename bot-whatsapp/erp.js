@@ -4,6 +4,7 @@
 //   createOrder(order)                graba el pedido (base pedidos.sqlite + hoja de Google opcional)
 // Las dos primeras bases las alimenta el ERP (hoy, datos.js; después, la sincronización con a3ERP): el bot solo las lee.
 
+import { usarFamilias } from "./ordenfamilia.js";
 import fs from "node:fs";
 import { getDb } from "./db.js";
 import { importData } from "./seed.js";
@@ -24,6 +25,7 @@ let catalogDb, customersDb;
 function dbs() {
   if (!catalogDb) {
     catalogDb = openCatalogDb();
+    usarFamilias((id) => catalogDb.get(id)?.family ?? null); // el orden de pedidos, Excel e histórico es el de a3ERP: familia, subfamilia y artículo
     customersDb = openCustomersDb();
     if (!catalogDb.count() && !customersDb.count()) {
       const file = fs.existsSync(SEED_FILE) ? SEED_FILE : process.env.DEMO === "1" && fs.existsSync(EXAMPLE_FILE) ? EXAMPLE_FILE : null;
