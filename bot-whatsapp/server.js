@@ -10,7 +10,7 @@ import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder, totals } from "./pricing.js";
 import { createAuth, rateLimiter } from "./auth.js";
-import { cabecerasSeguridad, CSP, eventoSeguridad, usarRegistro, ipDe, claveDebil, crearEscudo, origenAjeno, panelPermitido } from "./seguridad.js";
+import { cabecerasSeguridad, CSP, eventoSeguridad, usarRegistro, ipDe, claveDebil, crearEscudo, origenAjeno, panelPermitido, cspEstricta } from "./seguridad.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
 import { estadoSistema, crearVigilante } from "./monitor.js";
@@ -194,7 +194,7 @@ async function onMessage(msg) {
     await send(OWNER_PHONE, `🛒 Nuevo pedido de ${out.order.name} (+${from})\n${out.order.text}\nTotal: ${total}\n📍 ${out.order.address}`);
   }
   if (out.handoff) {
-    console.log(`ATENCIÓN HUMANA solicitada por +${from}`);
+    console.log(`ATENCIÓN HUMANA solicitada por +${String(from).slice(0, 3)}******${String(from).slice(-2)}`); // teléfono tapado: el registro no lleva el número entero
     if (OWNER_PHONE) await send(OWNER_PHONE, `👤 +${from} pide hablar con una persona.`);
   }
 }
@@ -304,7 +304,7 @@ function webOrderRoutes(req, res, url) {
   const token = m[1];
 
   if (req.method === "GET" && !m[2]) {
-    return enviar(res, 200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }, empaquetar(fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8"), "pedido"));
+    { const cuerpo = empaquetar(fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8"), "pedido"); return enviar(res, 200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "Content-Security-Policy": cspEstricta(cuerpo) }, cuerpo); }
   }
 
   (async () => {
@@ -545,6 +545,7 @@ function imgs() {
 const imgUrl = (id) => (imgs().has(id) ? `/img/${encodeURIComponent(id)}?v=${imgVer.get(id) ?? 0}` : null); // ?v= cambia al cambiar la foto: el móvil no se queda con la antigua guardada
 const imgEsIa = (id) => (imgs(), imgIa.has(String(id)));
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow", "Content-Security-Policy": CSP };
+const htmlCsp = (cuerpo) => ({ ...HTML, "Content-Security-Policy": cspEstricta(cuerpo) }); // la política estricta lleva las huellas de los scripts de ESA página
 const sendJson = (res, code, data) => enviar(res, code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify(data));
 
 // «Tu pedido de siempre» que el cliente ha editado o borrado: cambia la tarjeta del Inicio (sin fila guardada sale el último pedido, como siempre)
@@ -608,7 +609,7 @@ async function appRoutes(req, res, url) {
   // Aplicación de la empresa (el empresario)
   if (p === "/empresa" || p === "/distribuidor") {
     if (!adminEnabled) return void res.writeHead(404).end();
-    return void enviar(res, 200, HTML, page("empresa.html"));
+    { const cuerpo = page("empresa.html"); return void enviar(res, 200, htmlCsp(cuerpo), cuerpo); }
   }
   if (p.startsWith("/api/admin/")) {
     if (!adminEnabled) return void res.writeHead(404).end(); // la aplicación del cliente no tiene administración, ni con clave
@@ -616,7 +617,7 @@ async function appRoutes(req, res, url) {
   }
   // Aplicación del cliente
   if (!clientEnabled) return void res.writeHead(404).end();
-  if (p === "/cliente" && req.method === "GET") return void enviar(res, 200, HTML, (() => { const dl = { titular: envTexto("PRIVACY_TITULAR") || undefined, cif: envTexto("PRIVACY_CIF"), direccion: envTexto("PRIVACY_DIRECCION") || undefined, email: envTexto("PRIVACY_EMAIL") }; return empaquetar(page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml(dl)).replaceAll("<div data-aviso-legal></div>", avisoLegalHtml(dl)), "cliente"); })());
+  if (p === "/cliente" && req.method === "GET") return void ((cuerpo) => enviar(res, 200, htmlCsp(cuerpo), cuerpo))((() => { const dl = { titular: envTexto("PRIVACY_TITULAR") || undefined, cif: envTexto("PRIVACY_CIF"), direccion: envTexto("PRIVACY_DIRECCION") || undefined, email: envTexto("PRIVACY_EMAIL") }; return empaquetar(page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml(dl)).replaceAll("<div data-aviso-legal></div>", avisoLegalHtml(dl)), "cliente"); })());
   if (await auth.route(req, res, url)) return;
 
   const account = auth.sessionOf(req);
@@ -635,7 +636,7 @@ async function appRoutes(req, res, url) {
   // Catálogo de pedido (la mini-aplicación) del cliente con sesión
   if (p === "/catalogo" && req.method === "GET") {
     if (!account) return void res.writeHead(302, { Location: "/cliente" }).end();
-    return void enviar(res, 200, HTML, empaquetar(page("pedido.html").toString(), "pedido"));
+    { const cuerpo = empaquetar(page("pedido.html").toString(), "pedido"); return void enviar(res, 200, htmlCsp(cuerpo), cuerpo); }
   }
   // Direcciones de entrega guardadas (solo las suyas; máximo 5)
   if (p === "/api/direcciones" && req.method === "GET") {

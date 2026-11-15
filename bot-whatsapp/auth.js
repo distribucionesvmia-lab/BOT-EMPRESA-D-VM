@@ -6,7 +6,7 @@ import crypto from "node:crypto";
 import { normalizePhone, validEmail, pinValido } from "./cuentas-db.js";
 import { nifCodes, nifClean } from "./nif-codes.js";
 import { codeKey, validCode } from "./nif-key.js";
-import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe } from "./seguridad.js";
+import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
 
 const COOKIE = "vm_session";
 const MENSAJE_ELIMINADA = "Esta cuenta se eliminó. Si quieres volver a usar la aplicación, llámanos o solicita el alta de nuevo.";
@@ -98,7 +98,9 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   /** Aparato desde el que se entra: huella corta del navegador (nunca se guarda la cadena entera). Avisa al servidor para que pueda decirle al cliente «alguien ha entrado desde un aparato nuevo». */
   const huellaAparato = (req) => crypto.createHash("sha256").update(String(req.headers["user-agent"] ?? "")).digest("hex").slice(0, 16);
   const avisoAcceso = (token, req) => { try { const acc = accounts.sessionAccount(token); if (acc) onAcceso?.(acc, huellaAparato(req)); } catch {} };
-  const cookie = (token, maxAge) => `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
+  /** ¿La conexión del cliente es HTTPS? Lo dice PUBLIC_URL o, detrás de un túnel/proxy de confianza, Cloudflare (CF-Visitor / X-Forwarded-Proto): así la cookie nunca viaja sin cifrar aunque falte PUBLIC_URL. */
+  const esHttps = (req) => conexionHttps(req, { seguro: secure, confiarProxy: trustProxy });
+  const cookie = (token, maxAge, req) => `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${esHttps(req) ? "; Secure" : ""}`;
 
   /** Cuenta de la sesión de esta petición (o null). */
   const sessionOf = (req) => accounts.sessionAccount(parseCookies(req.headers.cookie)[COOKIE]);
@@ -120,7 +122,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (u.tipo === "alta") return res.writeHead(303, { Location: "/cliente#alta=" + encodeURIComponent(u.nombre || ""), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).end(), true; // persona nueva: sin sesión, solo abre su solicitud de alta con el nombre puesto
       const r = accounts.entrarPorInvitacion(u.customerId, { soloVer: u.soloVer, mensaje: u.mensaje, pedirCodigo: u.pedirCodigo });
       if (!r.ok) return fin(403, "No hemos podido entrar", "Tu cuenta está bloqueada ahora mismo. Llama a la oficina y lo solucionan.", '<a class="b" href="/cliente">Volver</a>');
-      return res.writeHead(303, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400)), Location: u.pedirCodigo ? "/cliente#invitacion" : "/cliente#enlace", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).end(), true;
+      return res.writeHead(303, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400, req)), Location: u.pedirCodigo ? "/cliente#invitacion" : "/cliente#enlace", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).end(), true;
     }
     // ── «Darme de baja de las ofertas por correo»: el enlace de cada correo de promoción. GET enseña un botón (así los programas que abren los enlaces solos no te dan de baja); el POST (el botón, o el «un clic» de Gmail) lo hace ──
     if (p.startsWith("/baja/") && (req.method === "GET" || req.method === "POST")) {
@@ -185,7 +187,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
           const own = accounts.loginByCode(codeKey(b.nif));
           if (own.ok) {
             const customer = customers.getById(own.account.customerId);
-            return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(own.token, req), cookie(own.token, 30 * 86400)) }), true;
+            return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(own.token, req), cookie(own.token, 30 * 86400, req)) }), true;
           }
           if (own.reason === "locked") return send(res, 401, { error: "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." }), true;
         }
@@ -202,7 +204,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         if (r.reason === "deleted") return send(res, 401, { error: MENSAJE_ELIMINADA }), true;
         if (!r.ok || ids.length > 1) return send(res, 401, { error: r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "NIF incorrecto. Si te sigue fallando, llama a la empresa." }), true;
         const customer = customers.getById(r.account.customerId);
-        return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400)) }), true;
+        return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400, req)) }), true;
       }
       // Teléfono + código: el nombre de la empresa solo se pide si hace falta (varios clientes comparten ese teléfono). Si se escribe, debe coincidir.
       const sinNombre = empresa.trim().length < 2;
@@ -216,12 +218,12 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       }
       if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Teléfono, código de entrada o nombre de la empresa incorrectos. Usa el teléfono con el que sueles contactar con nosotros." }), true;
       const customer = customers.getById(r.account.customerId);
-      return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400)) }), true;
+      return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400, req)) }), true;
     }
 
     if (p === "/api/salir" && req.method === "POST") {
       accounts.logout(parseCookies(req.headers.cookie)[COOKIE]);
-      return send(res, 200, { ok: true }, { "Set-Cookie": cookie("", 0) }), true;
+      return send(res, 200, { ok: true }, { "Set-Cookie": cookie("", 0, req) }), true;
     }
 
     if (p === "/api/yo" && req.method === "GET") {
@@ -284,7 +286,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (!b || String(b.confirmo ?? "").trim().toUpperCase() !== "ELIMINAR") return send(res, 400, { error: "Para eliminar la cuenta escribe ELIMINAR." }), true;
       const r = accounts.deleteAccount(acc.id);
       if (!r.ok) return send(res, 400, { error: "No se pudo eliminar la cuenta." }), true;
-      return send(res, 200, { ok: true, mensaje: "Tu cuenta se ha eliminado." }, { "Set-Cookie": cookie("", 0) }), true;
+      return send(res, 200, { ok: true, mensaje: "Tu cuenta se ha eliminado." }, { "Set-Cookie": cookie("", 0, req) }), true;
     }
 
     return false;

@@ -2031,7 +2031,7 @@ function renderSubs(list, c) {
   for (const s of c.subs) {
     const b = document.createElement("button"); b.type = "button"; b.className = "sub";
     const ph = fotoDe(c.id, s.id);
-    b.innerHTML = `<span class="sl">${ph ? `<img class="th" src="${esc(ph.img)}" alt="" onerror="this.remove()">` : ""}<span>${esc(s.nombre)}</span></span><small>${s.count} ›</small>`; b.onclick = () => irA(c.id, s.id); g.appendChild(b);
+    b.innerHTML = `<span class="sl">${ph ? `<img class="th" src="${esc(ph.img)}" alt="">` : ""}<span>${esc(s.nombre)}</span></span><small>${s.count} ›</small>`; b.onclick = () => irA(c.id, s.id); g.appendChild(b);
   }
   list.appendChild(g);
 }
@@ -3181,6 +3181,10 @@ function pendienteSinRed(eb) {
   if (!copia && pendienteGuardado()) pintarPendiente(pendienteGuardado(), null); // lo dejó guardado sin cobertura: se avisa al abrir con red
   if (estadoInicial && !/[#&](?:c|m|cat|tab)=/.test(String(window.vmPrecarga ?? location.hash))) setTimeout(() => { restaurando = true; try { tab = estadoInicial.vmTab === "hab" ? "hab" : "all"; restauraDe(estadoInicial); } finally { restaurando = false; } }, 0); // recargar o volver con «Adelante»: la búsqueda y el punto de la lista
 })();
+</script>
+<script>
+// Miniatura de sugerencia cuya foto no carga: se quita (antes era un onerror en línea, que la política de seguridad estricta no permite)
+document.addEventListener("error", (e) => { const t = e.target; if (t && t.tagName === "IMG" && t.classList && t.classList.contains("th")) t.remove(); }, true);
 </script>
 </body>
 </html>

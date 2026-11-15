@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 // Protección contra bots y abusos: campo trampa, comprobación «no soy un robot» (Cloudflare Turnstile, opcional) y cabeceras de seguridad.
 // Todo es opcional y seguro por defecto: sin TURNSTILE_SITE / TURNSTILE_SECRET en la configuración, la comprobación no se pide.
 const SITE = () => String(process.env.TURNSTILE_SITE ?? "").trim();
@@ -151,3 +152,24 @@ export function panelPermitido(req, extra = []) {
   const ok = (d) => esRedPrivada(d) || extra.includes(d);
   return ok(real) && (!cf || ok(cf)) && (!xf || ok(xf));
 }
+
+/**
+ * Política de contenido ESTRICTA para una página concreta: solo se ejecutan los scripts propios (/estatico/…), Cloudflare y los scripts en línea
+ * cuya huella SHA-256 está en la lista (se calcula con el contenido real de la página que se sirve). Quita `'unsafe-inline'` de los scripts: si
+ * alguien lograra colar un <script> o un onclick en la página (XSS), el navegador NO lo ejecuta. Los estilos en línea se mantienen.
+ * CSP_ESTRICTA=0 vuelve a la política antigua (por si algo dejara de funcionar en la oficina).
+ */
+export function cspEstricta(html) {
+  if (process.env.CSP_ESTRICTA === "0") return CSP;
+  const huellas = new Set();
+  for (const m of String(html).matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+    if (/\bsrc\s*=/i.test(m[1]) || !m[2].trim()) continue;
+    huellas.add(`'sha256-${crypto.createHash("sha256").update(m[2], "utf8").digest("base64")}'`);
+  }
+  return CSP.replace("script-src 'self' 'unsafe-inline'", ["script-src 'self'", ...huellas].join(" "));
+}
+/** ¿Hay en el HTML manejadores en línea (onclick=…) que una política estricta bloquearía? Sirve para vigilarlo en las pruebas. */
+export const manejadoresEnLinea = (html) => [...String(html).matchAll(/[\s"'`<]on[a-z]{3,}\s*=\s*["']/gi)].map((m) => m[0].trim());
+
+/** ¿La conexión del cliente es HTTPS? Lo dice PUBLIC_URL (`seguro`) o, detrás de un túnel/proxy de confianza, Cloudflare (CF-Visitor) o X-Forwarded-Proto. */
+export const conexionHttps = (req, { seguro = false, confiarProxy = false } = {}) => !!(seguro || (confiarProxy && req && (/"scheme"\s*:\s*"https"/.test(String(req.headers?.["cf-visitor"] ?? "")) || String(req.headers?.["x-forwarded-proto"] ?? "").split(",")[0].trim().toLowerCase() === "https")));
