@@ -113,21 +113,48 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
   // Nada se aplica solo: el panel enseña lo que hay, «Ver cambios» hace la vista previa de siempre y, al aplicar, el archivo pasa a la subcarpeta «aplicados».
   const ENTRADA_MAX = 80_000_000, tiposCache = new Map();
   const nombreValido = (n) => typeof n === "string" && n.length > 0 && n.length <= 200 && path.basename(n) === n && /\.(xlsx|zip)$/i.test(n) && !/^[.~]/.test(n);
+  // Subcarpetas de la bandeja: BASE-ARTICULOS, BASE-CLIENTES y BASE-HISTORICO (da igual mayúsculas, guiones o tildes). Lo que se deja ahí se entiende
+  // como de ese tipo; igualmente se mira el contenido, y si no cuadra se avisa y no se carga solo. Cada una tiene su propia subcarpeta «aplicados».
+  const SUBS = { basearticulos: "productos", baseproductos: "productos", baseclientes: "clientes", basehistorico: "historial", basehistorial: "historial" };
+  const normSub = (n) => String(n ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+  /** Carpeta de la bandeja que se pide («» = la principal, o el nombre de una subcarpeta BASE-…). null si no existe o no es una de las permitidas. */
+  function carpetaEntrada(dir, nombre) {
+    if (!nombre) return { ruta: dir, nombre: "", tipo: null };
+    try {
+      const d = fs.readdirSync(dir, { withFileTypes: true }).find((x) => x.isDirectory() && x.name === nombre && SUBS[normSub(x.name)]);
+      return d ? { ruta: path.join(dir, d.name), nombre: d.name, tipo: SUBS[normSub(d.name)] } : null;
+    } catch { return null; }
+  }
+  function archivosDe(carpeta) {
+    const out = [];
+    for (const f of fs.readdirSync(carpeta.ruta, { withFileTypes: true })) {
+      if (!f.isFile() || !nombreValido(f.name)) continue;
+      const st = fs.statSync(path.join(carpeta.ruta, f.name));
+      if (!st.size || st.size > ENTRADA_MAX) continue;
+      const k = `${carpeta.nombre}/${f.name}|${st.size}|${st.mtimeMs}`;
+      if (!tiposCache.has(k)) { try { tiposCache.set(k, detectarTipo(fs.readFileSync(path.join(carpeta.ruta, f.name)))); } catch { tiposCache.set(k, null); } if (tiposCache.size > 200) tiposCache.delete(tiposCache.keys().next().value); }
+      const visto = tiposCache.get(k);
+      let tipo = visto, aviso = null;
+      if (carpeta.tipo) { // en una subcarpeta BASE-…: manda lo que dice la carpeta, salvo que el contenido diga claramente otra cosa
+        if (!visto) tipo = carpeta.tipo;
+        else if (visto !== carpeta.tipo) { tipo = null; aviso = `Está en ${carpeta.nombre} pero parece de «${visto}». Revísalo antes de subirlo.`; }
+      }
+      out.push({ nombre: f.name, carpeta: carpeta.nombre, tipo, ...(aviso ? { aviso } : {}), tamano: st.size, modificado: st.mtime.toISOString() });
+    }
+    return out;
+  }
   function listarEntrada() {
     const dir = entradaDir();
     if (!dir) return { configurada: false };
     try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { return { configurada: true, carpeta: dir, archivos: [], error: "No se puede abrir la carpeta de entrada." }; }
-    const archivos = [];
-    for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (!f.isFile() || !nombreValido(f.name)) continue;
-      const st = fs.statSync(path.join(dir, f.name));
-      if (!st.size || st.size > ENTRADA_MAX) continue;
-      const k = `${f.name}|${st.size}|${st.mtimeMs}`;
-      if (!tiposCache.has(k)) { try { tiposCache.set(k, detectarTipo(fs.readFileSync(path.join(dir, f.name)))); } catch { tiposCache.set(k, null); } if (tiposCache.size > 200) tiposCache.delete(tiposCache.keys().next().value); }
-      archivos.push({ nombre: f.name, tipo: tiposCache.get(k), tamano: st.size, modificado: st.mtime.toISOString() });
-    }
+    const carpetas = [{ ruta: dir, nombre: "", tipo: null }];
+    const subcarpetas = [];
+    for (const d of fs.readdirSync(dir, { withFileTypes: true })) if (d.isDirectory() && SUBS[normSub(d.name)]) { carpetas.push({ ruta: path.join(dir, d.name), nombre: d.name, tipo: SUBS[normSub(d.name)] }); subcarpetas.push({ nombre: d.name, tipo: SUBS[normSub(d.name)] }); }
+    let archivos = [];
+    for (const c of carpetas) { try { archivos.push(...archivosDe(c)); } catch { /* una subcarpeta que no se puede leer no impide ver las demás */ } }
     archivos.sort((a, b) => (a.modificado < b.modificado ? 1 : -1));
-    return { configurada: true, carpeta: dir, archivos: archivos.slice(0, 50) };
+    for (const c of carpetas) { const primero = archivos.find((a) => a.carpeta === c.nombre); if (primero && c.nombre) primero.ultimo = true; } // el más reciente de cada subcarpeta BASE-… es el que toca subir
+    return { configurada: true, carpeta: dir, subcarpetas, archivos: archivos.slice(0, 60) };
   }
   // Máximo 10 claves erróneas cada 10 minutos por IP; superado el límite se bloquea esa IP aunque acierte la clave
   // Cada CLAVE distinta que falla cuenta una vez: el panel lanza varias peticiones a la vez con la misma clave y un solo
@@ -662,18 +689,18 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
     // ---- Bandeja de entrada (carpeta del ordenador) ----
     if (p === "/api/admin/entrada" && get) return send(res, 200, listarEntrada()), true;
     if (p === "/api/admin/entrada/archivo" && get) {
-      const n = url.searchParams.get("nombre") ?? "", dir = entradaDir();
-      if (!dir || !nombreValido(n) || !fs.existsSync(path.join(dir, n))) return send(res, 404, { error: "No existe ese archivo en la carpeta." }), true;
-      res.writeHead(200, { "Content-Type": "application/octet-stream", "Cache-Control": "no-store" }).end(fs.readFileSync(path.join(dir, n)));
+      const n = url.searchParams.get("nombre") ?? "", dir = entradaDir(), c = dir ? carpetaEntrada(dir, url.searchParams.get("carpeta") ?? "") : null;
+      if (!c || !nombreValido(n) || !fs.existsSync(path.join(c.ruta, n))) return send(res, 404, { error: "No existe ese archivo en la carpeta." }), true;
+      res.writeHead(200, { "Content-Type": "application/octet-stream", "Cache-Control": "no-store" }).end(fs.readFileSync(path.join(c.ruta, n)));
       return true;
     }
     if (p === "/api/admin/entrada/archivar" && post) { // el archivo ya se aplicó (o no hace falta): pasa a «aplicados», con la fecha delante
-      const b = (await readJson(req)) ?? {}, dir = entradaDir();
-      if (!dir || !nombreValido(b.nombre) || !fs.existsSync(path.join(dir, b.nombre))) return send(res, 404, { error: "No existe ese archivo en la carpeta." }), true;
+      const b = (await readJson(req)) ?? {}, dir = entradaDir(), c = dir ? carpetaEntrada(dir, typeof b.carpeta === "string" ? b.carpeta : "") : null;
+      if (!c || !nombreValido(b.nombre) || !fs.existsSync(path.join(c.ruta, b.nombre))) return send(res, 404, { error: "No existe ese archivo en la carpeta." }), true;
       try {
-        const destino = path.join(dir, "aplicados"); fs.mkdirSync(destino, { recursive: true });
+        const destino = path.join(c.ruta, "aplicados"); fs.mkdirSync(destino, { recursive: true }); // cada carpeta (la principal o cada BASE-…) tiene sus «aplicados»
         const sello = madrid(new Date().toISOString()).replace(/[-: ]/g, "").replace(/^(\d{8})/, "$1-").slice(0, 13);
-        fs.renameSync(path.join(dir, b.nombre), path.join(destino, `${sello}-${b.nombre}`));
+        fs.renameSync(path.join(c.ruta, b.nombre), path.join(destino, `${sello}-${b.nombre}`));
         return send(res, 200, { ok: true }), true;
       } catch (e) { return send(res, 409, { error: "No se pudo mover el archivo. Si lo tienes abierto en Excel, ciérralo y vuelve a intentarlo." }), true; }
     }
