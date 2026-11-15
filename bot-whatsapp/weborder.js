@@ -42,6 +42,9 @@ function oferta(p, customer) {
 }
 /** Clave para ordenar por nombre sin fijarse en comillas, acentos ni mayúsculas (el nombre original no se toca). */
 export const claveOrdenNombre = (n) => String(n ?? "").replace(/[´`"“”«»‘’']/g, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+/** Artículo que no se puede vender: precio 0 (o sin precio) o con un descuento del 100 %. No sale en el catálogo del cliente ni en el chat. */
+export const sinCoste = (p) => !(Number(p?.price) > 0) || Number(p?.discount ?? 0) >= 100;
+
 export function webProducts(customer, catalog, habitualProducts, imgOf = () => null, iaOf = () => false) {
   const habit = new Map(habitualProducts(customer).map((p) => [p.id, p]));
   const limpio = process.env.NOMBRES_LIMPIOS === "1";
@@ -65,6 +68,7 @@ export function webProducts(customer, catalog, habitualProducts, imgOf = () => n
       count: habit.get(p.id)?.count ?? 0,
     }))
     .sort((a, b) => b.count - a.count || claveOrdenNombre(a.name).localeCompare(claveOrdenNombre(b.name), "es"))
+    .filter((p) => !sinCoste(p)) // precio 0 o descuento del 100 % (el precio y el descuento ya son los de ESTE cliente): no se vende
     .filter((p, i, todos) => todos.findIndex((x) => x.id === p.id) === i && String(p.name ?? "").trim()) // mismo código solo una vez; sin nombre, no hay tarjeta
     .reduce((acc, p) => { // mismo nombre, precio y caja → se enseña uno: el que el cliente ya compra o, si no, el de código menor
       const k = [normNombre(p.name), p.price, p.discount ?? 0, p.unitsPerBox ?? 0].join("|"), j = acc.claves.get(k);

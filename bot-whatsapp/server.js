@@ -17,7 +17,7 @@ import { estadoSistema, crearVigilante } from "./monitor.js";
 import { privacidadHtml, avisoLegalHtml } from "./privacidad.js";
 import { estadoVersion } from "./version.js";
 import { sendMail } from "./mailer.js";
-import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, accesosDe, HISTORIAL_MAX, HISTORIAL_VER_MAS, HISTORIAL_ANALISIS } from "./weborder.js";
+import { sinCoste, webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, accesosDe, HISTORIAL_MAX, HISTORIAL_VER_MAS, HISTORIAL_ANALISIS } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "./delivery.js";
 // Lo que el catálogo necesita para el aviso «entrega hoy» y las opciones de día: se calcula SIEMPRE en el servidor con la hora de Madrid
 // «Lo más pedido» (para un cliente sin historial): identificadores de los artículos que más clientes compran, sin ningún dato personal; se recalcula cada 10 minutos
@@ -67,14 +67,14 @@ if (process.env.DEMO === "1") {
   process.env.EXPORT_DIR ??= "exportaciones-demo";
 }
 
-setCatalog(await getCatalog()); // catálogo (base de productos); si no hay, se usa el de config.js
+setCatalog((await getCatalog()).filter((p) => !sinCoste(p))); // catálogo (base de productos); si no hay, se usa el de config.js. Sin los artículos de precio 0 o con descuento del 100 %
 let catalogSeen = catalogVersion();
 // Si se actualizan los productos o precios, el bot los usa sin reiniciar
 async function refreshCatalog() {
   const v = catalogVersion();
   if (v !== catalogSeen) {
     catalogSeen = v;
-    setCatalog(await getCatalog());
+    setCatalog((await getCatalog()).filter((p) => !sinCoste(p)));
   }
 }
 
