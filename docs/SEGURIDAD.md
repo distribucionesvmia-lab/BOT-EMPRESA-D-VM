@@ -67,18 +67,22 @@ Es lo que más protege: no abres puertos del router, tienes HTTPS y Cloudflare f
 - **Cookie de sesión siempre «segura» por HTTPS**: antes solo llevaba `Secure` si `PUBLIC_URL` empezaba por `https://`; ahora también si la petición llegó por HTTPS a través de Cloudflare (con `TRUST_PROXY=1`). Así nunca viaja sin cifrar aunque falte esa línea.
 - **Registro sin teléfonos enteros**: la línea «ATENCIÓN HUMANA solicitada por…» ya no escribe el número completo.
 
-## Séptima tanda: entrar con NIF + correo + código que llega al correo
-**Cómo lo ve el cliente**: en la pantalla de acceso escribe su **NIF** y su **correo electrónico**; le llega un **código de 6 cifras** y, al escribirlo, entra. La entrada de siempre (solo NIF, o teléfono + código) queda detrás del enlace «Entrar de otra forma (sin correo)».
+## Séptima tanda: entrar SOLO con nombre + NIF + correo + código que llega al correo
+**Cómo lo ve el cliente**: en la pantalla de acceso escribe el **nombre de su empresa**, su **NIF** y su **correo electrónico**; le llega un **código de 6 cifras** a ese correo y, al escribirlo, entra. **No hay otra forma de entrar** (se cerraron la de solo el NIF y la de teléfono + código). Ya no hay «código de entrada» que elegir ni cambiar.
+
+**Altas: todas pasan por ti.** Quien pide acceso («Hazte cliente») queda **pendiente hasta que lo aceptes en «Solicitudes de alta»**, aunque coincida con un cliente que ya tienes (antes entraba solo). Para que luego pueda entrar, el **correo es obligatorio** en el alta. En «Qué encajó» ves con qué cliente se parece y **si el NIF que escribió coincide con el de ese cliente** (si dice «NO coincide», desconfía: puede ser alguien que se hace pasar por otro). Al aceptarla, el cliente entra con su nombre, su NIF y su correo.
 
 **Qué lo protege**
-- El código **solo se manda a un correo que ya consta** en la ficha del cliente (a3ERP o lo escrito a mano en el panel) o en su cuenta. Escribir el correo de otro no sirve: no recibe nada.
-- **No se puede averiguar qué NIF ni qué correos existen**: la respuesta es siempre la misma, coincida o no.
+- El código **solo se manda a un correo que ya consta** en la ficha del cliente (a3ERP o lo escrito a mano en el panel) o en su cuenta, y solo si **coinciden el nombre, el NIF y el correo**. Escribir el correo de otro no sirve: no recibe nada.
+- **No se puede averiguar qué NIF, nombres o correos existen**: la respuesta es siempre la misma, coincida o no.
 - El código vale **10 minutos**, **una sola vez**, se **anula tras 5 fallos** y no se guarda (solo una huella atada al cliente). Entre un código y otro hay **60 segundos**.
 - **No se pueden llenar buzones**: máximo 3 peticiones por NIF+correo cada 10 minutos, 8 por dirección y 120 códigos por hora en total (`CODIGO_CLAVE_LIMIT`, `CODIGO_IP_LIMIT`, `CODIGO_GLOBAL_LIMIT`). Se apunta `codigo-correo-muchas-peticiones` / `codigo-correo-tope-global`.
 - Si el programa tiene «No soy un robot» (Turnstile), también se pide tras varios intentos.
 - El correo lleva solo el código: ni NIF, ni código de cliente, ni enlaces (no se puede imitar con un enlace falso) y avisa de que no se comparta.
-- Un NIF que corresponde a dos clientes con el mismo correo no se adivina: no se manda nada (esos clientes entran con «otra forma» o llaman).
+- Si el NIF + correo + nombre encajan con DOS clientes, no se adivina cuál: no se manda nada (esos clientes llaman a la oficina).
 
-**Qué hace falta**: el correo de salida en **`cliente.env`**: `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (el mismo que usa la confirmación de pedido). **Sin él la opción no aparece** y todo queda como antes. `CODIGO_CORREO=0` la apaga.
+**Qué hace falta**: el correo de salida en **`cliente.env`**: `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` (el mismo que usa la confirmación de pedido). **Sin él, la entrada nueva no existe y se queda la antigua**: hasta que lo configures, el cierre de las otras formas no se aplica (si no, nadie podría entrar). En cuanto el correo está configurado, **solo se entra con código**. `CODIGO_CORREO=0` apaga todo esto (vuelve lo de antes); `ACCESO_SOLO_CORREO=0` reabre las otras formas de entrar manteniendo la nueva (solo para emergencias).
 
-**Importante (qué NO cambia solo)**: la entrada con **solo el NIF** (los 6 primeros dígitos) sigue funcionando; es la parte débil. Cuando la mayoría de clientes tengan correo en su ficha, pon **`ACCESO_SOLO_CORREO=1`** en `cliente.env` y reinicia: se cierran el acceso con solo el NIF y con teléfono, y solo se entra con NIF + correo + código. **Antes de hacerlo** mira en «Datos y Excel» → Clientes → «Ver cambios» la lista **«sin correo»**: esos clientes no podrían entrar (hay que añadir su correo en la ficha del cliente → «Editar datos»).
+**Quién no podrá entrar hasta que lo arregles**: los clientes **sin correo en su ficha** y los que **no tienen NIF** en a3ERP. Míralos en «Datos y Excel» → Clientes → «Ver cambios»: listas **«sin correo»** y **«sin NIF»**. Se arregla añadiendo el correo en la ficha del cliente (**«Editar datos»**) o volviendo a subir el Excel de clientes con el dato.
+
+**Lo que sigue funcionando sin código** (lo crea la empresa a propósito): los **enlaces de acceso** que generas en el panel y el enlace del chat de WhatsApp.

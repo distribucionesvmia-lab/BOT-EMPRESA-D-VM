@@ -487,9 +487,9 @@
       <div class="pag-cab"><h1>Solicitudes de alta</h1><p>Clientes nuevos que han pedido acceso y que el sistema no ha podido comprobar solo.</p></div>
       <div class="panel">
       <h2>Solicitudes de alta pendientes</h2>
-      <p class="muted">Aquí solo llegan las que el sistema <b>no ha podido comprobar solo</b> (el nombre, el teléfono o el correo no coinciden con la base de clientes, o el cliente está de baja). Las que coinciden entran automáticamente y aparecen en «Cuentas de clientes» por confirmar. Si apruebas, vale el PIN que eligió el cliente.</p>
+      <p class="muted"><b>Toda alta nueva pasa por ti:</b> nadie entra hasta que la aceptes (aunque se parezca a un cliente que ya tienes; en «Qué encajó» ves con cuál y si su NIF coincide). Al aceptarla, el cliente entra con <b>el nombre de su empresa, su NIF y su correo</b>: le llega un código a ese correo.</p>
       <div class="scroll"><table id="sol-tabla"><thead><tr><th>Empresa</th><th>Contacto</th><th>DNI/CIF</th><th>Qué encajó</th><th>Cliente de la base de datos</th><th></th></tr></thead><tbody id="sol"></tbody></table></div>
-      <p class="vacio" id="sol-vacio" hidden><b>No hay solicitudes pendientes.</b><span>Cuando alguien pida acceso y no se pueda comprobar solo, saldrá aquí para que lo revises.</span></p>
+      <p class="vacio" id="sol-vacio" hidden><b>No hay solicitudes pendientes.</b><span>Cuando alguien pida acceso, saldrá aquí para que lo aceptes o lo rechaces.</span></p>
       </div>
     </div>
 
@@ -1016,7 +1016,7 @@ async function solicitudes() {
     const buscar = el("input", "", { placeholder: "Buscar otro cliente…", type: "search" });
     buscar.onchange = async () => { const r = await call("/api/admin/clientes?q=" + encodeURIComponent(buscar.value)); sel.innerHTML = ""; sel.appendChild(el("option", "— elige un cliente —", { value: "" })); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); };
     const ok = el("button", "Aprobar", { className: "main" });
-    ok.onclick = async () => { try { const r = await call(`/api/admin/solicitudes/${s.id}/aprobar`, { clienteId: sel.value }); if (r.pin) mostrarPin(`Cuenta creada para ${r.cliente} (${r.telefono}). PIN:`, r.pin); else mostrarAviso(`Cuenta activada para ${r.cliente} (${r.telefono}). Entra con el PIN que eligió.`); refrescar(); } catch (e) { alert(e.message); } };
+    ok.onclick = async () => { try { const r = await call(`/api/admin/solicitudes/${s.id}/aprobar`, { clienteId: sel.value }); mostrarAviso(`Alta aceptada: ${r.cliente}. Ya puede entrar con el nombre de su empresa, su NIF y su correo (le llega un código al correo).`); refrescar(); } catch (e) { alert(e.message); } };
     const no = el("button", "Rechazar"); no.onclick = async () => { await call(`/api/admin/solicitudes/${s.id}/rechazar`, {}); refrescar(); };
     const td = el("td"); const box = el("div", "", { className: "row" }); box.append(sel, buscar); td.appendChild(box);
     const nuevo = el("button", "Es cliente nuevo: crear su ficha", { type: "button" });
@@ -1032,7 +1032,7 @@ async function solicitudes() {
       crear.disabled = true; msg.textContent = "";
       try {
         const r = await call(`/api/admin/solicitudes/${s.id}/aprobar`, { nuevo: form.valores() });
-        mostrarPin(`Cliente creado (${r.codigo}${r.provisional ? ", código provisional" : ""}) y cuenta de ${r.cliente} (${r.telefono}) activada.`, r.pin ?? "su contraseña");
+        mostrarAviso(`Cliente creado (${r.codigo}${r.provisional ? ", código provisional" : ""}) y alta aceptada: ${r.cliente}. Ya puede entrar con el nombre de su empresa, su NIF y su correo (le llega un código al correo).`);
         refrescar();
       } catch (e) { msg.textContent = e.message; } finally { crear.disabled = false; }
     };

@@ -97,7 +97,8 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const intentosAcceso = contadorIntentos(Number(process.env.CAPTCHA_DESPUES_DE ?? 5), 10 * 60_000); // pasados N intentos en 10 min desde una dirección, se pide «no soy un robot»
   // Entrada con código por correo: topes por dirección, por cliente+correo y en total (que nadie pueda usarlo para llenar buzones)
   const codigoActivo = () => !!enviarCodigo && process.env.CODIGO_CORREO !== "0";
-  const soloCorreo = () => codigoActivo() && process.env.ACCESO_SOLO_CORREO === "1"; // cierra las otras formas de entrar (NIF solo y teléfono + código)
+  const soloCorreo = () => codigoActivo() && process.env.ACCESO_SOLO_CORREO !== "0"; // con el código por correo disponible, SOLO se entra con nombre + NIF + correo + código (ACCESO_SOLO_CORREO=0 reabre las otras formas, solo para emergencias)
+  const altaAutomatica = () => process.env.ALTA_AUTOMATICA === "1"; // por defecto TODA alta la acepta la empresa; esto la dejaría entrar sola si coincide con un cliente (no recomendado)
   const correoIp = rateLimiter(Number(process.env.CODIGO_IP_LIMIT ?? 8), 10 * 60_000);
   const correoClave = rateLimiter(Number(process.env.CODIGO_CLAVE_LIMIT ?? 3), 10 * 60_000);
   const correoGlobal = rateLimiter(Number(process.env.CODIGO_GLOBAL_LIMIT ?? 120), 60 * 60_000);
@@ -106,13 +107,13 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const cleanMail = (v) => String(v ?? "").trim().toLowerCase();
   /** Clientes con ese NIF (o 6 primeros dígitos) que tienen ESE correo en su ficha o en su cuenta. El nombre de la empresa, si se escribe, estrecha la búsqueda. */
   function clientesConCorreo(nif, correo, empresa) {
-    const nombre = String(empresa ?? "").trim().length >= 2 ? new Set(customers.candidates(empresa).map((c) => c.id)) : null;
+    if (String(empresa ?? "").trim().length < 2) return [];
     return customers.findByNif(nif).filter((id) => {
-      if (nombre && !nombre.has(id)) return false;
       const c = customers.getById(id);
-      return [...(c?.emails ?? []), accounts.emailDe(id)].map(cleanMail).includes(correo);
+      return !!c && customers.nameMatches(c, empresa) && [...(c.emails ?? []), accounts.emailDe(id)].map(cleanMail).includes(correo);
     });
   }
+  const pedirNombre = (res, b) => String(b.empresa ?? "").trim().length < 2 ? (send(res, 400, { error: "Escribe el nombre de tu empresa o negocio, tal como lo conocemos." }), true) : false;
   const ip = (req) => ipDe(req, trustProxy);
   /** Aparato desde el que se entra: huella corta del navegador (nunca se guarda la cadena entera). Avisa al servidor para que pueda decirle al cliente «alguien ha entrado desde un aparato nuevo». */
   const huellaAparato = (req) => crypto.createHash("sha256").update(String(req.headers["user-agent"] ?? "")).digest("hex").slice(0, 16);
@@ -171,20 +172,26 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (!/^[A-Z0-9]{8,10}$/.test(nif) || nif.replace(/\D/g, "").length < 6) return send(res, 400, { error: "Escribe tu DNI, NIE o CIF (por ejemplo 12345678Z o B12345678)." }), true;
       if (empresa.length < 2 || empresa.length > 80) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
       if (!normalizePhone(b.telefono)) return send(res, 400, { error: "El teléfono no es válido." }), true;
-      if (correo && !validEmail(correo)) return send(res, 400, { error: "El correo no es válido." }), true; // el correo es opcional
-      if (!pinValido(pin)) return send(res, 400, { error: "Elige un código de entrada de 6 letras o números." }), true;
+      if (correo && !validEmail(correo)) return send(res, 400, { error: "El correo no es válido." }), true; // opcional solo si no se entra con código por correo
+      if (codigoActivo() && !correo) return send(res, 400, { error: "Escribe tu correo electrónico: lo necesitas para entrar (te enviaremos un código a ese correo)." }), true;
+      const sinCodigoEntrada = soloCorreo(); // con el acceso nuevo no hay «código de entrada»: ni se pide ni se guarda
+      if (!sinCodigoEntrada && !pinValido(pin)) return send(res, 400, { error: "Elige un código de entrada de 6 letras o números." }), true;
       // El sistema comprueba la solicitud contra la base de clientes. Acceso automático si el nombre de la empresa coincide
       // con un cliente guardado Y su teléfono o su correo también; si no, queda pendiente para que la revise la empresa.
       const m = customers.matchRegistration({ phone: b.telefono, email: correo, business: empresa });
-      if (m.customer) {
+      if (m.customer && altaAutomatica() && !sinCodigoEntrada) {
         const dato = [m.matched.phone ? "teléfono" : null, m.matched.email ? "correo" : null].filter(Boolean).join(" y ");
         const r = accounts.registerAuto({ phone: b.telefono, email: correo, business: empresa, pin, customerId: m.customer.id, matched: `nombre + ${dato}` });
         if (r.error) return send(res, 400, { error: r.error }), true;
         return send(res, 200, { ok: true, estado: "activa", mensaje: "Listo: ya tienes acceso. Entra con tu teléfono y tu código de entrada." }), true;
       }
-      const r = accounts.requestRegistration({ phone: b.telefono, email: correo, business: empresa, pin, nif, address: b.direccion }); // el DNI/CIF solo se guarda aquí (cliente nuevo) y se borra al resolver la solicitud
+      const r = accounts.requestRegistration({ phone: b.telefono, email: correo, business: empresa, pin: sinCodigoEntrada ? undefined : pin, nif, address: b.direccion }); // el DNI/CIF solo se guarda aquí (cliente nuevo) y se borra al resolver la solicitud
       if (r.error) return send(res, 400, { error: r.error }), true;
-      const motivo = { ambiguo: "Hay varios clientes que encajan", contacto: "El nombre coincide pero no el teléfono ni el correo", nombre: "No hay ningún cliente con ese nombre" }[m.reason];
+      const datos = [m.matched?.phone ? "el teléfono" : null, m.matched?.email ? "el correo" : null].filter(Boolean);
+      const nifCoincide = m.customer ? customers.findByNif(nif).map(String).includes(String(m.customer.id)) : false; // ¿el NIF escrito es el de ese cliente? (el NIF real no se guarda: se compara su huella)
+      const motivo = m.customer
+        ? `Parece el cliente «${m.customer.name}» (coincide el nombre${datos.length ? " y " + datos.join(" y ") : ""}). ${nifCoincide ? "El NIF escrito SÍ coincide con el de ese cliente." : "OJO: el NIF escrito NO coincide con el de ese cliente (¿error o suplantación?)."} Revísalo y acéptalo solo si es él.`
+        : { ambiguo: "Hay varios clientes que encajan", contacto: "El nombre coincide pero no el teléfono ni el correo", nombre: "No hay ningún cliente con ese nombre" }[m.reason];
       accounts.setMatched(r.id, motivo);
       return send(res, 200, { ok: true, estado: "pendiente", mensaje: "Hemos recibido tu solicitud. En un plazo de 24 a 48 horas nos pondremos en contacto contigo y se aceptará tu cuenta para que puedas hacer pedidos." }), true;
     }
@@ -202,9 +209,10 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
       }
       const correo = cleanMail(b.correo);
+      if (pedirNombre(res, b)) return true;
       if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe tu NIF: los 6 primeros dígitos de tu DNI o CIF, o el NIF completo." }), true;
       if (!validEmail(correo)) return send(res, 400, { error: "Escribe tu correo electrónico, el mismo que nos diste." }), true;
-      const clave = `${nifCodes(b.nif)[0]}|${correo}`;
+      const clave = `${nifCodes(b.nif)[0]}|${correo}`; // el tope es por NIF + correo (el nombre no cuenta: así no se esquiva escribiéndolo distinto)
       if (!correoClave(clave)) return demasiados(res, correoClave, clave, "Ya te hemos enviado códigos hace poco. Espera unos minutos."), true;
       const ids = clientesConCorreo(b.nif, correo, b.empresa);
       if (ids.length === 1 && correoGlobal("todos")) {
@@ -221,7 +229,8 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       const correo = cleanMail(b.correo), codigo = String(b.codigo ?? "").replace(/\s/g, "");
-      if (nifCodes(b.nif).length === 0 || !validEmail(correo)) return send(res, 400, { error: "Escribe tu NIF y tu correo." }), true;
+      if (pedirNombre(res, b)) return true;
+      if (nifCodes(b.nif).length === 0 || !validEmail(correo)) return send(res, 400, { error: "Escribe el nombre de tu empresa, tu NIF y tu correo." }), true;
       if (!/^\d{6}$/.test(codigo)) return send(res, 400, { error: "El código tiene 6 cifras. Míralo en el correo que te hemos enviado." }), true;
       const ids = clientesConCorreo(b.nif, correo, b.empresa);
       const c = ids.length === 1 ? accounts.codigoCorreoComprobar(ids, (id) => claveCodigoCorreo(id, codigo)) : { ok: false, reason: "invalid" };
@@ -292,7 +301,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (p === "/api/yo" && req.method === "GET") {
       const acc = sessionOf(req);
       if (!acc) return send(res, 200, { cliente: null }), true; // invitado: sin sesión no es un error (la consola del navegador queda limpia)
-      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode, soloVer: !!acc.soloVer, mensajeEnlace: acc.mensajeEnlace || "", carrito: "vm_carrito_c_" + String(acc.customerId) } }), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
+      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode || soloCorreo(), soloCorreo: soloCorreo(), soloVer: !!acc.soloVer, mensajeEnlace: acc.mensajeEnlace || "", carrito: "vm_carrito_c_" + String(acc.customerId) } }), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
     }
 
     // El cliente cambia el código de entrada (los 6 del NIF) por uno personal de 6 letras o números

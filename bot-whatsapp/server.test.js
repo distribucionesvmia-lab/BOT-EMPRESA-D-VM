@@ -24,7 +24,7 @@ before(async () => {
   proc = spawn(process.execPath, ["server.js"], {
     cwd: path.dirname(fileURLToPath(import.meta.url)),
     env: {
-      ...process.env, VM_HOY: "2026-11-15", DEMO: "1", PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
+      ...process.env, VM_HOY: "2026-11-15", DEMO: "1", ALTA_AUTOMATICA: "1" /* estas pruebas usan el alta automática como preparación; por defecto (producción) TODA alta la acepta la empresa: tanda57.test.js */, PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
       DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: syncDir, BACKUP_DIR: path.join(dir, "respaldos"), ENTRADA_DIR: path.join(dir, "entrada"), PUSH_ALLOW_HTTP: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],
