@@ -1526,7 +1526,7 @@ async function entrada() {
   const n = r.configurada ? (r.archivos ?? []).length : 0; $("n-dat").hidden = !n; $("n-dat").textContent = n || "";
   if (!r.configurada) return;
   const subs = (r.subcarpetas ?? []).map((s) => s.nombre);
-  $("entrada-info").textContent = r.error || `Deja los Excel de a3ERP (y el ZIP de fotos) en la carpeta ${r.carpeta}${subs.length ? ` o, mejor, en sus subcarpetas ${subs.join(", ")} (en cada una, el archivo más reciente es «Último»)` : ""}. Aquí aparecen solos; no se cambia nada hasta que tú pulses «Ver cambios» y luego «Aplicar cambios».`;
+  $("entrada-info").textContent = r.error || `Deja los Excel de a3ERP (y el ZIP de fotos) en la carpeta ${r.carpeta}${subs.length ? ` o, mejor, en sus subcarpetas ${subs.join(", ")} (en cada una, el archivo más reciente es «Último»)` : ""}. ${r.auto?.activa && subs.length ? " ACTUALIZACIÓN AUTOMÁTICA ACTIVADA: lo que dejes en esas carpetas se aplica solo (el archivo más reciente de cada una, cuando lleva 2 minutos sin cambiar), con copia de seguridad antes. Si hay algo que confirmar —precios que cambian más de un 25 %, muchos artículos que se quitan, datos raros— NO se aplica solo: queda aquí esperando." : " Aquí aparecen solos; no se cambia nada hasta que tú pulses «Ver cambios» y luego «Aplicar cambios»."}`;
   const tb = $("entrada-lista"); tb.innerHTML = "";
   if (!r.archivos?.length) { const tr = document.createElement("tr"); tr.appendChild(el("td", "No hay archivos nuevos en la carpeta.", { className: "muted" })); tb.appendChild(tr); return; }
   for (const a of r.archivos) {
@@ -1534,7 +1534,9 @@ async function entrada() {
     const ver = el("button", "Ver cambios", { type: "button", className: "main" }); ver.disabled = !a.tipo; ver.onclick = () => entradaVer(a);
     const arch = el("button", "Archivar", { type: "button", title: "Lo mueve a la subcarpeta «aplicados» sin cambiar nada: úsalo si ya está aplicado o no hace falta" }); arch.style.marginLeft = "8px"; arch.onclick = () => entradaArchivar(a.nombre, a.carpeta, "Archivado.");
     acc.append(ver, arch);
-    const nom = el("td"); nom.append(el("b", (a.carpeta ? a.carpeta + " / " : "") + a.nombre + (a.ultimo ? "  · Último" : "")), el("div", `${a.tipo ? TIPO_TXT[a.tipo] : a.aviso || "No sé de qué tipo es: súbelo a mano en su tarjeta"} · ${hora2(a.modificado)} · ${(a.tamano / 1048576).toFixed(1).replace(".", ",")} MB`, { className: "muted" }));
+    const espera = (r.auto?.pendientes ?? []).find((p) => p.carpeta === a.carpeta && p.nombre === a.nombre);
+    const nom = el("td"); if (espera) nom.append(el("div", "⚠ No se ha aplicado solo: " + espera.motivo, { className: "muted", style: "color:#C8102E;font-weight:600" }));
+    nom.append(el("b", (a.carpeta ? a.carpeta + " / " : "") + a.nombre + (a.ultimo ? "  · Último" : "")), el("div", `${a.tipo ? TIPO_TXT[a.tipo] : a.aviso || "No sé de qué tipo es: súbelo a mano en su tarjeta"} · ${hora2(a.modificado)} · ${(a.tamano / 1048576).toFixed(1).replace(".", ",")} MB`, { className: "muted" }));
     tr.append(nom, acc); tb.appendChild(tr);
   }
 }

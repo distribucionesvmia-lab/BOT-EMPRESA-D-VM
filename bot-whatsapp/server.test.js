@@ -1625,3 +1625,18 @@ test("BANDEJA DE ENTRADA: subcarpetas BASE-CLIENTES / BASE-HISTORICO / BASE-ARTI
   const l2 = (await call("GET", "/api/admin/entrada", { admin: true })).json;
   assert.equal(l2.archivos.find((a) => a.carpeta === "BASE-CLIENTES").nombre, "viejo.xlsx"); // ahora el «Último» es el siguiente
 });
+
+test("BANDEJA DE ENTRADA: «BASE-HISTORICO PEDIDOS» y «BASE-ARTÍCULOS» (con tilde y palabras detrás) se reconocen; la actualización automática no corre en las pruebas", async () => {
+  const carpeta = path.join(dir, "entrada");
+  fs.mkdirSync(path.join(carpeta, "BASE-HISTORICO PEDIDOS"), { recursive: true }); fs.mkdirSync(path.join(carpeta, "BASE-ARTÍCULOS"), { recursive: true });
+  fs.writeFileSync(path.join(carpeta, "BASE-HISTORICO PEDIDOS", "h.xlsx"), Buffer.from(buildWorkbook([{ name: "X", rows: [["hola", "adios"], [1, 2]] }])));
+  fs.writeFileSync(path.join(carpeta, "BASE-ARTÍCULOS", "a.xlsx"), Buffer.from(buildWorkbook([{ name: "A", rows: [["Cód. artículo", "Artículo", "Precio venta"], ["9997", "ARTICULO TILDE", 3]] }])));
+  const l = (await call("GET", "/api/admin/entrada", { admin: true })).json;
+  assert.ok(l.subcarpetas.some((s) => s.nombre === "BASE-HISTORICO PEDIDOS" && s.tipo === "historial"));
+  assert.ok(l.subcarpetas.some((s) => s.nombre === "BASE-ARTÍCULOS" && s.tipo === "productos"));
+  assert.equal(l.archivos.find((a) => a.carpeta === "BASE-HISTORICO PEDIDOS").tipo, "historial");
+  assert.equal(l.archivos.find((a) => a.carpeta === "BASE-ARTÍCULOS").tipo, "productos");
+  assert.equal(l.auto.activa, true); assert.deepEqual(l.auto.pendientes, []);
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(fs.existsSync(path.join(carpeta, "BASE-ARTÍCULOS", "a.xlsx")), "con DEMO=1 el planificador no corre: el archivo sigue ahí");
+});
