@@ -39,7 +39,7 @@ test("cabeceras nuevas y registro a prueba de saltos de línea", () => {
 });
 
 test("sin dependencias externas: nada que pueda venir infectado de npm", () => {
-  const p = JSON.parse(fs.readFileSync(new URL("./package.json", import.meta.url), "utf8"));
+  const p = JSON.parse(fs.readFileSync(new URL("./package.json", import.meta.url), "utf8").replace(/\r\n/g, "\n"));
   for (const k of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) assert.ok(!p[k] || Object.keys(p[k]).length === 0, k);
   assert.ok(!(p.scripts && Object.keys(p.scripts).some((n) => /^(pre|post)?install$|^prepare$/.test(n))), "ningún script que se ejecute al instalar");
 });
