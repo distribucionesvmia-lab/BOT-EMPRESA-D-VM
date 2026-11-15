@@ -113,21 +113,48 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
   // Nada se aplica solo: el panel enseña lo que hay, «Ver cambios» hace la vista previa de siempre y, al aplicar, el archivo pasa a la subcarpeta «aplicados».
   const ENTRADA_MAX = 80_000_000, tiposCache = new Map();
   const nombreValido = (n) => typeof n === "string" && n.length > 0 && n.length <= 200 && path.basename(n) === n && /\.(xlsx|zip)$/i.test(n) && !/^[.~]/.test(n);
+  // Subcarpetas de la bandeja: BASE-ARTICULOS, BASE-CLIENTES y BASE-HISTORICO (da igual mayúsculas, guiones o tildes). Lo que se deja ahí se entiende
+  // como de ese tipo; igualmente se mira el contenido, y si no cuadra se avisa y no se carga solo. Cada una tiene su propia subcarpeta «aplicados».
+  const SUBS = { basearticulos: "productos", baseproductos: "productos", baseclientes: "clientes", basehistorico: "historial", basehistorial: "historial" };
+  const normSub = (n) => String(n ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+  /** Carpeta de la bandeja que se pide («» = la principal, o el nombre de una subcarpeta BASE-…). null si no existe o no es una de las permitidas. */
+  function carpetaEntrada(dir, nombre) {
+    if (!nombre) return { ruta: dir, nombre: "", tipo: null };
+    try {
+      const d = fs.readdirSync(dir, { withFileTypes: true }).find((x) => x.isDirectory() && x.name === nombre && SUBS[normSub(x.name)]);
+      return d ? { ruta: path.join(dir, d.name), nombre: d.name, tipo: SUBS[normSub(d.name)] } : null;
+    } catch { return null; }
+  }
+  function archivosDe(carpeta) {
+    const out = [];
+    for (const f of fs.readdirSync(carpeta.ruta, { withFileTypes: true })) {
+      if (!f.isFile() || !nombreValido(f.name)) continue;
+      const st = fs.statSync(path.join(carpeta.ruta, f.name));
+      if (!st.size || st.size > ENTRADA_MAX) continue;
+      const k = `${carpeta.nombre}/${f.name}|${st.size}|${st.mtimeMs}`;
+      if (!tiposCache.has(k)) { try { tiposCache.set(k, detectarTipo(fs.readFileSync(path.join(carpeta.ruta, f.name)))); } catch { tiposCache.set(k, null); } if (tiposCache.size > 200) tiposCache.delete(tiposCache.keys().next().value); }
+      const visto = tiposCache.get(k);
+      let tipo = visto, aviso = null;
+      if (carpeta.tipo) { // en una subcarpeta BASE-…: manda lo que dice la carpeta, salvo que el contenido diga claramente otra cosa
+        if (!visto) tipo = carpeta.tipo;
+        else if (visto !== carpeta.tipo) { tipo = null; aviso = `Está en ${carpeta.nombre} pero parece de «${visto}». Revísalo antes de subirlo.`; }
+      }
+      out.push({ nombre: f.name, carpeta: carpeta.nombre, tipo, ...(aviso ? { aviso } : {}), tamano: st.size, modificado: st.mtime.toISOString() });
+    }
+    return out;
+  }
   function listarEntrada() {
     const dir = entradaDir();
     if (!dir) return { configurada: false };
     try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { return { configurada: true, carpeta: dir, archivos: [], error: "No se puede abrir la carpeta de entrada." }; }
-    const archivos = [];
-    for (const f of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (!f.isFile() || !nombreValido(f.name)) continue;
-      const st = fs.statSync(path.join(dir, f.name));
-      if (!st.size || st.size > ENTRADA_MAX) continue;
-      const k = `${f.name}|${st.size}|${st.mtimeMs}`;
-      if (!tiposCache.has(k)) { try { tiposCache.set(k, detectarTipo(fs.readFileSync(path.join(dir, f.name)))); } catch { tiposCache.set(k, null); } if (tiposCache.size > 200) tiposCache.delete(tiposCache.keys().next().value); }
-      archivos.push({ nombre: f.name, tipo: tiposCache.get(k), tamano: st.size, modificado: st.mtime.toISOString() });
-    }
+    const carpetas = [{ ruta: dir, nombre: "", tipo: null }];
+    const subcarpetas = [];
+    for (const d of fs.readdirSync(dir, { withFileTypes: true })) if (d.isDirectory() && SUBS[normSub(d.name)]) { carpetas.push({ ruta: path.join(dir, d.name), nombre: d.name, tipo: SUBS[normSub(d.name)] }); subcarpetas.push({ nombre: d.name, tipo: SUBS[normSub(d.name)] }); }
+    let archivos = [];
+    for (const c of carpetas) { try { archivos.push(...archivosDe(c)); } catch { /* una subcarpeta que no se puede leer no impide ver las demás */ } }
     archivos.sort((a, b) => (a.modificado < b.modificado ? 1 : -1));
-    return { configurada: true, carpeta: dir, archivos: archivos.slice(0, 50) };
+    for (const c of carpetas) { const primero = archivos.find((a) => a.carpeta === c.nombre); if (primero && c.nombre) primero.ultimo = true; } // el más reciente de cada subcarpeta BASE-… es el que toca subir
+    return { configurada: true, carpeta: dir, subcarpetas, archivos: archivos.slice(0, 60) };
   }
   // Máximo 10 claves erróneas cada 10 minutos por IP; superado el límite se bloquea esa IP aunque acierte la clave
   // Cada CLAVE distinta que falla cuenta una vez: el panel lanza varias peticiones a la vez con la misma clave y un solo
@@ -307,7 +334,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       if (mi && post) {
         const cli = customers.getById(decodeURIComponent(mi[1]));
         if (!cli) return send(res, 404, { error: "No encontramos ese cliente." }), true;
-        const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/\/$/, "");
+        const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1");
         if (!/^https?:\/\//.test(base)) return send(res, 409, { error: "Falta la dirección pública de la aplicación del cliente: ponla en CLIENTE_URL (en C:\\vm\\config) o abre una vez la aplicación del cliente desde su dirección pública." }), true;
         const op = opcionesInvitacion((await readJson(req)) ?? {});
         if (op.error) return send(res, 400, { error: op.error }), true;
@@ -324,7 +351,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       if (!tipo) return send(res, 400, { error: "Elige qué quieres que pueda hacer: darse de alta, ver la app o pedir." }), true;
       const nombre = String(b.nombre ?? "").replace(/\s+/g, " ").trim();
       if (nombre.length < 2 || nombre.length > 80) return send(res, 400, { error: "Escribe el nombre de la persona o del negocio (de 2 a 80 letras)." }), true;
-      const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/\/$/, "");
+      const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1");
       if (!/^https?:\/\//.test(base)) return send(res, 409, { error: "Falta la dirección pública de la aplicación del cliente: ponla en CLIENTE_URL (en C:\\vm\\config) o abre una vez la aplicación del cliente desde su dirección pública." }), true;
       const op = opcionesInvitacion({ ...b, modo: tipo === "pedir" ? "pedir" : "ver", pedirCodigo: tipo === "pedir" ? b.pedirCodigo : false });
       if (op.error) return send(res, 400, { error: op.error }), true;
@@ -622,7 +649,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       if (mc && post) return accounts.avisoProgCancelar(mc[1]) ? send(res, 200, { ok: true }) : send(res, 409, { error: "Ese aviso ya salió, se canceló o no existe." }), true; }
     // ---- Correos a clientes (promociones, descuentos, avisos de servicio): ahora o programados; las promociones solo a quien ha aceptado ofertas ----
     {
-      const smtpCfg = () => smtpDesdeEntorno(), baseCliente = () => String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/\/$/, "");
+      const smtpCfg = () => smtpDesdeEntorno(), baseCliente = () => String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1");
       const parte = (x) => ({ ...x, para: x.destino === "todos" ? (x.tipo === "promo" ? "Todos los que aceptan ofertas" : "Todos los clientes con correo") : (customers.getById(x.clienteId)?.name ?? "Cliente " + x.clienteId), tipoTexto: TIPOS_CORREO[x.tipo] });
       const lanzar = () => enviarCampanas({ accounts, contactos: () => customers.contactos(), smtp: smtpCfg()?.smtp, from: smtpCfg()?.from, base: baseCliente, negocio: "Distribuciones Valentín Martín", telefono: process.env.AYUDA_TEL ?? "" }).catch((e) => console.error("Correos a clientes:", e.message));
       if (p === "/api/admin/correos" && get) {
@@ -662,18 +689,18 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
     // ---- Bandeja de entrada (carpeta del ordenador) ----
     if (p === "/api/admin/entrada" && get) return send(res, 200, listarEntrada()), true;
     if (p === "/api/admin/entrada/archivo" && get) {
-      const n = url.searchParams.get("nombre") ?? "", dir = entradaDir();
-      if (!dir || !nombreValido(n) || !fs.existsSync(path.join(dir, n))) return send(res, 404, { error: "No existe ese archivo en la carpeta." }), true;
-      res.writeHead(200, { "Content-Type": "application/octet-stream", "Cache-Control": "no-store" }).end(fs.readFileSync(path.join(dir, n)));
+      const n = url.searchParams.get("nombre") ?? "", dir = entradaDir(), c = dir ? carpetaEntrada(dir, url.searchParams.get("carpeta") ?? "") : null;
+      if (!c || !nombreValido(n) || !fs.existsSync(path.join(c.ruta, n))) return send(res, 404, { error: "No existe ese archivo en la carpeta." }), true;
+      res.writeHead(200, { "Content-Type": "application/octet-stream", "Cache-Control": "no-store" }).end(fs.readFileSync(path.join(c.ruta, n)));
       return true;
     }
     if (p === "/api/admin/entrada/archivar" && post) { // el archivo ya se aplicó (o no hace falta): pasa a «aplicados», con la fecha delante
-      const b = (await readJson(req)) ?? {}, dir = entradaDir();
-      if (!dir || !nombreValido(b.nombre) || !fs.existsSync(path.join(dir, b.nombre))) return send(res, 404, { error: "No existe ese archivo en la carpeta." }), true;
+      const b = (await readJson(req)) ?? {}, dir = entradaDir(), c = dir ? carpetaEntrada(dir, typeof b.carpeta === "string" ? b.carpeta : "") : null;
+      if (!c || !nombreValido(b.nombre) || !fs.existsSync(path.join(c.ruta, b.nombre))) return send(res, 404, { error: "No existe ese archivo en la carpeta." }), true;
       try {
-        const destino = path.join(dir, "aplicados"); fs.mkdirSync(destino, { recursive: true });
+        const destino = path.join(c.ruta, "aplicados"); fs.mkdirSync(destino, { recursive: true }); // cada carpeta (la principal o cada BASE-…) tiene sus «aplicados»
         const sello = madrid(new Date().toISOString()).replace(/[-: ]/g, "").replace(/^(\d{8})/, "$1-").slice(0, 13);
-        fs.renameSync(path.join(dir, b.nombre), path.join(destino, `${sello}-${b.nombre}`));
+        fs.renameSync(path.join(c.ruta, b.nombre), path.join(destino, `${sello}-${b.nombre}`));
         return send(res, 200, { ok: true }), true;
       } catch (e) { return send(res, 409, { error: "No se pudo mover el archivo. Si lo tienes abierto en Excel, ciérralo y vuelve a intentarlo." }), true; }
     }

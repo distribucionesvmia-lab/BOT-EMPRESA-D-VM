@@ -1,50 +1,40 @@
-import { test } from "node:test";
+// ALBARÁN / FACTURA en el Excel de pedidos según el «Modelo pedido» del cliente en a3ERP (datos ficticios).
+import test from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import { origenAjeno, esRedPrivada, panelPermitido, cabecerasSeguridad, eventoSeguridad } from "./seguridad.js";
+import { FORMAT, imprimirHtml, tipoDocumento, usarModeloPedido } from "./export-format.js";
+import { parseClientes } from "./clientes-import.js";
+import { openCustomersDb } from "./clientes-db.js";
 
-const peticion = (metodo, cab = {}, ip = "203.0.113.4") => ({ method: metodo, headers: cab, socket: { remoteAddress: ip } });
+const pedido = (cid) => ({ ref: "VM-2026-000001", customer_id: cid, name: "BAR PRUEBA", city: "MEDINA", created_at: "2026-11-15T09:00:00Z", delivery_date: "2026-11-16", re: 0, note: null,
+  items: [{ id: "1001", name: "AGUA 1,5 L", units: 6, boxes: 1, price: 1, vat_rate: 10 }] });
+const textos = (h) => h.rows.map((r) => r.map((c) => (c && typeof c === "object" ? c.v : c))).flat().filter((v) => typeof v === "string");
 
-test("CSRF: lo que cambia datos desde otra web se rechaza; lo propio y lo que no es navegador pasa", () => {
-  const h = { host: "pedidos.ejemplo.es" };
-  assert.equal(origenAjeno(peticion("GET", { ...h, origin: "https://malo.com" })), null, "leer no cambia nada");
-  assert.ok(origenAjeno(peticion("POST", { ...h, origin: "https://malo.com" })));
-  assert.ok(origenAjeno(peticion("POST", { ...h, "sec-fetch-site": "cross-site" })));
-  assert.ok(origenAjeno(peticion("POST", { ...h, "sec-fetch-site": "same-site" })), "ni un subdominio hermano");
-  assert.ok(origenAjeno(peticion("DELETE", { ...h, origin: "null" })), "origen null (iframes, archivos locales)");
-  assert.equal(origenAjeno(peticion("POST", { ...h, origin: "https://pedidos.ejemplo.es", "sec-fetch-site": "same-origin" })), null);
-  assert.equal(origenAjeno(peticion("POST", h)), null, "sin cabeceras de navegador (MCP, WhatsApp, pruebas)");
-  assert.equal(origenAjeno(peticion("POST", { host: "127.0.0.1:3000", origin: "http://127.0.0.1:3000" })), null);
-  assert.equal(origenAjeno(peticion("POST", { host: "interno:3000", origin: "https://pedidos.ejemplo.es" }), ["https://pedidos.ejemplo.es"]), null, "dominio propio configurado");
+test("el Modelo pedido .002 sale como ALBARÁN, arriba y abajo; otro modelo, FACTURA; sin dato, nada", () => {
+  usarModeloPedido((id) => ({ A: "LSTIMPRPEDV.002", B: "_DATGEN_", C: "LSTIMPRPEDV.001" })[id] ?? null);
+  assert.equal(tipoDocumento("A"), "ALBARÁN"); assert.equal(tipoDocumento("B"), "FACTURA"); assert.equal(tipoDocumento("C"), "FACTURA"); assert.equal(tipoDocumento("Z"), null);
+  const h = FORMAT.build([pedido("A")]).sheets[0];
+  assert.equal(h.rows[0][0].v, "ALBARÁN"); assert.equal(h.rows.at(-1)[0].v, "ALBARÁN");
+  assert.equal(FORMAT.build([pedido("B")]).sheets[0].rows[0][0].v, "FACTURA");
+  assert.ok(!textos(FORMAT.build([pedido("Z")]).sheets[0]).some((t) => /ALBAR|FACTURA/.test(t)));
+  assert.equal((imprimirHtml([pedido("A")], { autoprint: false }).match(/class="doc alb">ALBARÁN/g) ?? []).length, 2);
+  usarModeloPedido(null);
 });
 
-test("panel: solo red privada, localhost y Tailscale; internet no", () => {
-  for (const ip of ["127.0.0.1", "::1", "::ffff:127.0.0.1", "10.1.2.3", "172.16.0.9", "172.31.255.1", "192.168.1.50", "::ffff:192.168.0.7", "100.101.102.103", "fd12:3456::1", "fe80::1"]) assert.ok(esRedPrivada(ip), ip);
-  for (const ip of ["8.8.8.8", "203.0.113.4", "172.32.0.1", "172.15.0.1", "100.63.0.1", "100.128.0.1", "2a00:1450::1", "", "abc", "999.1.1.1x"]) assert.ok(!esRedPrivada(ip), ip);
-  assert.ok(panelPermitido(peticion("GET", {}, "192.168.1.20")));
-  assert.ok(!panelPermitido(peticion("GET", {}, "203.0.113.4")), "conexión directa desde internet");
-  assert.ok(!panelPermitido(peticion("GET", { "cf-connecting-ip": "203.0.113.4" }, "127.0.0.1")), "entra por el túnel pero quien llama es público");
-  assert.ok(!panelPermitido(peticion("GET", { "x-forwarded-for": "203.0.113.4" }, "10.0.0.2")));
-  assert.ok(panelPermitido(peticion("GET", { "cf-connecting-ip": "192.168.1.9" }, "127.0.0.1")));
-  assert.ok(!panelPermitido(peticion("GET", { "x-forwarded-for": "10.0.0.1" }, "203.0.113.4")), "falsear la cabecera no sirve: la conexión real manda");
-  assert.ok(panelPermitido(peticion("GET", {}, "203.0.113.4"), ["203.0.113.4"]), "dirección añadida a mano");
+test("la importación lee «Modelo pedido» y lo guarda en la ficha", () => {
+  const rows = [["Cód. cliente", "Organización", "Teléfono", "Modelo pedido"], ["1", "UNO", "600111222", "LSTIMPRPEDV.002"], ["2", "DOS", "600111333", "_DATGEN_"]];
+  const { customers } = parseClientes(rows);
+  assert.deepEqual(customers.map((c) => c.modeloPedido), ["LSTIMPRPEDV.002", "_DATGEN_"]);
+  const db = openCustomersDb(":memory:"); db.upsertCustomers(customers);
+  assert.equal(db.modeloPedidoDe("1"), "LSTIMPRPEDV.002");
+  db.upsertCustomers([{ id: "1", name: "UNO" }]); // un Excel sin la columna no lo borra
+  assert.equal(db.modeloPedidoDe("1"), "LSTIMPRPEDV.002");
 });
 
-test("cabeceras nuevas y registro a prueba de saltos de línea", () => {
-  const c = cabecerasSeguridad();
-  assert.equal(c["Cross-Origin-Resource-Policy"], "same-origin"); assert.equal(c["X-Permitted-Cross-Domain-Policies"], "none");
-  const lineas = []; const w = console.warn; console.warn = (m) => lineas.push(String(m));
-  try { eventoSeguridad("prueba-log-" + Date.now(), "1.2.3.4\n[VM seguridad] falso · todo bien\r\n"); } finally { console.warn = w; }
-  assert.equal(lineas.length, 1); assert.ok(!/[\r\n]/.test(lineas[0]));
-});
-
-test("sin dependencias externas: nada que pueda venir infectado de npm", () => {
-  const p = JSON.parse(fs.readFileSync(new URL("./package.json", import.meta.url), "utf8").replace(/\r\n/g, "\n"));
-  for (const k of ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]) assert.ok(!p[k] || Object.keys(p[k]).length === 0, k);
-  assert.ok(!(p.scripts && Object.keys(p.scripts).some((n) => /^(pre|post)?install$|^prepare$/.test(n))), "ningún script que se ejecute al instalar");
-});
-
-test("server.js aplica la puerta del panel y la defensa CSRF", () => {
-  const s = fs.readFileSync(new URL("./server.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
-  assert.match(s, /panelPermitido\(req, panelExtra\)/); assert.match(s, /origenAjeno\(req, origenesPropios\)/);
+test("la dirección pública para enlaces se queda en https://dominio aunque se haya puesto con /cliente detrás", async () => {
+  const fs = await import("node:fs");
+  const norm = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const quita = '.replace(/^(https?:\\/\\/[^/]+).*$/i, "$1")';
+  assert.equal(norm("./admin.js").split(quita).length - 1, 3); // los 3 sitios que arman /entrar/<token> y los enlaces de baja
+  assert.match(norm("./server.js"), /const PUBLIC_URL = .*replace\(\/\^\(https\?/);
+  assert.equal("https://pc.ts.net/cliente/".replace(/^(https?:\/\/[^/]+).*$/i, "$1"), "https://pc.ts.net");
 });

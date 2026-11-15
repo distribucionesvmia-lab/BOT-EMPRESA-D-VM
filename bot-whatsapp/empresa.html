@@ -1525,34 +1525,35 @@ async function entrada() {
   $("entrada-panel").hidden = !r.configurada;
   const n = r.configurada ? (r.archivos ?? []).length : 0; $("n-dat").hidden = !n; $("n-dat").textContent = n || "";
   if (!r.configurada) return;
-  $("entrada-info").textContent = r.error || `Deja los Excel de a3ERP (y el ZIP de fotos) en la carpeta ${r.carpeta}. Aquí aparecen solos; no se cambia nada hasta que tú pulses «Ver cambios» y luego «Aplicar cambios».`;
+  const subs = (r.subcarpetas ?? []).map((s) => s.nombre);
+  $("entrada-info").textContent = r.error || `Deja los Excel de a3ERP (y el ZIP de fotos) en la carpeta ${r.carpeta}${subs.length ? ` o, mejor, en sus subcarpetas ${subs.join(", ")} (en cada una, el archivo más reciente es «Último»)` : ""}. Aquí aparecen solos; no se cambia nada hasta que tú pulses «Ver cambios» y luego «Aplicar cambios».`;
   const tb = $("entrada-lista"); tb.innerHTML = "";
   if (!r.archivos?.length) { const tr = document.createElement("tr"); tr.appendChild(el("td", "No hay archivos nuevos en la carpeta.", { className: "muted" })); tb.appendChild(tr); return; }
   for (const a of r.archivos) {
     const tr = document.createElement("tr"), acc = el("td");
     const ver = el("button", "Ver cambios", { type: "button", className: "main" }); ver.disabled = !a.tipo; ver.onclick = () => entradaVer(a);
-    const arch = el("button", "Archivar", { type: "button", title: "Lo mueve a la subcarpeta «aplicados» sin cambiar nada: úsalo si ya está aplicado o no hace falta" }); arch.style.marginLeft = "8px"; arch.onclick = () => entradaArchivar(a.nombre, "Archivado.");
+    const arch = el("button", "Archivar", { type: "button", title: "Lo mueve a la subcarpeta «aplicados» sin cambiar nada: úsalo si ya está aplicado o no hace falta" }); arch.style.marginLeft = "8px"; arch.onclick = () => entradaArchivar(a.nombre, a.carpeta, "Archivado.");
     acc.append(ver, arch);
-    const nom = el("td"); nom.append(el("b", a.nombre), el("div", `${a.tipo ? TIPO_TXT[a.tipo] : "No sé de qué tipo es: súbelo a mano en su tarjeta"} · ${hora2(a.modificado)} · ${(a.tamano / 1048576).toFixed(1).replace(".", ",")} MB`, { className: "muted" }));
+    const nom = el("td"); nom.append(el("b", (a.carpeta ? a.carpeta + " / " : "") + a.nombre + (a.ultimo ? "  · Último" : "")), el("div", `${a.tipo ? TIPO_TXT[a.tipo] : a.aviso || "No sé de qué tipo es: súbelo a mano en su tarjeta"} · ${hora2(a.modificado)} · ${(a.tamano / 1048576).toFixed(1).replace(".", ",")} MB`, { className: "muted" }));
     tr.append(nom, acc); tb.appendChild(tr);
   }
 }
 async function entradaVer(a) {
   $("entrada-msg").textContent = "Abriendo el archivo…";
   try {
-    const r = await call(`/api/admin/entrada/archivo?nombre=${encodeURIComponent(a.nombre)}`, null, true);
+    const r = await call(`/api/admin/entrada/archivo?nombre=${encodeURIComponent(a.nombre)}&carpeta=${encodeURIComponent(a.carpeta || "")}`, null, true);
     if (!r.ok) throw new Error("No se pudo leer el archivo de la carpeta.");
     const p = nombreTipo[a.tipo], dt = new DataTransfer(); dt.items.add(new File([await r.blob()], a.nombre));
-    $(p + "-file").files = dt.files; enRevision = { p, nombre: a.nombre };
+    $(p + "-file").files = dt.files; enRevision = { p, nombre: a.nombre, carpeta: a.carpeta || "" };
     $(p + "-ver").click(); document.querySelector(`.dx-card[data-tipo="${a.tipo}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
     $("entrada-msg").textContent = `Revisa los cambios de «${a.nombre}» más abajo y pulsa «Aplicar cambios» si son correctos. Al aplicarlos, el archivo pasa a la subcarpeta «aplicados».`;
   } catch (e) { $("entrada-msg").textContent = e.message; }
 }
-async function entradaArchivar(nombre, msg) {
-  try { await call("/api/admin/entrada/archivar", { nombre }); if (msg) $("entrada-msg").textContent = msg; } catch (e) { $("entrada-msg").textContent = e.message; }
+async function entradaArchivar(nombre, carpeta, msg) {
+  try { await call("/api/admin/entrada/archivar", { nombre, carpeta: carpeta || "" }); if (msg) $("entrada-msg").textContent = msg; } catch (e) { $("entrada-msg").textContent = e.message; }
   entrada().catch(() => {});
 }
-function entradaTrasAplicar(p) { if (enRevision && enRevision.p === p) { const n = enRevision.nombre; enRevision = null; entradaArchivar(n, `Aplicado: «${n}» ha pasado a la subcarpeta «aplicados».`); } }
+function entradaTrasAplicar(p) { if (enRevision && enRevision.p === p) { const n = enRevision.nombre, c = enRevision.carpeta; enRevision = null; entradaArchivar(n, c, `Aplicado: «${n}» ha pasado a la subcarpeta «aplicados».`); } }
 async function avisos() {
   const r = await call("/api/admin/resumen");
   const n = (id, v) => { $(id).hidden = !v; $(id).textContent = v; };

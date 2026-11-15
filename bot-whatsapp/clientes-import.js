@@ -22,7 +22,7 @@ const yes = (v) => /^(si|sí|s|true|1|x)$/i.test(String(v ?? "").trim());
 
 const FIELDS = [
   ["code", /^cod/], ["name", /^organizacion/], ["legal", /^razon social/], ["city", /^poblacion/], ["municipio", /^(cod\w* )?(de )?municipio$|^cod\w* ine$|^ine$/], ["address", /^direccion/],
-  ["phone", /^telefono/], ["email", /^e ?mail|^correo/], ["nif", /^nif|^cif|^n\.?i\.?f/], ["blocked", /^bloqueado/], ["obsolete", /^obsoleto/], ["section", /^seccion/],
+  ["phone", /^telefono/], ["email", /^e ?mail|^correo/], ["nif", /^nif|^cif|^n\.?i\.?f/], ["blocked", /^bloqueado/], ["obsolete", /^obsoleto/], ["section", /^seccion/], ["modelo", /^modelo pedido/],
 ];
 
 /** Filas del Excel → { customers, stats }. La primera fila con «Cód» y «Organización» es la cabecera. */
@@ -46,7 +46,7 @@ export function parseClientes(rows) {
     const phones = extractPhones(get(r, "phone")), emails = extractEmails(get(r, "email"));
     const active = !(yes(get(r, "blocked")) || yes(get(r, "obsolete")));
     const legal = get(r, "legal");
-    customers.push({ id, name, legalName: legal && norm(legal) !== norm(name) ? legal : "", nifKeys: nifKeys(id, get(r, "nif")), city: get(r, "city"), municipio: String(get(r, "municipio")).replace(/\D/g, ""), address: [get(r, "address"), get(r, "city")].filter(Boolean).join(", "), phones, emails, phone: phones[0] ?? "", active });
+    customers.push({ id, name, legalName: legal && norm(legal) !== norm(name) ? legal : "", nifKeys: nifKeys(id, get(r, "nif")), city: get(r, "city"), municipio: String(get(r, "municipio")).replace(/\D/g, ""), address: [get(r, "address"), get(r, "city")].filter(Boolean).join(", "), phones, emails, phone: phones[0] ?? "", active, ...(col.modelo !== undefined ? { modeloPedido: get(r, "modelo") } : {}) });
     stats.importados++;
     if (!phones.length) { stats.sinTelefono++; listas.sinTelefono.push({ id, name }); }
     if (!emails.length) { stats.sinCorreo++; listas.sinCorreo.push({ id, name }); }

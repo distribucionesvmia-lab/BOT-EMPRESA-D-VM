@@ -83,7 +83,7 @@ const API = process.env.WHATSAPP_API_URL ?? `https://graph.facebook.com/v21.0/${
 const SOLO_VER_TEXTO = "Has entrado con un enlace de solo consulta: puedes ver el catálogo, pero no enviar pedidos. Si quieres pedir, llama a la oficina o entra con tu código.";
 const SESSION_TTL = 24 * 60 * 60 * 1000;
 // Dirección pública del servidor (HTTPS) para el enlace a la mini-aplicación de pedido
-const PUBLIC_URL = (process.env.PUBLIC_URL ?? `http://localhost:${PORT}`).replace(/\/$/, "");
+const PUBLIC_URL = (process.env.PUBLIC_URL ?? `http://localhost:${PORT}`).replace(/^(https?:\/\/[^/]+).*$/i, "$1");
 
 const sessions = new Map(); // teléfono -> { session, last }
 const chatSessions = new Map(); // id de cuenta -> { session, last }: conversación de un cliente con sesión iniciada
@@ -1071,7 +1071,7 @@ const servidorHttp = http
     }
     // Correos a clientes programados desde el panel (promociones, avisos de servicio): cada minuto manda los que ya tocan. Solo en la app de la empresa y con SMTP; CORREOS_PROGRAMADOS=0 lo apaga.
     if (process.env.DEMO !== "1" && !process.env.VM_TEST && adminEnabled && process.env.CORREOS_PROGRAMADOS !== "0" && smtpDesdeEntorno()) {
-      setInterval(() => { const c = smtpDesdeEntorno(); if (!c) return; enviarCampanas({ accounts: getAccountsDb(), contactos: () => customerDirectory.contactos(), smtp: c.smtp, from: c.from, base: () => String(process.env.CLIENTE_URL || getAccountsDb().ajuste("contacto") || "").replace(/\/$/, ""), negocio: BUSINESS.name, telefono: AYUDA.telefono }).catch((e) => console.error("Correos programados:", e.message)); }, 60e3).unref();
+      setInterval(() => { const c = smtpDesdeEntorno(); if (!c) return; enviarCampanas({ accounts: getAccountsDb(), contactos: () => customerDirectory.contactos(), smtp: c.smtp, from: c.from, base: () => String(process.env.CLIENTE_URL || getAccountsDb().ajuste("contacto") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1"), negocio: BUSINESS.name, telefono: AYUDA.telefono }).catch((e) => console.error("Correos programados:", e.message)); }, 60e3).unref();
     }
     // Vigilancia: avisa por correo de problemas nuevos y manda un informe diario (VIGILANCIA=0 la desactiva)
     if (process.env.DEMO !== "1" && adminEnabled && process.env.VIGILANCIA !== "0") {

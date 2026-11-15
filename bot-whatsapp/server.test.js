@@ -1593,3 +1593,35 @@ test("SEGURIDAD 2: clave del panel incorrecta y acciones del panel quedan anotad
   assert.ok(a && a.estado >= 400 && a.ruta === "/api/admin/pedidos/borrar", JSON.stringify(r.json.actividad.slice(0, 3)));
   assert.equal((await call("GET", "/api/admin/seguridad")).status, 403); // sin la clave, no se ve
 });
+
+test("BANDEJA DE ENTRADA: subcarpetas BASE-CLIENTES / BASE-HISTORICO / BASE-ARTICULOS (tipo por carpeta, «Último», avisos y archivar en su propia «aplicados»)", async () => {
+  const carpeta = path.join(dir, "entrada"), A = { headers: { Authorization: `Bearer ${ADMIN}` } };
+  for (const s of ["BASE-CLIENTES", "BASE-HISTORICO", "BASE-ARTICULOS", "otra-carpeta"]) fs.mkdirSync(path.join(carpeta, s), { recursive: true });
+  const cli = (nif) => Buffer.from(buildWorkbook([{ name: "C", rows: [cabecera, ["7902", "BAR SUB", "BAR SUB", "MEDINA", "CL. DOS 2", "611000222", "", nif, "No", "No", "1"]] }]));
+  fs.writeFileSync(path.join(carpeta, "BASE-CLIENTES", "viejo.xlsx"), cli("B33333333")); fs.utimesSync(path.join(carpeta, "BASE-CLIENTES", "viejo.xlsx"), new Date("2026-01-01"), new Date("2026-01-01"));
+  fs.writeFileSync(path.join(carpeta, "BASE-CLIENTES", "nuevo.xlsx"), cli("B44444444"));
+  fs.writeFileSync(path.join(carpeta, "BASE-ARTICULOS", "tarifa.xlsx"), Buffer.from(buildWorkbook([{ name: "A", rows: [["Cód. artículo", "Artículo", "Precio venta"], ["9998", "ARTICULO SUB", 2]] }])));
+  fs.writeFileSync(path.join(carpeta, "BASE-HISTORICO", "raro.xlsx"), Buffer.from(buildWorkbook([{ name: "X", rows: [["hola", "adios"], [1, 2]] }]))); // sin cabeceras reconocibles: manda la carpeta
+  fs.writeFileSync(path.join(carpeta, "BASE-HISTORICO", "equivocado.xlsx"), cli("B55555555")); // es de clientes pero está en BASE-HISTORICO
+  fs.writeFileSync(path.join(carpeta, "otra-carpeta", "ignorado.xlsx"), cli("B66666666")); // subcarpeta que no es una BASE-…: no se mira
+  const l = (await call("GET", "/api/admin/entrada", { admin: true })).json;
+  assert.deepEqual(l.subcarpetas.map((s) => s.nombre).sort(), ["BASE-ARTICULOS", "BASE-CLIENTES", "BASE-HISTORICO"]);
+  const f = (c, n) => l.archivos.find((a) => a.carpeta === c && a.nombre === n);
+  assert.equal(f("BASE-CLIENTES", "nuevo.xlsx").tipo, "clientes"); assert.equal(f("BASE-CLIENTES", "nuevo.xlsx").ultimo, true); assert.equal(f("BASE-CLIENTES", "viejo.xlsx").ultimo, undefined); // el más reciente es el «Último»
+  assert.equal(f("BASE-ARTICULOS", "tarifa.xlsx").tipo, "productos");
+  assert.equal(f("BASE-HISTORICO", "raro.xlsx").tipo, "historial"); // el contenido no se reconoce: vale lo que dice la carpeta (la vista previa lo comprobará)
+  assert.equal(f("BASE-HISTORICO", "equivocado.xlsx").tipo, null); assert.match(f("BASE-HISTORICO", "equivocado.xlsx").aviso, /BASE-HISTORICO/); // contenido de otro tipo: avisa y no se carga solo
+  assert.equal(l.archivos.some((a) => a.nombre === "ignorado.xlsx"), false);
+  assert.equal(JSON.stringify(l).includes("B44444444"), false);
+  // descargar desde la subcarpeta (y solo de las permitidas)
+  const ok = await fetch(`${BASE}/api/admin/entrada/archivo?nombre=nuevo.xlsx&carpeta=BASE-CLIENTES`, A);
+  assert.equal(ok.status, 200); assert.equal(Buffer.from(await ok.arrayBuffer()).length, fs.statSync(path.join(carpeta, "BASE-CLIENTES", "nuevo.xlsx")).size);
+  for (const mal of ["nuevo.xlsx&carpeta=otra-carpeta", "nuevo.xlsx&carpeta=..", "nuevo.xlsx&carpeta=..%2F", "nuevo.xlsx&carpeta=BASE-ARTICULOS", "ignorado.xlsx&carpeta=otra-carpeta"]) assert.equal((await fetch(`${BASE}/api/admin/entrada/archivo?nombre=${mal}`, A)).status, 404, mal);
+  // archivar: va a «aplicados» de SU subcarpeta
+  assert.equal((await call("POST", "/api/admin/entrada/archivar", { admin: true, body: { nombre: "nuevo.xlsx", carpeta: "otra-carpeta" } })).status, 404);
+  assert.equal((await call("POST", "/api/admin/entrada/archivar", { admin: true, body: { nombre: "nuevo.xlsx", carpeta: "BASE-CLIENTES" } })).status, 200);
+  assert.equal(fs.existsSync(path.join(carpeta, "BASE-CLIENTES", "nuevo.xlsx")), false);
+  assert.ok(fs.readdirSync(path.join(carpeta, "BASE-CLIENTES", "aplicados")).some((n) => /^\d{8}-\d{4}-nuevo\.xlsx$/.test(n)));
+  const l2 = (await call("GET", "/api/admin/entrada", { admin: true })).json;
+  assert.equal(l2.archivos.find((a) => a.carpeta === "BASE-CLIENTES").nombre, "viejo.xlsx"); // ahora el «Último» es el siguiente
+});
