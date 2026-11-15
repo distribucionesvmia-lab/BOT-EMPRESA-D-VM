@@ -169,10 +169,10 @@ test("hoja de pedido: cabecera sin código ni nombre de cliente, líneas con ☐
 test("hoja de pedido: formato de las líneas (alto 30, casilla ☐ y cajas grandes, filas alternas, precios en gris, centrado salvo descripción)", () => {
   const f = exportar([pedido("k1", {})]);
   const xml = f["xl/worksheets/sheet1.xml"];
-  assert.equal([...xml.matchAll(/<row r="[56]" ht="30" customHeight="1">/g)].length, 2); // las dos líneas, filas finas de 30
+  assert.equal([...xml.matchAll(/<row r="[56]" ht="40" customHeight="1">/g)].length, 2); // las dos líneas, filas de 40 con la casilla grande
   const caja = (ref) => estiloDe(f, xml, ref);
   assert.equal(caja("C5").negrita, true); // valor de cajas en negrita
-  assert.match(f["xl/styles.xml"], /<sz val="26"/); assert.match(f["xl/styles.xml"], /<sz val="22"/); // casilla ☐ de 26 pt y cajas de 22 pt
+  assert.match(f["xl/styles.xml"], /<sz val="40"/); assert.match(f["xl/styles.xml"], /<sz val="22"/); // casilla ☐ de 40 pt y cajas de 22 pt
   for (const c of ["H5", "I5", "J5"]) assert.equal(caja(c).color, "808080", c); // precio, dto. e importe en gris
   assert.notEqual(caja("A5").relleno, caja("A6").relleno); // una fila blanca y otra gris claro
   for (const c of ["A5", "B5", "C5", "F5", "G5", "H5", "I5"]) assert.equal(caja(c).alineado, "center", c); // centrado en horizontal
@@ -353,7 +353,7 @@ test("imprimir directamente: una página por pedido con casilla ☐ y cajas gran
   const html = imprimirHtml(db.exportedOrders(e.export.id), { autoprint: false });
   assert.equal((html.match(/<section class="hoja">/g) ?? []).length, 2); // un pedido por página
   assert.match(html, /<td class="chk">☐<\/td><td class="cajas">2<\/td>/); // línea por cajas: casilla y nº de cajas
-  assert.match(html, /td\.chk \{[^}]*font-size:30px/); assert.match(html, /td\.cajas \{[^}]*font-size:24px/);
+  assert.match(html, /td\.chk \{[^}]*font-size:44px/); assert.match(html, /td\.cajas \{[^}]*font-size:24px/);
   assert.match(html, /Artículo A &amp; &lt;B&gt;/); assert.match(html, /Llamar &lt;antes&gt;/); // nada sin escapar
   assert.match(html, /TOTAL PEDIDO/); assert.doesNotMatch(html, /<script>/); // sin autoimpresión cuando va dentro de la aplicación
   assert.match(imprimirHtml(db.exportedOrders(e.export.id)), /<script>addEventListener\('load'/); // abierta sola, se imprime sola
