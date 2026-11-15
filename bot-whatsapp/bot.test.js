@@ -147,10 +147,10 @@ test("persona genera handoff y cancelar reinicia", () => {
 test("«hacer pedido» y frases parecidas abren el catálogo (con enlace) o la lista (sin enlace)", () => {
   for (const t of ["hacer pedido", "Quiero hacer un pedido", "nuevo pedido", "abrir catálogo", "quiero pedir", "hola quiero hacer un pedido nuevo"]) {
     const r = say(newSession(bar, "/catalogo"), t);
-    // con histórico (lo pedido en los últimos 6 meses) se enseñan primero sus artículos y, debajo, el acceso al catálogo
-    assert.equal(r.ui.type, "historico", t);
-    assert.equal(r.ui.catalogo.url, "/catalogo");
-    assert.ok(r.ui.rows.length > 0, t);
+    // con histórico (lo pedido en los últimos 6 meses) el catálogo se abre en «Lo habitual»
+    assert.equal(r.ui.type, "link", t);
+    assert.equal(r.ui.url, "/catalogo#tab=hab");
+    assert.equal(r.ui.open, true, t);
   }
   const nuevo = say(newSession({ id: "C-9", name: "Bar Nuevo", address: "x", orders: [] }, "/catalogo"), "hacer pedido"); // sin histórico: se abre el catálogo como siempre
   assert.equal(nuevo.ui.type, "link"); assert.equal(nuevo.ui.url, "/catalogo"); assert.equal(nuevo.ui.open, true);
@@ -184,7 +184,7 @@ test("«histórico» enseña los pedidos anteriores con lo que pidió en cada un
 
 test("los botones del último pedido: «Hacer pedido» abre el catálogo y «Ver histórico» el histórico", () => {
   let r = say(newSession(bar, "/catalogo"), "último pedido");
-  assert.equal(say(r.session, "h:open").ui.type, "historico");
+  assert.equal(say(r.session, "h:open").ui.url, "/catalogo#tab=hab");
   assert.match(say(r.session, "h:hist").reply, /histórico/i);
 });
 

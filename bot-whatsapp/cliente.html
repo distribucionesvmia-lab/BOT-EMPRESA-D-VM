@@ -704,7 +704,6 @@
   input:focus, textarea:focus, select:focus, input:focus-visible, textarea:focus-visible { outline:3px solid var(--accent) !important; outline-offset:1px; box-shadow:none !important; }
   .autor-pie { margin:var(--s3, 12px) 0 0; font-size:calc(var(--t-micro, 12px) / var(--k,1)); color:var(--text-2); text-align:center; line-height:1.45; } .autor-pie b { font-weight:600; color:var(--text); }
   .autor-pie details { margin-top:4px; } .autor-pie summary { cursor:pointer; color:var(--accent); font-weight:600; display:block; text-align:center; padding:6px 4px; } .autor-pie .autor-txt { text-align:left; margin-top:6px; padding:10px 12px; background:var(--surface-2, var(--field, transparent)); border-radius:10px; } .autor-pie .autor-txt p { margin:0 0 6px; }
-.hist-art{display:grid;gap:8px}.hist-fila{display:grid;grid-template-columns:1fr 84px;gap:4px 8px;background:var(--surface,#fff);border:1px solid var(--line,#e5e5ea);border-radius:12px;padding:10px}.hist-fila b{grid-column:1/-1;font-weight:600}.hist-fila small{color:var(--text-2,#6e6e73)}.hist-fila input,.hist-fila select{min-height:44px;font:inherit;border:1px solid var(--line,#c7c7cc);border-radius:10px;padding:0 8px;background:var(--surface,#fff);color:inherit}.hist-fila select{grid-column:1/-1}.hist-ult{grid-column:1/-1;background:none;border:0;color:var(--accent,#C8102E);font:inherit;text-align:left;min-height:32px;padding:0}.hist-art .pill[disabled]{opacity:.5}
 </style>
 </head>
 <body>
@@ -1662,28 +1661,6 @@ function interactivo(ui) {
   const box = document.createElement("div"); box.className = "ui";
   if (ui.type === "link" && ui.home) { inicio(ui); if (ui.open) setTimeout(() => { location.href = ui.url; }, 800); return; }
   if (ui.type === "link") { const l = pill(ui.title, null, ui.url); l.classList.add("primary"); box.appendChild(l); if (ui.open) setTimeout(() => { location.href = ui.url; }, 800); } // «ui.open»: el cliente lo ha pedido por texto, se abre solo
-  else if (ui.type === "historico") { // artículos comprados: cajas/unidades a elegir y «Enviar al carrito» (abre el catálogo con eso ya puesto, sumado a lo que hubiera)
-    box.classList.add("hist-art"); const filas = [];
-    ui.rows.forEach((r) => {
-      const f = document.createElement("div"); f.className = "hist-fila";
-      const n = document.createElement("b"); n.textContent = r.nombre; const pr = document.createElement("small"); pr.textContent = r.precio;
-      const q = document.createElement("input"); q.type = "number"; q.min = "0"; q.max = "999"; q.step = "1"; q.inputMode = "numeric"; q.value = "0"; q.setAttribute("aria-label", "Cantidad de " + r.nombre);
-      const u = document.createElement("select"); u.setAttribute("aria-label", "Cajas o unidades de " + r.nombre);
-      if (r.upb) u.add(new Option(r.soloCaja ? "Cajas de " + r.upb : "Caja de " + r.upb, "caja"));
-      if (!r.soloCaja) u.add(new Option("Unidades", "ud"));
-      u.value = r.unit; const mas = document.createElement("button"); mas.type = "button"; mas.textContent = "Como la última vez"; mas.className = "hist-ult";
-      mas.onclick = () => { u.value = r.unit; q.value = r.qty; pinta(); };
-      q.oninput = pinta; u.onchange = pinta;
-      f.append(n, pr, q, u, mas); box.appendChild(f); filas.push({ r, q, u });
-    });
-    const envia = pill("", () => {
-      const l = filas.map(({ r, q, u }) => { const n = Math.min(999, Math.floor(Number(q.value)) || 0); return n > 0 ? encodeURIComponent(r.id) + "." + (u.value === "caja" && r.upb ? n * r.upb : n) : ""; }).filter(Boolean);
-      if (l.length) location.href = ui.catalogo.url.split("#")[0] + "#c=" + l.join(",") + "&a=1";
-    });
-    function pinta() { const k = filas.filter(({ q }) => Math.floor(Number(q.value)) > 0).length; envia.textContent = k ? "Enviar al carrito (" + k + ")" : "Elige cantidades"; envia.disabled = !k; }
-    envia.classList.add("primary"); pinta(); box.appendChild(envia);
-    const cat = pill(ui.catalogo.title, null, ui.catalogo.url); box.appendChild(cat);
-  }
   else if (ui.type === "buttons") ui.buttons.forEach((b) => box.appendChild(pill(b.title, () => enviar(b.id, b.title))));
   else if (ui.type === "multi") {
     const marcados = new Set(); box.classList.add("multi");
