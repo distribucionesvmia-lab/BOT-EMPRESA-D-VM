@@ -2234,7 +2234,7 @@ function renderList() {
       if (c.count > 30) { // categorías grandes: ordenar y filtrar por marca
         const ct = document.createElement("div"); ct.className = "cab-ord";
         const sel = (etq, opts, val, fn) => { const l = document.createElement("label"); l.textContent = etq; const s = document.createElement("select"); for (const [k, t] of opts) { const o = document.createElement("option"); o.value = k; o.textContent = t; if (k === val) o.selected = true; s.appendChild(o); } s.onchange = () => fn(s.value); l.appendChild(s); ct.appendChild(l); };
-        sel("Ordenar", [["hab", "Lo que más pido"], ["nombre", "Nombre (A–Z)"], ["pa", "Precio: de menor a mayor"], ["pd", "Precio: de mayor a menor"]], ordenCat, v => { ordenCat = v; limite = 150; $("list").scrollTop = 0; renderList(); });
+        sel("Ordenar", [["hab", "Orden habitual (a3ERP)"], ["nombre", "Nombre (A–Z)"], ["pa", "Precio: de menor a mayor"], ["pd", "Precio: de mayor a menor"]], ordenCat, v => { ordenCat = v; limite = 150; $("list").scrollTop = 0; renderList(); });
         if (marcasCat.length > 1) sel("Marca", [["", "Todas"], ...marcasCat.map(m => [m, m])], marcaCat, v => { marcaCat = v; limite = 150; $("list").scrollTop = 0; renderList(); });
         w.appendChild(ct);
       }
@@ -2282,7 +2282,7 @@ function renderList() {
   if (tab === "hab" && !q) items = items.slice().sort((a, b) => compararFamilias(a.fam, b.fam) || (b.count || 0) - (a.count || 0) || compararCodigos(a.id, b.id)); // por familia, subfamilia y artículo (como en a3ERP); dentro de cada subfamilia, lo que más pide primero
   else if (arbol && ordenCat === "nombre") items = items.slice().sort(cmpNombre);
   else if (arbol && (ordenCat === "pa" || ordenCat === "pd")) items = items.slice().sort((a, b) => (ordenCat === "pa" ? 1 : -1) * (precioUd(a) - precioUd(b)) || cmpNombre(a, b));
-  else if (arbol) items = [...items.filter(p => p.count > 0), ...items.filter(p => !(p.count > 0))]; // en cada categoría, lo que ya compra va arriba
+  else if (arbol) { const ord = items.slice().sort(porFamilia); items = [...ord.filter(p => p.count > 0), ...ord.filter(p => !(p.count > 0))]; } // en cada categoría, lo que ya compra va arriba; dentro de cada grupo, por familia, subfamilia y artículo (como en a3ERP y en su histórico)
   if (filtra) { // «Ver solo lo que he marcado»: una tabla con lo marcado (foto, cantidad, importe), no tarjetas
     tablaLineas.sinObs = true; list.appendChild(tablaLineas(items.map(p => ({ ...p, qty: qty.get(p.id) })))); tablaLineas.sinObs = false;
     return;

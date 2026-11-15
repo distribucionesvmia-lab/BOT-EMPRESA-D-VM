@@ -1,5 +1,6 @@
 import { hace, ahora, MESES_HABITUALES } from "./historial-import.js";
 import { BUSINESS, PRODUCTS, AYUDA, HORARIO_REPARTO } from "./config.js";
+import { ordenarLineas } from "./ordenfamilia.js";
 import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRows, isYes, isNo, isDone, parseRemove, parseChangeQty, lev } from "./nlu.js";
 import { isTooGeneric } from "./identify.js";
 import { categorizar } from "./categorias.js";
@@ -145,6 +146,7 @@ function importes(items, customer = CLIENTE) {
 const total = (items, customer) => importes(items, customer).total; // con IVA
 const detalleIva = (t) => (t.iva || t.re ? `_(base ${money(t.base)} + IVA ${money(t.iva)}${t.re ? ` + R.E. ${money(t.re)}` : ""})_` : "");
 const itemsText = (items) => {
+  items = ordenarLineas([...items], (i) => i.id); // por familia, subfamilia y artículo, como en a3ERP
   const t = importes(items);
   return items.map((i, k) => `• ${qtyLabel(i)} × ${i.name} = ${money(t.lines[k].amount)}${i.unsure ? " ⚠️" : ""}${i.note ? `\n   📝 ${i.note}` : ""}`).join("\n") +
     `\n*Total con IVA: ${money(t.total)}*${detalleIva(t) ? `\n${detalleIva(t)}` : ""}` +
@@ -378,6 +380,22 @@ function openCatalog(s, now = new Date()) {
   // Aviso de «entrega hoy»: la misma regla que la opción «Hoy» del calendario (Medina del Campo, laborable y antes de las 10:00 de Madrid)
   const aviso = s.customer && entregaHoyDisponible(s.customer, now) ? `🚚 ${AVISO_HOY}\n\n` : "";
   if (s.link) {
+    // Con histórico (artículos comprados en los últimos 6 meses): se enseña esa relación de ARTÍCULOS, con cajas/unidades a elegir y «Enviar al carrito»; debajo, el acceso al catálogo
+    const hist = s.customer && !s.unverified ? ordenarLineas(habitualProducts(s.customer), (p) => p.id).slice(0, 60) : [];
+    if (hist.length) {
+      return {
+        reply: aviso + "⭐ *Tu histórico de artículos* (lo que has comprado en los últimos 6 meses). Elige cuántas cajas o unidades quieres y pulsa *Enviar al carrito*; debajo tienes el catálogo completo.",
+        session: s,
+        ui: {
+          type: "historico",
+          catalogo: { title: "Abrir el catálogo", url: s.link },
+          rows: hist.map((p) => {
+            const upb = upbOf(p) || 0, q = Math.max(1, Math.floor(Number(p.lastQty) || 1)), caja = !!upb && (soloCaja(p) || q % upb === 0);
+            return { id: String(p.id), nombre: p.name, upb, soloCaja: soloCaja(p), unit: caja ? "caja" : "ud", qty: caja ? Math.max(1, Math.ceil(q / upb)) : q, precio: moneyP(priceOf(p)) };
+          }),
+        },
+      };
+    }
     return { reply: aviso + "🛒 *¡Abriendo tu catálogo!* Si no se abre solo, pulsa el botón.", session: s, ui: { type: "link", title: "Hacer pedido", url: s.link, open: true } };
   }
   return showList(s, 0, aviso + "🛒 Elige lo que quieres pedir:");
