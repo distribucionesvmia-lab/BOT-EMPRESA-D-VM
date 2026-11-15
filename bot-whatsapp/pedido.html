@@ -1352,6 +1352,15 @@
   #zoomFoto .zia, .ficha-ia { color:var(--gris-suave); }
   .autor-pie { margin:var(--s3, 12px) 0 0; font-size:calc(var(--t-micro, 12px) / var(--k,1)); color:var(--text-2); text-align:center; line-height:1.45; } .autor-pie b { font-weight:600; color:var(--text); }
   .autor-pie details { margin-top:4px; } .autor-pie summary { cursor:pointer; color:var(--accent); font-weight:600; display:block; text-align:center; padding:6px 4px; } .autor-pie .autor-txt { text-align:left; margin-top:6px; padding:10px 12px; background:var(--surface-2, var(--field, transparent)); border-radius:10px; } .autor-pie .autor-txt p { margin:0 0 6px; }
+  /* Corazón de favorito (rediseño): círculo de 32 px en la ESQUINA SUPERIOR DERECHA de la tarjeta (toque de 44 px), igual en móvil y en ordenador; el nombre deja sitio para que nunca se pise */
+  .pf-fav { position:absolute !important; grid-area:auto !important; left:auto !important; margin:0 !important; width:44px; height:44px; justify-self:auto; align-self:auto; z-index:2; transition:transform .15s var(--muelle, ease); }
+  .pf-fav:active { transform:scale(.9); }
+  .pf-n, .pf-sec { padding-right:34px; }
+  @media (max-width:1023px) {
+    .pf { grid-template-areas:"av info info" ". seg slot"; }
+    .pf-fav { right:calc(max(var(--gutter), calc((100% - 860px) / 2)) - 6px); top:calc(var(--s2) - 6px); }
+  }
+  @media (min-width:1024px) { .pf-fav { right:calc(var(--s3) - 6px); top:calc(var(--s3) - 6px); } .pf:not(.sin-foto) .pf-n, .pf:not(.sin-foto) .pf-sec { padding-right:0; } } /* con foto, el nombre va debajo de ella y no choca con el corazón */
 </style>
 </head>
 <body>
