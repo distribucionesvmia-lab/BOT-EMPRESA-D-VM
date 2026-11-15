@@ -5,6 +5,7 @@
 // Las dos primeras bases las alimenta el ERP (hoy, datos.js; después, la sincronización con a3ERP): el bot solo las lee.
 
 import { usarFamilias } from "./ordenfamilia.js";
+import { usarModeloPedido } from "./export-format.js";
 import fs from "node:fs";
 import { getDb } from "./db.js";
 import { importData } from "./seed.js";
@@ -22,6 +23,7 @@ const { SHEET_WEBHOOK_URL, SHEET_SECRET } = process.env;
 const SEED_FILE = new URL("./historial-demo.json", import.meta.url);
 const EXAMPLE_FILE = new URL("./ejemplo/historial-ficticio.json", import.meta.url);
 let catalogDb, customersDb;
+usarModeloPedido((id) => dbs().customersDb.modeloPedidoDe(id)); // el Excel dice ALBARÁN o FACTURA según el «Modelo pedido» del cliente
 function dbs() {
   if (!catalogDb) {
     catalogDb = openCatalogDb();

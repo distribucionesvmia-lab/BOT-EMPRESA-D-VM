@@ -59,6 +59,16 @@ export function esPorKilo(nombre) {
   return false;
 }
 
+// ── ALBARÁN o FACTURA: lo dice el «Modelo pedido» del cliente en a3ERP (LSTIMPRPEDV.002 = ALBARÁN; cualquier otro modelo = FACTURA; sin dato = no se escribe nada) ──
+let modeloDe = () => null;
+/** Dice cómo averiguar el «Modelo pedido» de un cliente por su código (lo pone erp.js). */
+export const usarModeloPedido = (fn) => { modeloDe = typeof fn === "function" ? fn : () => null; };
+export function tipoDocumento(customerId) {
+  let m; try { m = modeloDe(String(customerId ?? "")); } catch { m = null; }
+  m = String(m ?? "").trim(); if (!m) return null;
+  return /(^|\.)0*2$/.test(m) ? "ALBARÁN" : "FACTURA";
+}
+
 // ── Estilos de la hoja de pedido (el diseño sale de la hoja modelo de la empresa) ──
 const NAVY = "1F3864", AZUL = "D9E2F3", GRIS = "808080", FILA_GRIS = "E4E4E4", RAYA = "404040";
 const S = {
@@ -66,6 +76,8 @@ const S = {
   cartelR: estilo({ b: 1, sz: 22, color: "FFFFFF", fill: NAVY, h: "left", v: "center", indent: 1, shrink: 1 }),
   ciudad: estilo({ b: 1, sz: 18, color: "FFFFFF", fill: NAVY, h: "left", v: "center", indent: 1 }),
   navy: estilo({ fill: NAVY }),
+  docAlbaran: estilo({ b: 1, sz: 26, color: "FFFFFF", fill: "C00000", h: "center", v: "center" }),
+  docFactura: estilo({ b: 1, sz: 26, color: "FFFFFF", fill: "595959", h: "center", v: "center" }),
   head: estilo({ b: 1, fill: AZUL, h: "center", v: "center", wrap: 1 }),
   headVal: estilo({ h: "center", v: "center" }),
   totalLabel: estilo({ b: 1, h: "left", v: "center", indent: 1 }),
@@ -129,6 +141,9 @@ function orderSheet(o) {
   };
   const rellena = (desde, hasta, s) => { const x = []; for (let k = desde; k <= hasta; k++) x.push({ v: null, s, from: k }); return x; };
 
+  const doc = tipoDocumento(o.customer_id), sDoc = doc === "ALBARÁN" ? S.docAlbaran : S.docFactura;
+  const rotulo = (texto) => nuevaFila([{ v: texto, s: sDoc, from: 0, to: 9 }], 34);
+  if (doc) rotulo(`${doc}`); // portada: arriba del todo
   // CARTEL (barra azul): «Cliente 5900» a la izquierda y el nombre comercial a la derecha; debajo del nombre, la población
   nuevaFila([{ v: `Cliente ${o.customer_id ?? "—"}`, s: S.cartelL, from: 0, to: 2 }, { v: o.name ?? "", s: S.cartelR, from: 3, to: 9 }], 38);
   if (o.city) nuevaFila([{ v: null, s: S.navy, from: 0, to: 2 }, { v: o.city, s: S.ciudad, from: 3, to: 9 }], 28);
@@ -165,12 +180,13 @@ function orderSheet(o) {
   const widths = [autoWidth(lines.map((l) => l.id), 12, 16), 9, 9, autoWidth(lines.map((l) => l.name), 26, 52), 14, 11, 9, 9, 7, 11];
   if (conNota.length) {
     const usado = Object.values(heights).reduce((s, h) => s + h, 0);
-    const seccion = 17 + conNota.length * 34, cap = capacidadPagina(widths), margen = 40;
+    const seccion = 17 + conNota.length * 34 + (doc ? 34 : 0), cap = capacidadPagina(widths), margen = 40;
     let hueco = usado + seccion + margen <= cap ? cap - usado - seccion - margen : 0; // si el pedido cabe en una página, las observaciones de línea quedan abajo del todo; si no, van a continuación
     while (hueco >= 8) { const h = Math.min(hueco, 400); heights[rows.length] = h; rows.push(Array(COLS).fill(null)); hueco -= h; }
     nuevaFila([{ v: "Observaciones línea", s: S.head, from: 3 }], 17);
     for (const l of conNota) nuevaFila([{ v: l.id, s: S.lineaObsCod, from: 0 }, { v: `${l.name}\n*${String(l.note).trim()}`, s: S.lineaObsTxt, from: 3 }], 34);
   }
+  if (doc) rotulo(`${doc}`); // y abajo del todo
   return { name: sheetName(o), widths, rows, merges, heights, print: { area: `A1:${LAST}${rows.length}`, footerLeft: "", margins: MARGEN } };
 }
 
@@ -193,20 +209,22 @@ export function imprimirHtml(orders, { autoprint = true } = {}) {
     }).join("");
     const conNota = lines.filter((l) => String(l.note ?? "").trim());
     const nota = String(o.note ?? "").trim();
-    return `<section class="hoja">
+    const doc = tipoDocumento(o.customer_id), rot = doc ? `<div class="doc ${doc === "ALBARÁN" ? "alb" : "fac"}">${doc}</div>` : "";
+    return `<section class="hoja">${rot}
 <div class="cartel"><span>Cliente ${esc(o.customer_id ?? "—")}</span><b>${esc(o.name ?? "")}</b></div>${o.city ? `<div class="ciudad">${esc(o.city)}</div>` : ""}
 <div class="cab"><span><small>Nº pedido</small>${esc(o.ref)}</span><span><small>Fecha recep.</small>${esc(madridDate(o.created_at))}</span><span><small>Hora</small>${esc(madridTime(o.created_at))}</span></div>
 <table><thead><tr><th>Código artículo</th><th></th><th>Cajas</th><th>Descripción</th><th>Peso (kg)</th><th>Unidades</th><th></th><th>Precio</th><th>Dto. %</th><th>Importe</th></tr></thead><tbody>${filas}</tbody></table>
 <table class="tot"><tr><td>Total base imponible</td><td class="n">${eur(t.base)}</td></tr><tr><td>Total IVA</td><td class="n">${eur(t.iva)}</td></tr><tr><td>Total R.E.</td><td class="n">${eur(t.re)}</td></tr><tr class="fin"><td>TOTAL PEDIDO</td><td class="n">${eur(t.total)}</td></tr></table>
 <div class="entrega" style="background:${d ? COLOR_ENTREGA[d.color] : "transparent"}">${esc(d?.texto ?? "ENTREGA: SIN DÍA ELEGIDO")}</div>
 <div class="obs"><b>Observaciones del cliente</b><div class="caja${nota ? " rojo" : ""}">${esc(nota)}</div></div>
-${conNota.length ? `<div class="obsl"><b>Observaciones línea</b>${conNota.map((l) => `<p><span>${esc(l.id)}</span>${esc(l.name)}<br><i>*${esc(String(l.note).trim())}</i></p>`).join("")}</div>` : ""}
+${conNota.length ? `<div class="obsl"><b>Observaciones línea</b>${conNota.map((l) => `<p><span>${esc(l.id)}</span>${esc(l.name)}<br><i>*${esc(String(l.note).trim())}</i></p>`).join("")}</div>` : ""}${rot}
 </section>`;
   }).join("");
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Pedidos</title><style>
 @page { size: A4 portrait; margin: 10mm; }
 * { box-sizing: border-box; } body { margin:0; font:12px/1.25 Calibri, Arial, sans-serif; color:#000; }
 .hoja { page-break-after: always; break-after: page; } .hoja:last-child { page-break-after: auto; break-after: auto; }
+.doc { color:#fff; text-align:center; font-weight:700; font-size:20px; padding:6px; } .doc.alb { background:#c00000; } .doc.fac { background:#595959; }
 .cartel { background:#1f3864; color:#fff; display:flex; gap:16px; align-items:center; padding:8px 12px; font-size:22px; } .cartel b { flex:1; }
 .ciudad { background:#1f3864; color:#fff; padding:0 12px 6px 40%; font-size:15px; }
 .cab { display:flex; gap:24px; padding:6px 4px; background:#dce6f4; } .cab small { display:block; font-weight:700; font-size:10px; } .cab span:first-child { flex:1; }

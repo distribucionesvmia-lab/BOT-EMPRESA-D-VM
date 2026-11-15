@@ -66,7 +66,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
   db.exec(SCHEMA);
   // Bases creadas antes de existir razón social y población
-  for (const col of ["legal_name", "city", "nif_keys", "municipio"]) {
+  for (const col of ["legal_name", "city", "nif_keys", "municipio", "modelo_pedido"]) {
     if (!db.prepare("PRAGMA table_info(customers)").all().some((x) => x.name === col)) db.exec(`ALTER TABLE customers ADD COLUMN ${col} TEXT`);
   }
   const phones9 = (c) => [...new Set([...(c.phones ?? []), ...(c.phone ? [c.phone] : [])].map(last9).filter((p) => p.length === 9))];
@@ -124,6 +124,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
                phone = COALESCE(excluded.phone, phone), address = COALESCE(excluded.address, address),
                recargo = excluded.recargo, active = excluded.active, updated_at = excluded.updated_at`,
           ).run(id, String(c.name).trim(), c.legalName ?? null, c.city ?? null, String(c.municipio ?? "").trim() || null, c.phone ?? phones9(c)[0] ?? null, c.address ?? null, (c.recargoEquivalencia === undefined ? byId.get(id)?.recargo : c.recargoEquivalencia) ? 1 : 0, c.active === false ? 0 : 1, now); // un Excel sin el dato del recargo no lo borra
+          if (c.modeloPedido !== undefined) db.prepare("UPDATE customers SET modelo_pedido = ? WHERE id = ?").run(String(c.modeloPedido ?? "").trim() || null, id); // «Modelo pedido» de a3ERP (LSTIMPRPEDV.002 = se factura en albarán)
           // El NIF no se guarda: solo la huella de sus 6 primeros dígitos (nif-key.js). Si el cliente ya trae las huellas, se usan tal cual.
           const keys = Array.isArray(c.nifKeys) ? c.nifKeys : c.nif ? nifKeys(id, c.nif) : [];
           if (keys.length) db.prepare("UPDATE customers SET nif_keys = ? WHERE id = ?").run(JSON.stringify(keys), id);
@@ -156,6 +157,9 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
         throw err;
       }
     },
+
+    /** «Modelo pedido» de a3ERP del cliente (p. ej. «LSTIMPRPEDV.002») o null. */
+    modeloPedidoDe: (id) => db.prepare("SELECT modelo_pedido FROM customers WHERE id = ?").get(String(id))?.modelo_pedido ?? null,
 
     /** Lo escrito a mano en la ficha: { phones, emails (los añadidos a mano), notes, … }. */
     manualOf: (id) => manualDe(String(id)),
