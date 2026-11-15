@@ -1581,3 +1581,15 @@ test("SEGURIDAD: campo trampa, cabeceras, y la clave de «no soy un robot» solo
   assert.equal(api.json.turnstile, null); // sin claves en la configuración, no se pide nada
   assert.equal(api.headers.get("strict-transport-security"), null); // HSTS solo con HSTS=1
 });
+
+test("SEGURIDAD 2: clave del panel incorrecta y acciones del panel quedan anotadas (sin datos de clientes)", async () => {
+  await call("GET", "/api/admin/solicitudes", { headers: { Authorization: "Bearer clave-equivocada-1" } });
+  const noMiran = await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { ids: [], confirmo: false } }); // se rechaza, pero igualmente se anota que se intentó
+  assert.ok(noMiran.status >= 400);
+  const r = await call("GET", "/api/admin/seguridad", { admin: true });
+  assert.equal(r.status, 200);
+  assert.ok(r.json.porTipo.some((x) => x.tipo === "panel-clave-incorrecta"));
+  const a = r.json.actividad.find((x) => x.accion === "Borró pedidos");
+  assert.ok(a && a.estado >= 400 && a.ruta === "/api/admin/pedidos/borrar", JSON.stringify(r.json.actividad.slice(0, 3)));
+  assert.equal((await call("GET", "/api/admin/seguridad")).status, 403); // sin la clave, no se ve
+});

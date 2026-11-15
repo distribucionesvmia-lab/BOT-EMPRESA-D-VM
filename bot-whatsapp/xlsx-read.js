@@ -3,8 +3,10 @@
 import zlib from "node:zlib";
 
 /** Descomprime un ZIP en memoria: { "ruta": Buffer }. Solo lee los ficheros que se piden. */
+const MAX_ENTRADA = 120_000_000, MAX_TOTAL = 300_000_000; // lo descomprimido: por archivo y en total (contra «bombas» ZIP que se hinchan hasta llenar la memoria)
 export function unzip(buf, want) {
   const out = {};
+  let total = 0;
   let eocd = buf.length - 22;
   while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
   if (eocd < 0) throw new Error("El archivo no es un .xlsx o .zip válido");
@@ -17,7 +19,9 @@ export function unzip(buf, want) {
     if (!(typeof want === "function" ? want(name) : want.includes(name))) continue;
     const lnl = buf.readUInt16LE(off + 26), lel = buf.readUInt16LE(off + 28);
     const data = buf.subarray(off + 30 + lnl + lel, off + 30 + lnl + lel + csize);
-    out[name] = method === 8 ? zlib.inflateRawSync(data) : data;
+    const dato = method === 8 ? zlib.inflateRawSync(data, { maxOutputLength: MAX_ENTRADA }) : data; // si se pasa del límite, lanza error y se rechaza el archivo
+    total += dato.length; if (total > MAX_TOTAL) throw new Error("El archivo descomprimido es demasiado grande");
+    out[name] = dato;
   }
   return out;
 }

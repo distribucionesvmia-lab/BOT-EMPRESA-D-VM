@@ -8,6 +8,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { send, readJson, makeAdminCheck } from "./auth.js";
+import { ipDe, eventoSeguridad } from "./seguridad.js";
+import { etiquetaAccion } from "./actividad.js";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2, promoVigente, precioEfectivo, hoyMadrid } from "./pricing.js";
 import { categorizar } from "./categorias.js";
@@ -132,18 +134,22 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
   // error al teclear no debe bloquear al administrador. Las peticiones sin clave no cuentan (no adivinan nada).
   const failures = new Map();
   const recentFailures = (key, now = Date.now()) => (failures.get(key) ?? []).filter((f) => now - f.t < 10 * 60_000);
-  const ip = (req) => (process.env.TRUST_PROXY === "1" ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() : "") || req.socket.remoteAddress || "?";
+  const ip = (req) => ipDe(req);
 
   return async function route(req, res, url) {
     const p = url.pathname;
     if (!p.startsWith("/api/admin/")) return false;
     const who = ip(req);
-    if (recentFailures(who).length >= 10) return send(res, 429, { error: "Demasiados intentos. Espera unos minutos." }), true;
+    if (recentFailures(who).length >= 10) return eventoSeguridad("panel-bloqueado-por-claves-erroneas", who), send(res, 429, { error: "Demasiados intentos. Espera unos minutos." }), true;
     if (!isAdmin(req)) {
       const presented = req.headers.authorization;
       const prev = recentFailures(who);
-      if (presented && !prev.some((f) => f.h === presented)) failures.set(who, [...prev, { t: Date.now(), h: presented }]);
+      if (presented && !prev.some((f) => f.h === presented)) { failures.set(who, [...prev, { t: Date.now(), h: presented }]); eventoSeguridad("panel-clave-incorrecta", who); }
       return send(res, 403, { error: "Acceso no autorizado." }), true;
+    }
+    { // registro de actividad: lo que cambia algo, con la hora y la dirección (sin datos de clientes ni contenido)
+      const accion = etiquetaAccion(req.method, p);
+      if (accion) res.on("finish", () => { try { accounts.actividadRegistrar({ ip: who, accion, ruta: p, estado: res.statusCode }); } catch {} });
     }
     const get = req.method === "GET", post = req.method === "POST";
 
@@ -152,6 +158,9 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       const list = orders.listOrders({ exportStatus: "pending", limit: 500 }).map(orderView);
       return send(res, 200, { clientes: customers.search({ limit: 1 }).total, cuentasSinConfirmar: accounts.listAccounts().filter((a) => !a.verified && a.status !== "deleted").length, derechosPendientes: accounts.listRightsRequests("pendiente").length, solicitudes: accounts.listRegistrations("pending").length, pedidosPendientes: list.filter((o) => o.estado === "pendiente").length, pedidosRetenidos: list.filter((o) => o.estado === "retenido").length }), true;
     }
+
+    // ---- Seguridad: lo que el programa ha parado y lo que se ha hecho en el panel ----
+    if (p === "/api/admin/seguridad" && get) return send(res, 200, { ...accounts.seguridadResumen({ horas: 24 * 7 }), actividad: accounts.actividadLista(Number(url.searchParams.get("limite") ?? 100)) }), true;
 
     // ---- Últimas subidas de Excel (para la sección «Datos y Excel») ----
     if (p === "/api/admin/actualizaciones" && get) return send(res, 200, actualizaciones()), true;

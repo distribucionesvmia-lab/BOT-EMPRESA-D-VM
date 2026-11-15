@@ -24,6 +24,21 @@ export function backupAll(dbs, opts = {}) {
   return { files: out, errors };
 }
 
+/** Copia las copias recién hechas a una SEGUNDA carpeta (un disco USB, OneDrive, Drive…) y conserva solo las `keep` más recientes de cada base. Si el disco principal se cifra o se rompe, esta sigue ahí. */
+export function copiarASegundaCarpeta(files, dir2, { keep = 14 } = {}) {
+  const copiados = [], errores = {};
+  if (!dir2) return { copiados, errores };
+  try { fs.mkdirSync(dir2, { recursive: true }); } catch (e) { return { copiados, errores: { carpeta: e.message } }; }
+  for (const [name, f] of Object.entries(files)) {
+    try {
+      fs.copyFileSync(f, path.join(dir2, path.basename(f))); copiados.push(path.basename(f));
+      const old = fs.readdirSync(dir2).filter((x) => new RegExp(`^${name}-\\d{8}-\\d{4}\\.sqlite$`).test(x)).sort().slice(0, -keep);
+      for (const x of old) fs.rmSync(path.join(dir2, x), { force: true });
+    } catch (e) { errores[name] = e.message; }
+  }
+  return { copiados, errores };
+}
+
 const toMin = (hm) => { const [h, m] = String(hm).split(":").map(Number); return h * 60 + (m || 0); };
 /**
  * Copia diaria de todas las bases a la hora indicada (hora de Madrid, 03:00 por defecto), independiente de la exportación a Excel.
@@ -38,6 +53,12 @@ export function scheduleBackups(getDbs, { at = process.env.BACKUP_TIME ?? "03:00
     doneDate = date;
     for (const [n, f] of Object.entries(files)) log.log(`Copia de seguridad de ${n}: ${f}`);
     for (const [n, e] of Object.entries(errors)) log.error(`No se pudo copiar la base de ${n}:`, e);
+    const dir2 = process.env.BACKUP_DIR2; // segunda carpeta (USB / nube), opcional
+    if (dir2) {
+      const r = copiarASegundaCarpeta(files, dir2);
+      if (r.copiados.length) log.log(`Copia en la segunda carpeta (${dir2}): ${r.copiados.length} archivos`);
+      for (const [n, e] of Object.entries(r.errores)) log.error(`No se pudo copiar a la segunda carpeta (${n}):`, e);
+    }
   };
   tick();
   const timer = setInterval(tick, every);

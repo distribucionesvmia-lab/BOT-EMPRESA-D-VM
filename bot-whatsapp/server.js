@@ -10,7 +10,7 @@ import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder, totals } from "./pricing.js";
 import { createAuth, rateLimiter } from "./auth.js";
-import { cabecerasSeguridad, CSP, eventoSeguridad } from "./seguridad.js";
+import { cabecerasSeguridad, CSP, eventoSeguridad, usarRegistro, ipDe, claveDebil } from "./seguridad.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
 import { estadoSistema, crearVigilante } from "./monitor.js";
@@ -294,6 +294,7 @@ function readJson(req, max = 100_000) {
     req.on("end", () => {
       try { resolve(JSON.parse(body)); } catch { resolve(null); }
     });
+    req.on("error", () => resolve(null)); req.on("close", () => resolve(null)); // cuerpo demasiado grande o conexión cortada: no se queda colgado
   });
 }
 
@@ -391,7 +392,10 @@ const datosDelCliente = (acc) => {
     avisos_en_el_movil: getAccountsDb().pushOf(acc.customerId).length, // móviles donde tiene activados los avisos (las claves de cada móvil no se incluyen)
   };
 };
+usarRegistro((tipo, detalle) => getAccountsDb().seguridadRegistrar(tipo, detalle)); // los hechos sospechosos quedan en la base: se ven en el panel y avisan por correo
 const auth = createAuth({
+  onAcceso: (acc, huella) => { if (getAccountsDb().aparatoVisto(acc.id, huella).nuevo) void avisosPush().aCliente(acc.customerId, { title: "Nuevo acceso a tu cuenta", body: "Alguien ha entrado en tu cuenta desde un aparato nuevo. Si has sido tú, no tienes que hacer nada. Si no, llama a la oficina.", url: "/cliente", tag: "acceso-nuevo" }); },
+  onCodigo: (acc) => { void avisosPush().aCliente(acc.customerId, { title: "Código de entrada cambiado", body: "Se ha cambiado el código de entrada de tu cuenta. Si no has sido tú, llama a la oficina.", url: "/cliente", tag: "codigo-cambiado" }); },
   accounts: getAccountsDb(),
   customers: customerDirectory,
   misDatos: datosDelCliente,
@@ -432,6 +436,13 @@ const estadoDelSistema = adminEnabled ? () => {
     pedidosPendientes: () => pend, solicitudesPendientes: () => getAccountsDb().listRegistrations("pending"), cuentasSinConfirmar: () => getAccountsDb().listAccounts().filter((a) => !a.verified).length,
     sync, correo: notificador, copiasDir: process.env.BACKUP_DIR ?? "respaldos", dataDir,
     catalogo: () => { const l = dbsAdmin.catalogDb.list({ activeOnly: true }); return { activos: l.length, sinPrecio: l.filter((p) => !(p.price > 0)).length }; },
+    extras: () => { // seguridad: clave del panel débil e intentos sospechosos parados en las últimas 24 h
+      const out = [];
+      if (process.env.DEMO !== "1" && claveDebil(process.env.ADMIN_TOKEN)) out.push({ clave: "clave-panel-debil", gravedad: "alta", texto: "La clave del panel (ADMIN_TOKEN) es corta o fácil de adivinar. Cámbiala por una de 20 letras y números como mínimo." });
+      const s = getAccountsDb().seguridadResumen({ horas: 24 });
+      if (s.total >= Number(process.env.SEGURIDAD_AVISO_DESDE ?? 10)) out.push({ clave: "intentos-sospechosos", gravedad: "media", texto: `El programa ha parado ${s.total} intentos sospechosos en las últimas 24 h (${s.porTipo.slice(0, 3).map((x) => `${x.tipo}: ${x.n}`).join(", ")}). Mira el detalle en el panel, «Cuentas de clientes» → «Seguridad».` });
+      return out;
+    },
   });
 } : null;
 const ficheroActualizaciones = nodePath.join(nodePath.dirname(process.env.CUSTOMERS_DB ?? "clientes.sqlite"), "actualizaciones.log");
@@ -557,6 +568,7 @@ async function accountChat(account, text, msgId, carrito = null) {
   const out = handleMessage(cur, text, { carritoExterno: itemsDeCarrito(carrito) });
   chatSessions.set(account.id, { session: out.session, last: Date.now() });
   if (out.order && account.soloVer) { out.order = null; out.reply = SOLO_VER_TEXTO; } // enlace de «solo ver»: nada se envía
+  if (out.order && !pedidosLimite(String(account.id))) { eventoSeguridad("demasiados-pedidos", `cuenta ${account.id} (chat)`); out.order = null; out.reply = "Has enviado muchos pedidos en poco tiempo. Si necesitas más, llámanos y lo hacemos contigo."; } // el mismo tope que el catálogo
   if (out.order) {
     const key = `chat:${account.id}:${msgId ?? crypto.randomUUID()}`; // el mismo mensaje reenviado no duplica el pedido
     const { order: guardado } = await createOrder(priceOrder({ at: new Date().toISOString(), phone: account.phone, key, ...holdIfUnconfirmed(account, out.order) }, customer, catalogNow()));
@@ -849,7 +861,7 @@ async function appRoutes(req, res, url) {
     if (Number(req.headers["content-length"] ?? 0) > 4096) { req.resume(); return void res.writeHead(413).end(); }
     try {
       const e = limpiaError(await readJson(req)), cid = account ? String(account.customerId) : null;
-      if (e && (cid ? errLimitCliente(cid) : errLimitIp(req.socket.remoteAddress ?? "?"))) getAccountsDb().errorRegistrar(e, { customerId: cid, navegador: navegadorCorto(req.headers["user-agent"]) });
+      if (e && (cid ? errLimitCliente(cid) : errLimitIp(ipDe(req)))) getAccountsDb().errorRegistrar(e, { customerId: cid, navegador: navegadorCorto(req.headers["user-agent"]) });
     } catch { /* un fallo al apuntar un fallo no se cuenta a nadie */ }
     return void res.writeHead(204).end();
   }
@@ -954,7 +966,7 @@ async function appRoutes(req, res, url) {
   res.writeHead(404).end();
 }
 
-http
+const servidorHttp = http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://x");
     if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.png" || url.pathname.startsWith("/captura-") || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/estatico/") || url.pathname.startsWith("/entrar/") || url.pathname.startsWith("/baja/") || url.pathname.startsWith("/img/")) {
@@ -1048,3 +1060,13 @@ http
     // En Render (o similar) los datos deben estar en el disco persistente: si no, se pierden en cada despliegue
     if (process.env.RENDER && !String(process.env.DB_PATH ?? "").startsWith("/var/data")) console.error("⚠️  ATENCIÓN: DB_PATH no apunta al disco persistente (/var/data). Los datos se perderán al reiniciar o redesplegar.");
   });
+
+// Tiempos máximos (contra peticiones lentas que mantienen conexiones abiertas): la aplicación pública es más estricta; la de la empresa deja tiempo para subir Excel y ZIP grandes por la red local
+servidorHttp.headersTimeout = 20_000;
+servidorHttp.requestTimeout = clientEnabled && !adminEnabled ? 60_000 : 600_000;
+servidorHttp.maxRequestsPerSocket = 1000;
+// Avisos al arrancar (solo en el registro): clave del panel débil y proxy sin configurar
+if (process.env.DEMO !== "1" && !process.env.VM_TEST) {
+  if (adminEnabled && claveDebil(process.env.ADMIN_TOKEN)) console.warn("[VM seguridad] La clave del panel (ADMIN_TOKEN) es corta o fácil de adivinar. Cámbiala por una de 20 letras y números como mínimo.");
+  if (clientEnabled && PUBLIC_URL.startsWith("https://") && process.env.TRUST_PROXY !== "1") console.warn("[VM seguridad] La web es pública con HTTPS pero TRUST_PROXY no está en 1: todos los clientes parecen una sola dirección y los límites de intentos pueden bloquear a todos a la vez. Pon TRUST_PROXY=1 en cliente.env si hay un túnel o proxy (Cloudflare).");
+}

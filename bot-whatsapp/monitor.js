@@ -15,6 +15,11 @@ export function estadoSistema(deps, umbrales = {}) {
   const u = { pedidoHoras: 12, altaHoras: 24, retenidoHoras: 3, copiaHoras: 30, discoMB: 1024, ...umbrales };
   const ahora = deps.ahora?.() ?? Date.now();
   const problemas = [];
+  try { problemas.push(...(deps.extras?.() ?? [])); } catch {} // avisos extra (seguridad)
+  if (process.env.BACKUP_DIR2) { // segunda carpeta de copias (USB / nube): si no se está llenando, avisa
+    try { const ec2 = estadoCopias(process.env.BACKUP_DIR2, { ahora }); for (const b of ec2.bases) if (!b.hay || b.vieja) { problemas.push({ clave: "copia-segunda-carpeta", gravedad: "alta", texto: `La segunda carpeta de copias (BACKUP_DIR2) no se está llenando: «${b.nombre}» ${b.hay ? "tiene una copia vieja" : "no tiene copia"}. ¿Está conectado el disco USB o la nube?` }); break; } }
+    catch { problemas.push({ clave: "copia-segunda-carpeta", gravedad: "alta", texto: "No se puede leer la segunda carpeta de copias (BACKUP_DIR2). ¿Está conectado el disco USB o la nube?" }); }
+  }
   const pedidos = deps.pedidosPendientes();
   const retenidos = pedidos.filter((p) => p.estado === "retenido"), listos = pedidos.filter((p) => p.estado !== "retenido");
   const masViejo = (l) => (l.length ? Math.max(...l.map((p) => horas(p.fecha, ahora))) : 0);

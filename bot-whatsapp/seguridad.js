@@ -26,13 +26,38 @@ export function contadorIntentos(tope, ventanaMs) {
   };
 }
 
+let registro = null, ultimoRegistro = new Map();
+/** Dónde se guardan los hechos sospechosos para el panel y los avisos por correo (lo pone server.js con la base de cuentas). */
+export const usarRegistro = (fn) => { registro = typeof fn === "function" ? fn : null; };
+/** Dirección real de quien llama. Detrás de Cloudflare/un proxy (TRUST_PROXY=1) se usa la que pone el proxy: sin esto, TODOS los clientes parecerían uno solo y los límites de intentos bloquearían a todos a la vez. */
+export const ipDe = (req, confiar = process.env.TRUST_PROXY === "1") => {
+  if (confiar) {
+    const cf = String(req.headers["cf-connecting-ip"] ?? "").trim(); // Cloudflare lo pone siempre y pisa el que mande el cliente
+    if (cf) return cf;
+    const xf = String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim(); if (xf) return xf;
+  }
+  return req.socket?.remoteAddress || "?";
+};
+/** ¿La clave del panel es corta o fácil de adivinar? (nunca se devuelve la clave) */
+export const claveDebil = (c) => {
+  const s = String(c ?? ""); if (!s) return false;
+  if (s.length < 16) return true;
+  if (/^(.)\1+$/.test(s) || /^(1234|abcd|qwer|clave|password|admin|demo|contrase)/i.test(s)) return true;
+  return new Set(s).size < 6;
+};
 let ultimoAviso = new Map();
 /** Anota un hecho sospechoso en el registro del programa (C:\vm\logs). Como máximo uno por tipo cada minuto, para no llenarlo. */
 export function eventoSeguridad(tipo, detalle = "") {
+  registrarSeguridad(tipo, detalle);
   const ahora = Date.now();
   if (ahora - (ultimoAviso.get(tipo) ?? 0) < 60_000) return;
   ultimoAviso.set(tipo, ahora); if (ultimoAviso.size > 50) ultimoAviso = new Map([[tipo, ahora]]);
   console.warn(`[VM seguridad] ${tipo}${detalle ? " · " + detalle : ""}`);
+}
+/** Apunta el hecho en la base (para el panel y el aviso por correo): como máximo uno cada 10 s por tipo, para que un ataque no llene la base. */
+export function registrarSeguridad(tipo, detalle = "") {
+  const ahora = Date.now(); if (ahora - (ultimoRegistro.get(tipo) ?? 0) < 10_000) return; ultimoRegistro.set(tipo, ahora);
+  try { registro?.(tipo, String(detalle).slice(0, 120)); } catch {}
 }
 
 /** Cabeceras para todas las respuestas del cliente. HSTS solo si HSTS=1 (cuando ya hay HTTPS delante, p. ej. Cloudflare). */

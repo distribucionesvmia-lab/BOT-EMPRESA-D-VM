@@ -91,6 +91,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   db.exec("CREATE TABLE IF NOT EXISTS usual_orders (customer_id TEXT PRIMARY KEY, lines TEXT NOT NULL, hidden INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL)"); // «Tu pedido de siempre» editado o borrado por el cliente (sin fila = el último pedido, como siempre)
   // Enlaces de invitación que crea la oficina: de UN solo uso y con caducidad. Solo se guarda la huella (hash) del enlace, nunca el enlace.
   // Errores de la app del cliente (qué falló y dónde, sin datos personales). Se guardan 30 días.
+  // Seguridad: hechos sospechosos que el programa ha parado, registro de lo que se hace en el panel y aparatos desde los que ha entrado cada cuenta (solo una huella corta, nunca el navegador entero)
+  db.exec("CREATE TABLE IF NOT EXISTS seguridad_eventos (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, tipo TEXT NOT NULL, detalle TEXT NOT NULL DEFAULT '')");
+  db.exec("CREATE TABLE IF NOT EXISTS actividad_panel (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, ip TEXT NOT NULL DEFAULT '', accion TEXT NOT NULL, ruta TEXT NOT NULL DEFAULT '', estado INTEGER NOT NULL DEFAULT 0)");
+  db.exec("CREATE TABLE IF NOT EXISTS aparatos_vistos (account_id INTEGER NOT NULL, huella TEXT NOT NULL, first_at TEXT NOT NULL, PRIMARY KEY (account_id, huella))");
   db.exec("CREATE TABLE IF NOT EXISTS errores_app (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, customer_id TEXT, tipo TEXT NOT NULL, pantalla TEXT NOT NULL, api TEXT, estado INTEGER NOT NULL DEFAULT 0, mensaje TEXT, navegador TEXT)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_errores_at ON errores_app(at)");
   db.exec("CREATE TABLE IF NOT EXISTS invitaciones (id INTEGER PRIMARY KEY AUTOINCREMENT, token_hash TEXT NOT NULL UNIQUE, customer_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT, motivo TEXT)");
@@ -259,6 +263,31 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     hideUsual(customerId, now = new Date().toISOString()) { db.prepare("INSERT INTO usual_orders (customer_id, lines, hidden, updated_at) VALUES (?, '[]', 1, ?) ON CONFLICT(customer_id) DO UPDATE SET lines = '[]', hidden = 1, updated_at = excluded.updated_at").run(String(customerId), now); return true; },
     resetUsual: (customerId) => db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(String(customerId)).changes === 1,
     allStanding() { const m = new Map(); for (const r of db.prepare("SELECT customer_id, days, paused, skip_week FROM standing_orders").all()) m.set(r.customer_id, { days: JSON.parse(r.days), paused: !!r.paused, skipWeek: r.skip_week ?? null }); return m; },
+    /** Apunta un hecho sospechoso (ver seguridad.js). Borra los de más de 60 días. */
+    seguridadRegistrar(tipo, detalle = "", now = new Date().toISOString()) {
+      db.prepare("INSERT INTO seguridad_eventos (at, tipo, detalle) VALUES (?, ?, ?)").run(now, String(tipo).slice(0, 60), String(detalle).slice(0, 120));
+      db.prepare("DELETE FROM seguridad_eventos WHERE at < ?").run(new Date(new Date(now).getTime() - 60 * 86_400_000).toISOString());
+    },
+    /** Lo parado en las últimas `horas` horas: total y por tipo, más los últimos. */
+    seguridadResumen({ horas = 24, now = new Date().toISOString() } = {}) {
+      const desde = new Date(new Date(now).getTime() - horas * 3_600_000).toISOString();
+      return { desde, total: db.prepare("SELECT COUNT(*) AS n FROM seguridad_eventos WHERE at >= ?").get(desde).n,
+        porTipo: db.prepare("SELECT tipo, COUNT(*) AS n FROM seguridad_eventos WHERE at >= ? GROUP BY tipo ORDER BY n DESC").all(desde),
+        ultimos: db.prepare("SELECT at, tipo, detalle FROM seguridad_eventos WHERE at >= ? ORDER BY id DESC LIMIT 25").all(desde) };
+    },
+    /** Apunta una acción hecha en el panel de la empresa (sin datos de clientes: solo qué, desde qué dirección y si salió bien). Borra lo de más de 180 días. */
+    actividadRegistrar({ ip = "", accion, ruta = "", estado = 0 }, now = new Date().toISOString()) {
+      db.prepare("INSERT INTO actividad_panel (at, ip, accion, ruta, estado) VALUES (?, ?, ?, ?, ?)").run(now, String(ip).slice(0, 64), String(accion).slice(0, 120), String(ruta).slice(0, 200), Number(estado) || 0);
+      db.prepare("DELETE FROM actividad_panel WHERE at < ?").run(new Date(new Date(now).getTime() - 180 * 86_400_000).toISOString());
+    },
+    actividadLista(limit = 100) { return db.prepare("SELECT at, ip, accion, ruta, estado FROM actividad_panel ORDER BY id DESC LIMIT ?").all(Math.min(500, Math.max(1, Number(limit) || 100))); },
+    /** ¿Es la primera vez que esta cuenta entra desde este aparato? Devuelve { nuevo, conocidos }: «nuevo» solo si ya había entrado desde otro (la primera vez nunca avisa). */
+    aparatoVisto(accountId, huella, now = new Date().toISOString()) {
+      const conocidos = db.prepare("SELECT COUNT(*) AS n FROM aparatos_vistos WHERE account_id = ?").get(accountId).n;
+      const ya = db.prepare("SELECT 1 FROM aparatos_vistos WHERE account_id = ? AND huella = ?").get(accountId, huella);
+      if (!ya) { db.prepare("INSERT INTO aparatos_vistos (account_id, huella, first_at) VALUES (?, ?, ?)").run(accountId, huella, now); db.prepare("DELETE FROM aparatos_vistos WHERE account_id = ? AND huella NOT IN (SELECT huella FROM aparatos_vistos WHERE account_id = ? ORDER BY first_at DESC LIMIT 20)").run(accountId, accountId); }
+      return { nuevo: !ya && conocidos > 0, conocidos };
+    },
     /** Apunta un error ya limpio (ver errores.js). Borra los de más de 30 días. */
     errorRegistrar(e, { customerId = null, navegador = "", now = new Date().toISOString() } = {}) {
       db.prepare("INSERT INTO errores_app (at, customer_id, tipo, pantalla, api, estado, mensaje, navegador) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(now, customerId == null ? null : String(customerId), e.tipo, e.pantalla, e.api || null, e.estado || 0, e.mensaje || null, String(navegador).slice(0, 60));

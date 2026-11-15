@@ -57,7 +57,7 @@ test("servidor: «solo ver» no deja enviar pedidos (catálogo ni chat), el pane
   assert.match(ad, /opcionesInvitacion\(/); assert.match(ad, /\/api\/admin\/invitaciones"/); assert.match(ad, /anular/); assert.match(ad, /invitaciones\/plantilla/);
   assert.doesNotMatch(ad.slice(ad.indexOf("// ---- Enlace de invitación"), ad.indexOf("// ---- Errores de la app")), /sendMail|enviarPush|fetch\(/); // el sistema no envía nada
   for (const t of ["inv-dias", "inv-fecha", "inv-hora", "inv-usos", "inv-modo", "inv-codigo", "inv-msg-b", "inv-plantilla", "inv-lista", "Anular", "Solo ver el catálogo"]) assert.ok(e.includes(t), t);
-  assert.match(e, /erroresApp\(\), invitaciones\(\)/);
+  assert.match(e, /erroresApp\(\), seguridadPanel\(\), invitaciones\(\)/);
   assert.match(ped, /function pintarSoloVer\(\)/); assert.match(ped, /data\.soloVer/); assert.match(cli, /y\?\.mensajeEnlace/); assert.match(cli, /in-enlace/);
 });
 

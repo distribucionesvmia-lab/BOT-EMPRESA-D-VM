@@ -23,3 +23,10 @@ Es lo que más protege: no abres puertos del router, tienes HTTPS y Cloudflare f
 - No navegar ni abrir correos en ese ordenador.
 - Copia de seguridad **fuera** del ordenador (disco externo o nube) de `C:\vm\datos` y de `BACKUP_DIR`: si un virus cifra el disco, las copias del mismo disco también se pierden.
 - Contraseñas largas y distintas para `ADMIN_TOKEN` y para cualquier acceso remoto (TeamViewer, etc.).
+
+## Añadido después (segunda tanda de seguridad)
+- **Si usas Cloudflare Tunnel (o cualquier proxy): pon `TRUST_PROXY=1` en `C:\vm\config\cliente.env`.** Sin eso, todos los clientes llegan «desde la misma dirección» (la del túnel) y los límites de intentos pueden bloquear a todos a la vez. El programa avisa en `C:\vm\logs` si falta. Con `TRUST_PROXY=1` se usa la dirección que pone Cloudflare (`CF-Connecting-IP`), que un cliente no puede falsear. **Solo activarlo si la web está DETRÁS del túnel** (nunca con el puerto abierto directamente a internet).
+- **Segunda carpeta de copias:** `BACKUP_DIR2=D:\copias-vm` (un disco USB) o la carpeta de OneDrive/Drive en `empresa.env`. Cada noche, tras la copia de siempre, se copia ahí y se guardan las 14 últimas. Si no se llena (USB desconectado), llega un aviso `[VM vigilancia]`.
+- **Panel → «Cuentas de clientes» → «Seguridad y actividad del panel»:** lo que el programa ha parado y lo que se ha hecho en el panel (precios, ofertas, borrados, enlaces…) con hora y dirección.
+- **Avisos por correo:** si en 24 h se paran 10 o más intentos sospechosos (`SEGURIDAD_AVISO_DESDE`), llega un `[VM vigilancia]`; también si la clave del panel (`ADMIN_TOKEN`) es corta o fácil (cámbiala por una de 20 letras y números como mínimo).
+- **Al cliente:** le llega un aviso al móvil si cambian su código de entrada o si alguien entra desde un aparato nuevo (solo si tiene los avisos activados).

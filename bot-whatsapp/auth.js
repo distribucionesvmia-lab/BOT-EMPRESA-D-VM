@@ -6,7 +6,7 @@ import crypto from "node:crypto";
 import { normalizePhone, validEmail, pinValido } from "./cuentas-db.js";
 import { nifCodes, nifClean } from "./nif-codes.js";
 import { codeKey, validCode } from "./nif-key.js";
-import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad } from "./seguridad.js";
+import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe } from "./seguridad.js";
 
 const COOKIE = "vm_session";
 const MENSAJE_ELIMINADA = "Esta cuenta se eliminó. Si quieres volver a usar la aplicación, llámanos o solicita el alta de nuevo.";
@@ -85,7 +85,7 @@ export { send, readJson };
  * secure: cookie solo por HTTPS · trustProxy: usar X-Forwarded-For para la IP
  */
 const paginaEntrar = (titulo, texto, boton) => `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${titulo} · Distribuciones Valentín Martín</title><style>:root{--bg:#F5F5F7;--card:#fff;--t:#1D1D1F;--t2:#5F5F65;--a:#C8102E;--on:#fff}@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1C1C1E;--t:#F5F5F7;--t2:#A8A8B0;--a:#FF6B7D;--on:#1D1D1F}}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--t);font:16px/1.45 system-ui,sans-serif}header{background:#C8102E;color:#fff;padding:20px 16px;text-align:center;font-weight:700;font-size:20px}main{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px}.c{background:var(--card);border-radius:20px;padding:28px 22px;max-width:420px;width:100%;text-align:center}h1{margin:0 0 8px;font-size:24px}p{margin:0 0 14px;color:var(--t2)}a.b,button{display:flex;align-items:center;justify-content:center;width:100%;min-height:52px;border:0;border-radius:26px;background:var(--a);color:var(--on);font:inherit;font-weight:700;font-size:17px;cursor:pointer;text-decoration:none}a.s{display:block;margin-top:8px;padding:12px 0;color:var(--a);font-weight:600;min-height:44px;line-height:1.35}</style><body><header>Distribuciones Valentín Martín</header><main><div class="c"><h1>${titulo}</h1><p>${texto}</p>${boton}</div></main></body></html>`;
-export function createAuth({ accounts, customers, misDatos = null, secure = false, trustProxy = false }) {
+export function createAuth({ accounts, customers, misDatos = null, secure = false, trustProxy = false, onAcceso = null, onCodigo = null }) {
   // Límites por IP (configurables para las pruebas): accesos cada 10 minutos y solicitudes de alta cada hora
   const loginLimit = rateLimiter(Number(process.env.LOGIN_LIMIT ?? 20), 10 * 60_000);
   // Acceso solo con NIF (sin nombre): no hay una cuenta a la que contar los fallos, así que se limita más por IP y en conjunto
@@ -94,7 +94,10 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const usoLimit = rateLimiter(300, 10 * 60_000); // contadores: muchos permitidos, pero no infinitos por IP
   const registerLimit = rateLimiter(Number(process.env.REGISTER_LIMIT ?? 20), 60 * 60_000);
   const intentosAcceso = contadorIntentos(Number(process.env.CAPTCHA_DESPUES_DE ?? 5), 10 * 60_000); // pasados N intentos en 10 min desde una dirección, se pide «no soy un robot»
-  const ip = (req) => (trustProxy ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() : "") || req.socket.remoteAddress || "?";
+  const ip = (req) => ipDe(req, trustProxy);
+  /** Aparato desde el que se entra: huella corta del navegador (nunca se guarda la cadena entera). Avisa al servidor para que pueda decirle al cliente «alguien ha entrado desde un aparato nuevo». */
+  const huellaAparato = (req) => crypto.createHash("sha256").update(String(req.headers["user-agent"] ?? "")).digest("hex").slice(0, 16);
+  const avisoAcceso = (token, req) => { try { const acc = accounts.sessionAccount(token); if (acc) onAcceso?.(acc, huellaAparato(req)); } catch {} };
   const cookie = (token, maxAge) => `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
 
   /** Cuenta de la sesión de esta petición (o null). */
@@ -117,7 +120,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (u.tipo === "alta") return res.writeHead(303, { Location: "/cliente#alta=" + encodeURIComponent(u.nombre || ""), "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).end(), true; // persona nueva: sin sesión, solo abre su solicitud de alta con el nombre puesto
       const r = accounts.entrarPorInvitacion(u.customerId, { soloVer: u.soloVer, mensaje: u.mensaje, pedirCodigo: u.pedirCodigo });
       if (!r.ok) return fin(403, "No hemos podido entrar", "Tu cuenta está bloqueada ahora mismo. Llama a la oficina y lo solucionan.", '<a class="b" href="/cliente">Volver</a>');
-      return res.writeHead(303, { "Set-Cookie": cookie(r.token, 30 * 86400), Location: u.pedirCodigo ? "/cliente#invitacion" : "/cliente#enlace", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).end(), true;
+      return res.writeHead(303, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400)), Location: u.pedirCodigo ? "/cliente#invitacion" : "/cliente#enlace", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).end(), true;
     }
     // ── «Darme de baja de las ofertas por correo»: el enlace de cada correo de promoción. GET enseña un botón (así los programas que abren los enlaces solos no te dan de baja); el POST (el botón, o el «un clic» de Gmail) lo hace ──
     if (p.startsWith("/baja/") && (req.method === "GET" || req.method === "POST")) {
@@ -182,7 +185,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
           const own = accounts.loginByCode(codeKey(b.nif));
           if (own.ok) {
             const customer = customers.getById(own.account.customerId);
-            return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": cookie(own.token, 30 * 86400) }), true;
+            return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(own.token, req), cookie(own.token, 30 * 86400)) }), true;
           }
           if (own.reason === "locked") return send(res, 401, { error: "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." }), true;
         }
@@ -199,7 +202,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         if (r.reason === "deleted") return send(res, 401, { error: MENSAJE_ELIMINADA }), true;
         if (!r.ok || ids.length > 1) return send(res, 401, { error: r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "NIF incorrecto. Si te sigue fallando, llama a la empresa." }), true;
         const customer = customers.getById(r.account.customerId);
-        return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": cookie(r.token, 30 * 86400) }), true;
+        return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400)) }), true;
       }
       // Teléfono + código: el nombre de la empresa solo se pide si hace falta (varios clientes comparten ese teléfono). Si se escribe, debe coincidir.
       const sinNombre = empresa.trim().length < 2;
@@ -213,7 +216,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       }
       if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : r.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "Teléfono, código de entrada o nombre de la empresa incorrectos. Usa el teléfono con el que sueles contactar con nosotros." }), true;
       const customer = customers.getById(r.account.customerId);
-      return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": cookie(r.token, 30 * 86400) }), true;
+      return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400)) }), true;
     }
 
     if (p === "/api/salir" && req.method === "POST") {
@@ -238,6 +241,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (customers.findByNif(b.nuevo).length) return send(res, 400, { error: "Ese código no está disponible. Elige otro." }), true; // no puede coincidir con el NIF de nadie
       const r = accounts.setCodeKey(acc.id, codeKey(b.nuevo));
       if (r.error) return send(res, 400, { error: r.error }), true;
+      try { onCodigo?.(acc); } catch {}
       return send(res, 200, { ok: true }), true;
     }
 

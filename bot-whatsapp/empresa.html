@@ -736,6 +736,19 @@
       </div>
       </div>
       <div class="panel">
+        <h2>Seguridad y actividad del panel</h2>
+      <p class="muted" style="margin:0 0 8px">Lo que el programa ha parado (bots, intentos de entrar, demasiados pedidos) y lo que se ha hecho en este panel (precios, ofertas, borrados, enlaces…) con la hora y la dirección. No lleva datos de clientes ni claves.</p>
+      <p id="seg-vacio" class="vacio" hidden><b>Nada sospechoso en los últimos 7 días.</b><span>Si alguien intenta entrar o hacer pedidos de forma rara, el programa lo para y lo anota aquí.</span></p>
+      <div id="seg-caja" hidden>
+        <div class="scroll"><table><thead><tr><th>Qué se ha parado (7 días)</th><th>Veces</th></tr></thead><tbody id="seg-tipo"></tbody></table></div>
+        <h3 style="margin:12px 0 4px">Los últimos</h3>
+        <div class="scroll"><table><thead><tr><th>Cuándo</th><th>Qué</th><th>Detalle</th></tr></thead><tbody id="seg-ult"></tbody></table></div>
+      </div>
+      <h3 style="margin:14px 0 4px">Actividad del panel (lo último)</h3>
+      <p id="act-vacio" class="vacio" hidden><b>Todavía no hay actividad anotada.</b><span>Aquí saldrá cada cambio que se haga en el panel.</span></p>
+      <div class="scroll"><table id="act-tabla"><thead><tr><th>Cuándo</th><th>Qué se hizo</th><th>Desde</th><th>Resultado</th></tr></thead><tbody id="act-lista"></tbody></table></div>
+      </div>
+      <div class="panel">
         <h2>Derechos de protección de datos</h2>
       <p class="muted" style="margin:0 0 8px">Lo que piden los clientes desde la aplicación («Mis datos y privacidad»): corregir sus datos, limitar su uso u oponerse. <b>Hay que contestarles en un plazo máximo de un mes.</b> Cuando un cliente elimina su cuenta, aquí queda anotado (se borran su acceso, contactos y favoritos; los pedidos se conservan por obligación legal).</p>
       <div class="scroll"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Qué pide</th><th>Detalle</th><th>Estado</th><th></th></tr></thead><tbody id="der"></tbody></table></div>
@@ -1042,6 +1055,14 @@ async function erroresApp() {
   const llena = (id, filas) => { const tb = $(id); tb.innerHTML = ""; for (const f of filas) { const tr = document.createElement("tr"); for (const v of f) tr.appendChild(el("td", String(v ?? "—"))); tb.appendChild(tr); } };
   llena("err-tipo", r.porTipo.map((x) => [TIPO_ERROR[x.tipo] ?? x.tipo, x.n])); llena("err-cli", r.porCliente.map((x) => [x.nombre, x.n])); llena("err-api", r.porApi.map((x) => [x.api, x.estado || "sin respuesta", x.n]));
   llena("err-ult", r.ultimos.map((x) => [hora(x.at), x.nombre, x.pantalla, (x.api ? x.api + " " : "") + (x.estado ? "(" + x.estado + ") " : "") + (x.mensaje || ""), x.navegador]));
+}
+const TIPO_SEG = { "alta-con-campo-trampa": "Solicitud de alta de un bot (campo trampa)", "muchas-solicitudes-de-alta": "Demasiadas solicitudes de alta desde una dirección", "alta-sin-comprobacion-robot": "Alta sin pasar el «no soy un robot»", "muchos-intentos-de-acceso": "Muchos intentos de acceso seguidos", "demasiados-pedidos": "Demasiados pedidos de un cliente en una hora", "panel-clave-incorrecta": "Clave del panel incorrecta", "panel-bloqueado-por-claves-erroneas": "Panel bloqueado por claves erróneas" };
+async function seguridadPanel() {
+  const r = await call("/api/admin/seguridad?limite=100"), llena = (id, filas) => { const tb = $(id); tb.innerHTML = ""; for (const f of filas) { const tr = document.createElement("tr"); for (const v of f) tr.appendChild(el("td", String(v ?? "—"))); tb.appendChild(tr); } };
+  $("seg-vacio").hidden = r.total > 0; $("seg-caja").hidden = r.total === 0;
+  if (r.total) { llena("seg-tipo", r.porTipo.map((x) => [TIPO_SEG[x.tipo] ?? x.tipo, x.n])); llena("seg-ult", r.ultimos.map((x) => [hora(x.at), TIPO_SEG[x.tipo] ?? x.tipo, x.detalle])); }
+  $("act-vacio").hidden = r.actividad.length > 0; $("act-tabla").hidden = r.actividad.length === 0;
+  llena("act-lista", r.actividad.map((x) => [hora(x.at), x.accion, x.ip, x.estado >= 400 ? "No se pudo (" + x.estado + ")" : "Hecho"]));
 }
 async function usoApp() {
   const u = await call("/api/admin/uso?dias=30"), tb = $("uso"); tb.innerHTML = "";
@@ -1559,7 +1580,7 @@ async function copias(comprobar = false) {
   finally { if (comprobar) { b.disabled = false; b.textContent = "Comprobar copias ahora"; } }
 }
 $("copias-comprobar").onclick = () => copias(true);
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), correoClientes(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), seguridadPanel(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), correoClientes(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 // ═════════ Estadísticas y patrones ═════════
 const est = { rango: "30d", d0: "", d1: "", datos: null, modo: "uds", mas: false, timerVivo: 0, timerDatos: 0, cliente: null };
