@@ -2,7 +2,7 @@
 
 **Cómo usarlos**
 1. Adjunta siempre la imagen `maqueta_minimalista_apple.png` (está en esta misma carpeta) como referencia visual.
-2. Pega primero la **CABECERA COMÚN** y justo debajo **un** prompt (1, 2, 3, 4, 5 o 6). Hazlos **en orden** y publica una versión después de cada uno.
+2. Pega primero la **CABECERA COMÚN** y justo debajo **un** prompt (1, 2, 3, 4, 5 o 6). Hazlos **en orden** y haz commit/push (y regenera la demo) después de cada uno.
 3. Al terminar cada uno, el constructor te da su informe; pásamelo y lo mido en 9 tamaños de pantalla antes de pasar al siguiente.
 
 **Qué significa «estilo Apple» aquí:** principios de diseño (simplicidad, jerarquía clara, mucho aire, un solo color de acento, fotografía protagonista, movimiento suave y con propósito), **no** copiar logos, iconos ni imágenes de Apple. Todo el contenido es de Valentín.
@@ -14,10 +14,15 @@
 ## CABECERA COMÚN (pégala antes de cada prompt)
 
 ```text
-Trabajas sobre el artefacto «Pedidos por WhatsApp» (https://claude.ai/artifact/5R8CeLCQi6uTPXkzEfsETP): app de pedidos de Distribuciones Valentín Martín, con acceso, chat y un catálogo de pedido (MINI_HTML, en un iframe con srcdoc), más el panel de la empresa. Estamos rediseñando SOLO la parte del cliente con un estilo minimalista y premium, inspirado en los principios de diseño de Apple. Te adjunto una maqueta como referencia visual: sigue su dirección, no copies sus datos de ejemplo.
+DÓNDE SE HACE EL CAMBIO: trabajas en el repositorio del programa, rama claude/eager-hamilton-gknalq (haz git pull antes de empezar y lee CLAUDE.md: sus reglas mandan sobre todo lo de abajo). La parte del cliente vive en bot-whatsapp/cliente.html (acceso, chat) y bot-whatsapp/pedido.html (catálogo y pedido), con sus pruebas; la demo online (artefacto «Pedidos por WhatsApp», https://claude.ai/artifact/5R8CeLCQi6uTPXkzEfsETP) se genera a partir de ese mismo código (demo-web/build.mjs y preparar-artefacto.js). Haz el cambio en el código fuente, no en el HTML generado, y vuelve a generar la demo al terminar.
+- npm test (en bot-whatsapp) debe pasar entero antes de publicar; si tocas comportamiento, añade o ajusta su prueba. Nunca borres ni desactives una prueba para que pase.
+- Respeta la política de seguridad ya instalada (CSP, límites, Turnstile opcional): no añadas scripts ni estilos externos ni nada que la incumpla; los iconos son SVG propios en línea y la tipografía es la del sistema.
+- Datos y claves reales (C:\vm\datos, C:\vm\config, Excel reales) no se tocan; las pruebas usan datos ficticios.
+
+Estamos rediseñando SOLO la parte del cliente (acceso, chat, catálogo, pedido; no el panel de la empresa) con un estilo minimalista y premium, inspirado en los principios de diseño de Apple. Te adjunto una maqueta como referencia visual: sigue su dirección, no copies sus datos de ejemplo.
 
 REGLAS GENERALES
-- Lee primero la versión publicada actual y parte de ella. Publica una versión al terminar y dime su número. Si algo falla, no publiques: dímelo.
+- Parte del código actual de la rama. Haz un commit por cada paso lógico, con mensaje claro en español, y push a la rama de trabajo; dime el número de commit y, si regeneras la demo, el de la versión publicada. Si algo falla, no publiques: dímelo.
 - No cambies datos (tarifa, clientes), precios, descuentos, IVA, reglas de entrega ni el panel de la empresa. No quites ninguna función existente: se rediseña su aspecto y su sitio, no se elimina. Si una función no tiene sitio claro en el nuevo diseño, déjala accesible y dímelo.
 - Un solo color de acento: el rojo de Valentín (#C8102E), solo para la acción principal, el estado activo y detalles puntuales. El resto es neutro. Los avisos usan verde (correcto) o ámbar (atención); el rojo no se usa como color de error en texto pequeño.
 - Toda zona pulsable mide al menos 44×44 px. Todo texto cumple contraste AA (4,5:1; 3:1 en texto grande).
