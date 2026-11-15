@@ -44,6 +44,23 @@ Solo se usa la base de la empresa **VALENTIN** (Valentín Martín Gallego). Las 
    - **Historial:** líneas de factura de venta (`LINEFACT` + `CABEFACV`) de los últimos 12 meses desde la última factura de la copia, sin abonos.
 4. Los Excel llevan el NIF de los clientes: la carpeta de salida **no se sube a GitHub** (`salida-datos` está en `.gitignore`).
 
+### Exportación automática desde a3ERP (sin copias a mano)
+En lugar de restaurar una copia cada vez, un script programado en el PC/servidor de a3ERP **lee la base en solo lectura cada hora** y deja los tres Excel en la carpeta de Drive para escritorio. Solo reescribe un Excel si sus datos han cambiado, así que Drive no sube nada si no hay novedades. Está probado contra la copia real de VALENTIN: da los mismos Excel que el procedimiento manual y la segunda pasada dice «sin cambios».
+1. **Instalar** (una vez): Node 22 (el servidor ya lo usa) y el proyecto en `C:\vm\bot`. No hace falta instalar nada de SQL: usa PowerShell, que viene con Windows (`deploy/windows/consulta-sql.ps1`).
+2. **Configurar**: copiar `deploy/windows/a3erp.env.example` a `C:\vm\config\a3erp.env` y poner el servidor (`SRVVALENTIN\A3ERP`) y la carpeta de Drive (`CARPETA_DATOS`).
+3. **Permiso de solo lectura** (lo ejecuta quien administre SQL Server, una vez). Mejor un usuario propio que la cuenta `sa`:
+   ```sql
+   CREATE LOGIN vm_lectura WITH PASSWORD = 'una-clave-larga-y-secreta';
+   USE VALENTIN;
+   CREATE USER vm_lectura FOR LOGIN vm_lectura;
+   ALTER ROLE db_datareader ADD MEMBER vm_lectura;
+   ```
+   y poner `A3_SQL_USER=vm_lectura` y `A3_SQL_PASS=…` en `a3erp.env` (o dejarlos vacíos para usar la cuenta de Windows, si tiene permiso de lectura).
+4. **Probar**: ejecutar `deploy\windows\exportar-a3erp.bat` y mirar `C:\vm\logs\a3erp.log`: debe listar `clientes.xlsx`, `productos.xlsx` e `historial-ventas.xlsx` con su número de filas.
+5. **Programar**: ejecutar `deploy\windows\instalar-exportacion-a3erp.bat` con el usuario que tiene abierto Google Drive para escritorio. La tarea corre cada hora mientras ese usuario tenga la sesión iniciada (la carpeta de Drive es de su sesión).
+- Lee con `READ UNCOMMITTED` y con intención de solo lectura: no bloquea a a3ERP mientras se trabaja. Nunca escribe en a3ERP.
+- **El servidor real** (Render) lee esa carpeta de Drive cada 15 minutos y se actualiza solo. **El artefacto de Claude** no: necesita publicar los archivos y pulsar «Aplicar cambios» (ver más abajo).
+
 ### Cuando llega una copia nueva (solo se aplican las diferencias)
 Con el artefacto de Claude «Pedidos por WhatsApp» la actualización es **incremental**: el cargador guarda una huella de cada producto y cliente (`cargas/hashes-*` en su base) y en cada carga escribe **solo lo nuevo o modificado** y retira lo que ya no está. La primera vez carga todo.
 1. Restaurar la copia nueva, extraer los Excel (`extraer-a3erp.js`) y preparar los datos: `node preparar-artefacto.js --entrada ./salida-datos --origen "copia a3ERP VALENTIN dd/mm/aaaa"`. Muestra cuántos registros son nuevos, modificados y retirados frente a la copia anterior.

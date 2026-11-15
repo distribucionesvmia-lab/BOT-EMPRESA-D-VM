@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CONSULTAS, aExcel } from "./extraer-a3erp.js";
+import { CONSULTAS, aExcel, conexionDeEntorno } from "./extraer-a3erp.js";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { parseProductosXlsx } from "./productos-import.js";
 import { parseHistorialXlsx } from "./historial-import.js";
@@ -34,4 +34,10 @@ test("historial: agrupa por cliente y documento, con fecha y cantidad", () => {
 
 test("las consultas son SELECT fijos y de solo lectura", () => {
   for (const def of Object.values(CONSULTAS)) assert.match(def.sql(12).trim(), /^SELECT/i), assert.doesNotMatch(def.sql(12), /\b(INSERT|UPDATE|DELETE|DROP|EXEC)\b/i);
+});
+
+test("conexión: con A3_SQL_SERVER usa PowerShell (cuenta de Windows si no hay usuario); si no, sqlcmd", () => {
+  assert.deepEqual(conexionDeEntorno({ A3_SQL_SERVER: "SRV\\A3ERP" }), { powershell: true, servidor: "SRV\\A3ERP", usuario: "", clave: "" });
+  assert.equal(conexionDeEntorno({ A3_SQL_SERVER: "x", A3_SQL_USER: "lectura", A3_SQL_PASS: "p" }).usuario, "lectura");
+  assert.deepEqual(conexionDeEntorno({ SQLCMD_JSON: '["sqlcmd","-S","."]' }), { sqlcmd: ["sqlcmd", "-S", "."] });
 });
