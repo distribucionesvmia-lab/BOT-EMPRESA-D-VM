@@ -86,17 +86,17 @@ export async function enviarCampanas({ accounts, contactos, smtp, from, base = (
       if (r.tipo === "promo" && !/^https?:\/\//.test(baseUrl)) { accounts.campanaCorreoMarcar(r.id, "error", "Falta la dirección pública de la aplicación del cliente (CLIENTE_URL): sin ella no se puede poner el enlace de baja que exige la ley."); siguiente(); continue; }
       const aud = audiencia({ accounts, contactos: contactos(), campana: r });
       const hoyYa = accounts.correosEnviadosDesde(new Date(ahora.getTime() - 86400_000).toISOString()), cupo = Math.max(0, limiteDia() - hoyYa);
-      let ok = 0, mal = 0, porLimite = 0, porFallo = 0, saltados = 0;
+      let ok = 0, mal = 0, porLimite = 0, porFallo = 0, saltados = 0; const motivos = new Set();
       for (const d of aud.destinatarios) {
         if (accounts.campanaCorreoYaEnviado(r.id, d.id)) { saltados++; continue; }
         if (ok >= cupo) { porLimite++; continue; }
         const m = mensajeCampana(r, { nombre: d.nombre, base: baseUrl, token: r.tipo === "promo" ? accounts.bajaToken(d.id) : "", negocio, telefono });
         try { await send(smtp, { from, to: d.email, subject: m.subject, text: m.text, headers: m.headers }); accounts.campanaCorreoEnvio(r.id, d.id, "enviado"); ok++; }
-        catch (e) { accounts.campanaCorreoEnvio(r.id, d.id, "error", String(e.message).slice(0, 160)); mal++; log.error?.(`Correo de campaña ${r.id}: ${e.message}`); if (/rechaz|credencial|certificate|no se pudo conectar|tiempo agotado/i.test(e.message) && ok === 0 && mal >= 3) { porFallo += aud.destinatarios.length - ok - mal - saltados - porLimite; break; } } // si el servidor falla desde el principio, no se sigue
+        catch (e) { accounts.campanaCorreoEnvio(r.id, d.id, "error", String(e.message).slice(0, 160)); mal++; motivos.add(String(e.message).replace(/\s+/g, " ").slice(0, 260)); log.error?.(`Correo de campaña ${r.id}: ${e.message}`); if (/rechaz|credencial|certificate|no se pudo conectar|tiempo agotado/i.test(e.message) && ok === 0 && mal >= 3) { porFallo += aud.destinatarios.length - ok - mal - saltados - porLimite; break; } } // si el servidor falla desde el principio, no se sigue
         if (pausaMs) await new Promise((x) => setTimeout(x, pausaMs));
       }
       const partes = [`${ok} enviado${ok === 1 ? "" : "s"}`, ...(mal ? [`${mal} con error`] : []), ...(porLimite ? [`${porLimite} sin enviar por el límite diario`] : []), ...(porFallo ? [`${porFallo} sin enviar porque el servidor de correo falla`] : []), ...(aud.sinCorreo ? [`${aud.sinCorreo} sin correo`] : []), ...(aud.sinPermiso ? [`${aud.sinPermiso} no han aceptado ofertas`] : [])];
-      accounts.campanaCorreoMarcar(r.id, mal && !ok ? "error" : "enviado", partes.join(" · ")); out.enviadas++; siguiente();
+      accounts.campanaCorreoMarcar(r.id, mal && !ok ? "error" : "enviado", partes.join(" · ") + (motivos.size ? ` — Motivo del error: ${[...motivos].slice(0, 2).join(" / ")}` : "")); out.enviadas++; siguiente();
     } catch (e) { log.error?.("Campaña de correo:", e.message); accounts.campanaCorreoMarcar(r.id, "error", e.message); siguiente(); }
   }
   return out;

@@ -83,7 +83,7 @@ test("ENVÍO: sin la dirección pública no se mandan promociones; el límite di
   // servidor de correo caído: se apunta, sin repetir
   m = montar(); m.accounts.ofertasSet("1", true, "cliente");
   m.accounts.campanaCorreoAdd({ ...validarCampana({ ...base, tipo: "servicio" }, { ahora: AHORA }).campana, clienteId: null });
-  await enviarCampanas({ ...ctx(m, { send: async () => { throw new Error("servidor caído"); } }), ahora: new Date("2026-11-18T08:00:30Z") }); assert.equal(m.accounts.campanaCorreoHistorial()[0].estado, "error"); assert.match(m.accounts.campanaCorreoHistorial()[0].resultado, /con error/);
+  await enviarCampanas({ ...ctx(m, { send: async () => { throw new Error("servidor caído"); } }), ahora: new Date("2026-11-18T08:00:30Z") }); assert.equal(m.accounts.campanaCorreoHistorial()[0].estado, "error"); assert.match(m.accounts.campanaCorreoHistorial()[0].resultado, /con error.*Motivo del error: servidor caído/); // el panel dice por qué falló
   // semanal
   m = montar(); m.accounts.ofertasSet("1", true, "cliente");
   m.accounts.campanaCorreoAdd({ ...validarCampana({ ...base, dia: "2026-10-22", repetir: "semana" }, { ahora: new Date("2026-10-20T10:00:00Z") }).campana, clienteId: null });
