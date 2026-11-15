@@ -423,3 +423,6 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 
 ## Corazón de favorito: esquina superior derecha (rediseño)
 - El corazón (`.pf-fav`) ya no va abajo a la izquierda (móvil) ni encima del nombre (ordenador, sobre todo en artículos sin foto): es un círculo de 32 px (toque de 44 px) en la **esquina superior derecha** de la tarjeta, alineado con el borde derecho del «+»; el nombre y la línea «Caja de N…» dejan 34 px a la derecha para no pisarlo (en ordenador, con foto, no hace falta). Móvil/tableta: la fila de abajo es «selector Caja|Ud · +» (`grid-template-areas:"av info info" ". seg slot"`). Bloque final del `<style>` de `pedido.html`. Comprobado con capturas a 360, 800 y 1280 px (con favoritos simulados); no en un móvil real.
+
+## Recuadros de las fotos más grandes en el catálogo
+- A petición de la empresa, la baldosa de la foto de cada artículo del catálogo (`.pf-av`) es más grande: **móvil 96 px** (antes 64), **tableta 128 px**, **ordenador: ocupa el ancho de la tarjeta, hasta 230 px** y cuadrada (antes 96 px). Bloque final del `<style>` de `pedido.html`. En móvil el nombre tiene algo menos de ancho (se parte en más líneas; máximo 3, 4 con letra grande). Esto sustituye lo dicho en «Bench 2» sobre 64/96 px. Comprobado con capturas a 360, 800 y 1280 px; no en un móvil real.

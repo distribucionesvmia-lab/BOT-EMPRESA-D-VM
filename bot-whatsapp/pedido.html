@@ -1361,6 +1361,10 @@
     .pf-fav { right:calc(max(var(--gutter), calc((100% - 860px) / 2)) - 6px); top:calc(var(--s2) - 6px); }
   }
   @media (min-width:1024px) { .pf-fav { right:calc(var(--s3) - 6px); top:calc(var(--s3) - 6px); } .pf:not(.sin-foto) .pf-n, .pf:not(.sin-foto) .pf-sec { padding-right:0; } } /* con foto, el nombre va debajo de ella y no choca con el corazón */
+  /* Fotos más grandes en el catálogo (a petición de la empresa): que se vea bien el producto que se compra */
+  @media (max-width:1023px) { .pf { grid-template-columns:96px minmax(0, 1fr) auto; } .pf-av { width:96px; height:96px; } }
+  @media (min-width:768px) and (max-width:1023px) { .pf { grid-template-columns:128px minmax(0, 1fr) auto; } .pf-av { width:128px; height:128px; } }
+  @media (min-width:1024px) { .pf-av { width:100%; max-width:230px; height:auto; aspect-ratio:1 / 1; margin:0 auto; } }
 </style>
 </head>
 <body>
