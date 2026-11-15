@@ -71,8 +71,21 @@ class Conn {
  * Envía un correo. cfg: { host, port = 587, secure = "starttls" | "tls" | "none", user, pass, rejectUnauthorized = true, timeout = 20000 }
  * msg: { from, to (texto o lista), subject, text }. Lanza un Error claro si algo falla.
  */
+/** Quita comillas y espacios de los extremos (típico al copiar a un fichero de configuración). En Gmail la contraseña de aplicación son 16 letras: Google la enseña en grupos de 4 con espacios y aquí se quitan. */
+export const limpiaCredencial = (v, { sinEspacios = false } = {}) => { let t = String(v ?? "").trim().replace(/^(["'])(.*)\1$/, "$2").trim(); if (sinEspacios) t = t.replace(/\s+/g, ""); return t; };
+const esGoogle = (host) => /(^|\.)(gmail|googlemail)\.com$/i.test(String(host ?? ""));
+/** Mensaje de «usuario o contraseña rechazados» con lo que respondió el servidor y datos NO secretos (el usuario y cuántos caracteres tiene la contraseña), para saber qué falla. */
+export function errorDeCredenciales(r, { host, user, pass }) {
+  const resp = String(r?.text ?? "").replace(/\s+/g, " ").trim().slice(0, 160), g = esGoogle(host);
+  const pista = /application-specific|app password|InvalidSecondFactor/i.test(resp) ? " Google pide una CONTRASEÑA DE APLICACIÓN (16 letras), no la contraseña normal de la cuenta."
+    : /WebLoginRequired|web browser|NeedsBrowser|accounts\.google\.com\/signin|critical-security-alert/i.test(resp) ? " Google ha bloqueado el acceso hasta que lo confirmes: entra en la cuenta desde el navegador, mira «Seguridad» y acepta el aviso de actividad."
+    : g && String(pass ?? "").length !== 16 ? ` Las contraseñas de aplicación de Google tienen exactamente 16 letras y aquí se leen ${String(pass ?? "").length}.` : "";
+  return new Error(`El servidor de correo rechazó el usuario o la contraseña. Respuesta del servidor: ${r?.code ?? "?"} ${resp || "(sin texto)"}. Usuario que lee el programa: «${user}». La contraseña que lee el programa tiene ${String(pass ?? "").length} caracteres.${pista}`);
+}
+
 export async function sendMail(cfg, msg) {
-  const { host, port = 587, secure = "starttls", user, pass, rejectUnauthorized = true, timeout = 20000 } = cfg;
+  const { host, port = 587, secure = "starttls", rejectUnauthorized = true, timeout = 20000 } = cfg;
+  const user = limpiaCredencial(cfg.user), pass = cfg.pass === undefined || cfg.pass === null ? cfg.pass : limpiaCredencial(cfg.pass, { sinEspacios: esGoogle(host) });
   if (!host) throw new Error("Falta el servidor de correo (SMTP_HOST).");
   const to = [].concat(msg.to).map(addrOf).filter(Boolean);
   if (!to.length) throw new Error("Falta el destinatario del correo.");
@@ -105,10 +118,10 @@ export async function sendMail(cfg, msg) {
         await c.cmd("AUTH LOGIN", [334]);
         await c.cmd(b64(user), [334]);
         const r = await c.cmd(b64(pass ?? ""), [235, 334, 535]).catch((e) => { throw e; });
-        if (r.code !== 235) throw new Error("El servidor de correo rechazó el usuario o la contraseña.");
+        if (r.code !== 235) throw errorDeCredenciales(r, { host, user, pass });
       } else {
         const r = await c.cmd(`AUTH PLAIN ${b64(`\0${user}\0${pass ?? ""}`)}`, [235, 535]);
-        if (r.code !== 235) throw new Error("El servidor de correo rechazó el usuario o la contraseña.");
+        if (r.code !== 235) throw errorDeCredenciales(r, { host, user, pass });
       }
     }
     await c.cmd(`MAIL FROM:<${addrOf(msg.from)}>`, [250]);

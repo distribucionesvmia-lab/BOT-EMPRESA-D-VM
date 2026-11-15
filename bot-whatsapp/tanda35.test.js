@@ -62,3 +62,14 @@ test("MI CUENTA y PANEL: interruptor «Correo con la confirmación de mis pedido
   assert.match(c, /function pintarCorreo\(box\)/); assert.match(c, /Correo con la confirmación de mis pedidos/); assert.match(c, /pintarCorreo\(correoCaja\)/); assert.match(c, /no es una factura/);
   assert.match(e, /async function correoClientes\(\)/); assert.match(e, /cliente\.env/); assert.match(a, /"\/api\/admin\/correo-clientes" && get/);
 });
+
+test("CORREO: la contraseña de aplicación de Google se limpia (espacios y comillas) y el error dice qué respondió el servidor sin enseñar la contraseña", async () => {
+  const { limpiaCredencial, errorDeCredenciales } = await import("./mailer.js");
+  assert.equal(limpiaCredencial("  abcd efgh ijkl mnop \r", { sinEspacios: true }), "abcdefghijklmnop"); assert.equal(limpiaCredencial('"abcd efgh"'), "abcd efgh"); assert.equal(limpiaCredencial("'x@y.es'"), "x@y.es"); assert.equal(limpiaCredencial(undefined), "");
+  const e1 = errorDeCredenciales({ code: 535, text: "5.7.8 Username and Password not accepted. For more information, go to" }, { host: "smtp.gmail.com", user: "pedidos@gmail.com", pass: "claveSecreta12" });
+  assert.match(e1.message, /rechazó el usuario o la contraseña/); assert.match(e1.message, /535 5\.7\.8 Username and Password not accepted/); assert.match(e1.message, /«pedidos@gmail\.com»/); assert.match(e1.message, /tiene 14 caracteres/); assert.match(e1.message, /exactamente 16 letras y aquí se leen 14/);
+  assert.ok(!e1.message.includes("claveSecreta12"), "la contraseña no sale nunca");
+  assert.match(errorDeCredenciales({ code: 534, text: "5.7.9 Application-specific password required" }, { host: "smtp.gmail.com", user: "a@gmail.com", pass: "abcdefghijklmnop" }).message, /CONTRASEÑA DE APLICACIÓN/);
+  assert.match(errorDeCredenciales({ code: 534, text: "5.7.14 Please log in via your web browser" }, { host: "smtp.gmail.com", user: "a@gmail.com", pass: "abcdefghijklmnop" }).message, /bloqueado el acceso/);
+  assert.doesNotMatch(errorDeCredenciales({ code: 535, text: "mal" }, { host: "smtp.otro.es", user: "a@b.es", pass: "x" }).message, /16 letras/); // la pista de 16 letras es solo de Google
+});
