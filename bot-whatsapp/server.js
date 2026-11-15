@@ -45,6 +45,7 @@ import { categorizar } from "./categorias.js";
 import { empaquetar, estatico } from "./estaticos.js";
 import { avisarCortes, horaAviso } from "./avisocorte.js";
 import { enviarProgramados } from "./avisos-programados.js";
+import { enviarCampanas } from "./correo-campanas.js";
 import { crearCorreoCliente, smtpDesdeEntorno, elegirDestino, tapar, emailValido } from "./correo-cliente.js";
 import { zip as zipNode } from "./zip.js";
 import { limpiaError, navegadorCorto } from "./errores.js";
@@ -849,6 +850,17 @@ async function appRoutes(req, res, url) {
     } catch { /* un fallo al apuntar un fallo no se cuenta a nadie */ }
     return void res.writeHead(204).end();
   }
+  if (p === "/api/correo/ofertas" && req.method === "GET") { // «Quiero recibir ofertas y promociones por correo»: permiso del cliente (por defecto NO)
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const dest = elegirDestino({ account, customer: customerDirectory.getById(account.customerId) }), o = getAccountsDb().ofertasDe(account.customerId);
+    return void sendJson(res, 200, { disponible: !!dest, acepta: !!o?.acepta, destino: dest ? tapar(dest) : null });
+  }
+  if (p === "/api/correo/ofertas" && req.method === "POST") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    const body = await readJson(req), acepta = body?.acepta === true; getAccountsDb().ofertasSet(account.customerId, acepta, "cliente");
+    return void sendJson(res, 200, { ok: true, acepta });
+  }
   if (p === "/api/correo/pedidos" && req.method === "GET") { // «Recibir por correo la confirmación de mis pedidos»: solo se ofrece si hay correo del servidor y un correo suyo
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     const dest = correoCliente() ? elegirDestino({ account, customer: customerDirectory.getById(account.customerId) }) : null;
@@ -941,7 +953,7 @@ async function appRoutes(req, res, url) {
 http
   .createServer((req, res) => {
     const url = new URL(req.url, "http://x");
-    if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.png" || url.pathname.startsWith("/captura-") || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/estatico/") || url.pathname.startsWith("/entrar/") || url.pathname.startsWith("/img/")) {
+    if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.png" || url.pathname.startsWith("/captura-") || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/estatico/") || url.pathname.startsWith("/entrar/") || url.pathname.startsWith("/baja/") || url.pathname.startsWith("/img/")) {
       appRoutes(req, res, url).catch((err) => {
         console.error(err);
         if (!res.headersSent) res.writeHead(500).end();
@@ -1017,6 +1029,10 @@ http
     // Avisos programados desde el panel (promociones, descuentos…): cada minuto manda los que ya tocan. Solo en la aplicación de la empresa; AVISOS_PROGRAMADOS=0 lo apaga.
     if (process.env.DEMO !== "1" && !process.env.VM_TEST && adminEnabled && process.env.AVISOS_PROGRAMADOS !== "0") {
       setInterval(() => { enviarProgramados({ accounts: getAccountsDb(), avisos: avisosPush(), customers: customerDirectory }).catch((e) => console.error("Avisos programados:", e.message)); }, 60e3).unref();
+    }
+    // Correos a clientes programados desde el panel (promociones, avisos de servicio): cada minuto manda los que ya tocan. Solo en la app de la empresa y con SMTP; CORREOS_PROGRAMADOS=0 lo apaga.
+    if (process.env.DEMO !== "1" && !process.env.VM_TEST && adminEnabled && process.env.CORREOS_PROGRAMADOS !== "0" && smtpDesdeEntorno()) {
+      setInterval(() => { const c = smtpDesdeEntorno(); if (!c) return; enviarCampanas({ accounts: getAccountsDb(), contactos: () => customerDirectory.contactos(), smtp: c.smtp, from: c.from, base: () => String(process.env.CLIENTE_URL || getAccountsDb().ajuste("contacto") || "").replace(/\/$/, ""), negocio: BUSINESS.name, telefono: AYUDA.telefono }).catch((e) => console.error("Correos programados:", e.message)); }, 60e3).unref();
     }
     // Vigilancia: avisa por correo de problemas nuevos y manda un informe diario (VIGILANCIA=0 la desactiva)
     if (process.env.DEMO !== "1" && adminEnabled && process.env.VIGILANCIA !== "0") {

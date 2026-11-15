@@ -1146,6 +1146,16 @@ async function preguntarAvisos() {
 }
 $("av-si").onclick = async () => { $("av-si").disabled = true; $("av-err").textContent = ""; try { await activarAvisos(); $("m-avisos").hidden = true; } catch (e) { $("av-err").textContent = e.message || "No se han podido activar. Puedes probar más tarde desde Mi cuenta."; $("av-si").disabled = false; } };
 $("av-no").onclick = () => ($("m-avisos").hidden = true);
+// «Ofertas por correo»: permiso del cliente (por defecto NO). Solo sale si tenemos un correo suyo. Se puede quitar aquí o con el enlace de baja de cada correo.
+async function pintarOfertas(box) {
+  const oj = await fetch("/api/correo/ofertas").then((r) => (r.ok ? r.json() : null)).catch(() => null); box.textContent = "";
+  if (!oj || !oj.disponible) return;
+  const fila = nodo("label", null, "cu-interruptor"), cb = document.createElement("input"); cb.type = "checkbox"; cb.setAttribute("role", "switch"); cb.checked = !!oj.acepta; cb.id = "ofertas-sw";
+  const tx = nodo("span"); tx.append(nodo("b", "Quiero recibir ofertas y promociones por correo"), nodo("small", `Te escribiremos a ${oj.destino} cuando haya ofertas. Puedes darte de baja cuando quieras, aquí o desde cualquier correo. Los avisos de tus pedidos no dependen de esto.`));
+  const msg = nodo("p", "", "res");
+  cb.onchange = async () => { cb.disabled = true; const r = await post("/api/correo/ofertas", { acepta: cb.checked }).catch(() => null); if (!r?.ok) { cb.checked = !cb.checked; msg.textContent = "No se ha podido guardar. Inténtalo otra vez."; } else msg.textContent = ""; cb.disabled = false; };
+  fila.append(cb, tx); box.append(fila, msg);
+}
 // «Correo»: confirmación de cada pedido por correo (se puede quitar). Solo sale si la empresa tiene el correo configurado y hay una dirección suya.
 async function pintarCorreo(box) {
   const cj = await fetch("/api/correo/pedidos").then((r) => (r.ok ? r.json() : null)).catch(() => null); box.textContent = "";
@@ -1248,6 +1258,7 @@ async function abrirCuenta(irAPedidos, mas) {
   B.appendChild(corr);
   // Avisos en este móvil (notificaciones)
   const correoCaja = nodo("div"); B.appendChild(correoCaja); pintarCorreo(correoCaja).catch(() => { correoCaja.textContent = ""; });
+  const ofertasCaja = nodo("div"); B.appendChild(ofertasCaja); pintarOfertas(ofertasCaja).catch(() => { ofertasCaja.textContent = ""; });
   const avisosCaja = nodo("div"); B.appendChild(avisosCaja); pintarAvisos(avisosCaja).catch(() => { avisosCaja.textContent = ""; });
   const pf = nodo("button", "Mi pedido fijo", "vm-btn ghost"); pf.type = "button"; pf.onclick = () => { $("m-cuenta").hidden = true; $("mifijo").click(); }; B.appendChild(pf);
   const cs = nodo("button", "Cerrar sesión", "vm-btn ghost cu-salir"); cs.type = "button"; cs.onclick = () => { $("m-cuenta").hidden = true; cerrarSesion(); }; B.appendChild(cs);

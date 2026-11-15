@@ -14,6 +14,7 @@ export function validarEdicion(b) {
   if ("poblacion" in b) { patch.city = texto(b.poblacion, 60); }
   if ("municipio" in b) { const m = texto(b.municipio, 5); if (m && !/^\d{5}$/.test(m)) return { error: "El código de municipio tiene 5 cifras (Medina del Campo es 47085)." }; patch.municipio = m; }
   if ("recargo" in b) patch.recargo = b.recargo === true;
+  if ("ofertas" in b) patch.ofertas = b.ofertas === true; // permiso para recibir OFERTAS por correo (lo marca la empresa solo si el cliente se lo ha dado)
   if ("notas" in b) { patch.notes = String(b.notas ?? "").trim().slice(0, 500); }
   if ("telefonos" in b) {
     if (!Array.isArray(b.telefonos) || b.telefonos.length > 10) return { error: "Los teléfonos no son válidos (máximo 10)." };

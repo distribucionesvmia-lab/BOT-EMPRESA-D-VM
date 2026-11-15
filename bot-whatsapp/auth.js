@@ -117,6 +117,17 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (!r.ok) return fin(403, "No hemos podido entrar", "Tu cuenta está bloqueada ahora mismo. Llama a la oficina y lo solucionan.", '<a class="b" href="/cliente">Volver</a>');
       return res.writeHead(303, { "Set-Cookie": cookie(r.token, 30 * 86400), Location: u.pedirCodigo ? "/cliente#invitacion" : "/cliente#enlace", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" }).end(), true;
     }
+    // ── «Darme de baja de las ofertas por correo»: el enlace de cada correo de promoción. GET enseña un botón (así los programas que abren los enlaces solos no te dan de baja); el POST (el botón, o el «un clic» de Gmail) lo hace ──
+    if (p.startsWith("/baja/") && (req.method === "GET" || req.method === "POST")) {
+      const ya = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow", "X-Content-Type-Options": "nosniff" };
+      const token = decodeURIComponent(p.slice(6)), fin = (code, t, x, b) => (res.writeHead(code, ya).end(paginaEntrar(t, x, b)), true);
+      if (!loginLimit(ip(req))) return fin(429, "Demasiados intentos", "Espera unos minutos y vuelve a abrir el enlace.", "");
+      const id = accounts.bajaPorToken(token);
+      if (!id) return fin(404, "Este enlace no es válido", "Puede que ya no exista. Si sigues recibiendo correos que no quieres, escríbenos y te damos de baja.", "");
+      if (req.method === "GET") return fin(200, "Darme de baja de las ofertas", "No volverás a recibir ofertas ni promociones por correo. Seguirás recibiendo la confirmación de tus pedidos.", `<form method="POST" action="/baja/${encodeURIComponent(token)}"><button type="submit">Darme de baja</button></form>`);
+      accounts.ofertasSet(id, false, "cliente");
+      return fin(200, "Listo, te hemos dado de baja", "Ya no recibirás ofertas ni promociones por correo. Si cambias de idea, puedes volver a activarlas en «Mi cuenta» dentro de la aplicación.", '<a class="b" href="/cliente">Ir a la aplicación</a>');
+    }
     if (!p.startsWith("/api/")) return false;
 
     if (p === "/api/registro" && req.method === "POST") {

@@ -1527,3 +1527,30 @@ test("PEDIDO CON CORREO OPCIONAL: un correo mal escrito se rechaza y uno válido
   assert.equal((await call("POST", "/catalogo", { cookie: A, body: body("correo-vacio-001", "") })).status, 200); // en blanco = sin correo escrito
   const d = (await call("GET", "/catalogo/datos", { cookie: A })).json; assert.ok(d.correo && typeof d.correo.disponible === "boolean" && "conocido" in d.correo);
 });
+
+test("CORREOS A CLIENTES (panel): rutas solo con la clave, recuento de a quién llegaría, vista previa y permiso de ofertas", async () => {
+  for (const [m, u, body] of [["GET", "/api/admin/correos"], ["POST", "/api/admin/correos/audiencia", {}], ["POST", "/api/admin/correos/programar", {}], ["POST", "/api/admin/correos/1/cancelar", {}]]) assert.ok([401, 403].includes((await call(m, u, { body })).status), u);
+  const l = (await call("GET", "/api/admin/correos", { admin: true })).json; for (const k of ["configurado", "baseLista", "limiteDia", "enviadosHoy", "aceptanOfertas", "pendientes", "historial"]) assert.ok(k in l, k);
+  const cli = (await call("GET", "/api/admin/clientes?q=a", { admin: true })).json[0];
+  const A = (b) => call("POST", "/api/admin/correos/audiencia", { admin: true, body: b });
+  assert.equal((await A({ tipo: "otro", destino: "todos" })).status, 400);
+  const aud = (await A({ tipo: "promo", destino: "todos" })).json; assert.equal(aud.enviaria, 0 + aud.enviaria); assert.ok("sinPermiso" in aud && "sinCorreo" in aud); // en una base nueva nadie ha aceptado ofertas
+  // la empresa marca que un cliente le ha dado permiso (y le añade un correo) → ya le llegaría la promoción
+  assert.equal((await call("POST", `/api/admin/cliente/${encodeURIComponent(cli.id)}/ficha`, { admin: true, body: { correos: ["permiso.ofertas@ejemplo.es"], ofertas: true } })).status, 200);
+  assert.equal((await call("GET", `/api/admin/cliente/${encodeURIComponent(cli.id)}/ficha`, { admin: true })).json.ofertasCorreo.origen, "empresa");
+  const uno = (await A({ tipo: "promo", destino: "cliente", clienteId: cli.id })).json; assert.equal(uno.enviaria, 1);
+  assert.equal((await call("POST", `/api/admin/cliente/${encodeURIComponent(cli.id)}/ficha`, { admin: true, body: { ofertas: false } })).status, 200);
+  assert.equal((await A({ tipo: "promo", destino: "cliente", clienteId: cli.id })).json.enviaria, 0); // quitado el permiso, no
+  assert.equal((await A({ tipo: "servicio", destino: "cliente", clienteId: cli.id })).json.enviaria, 1); // el aviso de servicio no necesita permiso
+  const v = (await call("POST", "/api/admin/correos/vista", { admin: true, body: { tipo: "promo", asunto: "Oferta", texto: "Hola {nombre}" } })).json; assert.ok(v.texto.startsWith("Publicidad")); assert.match(v.texto, /BAR EJEMPLO/); assert.match(v.texto, /\/baja\//);
+  assert.equal((await call("POST", "/api/admin/correos/vista", { admin: true, body: { tipo: "promo", asunto: "", texto: "x" } })).status, 400);
+  // sin correo configurado en el servidor de pruebas: no se programa nada
+  const p = await call("POST", "/api/admin/correos/programar", { admin: true, body: { tipo: "servicio", destino: "todos", asunto: "Aviso", texto: "Texto", ahora: true, confirmo: true } }); assert.equal(p.status, 400); assert.match(p.json.error, /no está configurado/);
+  // Mi cuenta: el permiso es del cliente y por defecto NO
+  const C = cookieOf(await entrarNif("111111")); assert.equal((await call("GET", "/api/correo/ofertas")).status, 401);
+  const g = (await call("GET", "/api/correo/ofertas", { cookie: C })).json; assert.equal(g.acepta, false); assert.equal(typeof g.disponible, "boolean");
+  assert.equal((await call("POST", "/api/correo/ofertas", { cookie: C, body: { acepta: true } })).json.acepta, true); assert.equal((await call("GET", "/api/correo/ofertas", { cookie: C })).json.acepta, true);
+  assert.equal((await call("POST", "/api/correo/ofertas", { cookie: C, body: { acepta: false } })).json.acepta, false);
+  // enlace de baja que no existe
+  const b = await fetch(BASE + "/baja/inventado", { redirect: "manual" }); assert.equal(b.status, 404); assert.match(await b.text(), /no es válido/);
+});

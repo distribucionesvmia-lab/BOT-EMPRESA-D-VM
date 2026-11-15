@@ -198,6 +198,7 @@
   .fi-form { margin:0; } .fi-chips-ed { display:flex; flex-wrap:wrap; gap:6px; margin:4px 0 8px; } .fi-ch { display:inline-flex; align-items:center; gap:6px; padding:4px 6px 4px 10px; border:1px solid var(--line); border-radius:999px; background:var(--th); font-size:13px; }
   .fi-ch button { min-height:22px; width:22px; padding:0; border-radius:50%; font-size:11px; line-height:1; } .fi-fila-add { display:flex; gap:8px; min-width:0; } .fi-fila-add input { flex:1 1 0; min-width:0; width:auto; } .fi-fila-add button { flex:none; } .fi-form .campo { min-width:0; }
   .fi-form label.inv-check { display:flex; flex-direction:row; align-items:flex-start; justify-content:flex-start; text-align:left; gap:10px; } .fi-form label.inv-check > span { text-align:left; } .ayuda.err { color:var(--accent); font-weight:600; }
+  .av-seg { margin:0 0 14px; max-width:420px; } .co-vista { white-space:pre-wrap; word-break:break-word; margin:14px 0 0; padding:14px; border:1px dashed var(--line); border-radius:10px; background:var(--th); font:13px/1.5 ui-monospace, Menlo, Consolas, monospace; max-height:340px; overflow:auto; }
   .est-exp { display:inline-flex; gap:8px; margin-left:auto; }
   .est-exp button { height:40px; }
   .est-filtros { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:flex-end; }
@@ -549,6 +550,8 @@
     </div>
     <div id="p-avisos" hidden>
       <div class="pag-cab"><h1>Avisos a clientes</h1><p>Envía una notificación al móvil de los clientes que han activado los avisos.</p></div>
+      <div class="seg av-seg" role="group" aria-label="Tipo de aviso"><button type="button" id="av-t-movil" class="on">Notificaciones al móvil</button><button type="button" id="av-t-correo">Correos</button></div>
+      <div id="av-movil">
       <div class="panel">
         <h2>Nuevo aviso</h2>
         <p class="muted" id="av-estado" style="margin:0 0 10px"></p>
@@ -590,6 +593,41 @@
         <h4 style="margin:16px 0 6px">Ya resueltos</h4><div class="scroll"><table><tbody id="pr-hist"></tbody></table></div>
       </div>
       <div class="panel"><h2>Últimos avisos enviados</h2><div class="scroll"><table><tbody id="av-hist"></tbody></table></div><p class="vacio" id="av-vacio" hidden><b>Todavía no has enviado ningún aviso.</b><span>Los avisos que mandes aparecerán aquí con cuántos móviles los han recibido.</span></p></div>
+      </div>
+      <div id="av-correo" hidden>
+        <div class="panel" id="co-card">
+          <h2>Escribir un correo</h2>
+          <p class="muted" id="co-estado" style="margin:0 0 6px"></p>
+          <p class="fi-aviso" id="co-aviso" hidden></p>
+          <div class="pr-plant" role="group" aria-label="Ideas para empezar"><span class="muted">Ideas:</span>
+            <button type="button" data-t="promo" data-a="Esta semana, ofertas en artículos seleccionados" data-x="Esta semana tenemos precios especiales en artículos seleccionados. Entra en el catálogo y aprovecha antes de que se acaben.">Oferta de la semana</button>
+            <button type="button" data-t="promo" data-a="Nueva promoción para ti" data-x="Tenemos una nueva promoción y queremos que seas de los primeros en saberlo. Entra en el catálogo y échale un vistazo.">Nueva promoción</button>
+            <button type="button" data-t="promo" data-a="Descuento por tiempo limitado" data-x="Descuento especial solo hasta fin de semana. Haz tu pedido antes de las 10:00 y te lo llevamos hoy.">Descuento limitado</button>
+            <button type="button" data-t="servicio" data-a="Cambio en el reparto" data-x="Te avisamos de un cambio en el reparto: ">Cambio de reparto</button>
+          </div>
+          <form id="f-correo" class="form-grid" autocomplete="off">
+            <label class="campo"><span>Tipo de correo</span><select id="co-tipo"><option value="promo">Promoción u oferta (publicidad)</option><option value="servicio">Aviso de servicio (sin publicidad)</option></select><small class="ayuda" id="co-tipo-ayuda"></small></label>
+            <label class="campo"><span>Para quién</span><select id="co-destino"><option value="todos">Todos los que corresponda</option><option value="cliente">Un solo cliente</option></select></label>
+            <div id="co-uno" class="form-grid campo-ancho" hidden><label class="campo"><span>Buscar cliente</span><input id="co-q" type="search" placeholder="Nombre o código del cliente" aria-label="Buscar cliente"></label><label class="campo"><span>Cliente elegido</span><select id="co-sel" aria-label="Cliente"></select></label></div>
+            <label class="campo campo-ancho"><span>Asunto <small>(máximo 90 letras)</small></span><input id="co-asunto" maxlength="90" placeholder="Por ejemplo: Oferta de la semana en cervezas" required></label>
+            <label class="campo campo-ancho"><span>Mensaje <small id="co-cuenta">(máximo 2000 letras)</small></span><textarea id="co-texto" maxlength="2000" rows="6" placeholder="Escribe aquí el mensaje. Puedes poner {nombre} y se cambia por el nombre de cada cliente." required></textarea><small class="ayuda">Se añaden solos el saludo («Hola, NOMBRE»), el enlace al catálogo y, en las promociones, la palabra «Publicidad» y el enlace para darse de baja.</small></label>
+            <label class="campo"><span>¿Cuándo?</span><select id="co-cuando"><option value="ahora">Enviar ahora</option><option value="programar">Programar para un día y hora</option></select></label>
+            <div id="co-prog" class="form-grid campo-ancho" hidden>
+              <label class="campo"><span>Día</span><input type="date" id="co-dia"></label>
+              <label class="campo"><span>Hora (de Madrid)</span><input type="time" id="co-hora" value="09:00"></label>
+              <label class="campo"><span>¿Se repite?</span><select id="co-repetir"><option value="no">No, solo una vez</option><option value="semana">Sí, el mismo día cada semana</option></select></label>
+            </div>
+            <p class="inv-resumen campo-ancho" id="co-resumen" role="status" aria-live="polite"></p>
+            <div class="acciones campo-ancho"><button class="main" id="co-enviar" type="submit">Enviar correo</button><button type="button" id="co-vista">Ver cómo queda</button><button type="button" id="co-prueba">Enviarme una prueba</button><span class="muted" id="co-msg" role="status"></span></div>
+          </form>
+          <pre class="co-vista" id="co-vista-caja" hidden></pre>
+        </div>
+        <div class="panel"><h2>Correos programados</h2>
+          <p class="vacio" id="co-vacio" hidden><b>No hay correos programados.</b><span>Cuando programes uno, aparecerá aquí hasta que salga. Mientras tanto puedes cancelarlo.</span></p>
+          <div class="scroll"><table id="co-tabla"><thead><tr><th>Cuándo</th><th>Correo</th><th>Para</th><th></th></tr></thead><tbody id="co-lista"></tbody></table></div>
+          <h4 style="margin:16px 0 6px">Ya enviados o resueltos</h4><div class="scroll"><table><tbody id="co-hist"></tbody></table></div>
+        </div>
+      </div>
     </div>
     <div id="p-cuentas" hidden>
       <div class="pag-cab"><h1>Cuentas de clientes</h1><p>Accesos de los clientes, enlaces de invitación, uso de la aplicación, errores y derechos de datos.</p></div>
@@ -1252,6 +1290,65 @@ $("f-prog").onsubmit = async (e) => {
   try { await call("/api/admin/avisos/programar", cuerpo); msg.textContent = "Aviso programado."; $("pr-titulo").value = ""; $("pr-texto").value = ""; prResumen(); await programados(); } catch (er) { msg.textContent = er.message; } finally { $("pr-enviar").disabled = false; }
 };
 prResumen();
+// ═════════ Correos a clientes ═════════
+let corrEstado = null, tCo = 0, tCoAud = 0;
+const coTodos = () => ({ tipo: $("co-tipo").value, destino: $("co-destino").value, clienteId: $("co-destino").value === "cliente" ? $("co-sel").value : undefined });
+$("av-t-movil").onclick = () => { $("av-movil").hidden = false; $("av-correo").hidden = true; $("av-t-movil").classList.add("on"); $("av-t-correo").classList.remove("on"); };
+$("av-t-correo").onclick = () => { $("av-movil").hidden = true; $("av-correo").hidden = false; $("av-t-correo").classList.add("on"); $("av-t-movil").classList.remove("on"); correos().catch(() => {}); coResumen(); };
+$("co-dia").min = hoyMadridStr(); $("co-dia").value = sumaDia(hoyMadridStr(), 1);
+function coResumen() {
+  const t = $("co-tipo").value, prog = $("co-cuando").value === "programar";
+  $("co-tipo-ayuda").textContent = t === "promo" ? "Solo se envía a los clientes que han aceptado recibir ofertas por correo. Lleva «Publicidad» y el enlace para darse de baja." : "Se envía a todos los clientes con correo (horarios, festivos, cambios de reparto…). No puede llevar publicidad.";
+  $("co-prog").hidden = !prog; $("co-enviar").textContent = prog ? "Programar correo" : "Enviar correo ahora"; $("co-cuenta").textContent = `(${$("co-texto").value.length} de 2000 letras)`;
+  const quien = $("co-destino").value === "cliente" ? ($("co-sel").selectedOptions[0]?.textContent.replace(/ \(\w+\)$/, "") || "el cliente que elijas") : (t === "promo" ? "todos los clientes que han aceptado ofertas" : "todos los clientes con correo");
+  const cuando = prog ? ($("co-dia").value ? `el ${new Date($("co-dia").value + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" })} a las ${$("co-hora").value}${$("co-repetir").value === "semana" ? " (y cada semana)" : ""}` : "el día que elijas") : "ahora mismo";
+  $("co-resumen").textContent = `Se enviará ${cuando} a ${quien}.`; clearTimeout(tCoAud); tCoAud = setTimeout(coAudiencia, 300);
+}
+async function coAudiencia() {
+  const c = coTodos(); if (c.destino === "cliente" && !c.clienteId) return;
+  try { const r = await call("/api/admin/correos/audiencia", c); const partes = [`Llegará a ${r.enviaria} cliente${r.enviaria === 1 ? "" : "s"}`]; if (r.sinCorreo) partes.push(`${r.sinCorreo} sin correo guardado`); if (r.sinPermiso) partes.push(`${r.sinPermiso} no han aceptado ofertas`); $("co-resumen").textContent += " " + partes.join(" · ") + "."; } catch { /* sin recuento */ }
+}
+for (const id of ["co-tipo", "co-destino", "co-sel", "co-cuando", "co-dia", "co-hora", "co-repetir", "co-texto"]) { $(id).addEventListener("input", coResumen); $(id).addEventListener("change", coResumen); }
+$("co-destino").addEventListener("change", () => { $("co-uno").hidden = $("co-destino").value !== "cliente"; });
+$("co-q").oninput = () => { clearTimeout(tCo); tCo = setTimeout(async () => { const q = $("co-q").value.trim(), sel = $("co-sel"); sel.innerHTML = ""; if (q.length >= 2) { const r = await call("/api/admin/clientes?q=" + encodeURIComponent(q)).catch(() => []); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); if (!r.length) sel.appendChild(el("option", "Ningún cliente con ese nombre", { value: "" })); } coResumen(); }, 250); };
+for (const b of document.querySelectorAll("#co-card .pr-plant button")) b.onclick = () => { $("co-tipo").value = b.dataset.t; $("co-asunto").value = b.dataset.a; $("co-texto").value = b.dataset.x; coResumen(); $("co-texto").focus(); };
+const ESTADO_CO = { enviado: "Enviado", cancelado: "Cancelado", perdido: "No salió", error: "Con error", interrumpido: "Interrumpido", enviando: "Enviando…" };
+async function correos() {
+  const r = corrEstado = await call("/api/admin/correos");
+  $("co-estado").textContent = r.configurado ? `Hoy has enviado ${r.enviadosHoy} de un máximo de ${r.limiteDia} correos (límite del proveedor). ${r.aceptanOfertas} cliente${r.aceptanOfertas === 1 ? "" : "s"} ha${r.aceptanOfertas === 1 ? "" : "n"} aceptado recibir ofertas por correo.` : "";
+  const av = $("co-aviso"), msgs = [];
+  if (!r.configurado) msgs.push("El correo no está configurado en este programa. Añade SMTP_HOST, SMTP_USER, SMTP_PASS y MAIL_FROM a empresa.env y reinicia «VM Empresa».");
+  if (r.configurado && !r.baseLista) msgs.push("Falta CLIENTE_URL en empresa.env (la dirección pública de la aplicación de los clientes): sin ella no se pueden enviar promociones, porque no se podría poner el enlace de baja que exige la ley.");
+  av.hidden = !msgs.length; av.textContent = msgs.join(" ");
+  const tb = $("co-lista"); tb.innerHTML = ""; $("co-vacio").hidden = r.pendientes.length > 0; $("co-tabla").hidden = !r.pendientes.length;
+  for (const x of r.pendientes) {
+    const tr = document.createElement("tr"), t = el("td"), acc = el("td"); t.append(el("b", x.asunto), el("div", `${x.tipoTexto}`, { className: "muted" }));
+    const b = el("button", "Cancelar", { type: "button", className: "peligro" }); b.onclick = async () => { if (!confirm(`¿Cancelar este correo?\n\n«${x.asunto}»\nIba a salir el ${fechaEs(x.cuando)}.`)) return; const a = await call(`/api/admin/correos/${x.id}/cancelar`, {}).catch((e) => ({ error: e.message })); if (a?.error) alert(a.error); correos(); }; acc.append(b);
+    tr.append(el("td", fechaEs(x.cuando) + (x.repetir === "semana" ? " · cada semana" : "")), t, el("td", x.para), acc); tb.append(tr);
+  }
+  const th = $("co-hist"); th.innerHTML = "";
+  for (const x of r.historial) { const tr = document.createElement("tr"), t = el("td"), e_ = el("td"); t.append(el("b", x.asunto), el("div", x.tipoTexto, { className: "muted" })); e_.append(el("span", ESTADO_CO[x.estado] ?? x.estado, { className: "badge " + (x.estado === "enviado" ? "exportado" : x.estado === "cancelado" ? "pendiente" : "retenido") })); if (x.resultado) e_.append(el("div", x.resultado, { className: "muted" })); tr.append(el("td", fechaEs(x.cuando)), t, el("td", x.para), e_); th.append(tr); }
+  if (!r.historial.length) th.append(el("tr")), th.lastChild.append(el("td", "Todavía no has enviado ningún correo desde aquí.", { className: "muted" }));
+}
+$("co-vista").onclick = async () => {
+  const caja = $("co-vista-caja"), msg = $("co-msg"); msg.textContent = "";
+  try { const r = await call("/api/admin/correos/vista", { tipo: $("co-tipo").value, asunto: $("co-asunto").value, texto: $("co-texto").value }); caja.textContent = `Asunto: ${r.asunto}\n\n${r.texto}`; caja.hidden = false; } catch (e) { msg.textContent = e.message; }
+};
+$("co-prueba").onclick = async () => {
+  const msg = $("co-msg"); msg.textContent = "Enviando prueba…";
+  try { const r = await call("/api/admin/correos/prueba", { tipo: $("co-tipo").value, asunto: $("co-asunto").value, texto: $("co-texto").value }); msg.textContent = `Prueba enviada a ${r.a.join(", ")}.`; } catch (e) { msg.textContent = e.message; }
+};
+$("f-correo").onsubmit = async (e) => {
+  e.preventDefault(); const msg = $("co-msg"), c = coTodos(), prog = $("co-cuando").value === "programar"; msg.textContent = "";
+  if (c.destino === "cliente" && !c.clienteId) { msg.textContent = "Busca y elige un cliente."; return; }
+  const cuerpo = { ...c, asunto: $("co-asunto").value, texto: $("co-texto").value, confirmo: true, ...(prog ? { dia: $("co-dia").value, hora: $("co-hora").value, repetir: $("co-repetir").value } : { ahora: true }) };
+  let n = ""; try { const a = await call("/api/admin/correos/audiencia", c); n = `Llegará a ${a.enviaria} cliente${a.enviaria === 1 ? "" : "s"}.\n\n`; } catch { /* sin recuento */ }
+  if (!confirm(`¿${prog ? "Programar" : "Enviar"} este correo?\n\n${prog ? "Saldrá el " + prCuandoCo() : "Saldrá ahora mismo"}.\n${n}${c.tipo === "promo" ? "Tipo: promoción (solo a quien aceptó ofertas).\n\n" : "Tipo: aviso de servicio.\n\n"}«${cuerpo.asunto}»\n\n${cuerpo.texto.slice(0, 300)}${cuerpo.texto.length > 300 ? "…" : ""}\n\n${prog ? "Podrás cancelarlo mientras esté pendiente." : "No se puede deshacer."}`)) return;
+  $("co-enviar").disabled = true;
+  try { const r = await call("/api/admin/correos/programar", cuerpo); msg.textContent = r.ahora ? `Enviando a ${r.enviaria} cliente${r.enviaria === 1 ? "" : "s"}… mira el resultado abajo en unos segundos.` : "Correo programado."; $("co-asunto").value = ""; $("co-texto").value = ""; coResumen(); await correos(); if (r.ahora) for (let i = 0; i < 8; i++) { await new Promise((x) => setTimeout(x, 3000)); await correos(); } } catch (er) { msg.textContent = er.message; } finally { $("co-enviar").disabled = false; }
+};
+const prCuandoCo = () => `${new Date($("co-dia").value + "T12:00:00").toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} a las ${$("co-hora").value}${$("co-repetir").value === "semana" ? " (y cada semana)" : ""}`;
+coResumen();
 // Enlace de invitación (un solo uso, 7 días): lo crea la oficina y lo manda ella misma
 let tInv = 0, invActual = null;
 $("inv-q").oninput = () => { clearTimeout(tInv); tInv = setTimeout(async () => { const q = $("inv-q").value.trim(), sel = $("inv-sel"); sel.innerHTML = ""; if (q.length < 2) return; const r = await call("/api/admin/clientes?q=" + encodeURIComponent(q)).catch(() => []); for (const c of r) sel.appendChild(el("option", `${c.name} (${c.id})`, { value: c.id })); if (!r.length) sel.appendChild(el("option", "Ningún cliente con ese nombre", { value: "" })); }, 300); };
@@ -1633,7 +1730,7 @@ const diaCorto = (d) => (d ? String(d).split("-").reverse().join("/") : "—");
 // ---- Editar la ficha a mano (teléfonos, correos, dirección, notas…): se guarda aparte y las importaciones de a3ERP no lo borran ----
 const tel9 = (t) => String(t ?? "").replace(/\D/g, "").replace(/^(0034|34)(?=\d{9}$)/, "").slice(-9);
 function seccionDatos(f) {
-  const c = f.cliente, sec = fiSec("Datos", fiDl([["Razón social", c.razon], ["Dirección", [c.direccion, c.poblacion].filter(Boolean).join(", ")], ["Teléfonos", c.telefonos.join(" · ")], ["Correos", c.correos.join(" · ")]]));
+  const c = f.cliente, of = f.ofertasCorreo, ofTxt = of?.acepta ? `Sí (${of.origen === "empresa" ? "marcado por la empresa" : "lo aceptó el cliente"} el ${fechaCorta(of.at)})` : of ? `No (se dio de baja el ${fechaCorta(of.at)})` : "No ha dado su permiso", sec = fiSec("Datos", fiDl([["Razón social", c.razon], ["Dirección", [c.direccion, c.poblacion].filter(Boolean).join(", ")], ["Teléfonos", c.telefonos.join(" · ")], ["Correos", c.correos.join(" · ")], ["Ofertas por correo", ofTxt]]));
   if (f.notas) { const n = el("p", "", { className: "fi-notas" }); n.append(el("b", "Notas internas: "), f.notas); sec.append(n); }
   if (!f.sinFicha) { const b = el("button", "Editar datos", { type: "button", className: "fi-editar" }); b.onclick = () => editarDatos(f, sec); sec.querySelector("h4").append(b); }
   return sec;
@@ -1656,15 +1753,16 @@ function editarDatos(f, sec) {
   const tel = chipLista("Teléfonos", "Añadir un teléfono (9 cifras)", c.telefonos, f.manual?.telefonos ?? [], tel9, (v) => (/^\d{9}$/.test(v) ? "" : "Escribe un teléfono de 9 cifras.")),
     mail = chipLista("Correos", "Añadir un correo", c.correos, f.manual?.correos ?? [], (v) => String(v).trim().toLowerCase(), (v) => (/^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]{2,}$/.test(v) ? "" : "Escribe un correo válido (nombre@dominio.es)."));
   const lRe = el("label", "", { className: "inv-check campo-ancho" }), iRe = el("input", "", { type: "checkbox", checked: !!c.recargo }); lRe.append(iRe, el("span", "Tiene recargo de equivalencia"));
+  const lOf = el("label", "", { className: "inv-check campo-ancho" }), iOf = el("input", "", { type: "checkbox", checked: !!f.ofertasCorreo?.acepta }), sOf = el("span", "Ha aceptado recibir ofertas y promociones por correo"); sOf.append(el("small", "Marca solo si el cliente te ha dado su permiso (por escrito o de palabra). Sin él, las promociones no se le envían. Siempre puede darse de baja con el enlace de cada correo.", { className: "ayuda" })); lOf.append(iOf, sOf);
   const lNotas = el("label", "", { className: "campo campo-ancho" }), iNotas = el("textarea", "", { rows: 3, maxLength: 500, value: f.notas ?? "", placeholder: "Por ejemplo: llamar antes de ir · paga en efectivo" }); lNotas.append(el("span", "Notas internas (el cliente no las ve)"), iNotas);
   const msg = el("p", "", { className: "muted campo-ancho", role: "status" }), acc = el("div", "", { className: "acciones campo-ancho" }), guardar = el("button", "Guardar cambios", { type: "submit", className: "main" }), cancelar = el("button", "Cancelar", { type: "button" });
   acc.append(guardar, cancelar);
-  form.append(lRazon, lDir, lPob, lMun, tel.nodo, mail.nodo, lRe, lNotas, el("p", "El nombre y el NIF los manda a3ERP y no se cambian aquí. Lo que añadas se conserva cuando se actualicen los datos desde el Excel.", { className: "muted campo-ancho", style: "margin:0" }), msg, acc);
+  form.append(lRazon, lDir, lPob, lMun, tel.nodo, mail.nodo, lRe, lOf, lNotas, el("p", "El nombre y el NIF los manda a3ERP y no se cambian aquí. Lo que añadas se conserva cuando se actualicen los datos desde el Excel.", { className: "muted campo-ancho", style: "margin:0" }), msg, acc);
   sec.replaceChildren(el("h4", "Editar datos")); sec.append(form); iRazon.focus();
   cancelar.onclick = () => abrirFicha(c.id);
   form.onsubmit = async (e) => {
     e.preventDefault(); guardar.disabled = true; msg.textContent = "Guardando…";
-    try { const r = await call(`/api/admin/cliente/${encodeURIComponent(c.id)}/ficha`, { razon: iRazon.value, direccion: iDir.value, poblacion: iPob.value, municipio: iMun.value, recargo: iRe.checked, notas: iNotas.value, telefonos: tel.valor(), correos: mail.valor() }); if (r.avisos?.length) alert(r.avisos.join("\n")); await abrirFicha(c.id); }
+    try { const r = await call(`/api/admin/cliente/${encodeURIComponent(c.id)}/ficha`, { razon: iRazon.value, direccion: iDir.value, poblacion: iPob.value, municipio: iMun.value, recargo: iRe.checked, ofertas: iOf.checked, notas: iNotas.value, telefonos: tel.valor(), correos: mail.valor() }); if (r.avisos?.length) alert(r.avisos.join("\n")); await abrirFicha(c.id); }
     catch (er) { msg.textContent = er.message; guardar.disabled = false; }
   };
 }

@@ -14,9 +14,11 @@ import { categorizar } from "./categorias.js";
 import { runExport } from "./exporter.js";
 import { backupDb } from "./backup.js";
 import { estadoCopias, comprobarCopias } from "./copias.js";
+import { sendMail } from "./mailer.js";
 import { validarProgramado, MAX_PENDIENTES } from "./avisos-programados.js";
 import { validarEdicion } from "./cliente-edicion.js";
-import { elegirDestino } from "./correo-cliente.js";
+import { elegirDestino, smtpDesdeEntorno } from "./correo-cliente.js";
+import { validarCampana, audiencia, mensajeCampana, enviarCampanas, limiteDia, MAX_PENDIENTES as MAX_CAMPANAS, TIPOS as TIPOS_CORREO } from "./correo-campanas.js";
 import { detectarTipo } from "./actualizar-datos.js";
 import { crearAvisos } from "./avisos.js";
 import { execFile } from "node:child_process";
@@ -444,7 +446,8 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
         if (mf && post) {
           const id = mf[1], c0 = customers.getById(id); if (!c0) return send(res, 404, { error: "No existe ese cliente." }), true;
           const v = validarEdicion((await readJson(req)) ?? {}); if (v.error) return send(res, 400, { error: v.error }), true;
-          customers.editar(id, v.patch);
+          const { ofertas, ...resto } = v.patch; if (Object.keys(resto).length) customers.editar(id, resto);
+          if (typeof ofertas === "boolean") accounts.ofertasSet(id, ofertas, "empresa");
           const avisos = []; // teléfono o correo que ya tiene otro cliente: se permite (hay teléfonos compartidos), pero se avisa
           for (const t of v.patch.phones ?? []) { const otros = customers.search({ q: t, limit: 5 }).rows.filter((r) => String(r.id) !== id && (String(r.phones ?? "").includes(t) || String(r.phone ?? "").includes(t))); if (otros.length) avisos.push(`El teléfono ${t} también lo tiene ${otros.map((r) => r.name).join(", ")}.`); }
           for (const e of v.patch.emails ?? []) { const otros = customers.search({ q: e, limit: 5 }).rows.filter((r) => String(r.id) !== id && String(r.emails ?? "").toLowerCase().includes(e)); if (otros.length) avisos.push(`El correo ${e} también lo tiene ${otros.map((r) => r.name).join(", ")}.`); }
@@ -460,6 +463,7 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
             manual: c0 ? { telefonos: customers.manualOf(id).phones ?? [], correos: customers.manualOf(id).emails ?? [] } : null, notas: c0 ? (customers.manualOf(id).notes ?? "") : "",
             cliente: { id: c.id, nombre: c.name, razon: c.legalName, poblacion: c.city, municipio: c.municipio, direccion: c.address, telefonos: [...new Set([c.phone, ...c.phones].filter(Boolean))], correos: c.emails, recargo: c.recargoEquivalencia, activo: c.active },
             esPrueba: esPruebaId(id), sinFicha: !c0,
+            ofertasCorreo: accounts.ofertasDe(id),
             correoPedidos: { destino: elegirDestino({ account: cu, customer: c }), activo: accounts.correoPedidoActivo(id), delaCuenta: !!cu?.email && elegirDestino({ account: cu, customer: c }) === cu.email },
             cuenta: cu ? { estado: cu.status, confirmada: cu.verified, bloqueada: cu.locked, ultimoAcceso: cu.lastLogin, creada: cu.createdAt, codigoPropio: cu.ownCode } : null,
             totalPedidosApp: todos.length,
@@ -583,6 +587,45 @@ export function createAdmin({ sync = null, mail = null, actualizador = null, est
     }
     { const mc = /^\/api\/admin\/avisos\/programados\/(\d+)\/cancelar$/.exec(p);
       if (mc && post) return accounts.avisoProgCancelar(mc[1]) ? send(res, 200, { ok: true }) : send(res, 409, { error: "Ese aviso ya salió, se canceló o no existe." }), true; }
+    // ---- Correos a clientes (promociones, descuentos, avisos de servicio): ahora o programados; las promociones solo a quien ha aceptado ofertas ----
+    {
+      const smtpCfg = () => smtpDesdeEntorno(), baseCliente = () => String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/\/$/, "");
+      const parte = (x) => ({ ...x, para: x.destino === "todos" ? (x.tipo === "promo" ? "Todos los que aceptan ofertas" : "Todos los clientes con correo") : (customers.getById(x.clienteId)?.name ?? "Cliente " + x.clienteId), tipoTexto: TIPOS_CORREO[x.tipo] });
+      const lanzar = () => enviarCampanas({ accounts, contactos: () => customers.contactos(), smtp: smtpCfg()?.smtp, from: smtpCfg()?.from, base: baseCliente, negocio: "Distribuciones Valentín Martín", telefono: process.env.AYUDA_TEL ?? "" }).catch((e) => console.error("Correos a clientes:", e.message));
+      if (p === "/api/admin/correos" && get) {
+        const desde = new Date(Date.now() - 86400_000).toISOString();
+        return send(res, 200, { configurado: !!smtpCfg(), baseLista: /^https?:\/\//.test(baseCliente()), destinoPrueba: (process.env.MAIL_TO ?? "").split(",").map((x) => x.trim()).filter(Boolean), limiteDia: limiteDia(), enviadosHoy: accounts.correosEnviadosDesde(desde), aceptanOfertas: accounts.ofertasAceptan().size, maximo: MAX_CAMPANAS, pendientes: accounts.campanaCorreoPendientes().map(parte), historial: accounts.campanaCorreoHistorial(15).map(parte) }), true;
+      }
+      if (p === "/api/admin/correos/audiencia" && post) {
+        const b = (await readJson(req)) ?? {}; if (!Object.hasOwn(TIPOS_CORREO, b.tipo) || (b.destino !== "todos" && b.destino !== "cliente")) return send(res, 400, { error: "Elige el tipo y a quién." }), true;
+        if (b.destino === "cliente" && !customers.getById(String(b.clienteId ?? ""))) return send(res, 400, { error: "Elige un cliente de la lista." }), true;
+        const a = audiencia({ accounts, contactos: customers.contactos(), campana: { tipo: b.tipo, destino: b.destino, clienteId: b.destino === "cliente" ? String(b.clienteId) : null } });
+        return send(res, 200, { enviaria: a.destinatarios.length, sinCorreo: a.sinCorreo, sinPermiso: a.sinPermiso, total: a.total, ejemplos: a.destinatarios.slice(0, 3).map((d) => d.nombre) }), true;
+      }
+      if ((p === "/api/admin/correos/vista" || p === "/api/admin/correos/prueba") && post) {
+        const b = (await readJson(req)) ?? {}, asunto = String(b.asunto ?? "").trim(), texto = String(b.texto ?? "").trim();
+        if (!Object.hasOwn(TIPOS_CORREO, b.tipo) || !asunto || !texto) return send(res, 400, { error: "Escribe el asunto y el mensaje." }), true;
+        const m = mensajeCampana({ asunto, texto, tipo: b.tipo }, { nombre: "BAR EJEMPLO", base: baseCliente() || "https://tu-direccion.es", token: "enlace-de-baja-de-ejemplo", negocio: "Distribuciones Valentín Martín", telefono: process.env.AYUDA_TEL ?? "" });
+        if (p.endsWith("/vista")) return send(res, 200, { asunto: m.subject, texto: m.text }), true;
+        const cfg = smtpCfg(), to = (process.env.MAIL_TO ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+        if (!cfg) return send(res, 400, { error: "El correo no está configurado en este programa (SMTP_HOST…)." }), true;
+        if (!to.length) return send(res, 400, { error: "Falta MAIL_TO (el correo de la empresa donde recibir la prueba)." }), true;
+        try { await sendMail(cfg.smtp, { from: cfg.from, to, subject: "[PRUEBA] " + m.subject, text: m.text, headers: [] }); return send(res, 200, { ok: true, a: to }), true; } catch (e) { return send(res, 502, { error: e.message }), true; }
+      }
+      if (p === "/api/admin/correos/programar" && post) {
+        if (!smtpCfg()) return send(res, 400, { error: "El correo no está configurado en este programa (SMTP_HOST, SMTP_USER, SMTP_PASS y MAIL_FROM en empresa.env)." }), true;
+        const v = validarCampana((await readJson(req)) ?? {}, { existeCliente: (id) => !!customers.getById(id) }); if (v.error) return send(res, 400, { error: v.error }), true;
+        if (v.campana.tipo === "promo" && !/^https?:\/\//.test(baseCliente())) return send(res, 400, { error: "Falta la dirección pública de la aplicación del cliente (CLIENTE_URL en empresa.env): sin ella no se puede poner en el correo el enlace de baja que exige la ley." }), true;
+        const a = audiencia({ accounts, contactos: customers.contactos(), campana: v.campana });
+        if (!a.destinatarios.length) return send(res, 400, { error: v.campana.tipo === "promo" ? `No hay a quién enviarlo: ${a.sinPermiso} cliente${a.sinPermiso === 1 ? "" : "s"} con correo no ha${a.sinPermiso === 1 ? "" : "n"} aceptado recibir ofertas (lo aceptan en «Mi cuenta» o lo marcas tú en su ficha si te han dado permiso) y ${a.sinCorreo} no tienen correo.` : `No hay a quién enviarlo: ${a.sinCorreo} sin correo guardado.` }), true;
+        if (accounts.campanaCorreoCuenta() >= MAX_CAMPANAS) return send(res, 400, { error: `Ya hay ${MAX_CAMPANAS} correos programados. Cancela alguno para añadir más.` }), true;
+        const id = accounts.campanaCorreoAdd(v.campana);
+        if (v.campana.ahora) void lanzar(); // sale ya, en segundo plano: el panel va viendo el resultado
+        return send(res, 200, { ok: true, id, enviaria: a.destinatarios.length, ahora: v.campana.ahora }), true;
+      }
+      { const mc = /^\/api\/admin\/correos\/(\d+)\/cancelar$/.exec(p);
+        if (mc && post) return accounts.campanaCorreoCancelar(mc[1]) ? send(res, 200, { ok: true }) : send(res, 409, { error: "Ese correo ya salió, se canceló o no existe." }), true; }
+    }
     // ---- Bandeja de entrada (carpeta del ordenador) ----
     if (p === "/api/admin/entrada" && get) return send(res, 200, listarEntrada()), true;
     if (p === "/api/admin/entrada/archivo" && get) {
