@@ -9,7 +9,7 @@ import { openDb } from "./db.js";
 import { runExport } from "./exporter.js";
 import { buildXlsx, buildWorkbook } from "./xlsx.js";
 import { priceOrder } from "./pricing.js";
-import { madrid, madridDate, FORMAT, capacidadPagina, imprimirHtml } from "./export-format.js";
+import { madrid, madridDate, FORMAT, capacidadPagina, imprimirHtml, esPorKilo } from "./export-format.js";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "vm-exp-"));
 const catalogo = [
@@ -129,7 +129,7 @@ const estiloDe = (files, xml, ref) => {
   const xf = [...st.match(/<cellXfs[^>]*>(.*?)<\/cellXfs>/s)[1].matchAll(/<xf [^>]*?(?:\/>|>.*?<\/xf>)/gs)][s][0];
   const fontId = Number(/fontId="(\d+)"/.exec(xf)[1]), fillId = Number(/fillId="(\d+)"/.exec(xf)[1]);
   const font = [...st.match(/<fonts[^>]*>(.*?)<\/fonts>/s)[1].matchAll(/<font>.*?<\/font>/gs)][fontId][0];
-  return { s, negrita: font.includes("<b/>"), color: /<color rgb="FF(\w+)"/.exec(font)?.[1] ?? null, relleno: fillId > 1, alineado: /horizontal="(\w+)"/.exec(xf)?.[1] ?? null };
+  return { s, sz: Number(/<sz val="(\d+)"/.exec(font)?.[1] ?? 0), negrita: font.includes("<b/>"), color: /<color rgb="FF(\w+)"/.exec(font)?.[1] ?? null, relleno: fillId > 1, alineado: /horizontal="(\w+)"/.exec(xf)?.[1] ?? null };
 };
 const exportar = (pedidos) => {
   const db = openDb(":memory:"), dir = tmp();
@@ -140,10 +140,10 @@ const exportar = (pedidos) => {
 test("hoja de pedido: cartel azul «Cliente 5900» + nombre comercial, y la población debajo del nombre", () => {
   const f = exportar([pedido("k1", { city: "MEDINA DEL CAMPO" })]);
   const xml = f["xl/worksheets/sheet1.xml"], rows = grid(xml);
-  assert.deepEqual([rows[0][0], rows[0][3]], ["Cliente C1", "Cliente de prueba"]); // código a la izquierda (A-C), nombre a la derecha (D-H)
+  assert.deepEqual([rows[0][0], rows[0][3]], ["Cliente C1", "Cliente de prueba"]); // código a la izquierda (A-C), nombre a la derecha (D-I)
   assert.deepEqual([rows[1][0], rows[1][3]], ["", "MEDINA DEL CAMPO"]); // la población, justo debajo del nombre
   assert.match(xml, /<row r="1" ht="38" customHeight="1"><c r="A1"/);
-  for (const m of ["A1:C1", "D1:H1", "A2:C2", "D2:H2"]) assert.ok(xml.includes(`<mergeCell ref="${m}"/>`), m);
+  for (const m of ["A1:C1", "D1:I1", "A2:C2", "D2:I2"]) assert.ok(xml.includes(`<mergeCell ref="${m}"/>`), m);
   // sin población, no hay fila vacía
   const sin = grid(exportar([pedido("k2", {})])["xl/worksheets/sheet1.xml"]);
   assert.equal(sin[1][0], "Nº pedido");
@@ -156,31 +156,71 @@ test("hoja de pedido: cabecera sin código ni nombre de cliente, líneas con ☐
   for (const fuera of ["Código cliente", "Nombre comercial", "IVA %", "Observaciones línea"]) assert.equal(todo.includes(fuera), false, fuera + " no va en la hoja de pedido");
   assert.deepEqual([rows[1][0], rows[1][4], rows[1][5]], ["Nº pedido", "Fecha recep.", "Hora"]);
   assert.deepEqual([rows[2][0], rows[2][4], rows[2][5]], ["VM-2026-000001", "28/10/2026", "11:00"]); // el código de cliente solo sale en el cartel
-  assert.deepEqual(rows[3], ["Código artículo", "", "Cajas", "Descripción", "Unidades", "Precio", "Dto. %", "Importe"]);
+  assert.deepEqual(rows[3], ["Código artículo", "", "Cajas", "Descripción", "Peso (kg)", "Unidades", "Precio", "Dto. %", "Importe"]);
   // 2 cajas × 6 = 12 uds × 1,50 = 18,00 · 1 ud × 3,00 − 10 % = 2,70
-  assert.deepEqual(rows[4], ["00123", "☐", "2", "Artículo A &amp; &lt;B&gt;", "12", "1.5", "", "18"]);
-  assert.deepEqual(rows[5], ["B1", "☐", "", "Artículo B", "1", "3", "10", "2.7"]);
-  // totales justo debajo de las líneas (etiqueta en D, importe en H): base 20,70 · IVA 3,78 + 0,27 = 4,05 · total 24,75
-  assert.deepEqual(rows.slice(6, 10).map((r) => [r[3], r[7]]), [["Total base imponible", "20.7"], ["Total IVA", "4.05"], ["Total R.E.", "0"], ["TOTAL PEDIDO", "24.75"]]);
+  assert.deepEqual(rows[4], ["00123", "☐", "2", "Artículo A &amp; &lt;B&gt;", "", "12", "1.5", "", "18"]); // vendido por cajas: ☐ y cajas
+  assert.deepEqual(rows[5], ["B1", "", "", "Artículo B", "", "1", "3", "10", "2.7"]); // solo unidades: sin ☐ y sin cajas
+  // totales justo debajo de las líneas (etiqueta en D, importe en I): base 20,70 · IVA 3,78 + 0,27 = 4,05 · total 24,75
+  assert.deepEqual(rows.slice(6, 10).map((r) => [r[3], r[8]]), [["Total base imponible", "20.7"], ["Total IVA", "4.05"], ["Total R.E.", "0"], ["TOTAL PEDIDO", "24.75"]]);
   // nada flotante: ni figuras ni dibujos (la casilla es un carácter de la celda)
   assert.equal(Object.keys(f).some((n) => /drawing|vml|ctrlProp/i.test(n)), false);
 });
 
-test("hoja de pedido: formato de las líneas (alto 44, casilla ☐, cajas y unidades grandes, filas alternas, cajas y unidades en negrita, precios en gris, sin cajas → unidades en negrita y negro, centrado salvo descripción)", () => {
+test("hoja de pedido: formato de las líneas (alto 44, casilla ☐ y cajas grandes, filas alternas, precios en gris, centrado salvo descripción)", () => {
   const f = exportar([pedido("k1", {})]);
   const xml = f["xl/worksheets/sheet1.xml"];
   assert.equal([...xml.matchAll(/<row r="[56]" ht="44" customHeight="1">/g)].length, 2); // las dos líneas, filas de 44
   const caja = (ref) => estiloDe(f, xml, ref);
   assert.equal(caja("C5").negrita, true); // valor de cajas en negrita
   assert.match(f["xl/styles.xml"], /<sz val="40"/); assert.match(f["xl/styles.xml"], /<sz val="22"/); // casilla ☐ de 40 pt y cajas de 22 pt
-  assert.deepEqual([caja("E5").negrita, caja("E5").color], [true, "000000"]); // unidades en negrita y negro, del mismo tamaño que las cajas (22 pt), también con cajas
-  for (const c of ["F5", "G5", "H5"]) assert.equal(caja(c).color, "808080", c); // precio, dto. e importe en gris
-  assert.deepEqual([caja("E6").negrita, caja("E6").color], [true, "000000"]); // sin cajas: unidades en negrita y negro
+  for (const c of ["G5", "H5", "I5"]) assert.equal(caja(c).color, "808080", c); // precio, dto. e importe en gris
   assert.notEqual(caja("A5").relleno, caja("A6").relleno); // una fila blanca y otra gris claro
-  for (const c of ["A5", "B5", "C5", "E5", "F5", "G5"]) assert.equal(caja(c).alineado, "center", c); // centrado en horizontal
-  assert.equal(caja("D5").alineado, "left"); assert.equal(caja("H5").alineado, "right"); // descripción a la izquierda e importe a la derecha, como la hoja modelo
+  for (const c of ["A5", "B5", "C5", "F5", "G5", "H5"]) assert.equal(caja(c).alineado, "center", c); // centrado en horizontal
+  assert.equal(caja("D5").alineado, "left"); assert.equal(caja("I5").alineado, "right"); // descripción a la izquierda e importe a la derecha, como la hoja modelo
   assert.equal(estiloDe(f, xml, "A4").alineado, "center"); // títulos de columna al medio
   assert.match(f["xl/styles.xml"], /<left style="thin"><color rgb="FF404040"\/><\/left>/); // bordes finos que separan líneas y columnas
+});
+
+test("unidades: con cajas, en negrita y tamaño normal; solo unidades, en negrita y GRANDES como las cajas", () => {
+  const f = exportar([pedido("k1", {})]), xml = f["xl/worksheets/sheet1.xml"];
+  const conCajas = estiloDe(f, xml, "F5"), soloUd = estiloDe(f, xml, "F6"), cajas = estiloDe(f, xml, "C5");
+  assert.equal(conCajas.negrita, true); assert.equal(soloUd.negrita, true);
+  assert.equal(soloUd.sz, cajas.sz); assert.equal(soloUd.sz, 22); // solo unidades: del tamaño del nº de cajas
+  assert.ok(conCajas.sz < soloUd.sz, `con cajas no se amplía (${conCajas.sz} < ${soloUd.sz})`);
+});
+
+test("la casilla ☐ y el nº de cajas solo salen en lo que se vende por cajas", () => {
+  const rows = grid(exportar([pedido("k1", {})])["xl/worksheets/sheet1.xml"]);
+  assert.deepEqual([rows[4][1], rows[4][2]], ["☐", "2"]); // por cajas
+  assert.deepEqual([rows[5][1], rows[5][2]], ["", ""]); // solo unidades: ni casilla ni cajas
+});
+
+test("artículos «KG»: recuadro de peso entre la descripción y las unidades, solo en esos", () => {
+  const items = [{ id: "J1", name: "JAMON YORK KG", qty: 2 }, { id: "A1", name: "AGUA BEZOYA 1,5 KG", qty: 1 }, { id: "H1", name: "HARINA 1KG", qty: 1 }, { id: "Q1", name: "QUESO KG.", qty: 3 }];
+  const f = exportar([pedido("kg", { items })]), xml = f["xl/worksheets/sheet1.xml"], rows = grid(xml);
+  const filaDe = (cod) => rows.findIndex((r) => r[0] === cod) + 1; // nº de fila de Excel
+  for (const cod of ["J1", "Q1"]) { // con «KG» suelto: descripción en D, recuadro vacío en E (borde grueso) y NO se combinan
+    const n = filaDe(cod); assert.ok(n > 0); assert.equal(rows[n - 1][4], "");
+    assert.equal(xml.includes(`<mergeCell ref="D${n}:E${n}"/>`), false, cod);
+    assert.match(f["xl/styles.xml"], /<left style="medium">/);
+    assert.ok(new RegExp(`<c r="E${n}" s="\\d+"`).test(xml), cod + " tiene la celda del recuadro");
+  }
+  for (const cod of ["A1", "H1"]) { const n = filaDe(cod); assert.equal(xml.includes(`<mergeCell ref="D${n}:E${n}"/>`), true, cod + " sin recuadro: la descripción ocupa también ese hueco"); } // con número («1,5 KG», «1KG») no es un artículo al peso
+  assert.equal(rows[3][4], "Peso (kg)"); // el título de la columna
+});
+
+test("esPorKilo: solo «KG» suelto, sin número delante ni detrás", () => {
+  for (const [n, e] of [["JAMON YORK KG", true], ["Chorizo kg", true], ["LOMO (KG)", true], ["QUESO KG.", true], ["AGUA 1KG", false], ["HARINA 1 KG", false], ["AZUCAR 1,5 KG", false], ["ARROZ KG 5", false], ["SAL 25KG", false], ["PAPEL KGS", false], ["", false], [null, false]]) assert.equal(esPorKilo(n), e, String(n));
+});
+
+test("impresión (HTML): casilla y cajas solo si hay cajas, recuadro de peso solo en los «KG», unidades grandes solo sin cajas", () => {
+  const o = { ref: "VM-1", customer_id: "C1", name: "X", created_at: "2026-10-28T10:00:00Z", items: [
+    { id: "A", name: "ARTICULO A", units: 12, boxes: 2, price: 1, amount: 12 }, { id: "B", name: "ARTICULO B", units: 1, price: 1, amount: 1 }, { id: "J", name: "JAMON KG", units: 2, price: 1, amount: 2 }] };
+  const h = imprimirHtml([o], { autoprint: false }), fila = (cod) => h.split("<tr").find((x) => x.includes(`<td class="c">${cod}</td>`));
+  assert.match(fila("A"), /<td class="chk">☐<\/td><td class="cajas">2<\/td>/); assert.match(fila("A"), /class="n u conCajas"/); assert.doesNotMatch(fila("A"), /class="peso"/);
+  assert.match(fila("B"), /<td class="chk"><\/td><td class="cajas"><\/td>/); assert.doesNotMatch(fila("B"), /conCajas/); assert.match(fila("B"), /colspan="2"/);
+  assert.match(fila("J"), /<td class="peso"><\/td>/); assert.doesNotMatch(fila("J"), /colspan="2"/);
+  assert.match(h, /<th>Peso \(kg\)<\/th>/);
 });
 
 test("hoja de pedido: totales → entrega (con color) → observaciones del cliente (cuadro, texto en rojo si hay)", () => {
@@ -192,7 +232,7 @@ test("hoja de pedido: totales → entrega (con color) → observaciones del clie
     assert.ok(t > 0 && e === t + 1 && o === e + 1 && rows[o + 1][3] === "Llamar antes", "orden: totales, entrega, observaciones, cuadro de texto");
     assert.match(xml, new RegExp(`<c r="D${e + 1}" s="${estilo}" t="inlineStr"><is><t xml:space="preserve">${texto}`));
     assert.equal(estiloDe(f, xml, `D${o + 2}`).color, "C00000"); // el texto de la observación, en rojo
-    for (const fila of [e, o, o + 1]) assert.ok(xml.includes(`<mergeCell ref="D${fila + 1}:H${fila + 1}"/>`)); // de la D a la H
+    for (const fila of [e, o, o + 1]) assert.ok(xml.includes(`<mergeCell ref="D${fila + 1}:I${fila + 1}"/>`)); // de la D a la I
   }
   // sin observación: cuadro vacío; sin día de entrega: lo dice
   const f = exportar([pedido("k", {})]), rows = grid(f["xl/worksheets/sheet1.xml"]);
@@ -212,7 +252,7 @@ test("impresión: A4 vertical ajustado al ancho, márgenes reducidos, área de i
   }
   const wb = f["xl/workbook.xml"];
   const filas = grid(f["xl/worksheets/sheet1.xml"]).length;
-  assert.ok(wb.includes(`<definedName name="_xlnm.Print_Area" localSheetId="0">'C1 · 000001'!$A$1:$H$${filas}</definedName>`)); // área de impresión = todo lo escrito
+  assert.ok(wb.includes(`<definedName name="_xlnm.Print_Area" localSheetId="0">'C1 · 000001'!$A$1:$I$${filas}</definedName>`)); // área de impresión = todo lo escrito
   assert.equal([...wb.matchAll(/_xlnm\.Print_Area/g)].length, 3);
 });
 
@@ -238,7 +278,7 @@ test("hojas: nombre «código · nº», sin repetirse aunque el cliente tenga do
 test("el recargo de equivalencia del cliente aparece en los totales", () => {
   const f = exportar([pedido("k1", { re: true })]); // 5,2 % de 18,00 = 0,94 · 1,4 % de 2,70 = 0,04
   const rows = grid(f["xl/worksheets/sheet1.xml"]);
-  assert.deepEqual(rows.filter((r) => /^Total|^TOTAL/.test(r[3])).map((r) => r[7]), ["20.7", "4.05", "0.98", "25.73"]);
+  assert.deepEqual(rows.filter((r) => /^Total|^TOTAL/.test(r[3])).map((r) => r[8]), ["20.7", "4.05", "0.98", "25.73"]);
 });
 
 test("hoja «Líneas»: una fila por línea con los datos del pedido", () => {
@@ -293,7 +333,7 @@ test("un pedido guardado antes del cálculo de precios también se exporta", () 
   db.createOrder({ key: "viejo", phone: "1", customerId: "C1", name: "X", at: "2026-10-28T10:00:00Z", items: [{ id: "A", name: "A", price: 2, qty: 3 }] });
   const f = unzip(fs.readFileSync(runExport(db, { dir }).filePath));
   const rows = grid(f["xl/worksheets/sheet1.xml"]);
-  assert.deepEqual(rows[4], ["A", "☐", "", "A", "3", "2", "", "6"]);
+  assert.deepEqual(rows[4], ["A", "", "", "A", "", "3", "2", "", "6"]); // sin cajas: sin ☐
   assert.equal(FORMAT.name, "pedidos-v4");
 });
 

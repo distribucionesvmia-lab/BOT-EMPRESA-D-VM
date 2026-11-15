@@ -278,7 +278,7 @@ test("EMPRESA: exporta a Excel una sola vez y se puede descargar", async () => {
   assert.equal((await fetch(`${BASE}/api/admin/exportaciones/${lista[0].id}/imprimir`)).status, 403);
   const imp = await fetch(`${BASE}/api/admin/exportaciones/${lista[0].id}/imprimir`, { headers: { Authorization: `Bearer ${ADMIN}` } });
   assert.equal(imp.status, 200); assert.match(imp.headers.get("content-type"), /text\/html/);
-  assert.match(await imp.text(), /<section class="hoja">[\s\S]*☐/);
+  assert.match(await imp.text(), /<section class="hoja">[\s\S]*<th>Peso \(kg\)<\/th>/); // la hoja trae la columna del peso (la casilla ☐ solo sale en lo que se vende por cajas)
   const ped = (await call("GET", "/api/admin/pedidos", { admin: true })).json;
   assert.ok(ped.every((o) => o.estado === "exportado"));
 });
