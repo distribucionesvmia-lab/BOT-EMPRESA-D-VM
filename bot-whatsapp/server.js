@@ -38,7 +38,7 @@ import { endpointValido, clavesValidas } from "./webpush.js";
 const FAM_NOMBRES = JSON.parse(fs.readFileSync(new URL("./familias-nombres.json", import.meta.url), "utf8")); // nombres de las familias y subfamilias de a3ERP (listado de familias)
 import { mailConfigFromEnv } from "./mailer.js";
 import { crearNotificador } from "./notificaciones.js";
-import { scheduleBackups } from "./backup.js";
+import { scheduleBackups, backupAll } from "./backup.js";
 import { sourceFromEnv } from "./drive.js";
 import nodePath from "node:path";
 import { BUSINESS, AYUDA, ayudaPublica, condicionesPedido, envTexto } from "./config.js";
@@ -439,6 +439,8 @@ const estadoDelSistema = adminEnabled ? () => {
     extras: () => { // seguridad: clave del panel débil e intentos sospechosos parados en las últimas 24 h
       const out = [];
       if (process.env.DEMO !== "1" && claveDebil(process.env.ADMIN_TOKEN)) out.push({ clave: "clave-panel-debil", gravedad: "alta", texto: "La clave del panel (ADMIN_TOKEN) es corta o fácil de adivinar. Cámbiala por una de 20 letras y números como mínimo." });
+      const auto = admin?.autoBases?.estado?.(); // actualización automática: archivos que esperan a una persona
+      if (auto?.pendientes?.length) out.push({ clave: "actualizacion-automatica", gravedad: "media", texto: `La actualización automática no ha podido aplicar ${auto.pendientes.length === 1 ? "1 archivo" : auto.pendientes.length + " archivos"}: ${auto.pendientes.slice(0, 3).map((p) => `${p.carpeta}/${p.nombre} (${p.motivo})`).join(" · ")}` });
       const s = getAccountsDb().seguridadResumen({ horas: 24 });
       if (s.total >= Number(process.env.SEGURIDAD_AVISO_DESDE ?? 10)) out.push({ clave: "intentos-sospechosos", gravedad: "media", texto: `El programa ha parado ${s.total} intentos sospechosos en las últimas 24 h (${s.porTipo.slice(0, 3).map((x) => `${x.tipo}: ${x.n}`).join(", ")}). Mira el detalle en el panel, «Cuentas de clientes» → «Seguridad».` });
       return out;
@@ -447,7 +449,9 @@ const estadoDelSistema = adminEnabled ? () => {
 } : null;
 const ficheroActualizaciones = nodePath.join(nodePath.dirname(process.env.CUSTOMERS_DB ?? "clientes.sqlite"), "actualizaciones.log");
 const leerActualizaciones = () => { try { return fs.readFileSync(ficheroActualizaciones, "utf8").trim().split("\n").slice(-60).map((l) => JSON.parse(l)).reverse(); } catch { return []; } };
-const admin = createAdmin({ imgDir: process.env.IMG_DIR ?? fileURLToPath(new URL("./imagenes/", import.meta.url)), sync, mail: notificador, actualizador, estado: estadoDelSistema, actualizaciones: leerActualizaciones, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), catalogDb: dbsAdmin?.catalogDb ?? null, adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
+// Copia de seguridad de TODAS las bases justo antes de que la actualización automática aplique un Excel (si falla, no se aplica)
+const respaldarAntesDeActualizar = () => { const { errors } = backupAll({ pedidos: getDb(), cuentas: getAccountsDb(), clientes: getDatabases().customersDb, catalogo: getDatabases().catalogDb }); if (Object.keys(errors).length) throw new Error(Object.entries(errors).map(([n, e]) => `${n}: ${e}`).join("; ")); };
+const admin = createAdmin({ respaldar: respaldarAntesDeActualizar, imgDir: process.env.IMG_DIR ?? fileURLToPath(new URL("./imagenes/", import.meta.url)), sync, mail: notificador, actualizador, estado: estadoDelSistema, actualizaciones: leerActualizaciones, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), catalogDb: dbsAdmin?.catalogDb ?? null, adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
 /** Datos fiscales de la empresa para el PDF: los PRIVACY_* de la configuración (lo que esté vacío no se imprime) y el teléfono de ayuda. */
 function datosPdfComunes() {
   const titular = envTexto("PRIVACY_TITULAR") || "Distribuciones Valentín Martín", cif = envTexto("PRIVACY_CIF"), dir = envTexto("PRIVACY_DIRECCION"), tel = AYUDA.telefono, mail = envTexto("PRIVACY_EMAIL");
@@ -1072,6 +1076,10 @@ const servidorHttp = http
     // Correos a clientes programados desde el panel (promociones, avisos de servicio): cada minuto manda los que ya tocan. Solo en la app de la empresa y con SMTP; CORREOS_PROGRAMADOS=0 lo apaga.
     if (process.env.DEMO !== "1" && !process.env.VM_TEST && adminEnabled && process.env.CORREOS_PROGRAMADOS !== "0" && smtpDesdeEntorno()) {
       setInterval(() => { const c = smtpDesdeEntorno(); if (!c) return; enviarCampanas({ accounts: getAccountsDb(), contactos: () => customerDirectory.contactos(), smtp: c.smtp, from: c.from, base: () => String(process.env.CLIENTE_URL || getAccountsDb().ajuste("contacto") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1"), negocio: BUSINESS.name, telefono: AYUDA.telefono }).catch((e) => console.error("Correos programados:", e.message)); }, 60e3).unref();
+    }
+    // Actualización automática desde BASE-ARTICULOS / BASE-CLIENTES / BASE-HISTORICO (ACTUALIZACION_AUTO=0 la desactiva): cada minuto mira si hay un archivo nuevo y estable
+    if (process.env.DEMO !== "1" && !process.env.VM_TEST && adminEnabled && process.env.ACTUALIZACION_AUTO !== "0") {
+      const t0 = setTimeout(() => { admin.autoBases.revisar().catch((e) => console.error("[VM actualización automática]", e.message)); const t = setInterval(() => admin.autoBases.revisar().catch((e) => console.error("[VM actualización automática]", e.message)), 60_000); t.unref?.(); }, 20_000); t0.unref?.();
     }
     // Vigilancia: avisa por correo de problemas nuevos y manda un informe diario (VIGILANCIA=0 la desactiva)
     if (process.env.DEMO !== "1" && adminEnabled && process.env.VIGILANCIA !== "0") {

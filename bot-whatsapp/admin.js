@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { send, readJson, makeAdminCheck } from "./auth.js";
 import { ipDe, eventoSeguridad } from "./seguridad.js";
 import { etiquetaAccion } from "./actividad.js";
+import { crearAutoBases } from "./auto-bases.js";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2, promoVigente, precioEfectivo, hoyMadrid } from "./pricing.js";
 import { categorizar } from "./categorias.js";
@@ -89,7 +90,7 @@ function vistaExcel(lista) {
   for (const sh of sheets) for (const row of sh.rows) for (const c of row) { const st = c && typeof c === "object" ? c.s ?? 0 : 0; if (st && !estilos[st]) estilos[st] = { css: estiloCss(st), dec: estiloDecimales(st) }; }
   return { orderCount: lista.length, lineCount, sheets, estilos };
 }
-export function createAdmin({ imgDir = null, sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "", catalogDb = null }) {
+export function createAdmin({ imgDir = null, sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "", catalogDb = null, respaldar = () => {} }) {
   const isAdmin = makeAdminCheck(adminToken);
   const fotos = crearFotos(imgDir);
   const fotosZip = catalogDb ? crearImportadorZip({ catalogDb, fotos }) : null;
@@ -113,17 +114,30 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
   // Nada se aplica solo: el panel enseña lo que hay, «Ver cambios» hace la vista previa de siempre y, al aplicar, el archivo pasa a la subcarpeta «aplicados».
   const ENTRADA_MAX = 80_000_000, tiposCache = new Map();
   const nombreValido = (n) => typeof n === "string" && n.length > 0 && n.length <= 200 && path.basename(n) === n && /\.(xlsx|zip)$/i.test(n) && !/^[.~]/.test(n);
-  // Subcarpetas de la bandeja: BASE-ARTICULOS, BASE-CLIENTES y BASE-HISTORICO (da igual mayúsculas, guiones o tildes). Lo que se deja ahí se entiende
-  // como de ese tipo; igualmente se mira el contenido, y si no cuadra se avisa y no se carga solo. Cada una tiene su propia subcarpeta «aplicados».
-  const SUBS = { basearticulos: "productos", baseproductos: "productos", baseclientes: "clientes", basehistorico: "historial", basehistorial: "historial" };
+  // Subcarpetas BASE-ARTICULOS, BASE-CLIENTES y BASE-HISTORICO (da igual mayúsculas, guiones, tildes o palabras detrás: «BASE-HISTORICO PEDIDOS» vale).
+  // Pueden estar dentro de la carpeta de entrada (ENTRADA_DIR) o en BASES_DIR (p. ej. C:\vm); en Windows, si no se ha puesto, se busca junto a la carpeta de datos.
+  // Lo que se deja ahí se entiende como de ese tipo; igualmente se mira el contenido, y si no cuadra se avisa y no se carga solo. Cada una tiene su propia subcarpeta «aplicados».
+  const SUBS = [["basearticulos", "productos"], ["baseproductos", "productos"], ["baseclientes", "clientes"], ["basehistorico", "historial"], ["basehistorial", "historial"]];
   const normSub = (n) => String(n ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
-  /** Carpeta de la bandeja que se pide («» = la principal, o el nombre de una subcarpeta BASE-…). null si no existe o no es una de las permitidas. */
+  const tipoDeSub = (n) => { const s = normSub(n); return SUBS.find(([pre]) => s.startsWith(pre))?.[1] ?? null; };
+  const basesDir = () => {
+    if (process.env.BASES_DIR) return process.env.BASES_DIR;
+    if (process.platform !== "win32" || !process.env.CUSTOMERS_DB) return "";
+    const d = path.dirname(path.dirname(path.resolve(process.env.CUSTOMERS_DB)));
+    try { return fs.readdirSync(d, { withFileTypes: true }).some((x) => x.isDirectory() && tipoDeSub(x.name)) ? d : ""; } catch { return ""; }
+  };
+  /** Carpetas donde se buscan las BASE-… (sin repetir). */
+  const raicesBases = () => { const out = []; for (const r of [entradaDir(), basesDir()]) if (r && !out.some((x) => path.resolve(x) === path.resolve(r))) out.push(r); return out; };
+  /** Carpeta de la bandeja que se pide («» = la de entrada, o el nombre de una subcarpeta BASE-… que exista). null si no existe o no es una de las permitidas. */
   function carpetaEntrada(dir, nombre) {
-    if (!nombre) return { ruta: dir, nombre: "", tipo: null };
-    try {
-      const d = fs.readdirSync(dir, { withFileTypes: true }).find((x) => x.isDirectory() && x.name === nombre && SUBS[normSub(x.name)]);
-      return d ? { ruta: path.join(dir, d.name), nombre: d.name, tipo: SUBS[normSub(d.name)] } : null;
-    } catch { return null; }
+    if (!nombre) return dir ? { ruta: dir, nombre: "", tipo: null } : null;
+    for (const raiz of raicesBases()) {
+      try {
+        const d = fs.readdirSync(raiz, { withFileTypes: true }).find((x) => x.isDirectory() && x.name === nombre && tipoDeSub(x.name));
+        if (d) return { ruta: path.join(raiz, d.name), nombre: d.name, tipo: tipoDeSub(d.name) };
+      } catch { /* carpeta no accesible */ }
+    }
+    return null;
   }
   function archivosDe(carpeta) {
     const out = [];
@@ -139,23 +153,41 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
         if (!visto) tipo = carpeta.tipo;
         else if (visto !== carpeta.tipo) { tipo = null; aviso = `Está en ${carpeta.nombre} pero parece de «${visto}». Revísalo antes de subirlo.`; }
       }
-      out.push({ nombre: f.name, carpeta: carpeta.nombre, tipo, ...(aviso ? { aviso } : {}), tamano: st.size, modificado: st.mtime.toISOString() });
+      out.push({ nombre: f.name, carpeta: carpeta.nombre, tipoCarpeta: carpeta.tipo, tipo, ...(aviso ? { aviso } : {}), tamano: st.size, modificado: st.mtime.toISOString() });
     }
     return out;
   }
   function listarEntrada() {
-    const dir = entradaDir();
-    if (!dir) return { configurada: false };
-    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { return { configurada: true, carpeta: dir, archivos: [], error: "No se puede abrir la carpeta de entrada." }; }
-    const carpetas = [{ ruta: dir, nombre: "", tipo: null }];
-    const subcarpetas = [];
-    for (const d of fs.readdirSync(dir, { withFileTypes: true })) if (d.isDirectory() && SUBS[normSub(d.name)]) { carpetas.push({ ruta: path.join(dir, d.name), nombre: d.name, tipo: SUBS[normSub(d.name)] }); subcarpetas.push({ nombre: d.name, tipo: SUBS[normSub(d.name)] }); }
+    const dir = entradaDir(), raices = raicesBases();
+    if (!raices.length) return { configurada: false };
+    if (dir) { try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { return { configurada: true, carpeta: dir, archivos: [], error: "No se puede abrir la carpeta de entrada." }; } }
+    const carpetas = dir ? [{ ruta: dir, nombre: "", tipo: null }] : [], subcarpetas = [];
+    for (const raiz of raices) {
+      let ds = []; try { ds = fs.readdirSync(raiz, { withFileTypes: true }); } catch { continue; }
+      for (const d of ds) if (d.isDirectory() && tipoDeSub(d.name) && !carpetas.some((c) => c.nombre === d.name)) { carpetas.push({ ruta: path.join(raiz, d.name), nombre: d.name, tipo: tipoDeSub(d.name) }); subcarpetas.push({ nombre: d.name, tipo: tipoDeSub(d.name) }); }
+    }
     let archivos = [];
     for (const c of carpetas) { try { archivos.push(...archivosDe(c)); } catch { /* una subcarpeta que no se puede leer no impide ver las demás */ } }
     archivos.sort((a, b) => (a.modificado < b.modificado ? 1 : -1));
     for (const c of carpetas) { const primero = archivos.find((a) => a.carpeta === c.nombre); if (primero && c.nombre) primero.ultimo = true; } // el más reciente de cada subcarpeta BASE-… es el que toca subir
-    return { configurada: true, carpeta: dir, subcarpetas, archivos: archivos.slice(0, 60) };
+    return { configurada: true, carpeta: dir || raices[0], subcarpetas, archivos: archivos.slice(0, 60), auto: autoBases.estado() };
   }
+  const archivarEnCarpeta = (c, nombre) => { // pasa el archivo a la subcarpeta «aplicados» de SU carpeta, con la fecha delante
+    const destino = path.join(c.ruta, "aplicados"); fs.mkdirSync(destino, { recursive: true });
+    const sello = madrid(new Date().toISOString()).replace(/[-: ]/g, "").replace(/^(\d{8})/, "$1-").slice(0, 13);
+    fs.renameSync(path.join(c.ruta, nombre), path.join(destino, `${sello}-${nombre}`));
+  };
+  // Actualización AUTOMÁTICA: lo que se deja en BASE-… se aplica solo (con copia de seguridad antes y las mismas protecciones de siempre). Ver auto-bases.js.
+  const autoBases = crearAutoBases({
+    activa: () => !!actualizador && process.env.ACTUALIZACION_AUTO !== "0",
+    listar: () => listarEntrada(),
+    leer: (nombre, carpeta) => { const c = carpetaEntrada(entradaDir(), carpeta); return c ? fs.readFileSync(path.join(c.ruta, nombre)) : null; },
+    archivar: (nombre, carpeta) => { const c = carpetaEntrada(entradaDir(), carpeta); if (c) archivarEnCarpeta(c, nombre); },
+    actualizador, respaldar,
+    leerAjuste: (k) => accounts.ajuste(k), guardarAjuste: (k, v) => accounts.ajusteGuardar(k, v),
+    registrar: (accion) => { try { accounts.actividadRegistrar({ ip: "automático", accion, ruta: "auto-bases", estado: 200 }); } catch { /* el registro nunca bloquea */ } },
+    log: console,
+  });
   // Máximo 10 claves erróneas cada 10 minutos por IP; superado el límite se bloquea esa IP aunque acierte la clave
   // Cada CLAVE distinta que falla cuenta una vez: el panel lanza varias peticiones a la vez con la misma clave y un solo
   // error al teclear no debe bloquear al administrador. Las peticiones sin clave no cuentan (no adivinan nada).
@@ -163,7 +195,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
   const recentFailures = (key, now = Date.now()) => (failures.get(key) ?? []).filter((f) => now - f.t < 10 * 60_000);
   const ip = (req) => ipDe(req);
 
-  return async function route(req, res, url) {
+  const route = async function route(req, res, url) {
     const p = url.pathname;
     if (!p.startsWith("/api/admin/")) return false;
     const who = ip(req);
@@ -698,9 +730,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       const b = (await readJson(req)) ?? {}, dir = entradaDir(), c = dir ? carpetaEntrada(dir, typeof b.carpeta === "string" ? b.carpeta : "") : null;
       if (!c || !nombreValido(b.nombre) || !fs.existsSync(path.join(c.ruta, b.nombre))) return send(res, 404, { error: "No existe ese archivo en la carpeta." }), true;
       try {
-        const destino = path.join(c.ruta, "aplicados"); fs.mkdirSync(destino, { recursive: true }); // cada carpeta (la principal o cada BASE-…) tiene sus «aplicados»
-        const sello = madrid(new Date().toISOString()).replace(/[-: ]/g, "").replace(/^(\d{8})/, "$1-").slice(0, 13);
-        fs.renameSync(path.join(c.ruta, b.nombre), path.join(destino, `${sello}-${b.nombre}`));
+        archivarEnCarpeta(c, b.nombre);
         return send(res, 200, { ok: true }), true;
       } catch (e) { return send(res, 409, { error: "No se pudo mover el archivo. Si lo tienes abierto en Excel, ciérralo y vuelve a intentarlo." }), true; }
     }
@@ -757,4 +787,6 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
     }
     return send(res, 404, { error: "No existe." }), true;
   };
+  route.autoBases = autoBases; // server.js la pone en marcha cada minuto
+  return route;
 }
