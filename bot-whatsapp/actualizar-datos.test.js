@@ -198,3 +198,14 @@ test("un Excel nuevo enseña SOLO lo que cambia (precio, modo de venta, nuevo, b
   assert.deepEqual([r.anadidos, r.modificados, r.desactivados], [1, 2, 1]);
   assert.equal(a.vistaPrevia("productos", xl(n)).aplicable, false); // y otra vez igual: nada que aplicar
 });
+
+test("fotos: si el nombre del archivo no es un código, se empareja por el NOMBRE del artículo y la anterior se archiva", () => {
+  const { a, catalogDb } = montarConFotos();
+  catalogDb.upsertProducts([{ id: "31", name: "AGUA BEZOYA PET 1,5L (R6)", price: 1, vat: 10 }, { id: "32", name: "AGUA BEZOYA 33 CL", price: 1, vat: 10 }]);
+  const foto = (n) => Buffer.alloc(300, n);
+  const z = Buffer.from(zip({ "Aguas/Bezoya · 1,5 L.webp": foto(1), "Aguas/Bezoya.webp": foto(2), "Aguas/Otra cosa 7 kg.webp": foto(3) }));
+  const p = a.vistaPrevia("fotos", z);
+  assert.equal(p.resumen.fotosNuevas, 1); assert.equal(p.resumen.ignoradas, 2); // «Bezoya» a secas es dudosa; la otra no existe
+  assert.ok(p.aviso.some((x) => /por el NOMBRE/.test(x)));
+  assert.equal(a.aplicar("fotos", z).fotosGuardadas, 1);
+});

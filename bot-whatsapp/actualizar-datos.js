@@ -1,6 +1,7 @@
 // Actualización de datos desde la aplicación de la empresa: se sube un Excel (productos, clientes o histórico), se ENSEÑAN los
 // cambios respecto a lo que ya hay y, al confirmar, se escriben SOLO las diferencias. Sin estado en el servidor: al aplicar
 // se vuelve a leer y comparar el mismo Excel, así lo que se aplica es siempre lo que acaba de verse.
+import { emparejar } from "./fotos-emparejar.js";
 import fs from "node:fs";
 import path from "node:path";
 import { parseClientesXlsx, extractPhones, extractEmails } from "./clientes-import.js";
@@ -211,23 +212,33 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const catalogo = new Set(nombres.keys());
     const nuevas = [], cambiadas = [], ignoradas = [];
     let iguales = 0;
-    const porId = new Map();
+    const porId = new Map(), porNombre = [];
+    const extDe = (n) => { const e = path.extname(n).slice(1).toLowerCase(); return e === "jpeg" ? "jpg" : e; };
     for (const [ruta, data] of Object.entries(entradas)) {
-      const m = /^([\w.-]{1,40})\.(jpe?g|png|webp)$/i.exec(path.basename(ruta)); // el código puede llevar punto (157.10)
-      if (!m) { ignoradas.push({ id: path.basename(ruta), nombre: "el nombre del archivo no es un código de producto" }); continue; }
-      if (data.length < 200 || data.length > 8_000_000) { ignoradas.push({ id: m[1], nombre: "tamaño de imagen no válido" }); continue; }
-      if (!catalogo.has(m[1])) { ignoradas.push({ id: m[1], nombre: "ese código no está en el catálogo" }); continue; }
-      porId.set(m[1], { ext: m[2].toLowerCase() === "jpeg" ? "jpg" : m[2].toLowerCase(), data });
+      const base = path.basename(ruta), m = /^([\w.-]{1,40})\.(jpe?g|png|webp)$/i.exec(base); // el código puede llevar punto (157.10)
+      if (data.length < 200 || data.length > 8_000_000) { ignoradas.push({ id: m?.[1] ?? base, nombre: "tamaño de imagen no válido" }); continue; }
+      if (m && catalogo.has(m[1])) { porId.set(m[1], { ext: extDe(base), data }); continue; }
+      // Si el nombre no es un código del catálogo, se intenta emparejar por el NOMBRE del artículo (fotos de la web: «Bezoya · 1,5 L.webp»)
+      if (m && /^\d+$/.test(m[1])) { ignoradas.push({ id: m[1], nombre: "ese código no está en el catálogo" }); continue; }
+      porNombre.push({ clave: ruta, nombre: base.replace(/\.[^.]+$/, ""), data, ext: extDe(base) });
+    }
+    let porElNombre = 0;
+    if (porNombre.length) {
+      const { parejas, dudosas, sin } = emparejar(porNombre, [...nombres].map(([id, name]) => ({ id, name })));
+      for (const p of parejas) if (!porId.has(p.id)) { porId.set(p.id, { ext: p.foto.ext, data: p.foto.data }); porElNombre++; } else ignoradas.push({ id: p.foto.nombre, nombre: "ese artículo ya tiene otra foto en el zip (con su código)" });
+      for (const d of dudosas) ignoradas.push({ id: d.foto.nombre, nombre: `dudosa, no se pone sola (¿${d.candidatos.slice(0, 2).map((c) => c.nombre).join(" o ")}?)` });
+      for (const x of sin) ignoradas.push({ id: x.nombre, nombre: "ningún artículo se llama parecido" });
     }
     const ruta = (id, ext) => path.join(imgDir, `${id}.${ext}`);
     for (const [id, f] of porId) {
       const r = ruta(id, f.ext);
       if (!fs.existsSync(r)) { const otra = ["jpg", "png", "webp"].some((e) => fs.existsSync(ruta(id, e))); (otra ? cambiadas : nuevas).push({ id, nombre: nombres.get(id) }); }
-      else if (!fs.readFileSync(r).equals(f.data)) cambiadas.push({ id });
+      else if (!fs.readFileSync(r).equals(f.data)) cambiadas.push({ id, nombre: nombres.get(id) });
       else iguales++;
     }
     const resumen = { fotosNuevas: nuevas.length, fotosCambiadas: cambiadas.length, iguales, ignoradas: ignoradas.length, fotosIA: [...porId.keys()].filter((i) => ia.has(i)).length };
-    const aviso = ignoradas.length ? [`${ignoradas.length} archivos se ignoran (código que no está en el catálogo u otros archivos).`] : [];
+    const aviso = ignoradas.length ? [`${ignoradas.length} archivos no se ponen (mira abajo el motivo de cada uno).`] : [];
+    if (porElNombre) aviso.unshift(`${porElNombre} fotos se han emparejado con su artículo por el NOMBRE (sin código). Revisa la lista de abajo antes de aplicar.`);
     const chicas = [...porId.values()].filter((f) => { const d = dimensiones(f.data); return d && Math.max(d.w, d.h) < POCA_RESOLUCION; }).length;
     if (chicas) aviso.push(`${chicas} fotos son de baja resolución (menos de ${POCA_RESOLUCION} px) y se verán borrosas.`);
     return {
@@ -239,7 +250,9 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
         for (const [id, f] of porId) {
           const r = ruta(id, f.ext);
           if (fs.existsSync(r) && fs.readFileSync(r).equals(f.data)) continue;
-          for (const e of ["jpg", "png", "webp"]) if (e !== f.ext) fs.rmSync(ruta(id, e), { force: true }); // una sola foto por producto
+          // la foto anterior NO se borra: pasa a «anteriores» con la fecha
+          const sello = new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-");
+          for (const e of ["jpg", "png", "webp"]) if (fs.existsSync(ruta(id, e))) { fs.mkdirSync(path.join(imgDir, "anteriores"), { recursive: true }); fs.renameSync(ruta(id, e), path.join(imgDir, "anteriores", `${id}-${sello}.${e}`)); }
           fs.writeFileSync(r, f.data); guardadas++;
         }
         // fotos-ia.json: códigos con foto generada con IA (el catálogo lo avisa en pequeño). Las que ahora vienen como reales se quitan.
