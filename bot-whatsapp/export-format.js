@@ -4,10 +4,10 @@
 // automática, páginas numeradas «1/3» abajo a la derecha). Cada hoja:
 //   CARTEL    barra azul oscuro: «Cliente 5900» (A-C) y el nombre comercial (D-H); debajo del nombre, la población
 //   CABECERA  Nº pedido · Fecha recep. · Hora (el código y el nombre del cliente ya están en el cartel)
-//   LÍNEAS    Código artículo · ☐ (preparado) · Cajas · Descripción · Peso (kg) · Unidades · Precio · Dto. % · Importe
+//   LÍNEAS    Código artículo · ☐ (preparado, cajas) · Cajas · Descripción · Peso (kg) · Unidades · ☐ (preparado, unidades) · Precio · Dto. % · Importe
 //             (filas alternas en gris claro y blanco, bordes finos; precio, dto. e importe en gris). Sin figuras flotantes: la casilla ☐ es un carácter de la celda.
 //             · Artículo vendido por CAJAS: ☐ y nº de cajas en grande; las unidades, en negrita y tamaño normal.
-//             · Artículo vendido solo por UNIDADES: sin ☐ y sin cajas; las unidades, en negrita y en grande (como las cajas).
+//             · Artículo vendido solo por UNIDADES: sin ☐ a la izquierda ni cajas; las unidades, en negrita y en grande (como las cajas), con su ☐ a la DERECHA de las unidades.
 //             · Artículo con «KG» solo en el nombre (sin número delante ni detrás, p. ej. «JAMÓN YORK KG»): un recuadro entre la descripción y las unidades
 //               para que quien prepara el pedido apunte lo que pesa (el precio depende del peso). Los demás artículos no llevan recuadro: su descripción ocupa también ese hueco.
 //   TOTALES   Total base imponible · Total IVA · Total R.E. · TOTAL PEDIDO (de la D a la H)
@@ -44,9 +44,9 @@ const linesOf = (o) => o.items.map((l) => ({ ...l, amount: amountOf(l) }));
 
 const HEAD = ["Nº pedido", "Código cliente", "Nombre comercial", "Fecha recepción", "Hora pedido"]; // (solo en la hoja plana «Líneas»)
 const LINE_HEAD = ["Código artículo", "Cajas", "Descripción", "Unidades", "Precio", "Dto. %", "Importe", "IVA %", "Observaciones línea"]; // (hoja plana)
-const COLS = 9; // hoja de pedido: A código · B ☐ preparado · C cajas · D descripción · E peso (kg, solo artículos «KG») · F unidades · G precio · H dto. · I importe
+const COLS = 10; // hoja de pedido: A código · B ☐ (cajas) · C cajas · D descripción · E peso (kg, solo artículos «KG») · F unidades · G ☐ (unidades) · H precio · I dto. · J importe
 const LAST = colName(COLS - 1);
-const PICK_HEAD = ["Código artículo", "", "Cajas", "Descripción", "Peso (kg)", "Unidades", "Precio", "Dto. %", "Importe"];
+const PICK_HEAD = ["Código artículo", "", "Cajas", "Descripción", "Peso (kg)", "Unidades", "", "Precio", "Dto. %", "Importe"];
 
 /** ¿Es un artículo que se vende «por kilos»? Su nombre lleva «KG» como palabra suelta, sin número delante ni detrás (no «1KG», «1,5 KG», «KG 5» ni «25 KG.»). */
 export function esPorKilo(nombre) {
@@ -130,10 +130,10 @@ function orderSheet(o) {
   const rellena = (desde, hasta, s) => { const x = []; for (let k = desde; k <= hasta; k++) x.push({ v: null, s, from: k }); return x; };
 
   // CARTEL (barra azul): «Cliente 5900» a la izquierda y el nombre comercial a la derecha; debajo del nombre, la población
-  nuevaFila([{ v: `Cliente ${o.customer_id ?? "—"}`, s: S.cartelL, from: 0, to: 2 }, { v: o.name ?? "", s: S.cartelR, from: 3, to: 8 }], 38);
-  if (o.city) nuevaFila([{ v: null, s: S.navy, from: 0, to: 2 }, { v: o.city, s: S.ciudad, from: 3, to: 8 }], 28);
+  nuevaFila([{ v: `Cliente ${o.customer_id ?? "—"}`, s: S.cartelL, from: 0, to: 2 }, { v: o.name ?? "", s: S.cartelR, from: 3, to: 9 }], 38);
+  if (o.city) nuevaFila([{ v: null, s: S.navy, from: 0, to: 2 }, { v: o.city, s: S.ciudad, from: 3, to: 9 }], 28);
   // CABECERA: Nº pedido · Fecha recep. · Hora (sin repetir código ni nombre de cliente)
-  nuevaFila([{ v: "Nº pedido", s: S.head, from: 0, to: 2 }, { v: null, s: S.head, from: 3 }, { v: "Fecha recep.", s: S.head, from: 4 }, { v: "Hora", s: S.head, from: 5 }, { v: null, s: S.head, from: 6, to: 8 }], 30);
+  nuevaFila([{ v: "Nº pedido", s: S.head, from: 0, to: 2 }, { v: null, s: S.head, from: 3 }, { v: "Fecha recep.", s: S.head, from: 4 }, { v: "Hora", s: S.head, from: 5 }, { v: null, s: S.head, from: 6, to: 9 }], 30);
   nuevaFila([{ v: o.ref, s: S.headVal, from: 0, to: 2 }, { v: madridDate(o.created_at), s: S.headVal, from: 4 }, { v: madridTime(o.created_at), s: S.headVal, from: 5 }], 17);
   // LÍNEAS
   nuevaFila(PICK_HEAD.map((v, k) => ({ v: v || null, s: S.head, from: k })), 30);
@@ -146,22 +146,23 @@ function orderSheet(o) {
       alPeso ? { v: l.name, s: st.descripcion, from: 3 } : { v: l.name, s: st.descripcion, from: 3, to: 4 }, // sin recuadro de peso, la descripción ocupa también ese hueco
       ...(alPeso ? [{ v: null, s: st.peso, from: 4 }] : []),
       { v: l.units ?? l.qty, s: porCajas ? st.unidadesConCajas : st.unidadesNegras, from: 5 }, // con cajas: negrita normal; solo unidades: en grande como las cajas
-      { v: l.price ?? null, s: st.precio, from: 6 }, { v: l.discount || null, s: st.grisNum, from: 7 }, { v: l.amount, s: st.importe, from: 8 },
+      { v: porCajas ? null : "☐", s: st.box, from: 6 }, // solo unidades: la casilla para marcar va a la derecha de las unidades
+      { v: l.price ?? null, s: st.precio, from: 7 }, { v: l.discount || null, s: st.grisNum, from: 8 }, { v: l.amount, s: st.importe, from: 9 },
     ];
     nuevaFila(celdas, 30); // filas finas: caben el nº grande y la casilla
   });
   // TOTALES (justo debajo de las líneas, de la D a la H)
-  const total = (text, value, fin) => nuevaFila([{ v: text, s: S.totalLabel, from: 3, to: 7 }, { v: value, s: fin ? S.totalFinal : S.totalGris, from: 8 }], 17);
+  const total = (text, value, fin) => nuevaFila([{ v: text, s: S.totalLabel, from: 3, to: 8 }, { v: value, s: fin ? S.totalFinal : S.totalGris, from: 9 }], 17);
   total("Total base imponible", t.base); total("Total IVA", t.iva); total("Total R.E.", t.re); total("TOTAL PEDIDO", t.total, true);
   // ENTREGA (con color) y OBSERVACIONES DEL CLIENTE (cuadro de texto: en rojo si hay observación)
   const d = deliveryInfo(o.delivery_date, o.created_at);
-  nuevaFila([{ v: d?.texto ?? "ENTREGA: SIN DÍA ELEGIDO", s: d ? OBS_STYLE[d.color] : STYLE.bold, from: 3, to: 8 }], 20);
-  nuevaFila([{ v: "Observaciones del cliente", s: STYLE.bold, from: 3, to: 8 }], 18);
+  nuevaFila([{ v: d?.texto ?? "ENTREGA: SIN DÍA ELEGIDO", s: d ? OBS_STYLE[d.color] : STYLE.bold, from: 3, to: 9 }], 20);
+  nuevaFila([{ v: "Observaciones del cliente", s: STYLE.bold, from: 3, to: 9 }], 18);
   const nota = String(o.note ?? "").trim();
-  nuevaFila([{ v: nota || null, s: nota ? S.obsBox : S.obsEmpty, from: 3, to: 8 }], 54);
+  nuevaFila([{ v: nota || null, s: nota ? S.obsBox : S.obsEmpty, from: 3, to: 9 }], 54);
   // OBSERVACIONES DE LÍNEA, al pie de la hoja (solo si alguna línea las lleva; si no, no se escribe nada)
   const conNota = lines.filter((l) => String(l.note ?? "").trim());
-  const widths = [autoWidth(lines.map((l) => l.id), 12, 16), 9, 9, autoWidth(lines.map((l) => l.name), 26, 52), 14, 11, 9, 7, 11];
+  const widths = [autoWidth(lines.map((l) => l.id), 12, 16), 9, 9, autoWidth(lines.map((l) => l.name), 26, 52), 14, 11, 9, 9, 7, 11];
   if (conNota.length) {
     const usado = Object.values(heights).reduce((s, h) => s + h, 0);
     const seccion = 17 + conNota.length * 34, cap = capacidadPagina(widths), margen = 40;
@@ -188,14 +189,14 @@ export function imprimirHtml(orders, { autoprint = true } = {}) {
     const filas = lines.map((l, k) => {
       const porCajas = l.boxes != null && l.boxes !== 0, alPeso = esPorKilo(l.name);
       return `<tr class="${k % 2 ? "g" : ""}"><td class="c">${esc(l.id)}</td><td class="chk">${porCajas ? "☐" : ""}</td><td class="cajas">${porCajas ? esc(l.boxes) : ""}</td><td class="d"${alPeso ? "" : ' colspan="2"'}>${esc(l.name)}</td>${alPeso ? '<td class="peso"></td>' : ""}` +
-        `<td class="n u${porCajas ? " conCajas" : ""}">${esc(l.units ?? l.qty)}</td><td class="n gr">${eur3(l.price)}</td><td class="n gr">${l.discount ? esc(l.discount) : ""}</td><td class="n gr">${eur(l.amount)}</td></tr>`;
+        `<td class="n u${porCajas ? " conCajas" : ""}">${esc(l.units ?? l.qty)}</td><td class="chk">${porCajas ? "" : "☐"}</td><td class="n gr">${eur3(l.price)}</td><td class="n gr">${l.discount ? esc(l.discount) : ""}</td><td class="n gr">${eur(l.amount)}</td></tr>`;
     }).join("");
     const conNota = lines.filter((l) => String(l.note ?? "").trim());
     const nota = String(o.note ?? "").trim();
     return `<section class="hoja">
 <div class="cartel"><span>Cliente ${esc(o.customer_id ?? "—")}</span><b>${esc(o.name ?? "")}</b></div>${o.city ? `<div class="ciudad">${esc(o.city)}</div>` : ""}
 <div class="cab"><span><small>Nº pedido</small>${esc(o.ref)}</span><span><small>Fecha recep.</small>${esc(madridDate(o.created_at))}</span><span><small>Hora</small>${esc(madridTime(o.created_at))}</span></div>
-<table><thead><tr><th>Código artículo</th><th></th><th>Cajas</th><th>Descripción</th><th>Peso (kg)</th><th>Unidades</th><th>Precio</th><th>Dto. %</th><th>Importe</th></tr></thead><tbody>${filas}</tbody></table>
+<table><thead><tr><th>Código artículo</th><th></th><th>Cajas</th><th>Descripción</th><th>Peso (kg)</th><th>Unidades</th><th></th><th>Precio</th><th>Dto. %</th><th>Importe</th></tr></thead><tbody>${filas}</tbody></table>
 <table class="tot"><tr><td>Total base imponible</td><td class="n">${eur(t.base)}</td></tr><tr><td>Total IVA</td><td class="n">${eur(t.iva)}</td></tr><tr><td>Total R.E.</td><td class="n">${eur(t.re)}</td></tr><tr class="fin"><td>TOTAL PEDIDO</td><td class="n">${eur(t.total)}</td></tr></table>
 <div class="entrega" style="background:${d ? COLOR_ENTREGA[d.color] : "transparent"}">${esc(d?.texto ?? "ENTREGA: SIN DÍA ELEGIDO")}</div>
 <div class="obs"><b>Observaciones del cliente</b><div class="caja${nota ? " rojo" : ""}">${esc(nota)}</div></div>
