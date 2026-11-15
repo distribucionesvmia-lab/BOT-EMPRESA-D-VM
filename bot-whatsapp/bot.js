@@ -1,3 +1,4 @@
+import { hace, ahora, MESES_HABITUALES } from "./historial-import.js";
 import { BUSINESS, PRODUCTS, AYUDA, HORARIO_REPARTO } from "./config.js";
 import { numberWords, NUMBER_WORDS, extractDelivery, explainDelivery, deliveryRows, isYes, isNo, isDone, parseRemove, parseChangeQty, lev } from "./nlu.js";
 import { isTooGeneric } from "./identify.js";
@@ -154,10 +155,11 @@ const fmtDate = (iso) => iso.slice(8, 10) + "/" + iso.slice(5, 7);
 const fmtDateFull = (iso) => fmtDate(iso) + "/" + iso.slice(0, 4);
 const pedidosDe = (customer) => [...(customer?.orders ?? [])].sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
-/** Artículos que el cliente suele comprar, de más a menos habitual, con las unidades de la última vez. */
-export function habitualProducts(customer) {
-  const stats = new Map();
+/** Artículos que el cliente ha comprado al menos una vez en los últimos 6 meses, de más a menos habitual, con las unidades de la última vez. */
+export function habitualProducts(customer, { hoy = ahora() } = {}) {
+  const stats = new Map(), desde = hace(MESES_HABITUALES, hoy); // el histórico del cliente: los artículos que ha pedido AL MENOS UNA VEZ en los últimos 6 meses
   for (const o of customer?.orders ?? []) {
+    if (String(o.date) < desde) continue;
     for (const l of o.lines) {
       const st = stats.get(l.productId) ?? { count: 0, lastDate: "", lastQty: l.qty };
       st.count++;

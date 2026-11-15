@@ -1,4 +1,5 @@
 // Prueba el bot con un catálogo con nombres reales de ERP y un cliente con historial de pedidos
+process.env.VM_HOY ??= "2026-11-15"; // fecha fija: «lo habitual» son los artículos de los últimos 6 meses
 import test from "node:test";
 import assert from "node:assert/strict";
 import { handleMessage, newSession, parseItems, setCatalog, setAskDelivery } from "./bot.js";

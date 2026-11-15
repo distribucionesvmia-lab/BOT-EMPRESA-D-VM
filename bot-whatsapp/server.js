@@ -16,7 +16,7 @@ import { estadoSistema, crearVigilante } from "./monitor.js";
 import { privacidadHtml, avisoLegalHtml } from "./privacidad.js";
 import { estadoVersion } from "./version.js";
 import { sendMail } from "./mailer.js";
-import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, accesosDe, HISTORIAL_MAX, HISTORIAL_VER_MAS } from "./weborder.js";
+import { webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, accesosDe, HISTORIAL_MAX, HISTORIAL_VER_MAS, HISTORIAL_ANALISIS } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "./delivery.js";
 // Lo que el catálogo necesita para el aviso «entrega hoy» y las opciones de día: se calcula SIEMPRE en el servidor con la hora de Madrid
 // «Lo más pedido» (para un cliente sin historial): identificadores de los artículos que más clientes compran, sin ningún dato personal; se recalcula cada 10 minutos
@@ -463,7 +463,7 @@ function pdfDeHistorial(account, doc) {
 }
 const page = (name) => fs.readFileSync(new URL(`./${name}`, import.meta.url));
 // El cliente con su historial de a3ERP MÁS lo que ha pedido por la aplicación o el chat (para «histórico» y «último pedido»)
-const clienteConPedidos = (id, max = HISTORIAL_MAX) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id, max), max);
+const clienteConPedidos = (id, max = HISTORIAL_ANALISIS) => withOwnOrders(customerDirectory.getById(id), getDb().ordersOf(id, max), max);
 const sinDocumento = (d) => !String(d ?? "").trim() || /^(undefined|null)$/i.test(String(d).trim()); // pedido de a3ERP sin número de documento: no hay PDF que enseñar
 const lunesDe = (day) => addDays(day, -((weekday(day) + 6) % 7)); // lunes de esa semana
 // Parecidos a un artículo retirado: mismas categoría y subcategoría y alguna palabra del nombre en común (hasta 3, solo del catálogo actual)

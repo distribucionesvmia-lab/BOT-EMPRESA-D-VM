@@ -2261,7 +2261,7 @@ function renderList() {
   if (!items.length) {
     let d;
     if (filtra) d = estadoVacio({ icono: "marca", titulo: "Aún no has marcado nada", texto: "Pulsa «+» en lo que necesites y aparecerá aquí.", boton: "Ver todos", onclick: () => $("fil").click() });
-    else if (tab === "hab" && !q) d = estadoVacio({ icono: "reloj", titulo: "Aún no tienes habituales", texto: "Cuando hagas tu primer pedido, aquí verás lo que sueles pedir. Mientras tanto, mira el catálogo.", boton: "Ver el catálogo", onclick: () => cambiarTab("all") });
+    else if (tab === "hab" && !q) d = estadoVacio({ icono: "reloj", titulo: "Aún no tienes habituales", texto: "Aquí salen los artículos que has pedido al menos una vez en los últimos 6 meses. Cuando hagas un pedido, los verás aquí. Mientras tanto, mira el catálogo.", boton: "Ver el catálogo", onclick: () => cambiarTab("all") });
     else if (q) {
       let extra = null;
       if (data.ayuda) { extra = document.createElement("button"); extra.type = "button"; extra.className = "estado-lnk"; extra.textContent = "¿No lo encuentras? Habla con una persona"; extra.onclick = () => abrirAyuda(data.ayuda, data.customer.name); }
@@ -2287,6 +2287,7 @@ function renderList() {
     tablaLineas.sinObs = true; list.appendChild(tablaLineas(items.map(p => ({ ...p, qty: qty.get(p.id) })))); tablaLineas.sinObs = false;
     return;
   }
+  if (tab === "hab" && !q && items.length) { const nota = document.createElement("div"); nota.className = "cuenta-lista"; nota.textContent = "Lo que has pedido al menos una vez en los últimos 6 meses"; list.appendChild(nota); }
   if (items.length > limite) { const info = document.createElement("div"); info.className = "cuenta-lista"; info.setAttribute("role", "status"); info.textContent = `Mostrando ${limite} de ${items.length}`; list.appendChild(info); }
   const conGrupos = arbol && ordenCat === "hab" && items.some(p => p.count > 0) && items.some(p => !(p.count > 0)); // en una sección: primero lo que ya compra, con su título
   let grupo = null, famPrev = null;

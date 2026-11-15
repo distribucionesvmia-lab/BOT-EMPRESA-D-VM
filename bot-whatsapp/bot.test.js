@@ -1,3 +1,4 @@
+process.env.VM_HOY ??= "2026-11-15"; // fecha fija: «lo habitual» son los artículos de los últimos 6 meses
 import test from "node:test";
 import assert from "node:assert/strict";
 import { handleMessage, newSession, parseItems, setAskDelivery } from "./bot.js";

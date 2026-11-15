@@ -89,6 +89,7 @@ export function conHistorial(clientes, historial = {}) {
  * solo los de fecha igual o posterior al último pedido de a3ERP, para no contarlos dos veces cuando después aparezcan en su historial.
  */
 export const HISTORIAL_VER_MAS = 30; // «Ver más» en Mi cuenta: hasta 30 pedidos
+export const HISTORIAL_ANALISIS = 400; // pedidos que se miran para saber qué artículos ha pedido en los últimos 6 meses (solo se ENSEÑAN los 10 o 30 últimos)
 export const HISTORIAL_MAX = 10; // pedidos que se guardan como historial de cada cliente: al llegar el 11.º se va el más antiguo
 const masRecientes = (orders, max = HISTORIAL_MAX) => [...orders].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, max);
 export function withOwnOrders(customer, ownOrders = [], max = HISTORIAL_MAX) {

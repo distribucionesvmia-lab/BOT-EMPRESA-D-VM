@@ -5,7 +5,12 @@ import { readXlsx } from "./xlsx-read.js";
 import { parseNumber } from "./productos-import.js";
 
 const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9%]+/g, " ").trim();
-export const MAX_ORDERS_PER_CUSTOMER = 10; // el historial de cada cliente son sus 10 últimos pedidos
+export const MAX_ORDERS_PER_CUSTOMER = 10; // como mínimo, sus 10 últimos pedidos
+export const MESES_HABITUALES = 6; // y TODOS los de los últimos 6 meses: de ahí salen «los artículos que ha pedido al menos una vez en los últimos 6 meses»
+export const MAX_PEDIDOS_SEIS_MESES = 400; // tope de seguridad por cliente
+/** Fecha (AAAA-MM-DD) de hace N meses. */
+export const ahora = () => (process.env.VM_HOY ? new Date(`${process.env.VM_HOY}T12:00:00Z`) : new Date()); // VM_HOY solo lo usan las pruebas (fecha fija)
+export const hace = (meses, hoy = ahora()) => { const d = new Date(hoy); d.setUTCMonth(d.getUTCMonth() - meses); return d.toISOString().slice(0, 10); };
 
 const FIELDS = [
   ["customer", /^(cod )?cliente$|^cod(igo)?( cliente)?$|^id cliente$/],
@@ -56,8 +61,8 @@ export function parseHistorial(rows) {
     byDoc.get(k).lines.push({ productId: pid, qty: Math.max(1, Math.round(qty)) });
     stats.lineas++;
   }
-  const byCustomer = new Map();
-  for (const [cid, byDoc] of orders) byCustomer.set(cid, [...byDoc.values()].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).slice(0, MAX_ORDERS_PER_CUSTOMER));
+  const byCustomer = new Map(), desde = hace(MESES_HABITUALES);
+  for (const [cid, byDoc] of orders) byCustomer.set(cid, [...byDoc.values()].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).filter((o, i) => i < MAX_ORDERS_PER_CUSTOMER || o.date >= desde).slice(0, MAX_PEDIDOS_SEIS_MESES));
   return { byCustomer, stats: { ...stats, clientes: byCustomer.size } };
 }
 
