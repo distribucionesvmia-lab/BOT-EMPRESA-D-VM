@@ -334,7 +334,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       if (mi && post) {
         const cli = customers.getById(decodeURIComponent(mi[1]));
         if (!cli) return send(res, 404, { error: "No encontramos ese cliente." }), true;
-        const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/\/$/, "");
+        const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1");
         if (!/^https?:\/\//.test(base)) return send(res, 409, { error: "Falta la dirección pública de la aplicación del cliente: ponla en CLIENTE_URL (en C:\\vm\\config) o abre una vez la aplicación del cliente desde su dirección pública." }), true;
         const op = opcionesInvitacion((await readJson(req)) ?? {});
         if (op.error) return send(res, 400, { error: op.error }), true;
@@ -351,7 +351,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       if (!tipo) return send(res, 400, { error: "Elige qué quieres que pueda hacer: darse de alta, ver la app o pedir." }), true;
       const nombre = String(b.nombre ?? "").replace(/\s+/g, " ").trim();
       if (nombre.length < 2 || nombre.length > 80) return send(res, 400, { error: "Escribe el nombre de la persona o del negocio (de 2 a 80 letras)." }), true;
-      const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/\/$/, "");
+      const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1");
       if (!/^https?:\/\//.test(base)) return send(res, 409, { error: "Falta la dirección pública de la aplicación del cliente: ponla en CLIENTE_URL (en C:\\vm\\config) o abre una vez la aplicación del cliente desde su dirección pública." }), true;
       const op = opcionesInvitacion({ ...b, modo: tipo === "pedir" ? "pedir" : "ver", pedirCodigo: tipo === "pedir" ? b.pedirCodigo : false });
       if (op.error) return send(res, 400, { error: op.error }), true;
@@ -649,7 +649,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       if (mc && post) return accounts.avisoProgCancelar(mc[1]) ? send(res, 200, { ok: true }) : send(res, 409, { error: "Ese aviso ya salió, se canceló o no existe." }), true; }
     // ---- Correos a clientes (promociones, descuentos, avisos de servicio): ahora o programados; las promociones solo a quien ha aceptado ofertas ----
     {
-      const smtpCfg = () => smtpDesdeEntorno(), baseCliente = () => String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/\/$/, "");
+      const smtpCfg = () => smtpDesdeEntorno(), baseCliente = () => String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1");
       const parte = (x) => ({ ...x, para: x.destino === "todos" ? (x.tipo === "promo" ? "Todos los que aceptan ofertas" : "Todos los clientes con correo") : (customers.getById(x.clienteId)?.name ?? "Cliente " + x.clienteId), tipoTexto: TIPOS_CORREO[x.tipo] });
       const lanzar = () => enviarCampanas({ accounts, contactos: () => customers.contactos(), smtp: smtpCfg()?.smtp, from: smtpCfg()?.from, base: baseCliente, negocio: "Distribuciones Valentín Martín", telefono: process.env.AYUDA_TEL ?? "" }).catch((e) => console.error("Correos a clientes:", e.message));
       if (p === "/api/admin/correos" && get) {

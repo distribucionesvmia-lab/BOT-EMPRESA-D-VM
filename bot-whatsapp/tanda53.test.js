@@ -29,3 +29,12 @@ test("la importación lee «Modelo pedido» y lo guarda en la ficha", () => {
   db.upsertCustomers([{ id: "1", name: "UNO" }]); // un Excel sin la columna no lo borra
   assert.equal(db.modeloPedidoDe("1"), "LSTIMPRPEDV.002");
 });
+
+test("la dirección pública para enlaces se queda en https://dominio aunque se haya puesto con /cliente detrás", async () => {
+  const fs = await import("node:fs");
+  const norm = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const quita = '.replace(/^(https?:\\/\\/[^/]+).*$/i, "$1")';
+  assert.equal(norm("./admin.js").split(quita).length - 1, 3); // los 3 sitios que arman /entrar/<token> y los enlaces de baja
+  assert.match(norm("./server.js"), /const PUBLIC_URL = .*replace\(\/\^\(https\?/);
+  assert.equal("https://pc.ts.net/cliente/".replace(/^(https?:\/\/[^/]+).*$/i, "$1"), "https://pc.ts.net");
+});
