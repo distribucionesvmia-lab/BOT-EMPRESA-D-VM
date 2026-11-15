@@ -18,6 +18,7 @@ import { sendMail } from "./mailer.js";
 import { validarProgramado, MAX_PENDIENTES } from "./avisos-programados.js";
 import { validarEdicion } from "./cliente-edicion.js";
 import { crearFotos, MAX_BYTES as FOTO_MAX } from "./fotos-articulos.js";
+import { crearImportadorZip, MAX_ZIP } from "./fotos-zip.js";
 import { elegirDestino, smtpDesdeEntorno } from "./correo-cliente.js";
 import { validarCampana, audiencia, mensajeCampana, enviarCampanas, limiteDia, MAX_PENDIENTES as MAX_CAMPANAS, TIPOS as TIPOS_CORREO } from "./correo-campanas.js";
 import { detectarTipo } from "./actualizar-datos.js";
@@ -89,6 +90,7 @@ function vistaExcel(lista) {
 export function createAdmin({ imgDir = null, sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "", catalogDb = null }) {
   const isAdmin = makeAdminCheck(adminToken);
   const fotos = crearFotos(imgDir);
+  const fotosZip = catalogDb ? crearImportadorZip({ catalogDb, fotos }) : null;
   const avisos = crearAvisos({ accountsDb: accounts });
   const estCache = new Map(); // estadísticas ya calculadas (se renuevan solas cuando cambian los pedidos)
   // ---- Artículos: precio, ofertas y la campana que avisa a los clientes ----
@@ -538,6 +540,18 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
         const r = fotos.guardar(mf[1], buf, req.headers["content-type"]); if (r.error) return send(res, 400, { error: r.error }), true;
         return send(res, 200, r), true;
       } }
+    // ---- Poner fotos desde un ZIP: primero se revisa (no cambia nada) y luego se aplican solo las que se confirman ----
+    if (p === "/api/admin/fotos/zip" && post) {
+      if (!fotosZip || !imgDir) return send(res, 400, { error: "Este programa no tiene catálogo o carpeta de fotos configurados." }), true;
+      const buf = await readBuffer(req, MAX_ZIP); if (!buf) return send(res, 413, { error: `El zip pesa demasiado (máximo ${MAX_ZIP / 1_000_000} MB).` }), true;
+      const r = fotosZip.vista(buf); return send(res, r.error ? 400 : 200, r), true;
+    }
+    if (p === "/api/admin/fotos/zip/aplicar" && post && fotosZip) {
+      const b = (await readJson(req)) ?? {};
+      if (b.confirmo !== true) return send(res, 400, { error: "Falta la confirmación." }), true;
+      const r = fotosZip.aplicar(String(b.token ?? ""), Array.isArray(b.ids) ? b.ids.slice(0, 2000) : [], { forzar: b.forzar === true });
+      return send(res, r.error ? 400 : 200, r), true;
+    }
     m = /^\/api\/admin\/articulos\/([\w.-]{1,40})\/(precio|oferta|avisar)$/.exec(p);
     if (m && post && catalogDb) {
       const prod = catalogDb.get(m[1]);
