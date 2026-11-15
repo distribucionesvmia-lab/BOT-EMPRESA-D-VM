@@ -34,6 +34,7 @@ export function parseClientes(rows) {
   const get = (r, k) => String(r[col[k]] ?? "").trim();
   const customers = [];
   const seen = new Set();
+  const listas = { sinNif: [], sinTelefono: [], sinCorreo: [] }; // quién, no solo cuántos (para la vista previa del panel)
   const stats = { filas: 0, importados: 0, sinTelefono: 0, sinCorreo: 0, sinNif: 0, sinMunicipio: 0, inactivos: 0, duplicados: 0, descartadas: 0 };
   for (const r of rows.slice(hi + 1)) {
     if (!r.some((c) => String(c).trim())) continue;
@@ -47,13 +48,13 @@ export function parseClientes(rows) {
     const legal = get(r, "legal");
     customers.push({ id, name, legalName: legal && norm(legal) !== norm(name) ? legal : "", nifKeys: nifKeys(id, get(r, "nif")), city: get(r, "city"), municipio: String(get(r, "municipio")).replace(/\D/g, ""), address: [get(r, "address"), get(r, "city")].filter(Boolean).join(", "), phones, emails, phone: phones[0] ?? "", active });
     stats.importados++;
-    if (!phones.length) stats.sinTelefono++;
-    if (!emails.length) stats.sinCorreo++;
-    if (!get(r, "nif")) stats.sinNif++;
+    if (!phones.length) { stats.sinTelefono++; listas.sinTelefono.push({ id, name }); }
+    if (!emails.length) { stats.sinCorreo++; listas.sinCorreo.push({ id, name }); }
+    if (!get(r, "nif")) { stats.sinNif++; listas.sinNif.push({ id, name }); }
     if (!String(get(r, "municipio")).replace(/\D/g, "")) stats.sinMunicipio++;
     if (!active) stats.inactivos++;
   }
-  return { customers, stats };
+  return { customers, stats, listas };
 }
 
 /** Lee el Excel (Buffer) y devuelve { customers, stats }. */

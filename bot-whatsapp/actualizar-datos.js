@@ -14,6 +14,7 @@ import { clasificar } from "./categorias.js";
 import { compararProductos, aplicarProductos, CAMPOS, vendible } from "./productos-diff.js";
 
 const MUESTRA = 40; // filas de detalle que se enseñan por apartado
+const LIMITE_CLIENTES = 500; // en clientes se enseña todo el detalle (hasta 500 por apartado); si hay más, la pantalla dice cuántos faltan
 const MIN_RATIO = 0.5; // un Excel con menos de la mitad de lo que hay se rechaza: casi seguro está incompleto
 export const TIPOS = ["productos", "clientes", "historial", "fotos"];
 const ETIQUETA_TIPO = { productos: "de productos o artículos", clientes: "de clientes", historial: "del historial de compras", fotos: "de fotos (ZIP)" };
@@ -132,7 +133,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
   // ---------- clientes ----------
   const CAMPOS_CLIENTE = [["name", "Nombre"], ["legalName", "Razón social"], ["address", "Dirección"], ["phone", "Teléfono"], ["active", "Activo"]];
   function clientes(buf) {
-    const { customers: lista, stats } = parseClientesXlsx(buf);
+    const { customers: lista, stats, listas } = parseClientesXlsx(buf);
     if (!lista.length) throw new Error("El Excel no tiene clientes.");
     const hay = customersDb.count();
     const aviso = [];
@@ -150,20 +151,28 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
       }
       if (c.emails?.length && !mismo([...c.emails].sort(), [...a.emails].sort())) cambios.push({ campo: "Correos", antes: a.emails.join(", "), despues: c.emails.join(", ") });
       if (c.phones?.length && !mismo([...c.phones].sort(), [...a.phones].sort())) cambios.push({ campo: "Teléfonos", antes: a.phones.join(", "), despues: c.phones.join(", ") });
+      if (cambios.some((x) => x.campo === "Teléfonos")) { const k = cambios.findIndex((x) => x.campo === "Teléfono"); if (k >= 0) cambios.splice(k, 1); } // no salgan «Teléfono» y «Teléfonos» a la vez por lo mismo
       if (cambios.length) { modificados.push({ id: c.id, nombre: a.name, cambios }); cambiar.push(c); } else iguales++;
     }
     const ausentes = customersDb.list().filter((c) => c.active && !enExcel.has(c.id));
     const reactivar = lista.filter((c) => c.active !== false && customersDb.getById(c.id)?.active === false).length;
     const resumen = { nuevos: nuevos.length, modificados: modificados.length, iguales, ausentes: ausentes.length, reactivados: reactivar, sinNif: stats.sinNif, sinTelefono: stats.sinTelefono };
+    // Detalle completo (hasta LIMITE_CLIENTES por apartado) y desglosado: quién es nuevo, quién se modifica (campo a campo: antes → ahora), quién ya no viene,
+    // y quién NO tiene NIF, teléfono o correo en el Excel (el NIF no se guarda: solo se comprueba aquí).
+    const L = LIMITE_CLIENTES, fila = (c) => ({ id: c.id, nombre: c.name });
     const detalle = {
-      nuevos: nuevos.slice(0, MUESTRA).map((c) => ({ id: c.id, nombre: c.name })),
-      modificados: modificados.slice(0, MUESTRA),
-      ausentes: ausentes.slice(0, MUESTRA).map((c) => ({ id: c.id, nombre: c.name })),
+      modificados: modificados.slice(0, L),
+      nuevos: nuevos.slice(0, L).map(fila),
+      ausentes: ausentes.slice(0, L).map(fila),
+      sinNif: listas.sinNif.slice(0, L).map(({ id, name }) => ({ id, nombre: name })),
+      sinTelefono: listas.sinTelefono.slice(0, L).map(({ id, name }) => ({ id, nombre: name })),
+      sinCorreo: listas.sinCorreo.slice(0, L).map(({ id, name }) => ({ id, nombre: name })),
     };
+    const detalleTotal = { modificados: modificados.length, nuevos: nuevos.length, ausentes: ausentes.length, sinNif: listas.sinNif.length, sinTelefono: listas.sinTelefono.length, sinCorreo: listas.sinCorreo.length };
     if (ausentes.length) aviso.push(`${ausentes.length} clientes que ya había no vienen en este Excel: se dejan como están (no se dan de baja solos).`);
     const bloqueante = aviso.some((a) => /No se puede aplicar/.test(a));
     return {
-      resumen, detalle, aviso, aplicable: cambiar.length > 0 && !bloqueante,
+      resumen, detalle, detalleTotal, aviso, aplicable: cambiar.length > 0 && !bloqueante,
       aplicar() {
         const r = customersDb.upsertCustomers(cambiar);
         const cuentasNuevas = accountsDb.ensureMany(cambiar.filter((c) => c.active !== false).map((c) => c.id));
