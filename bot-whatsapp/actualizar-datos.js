@@ -8,7 +8,7 @@ import { parseClientesXlsx, extractPhones, extractEmails } from "./clientes-impo
 import { parseNumber, PRECIO_MAXIMO } from "./productos-import.js";
 import { nifKeys } from "./nif-key.js";
 import { parseHistorialXlsx } from "./historial-import.js";
-import { unzip, readXlsx } from "./xlsx-read.js";
+import { unzip, readXlsx, filasConFoto } from "./xlsx-read.js";
 import { leerExcel, saltosDePrecio } from "./actualizar-productos.js";
 import { clasificar } from "./categorias.js";
 import { compararProductos, aplicarProductos, CAMPOS, vendible } from "./productos-diff.js";
@@ -17,7 +17,7 @@ const MUESTRA = 40; // filas de detalle que se enseñan por apartado
 const MIN_RATIO = 0.5; // un Excel con menos de la mitad de lo que hay se rechaza: casi seguro está incompleto
 export const TIPOS = ["productos", "clientes", "historial", "fotos"];
 const ETIQUETA_TIPO = { productos: "de productos o artículos", clientes: "de clientes", historial: "del historial de compras", fotos: "de fotos (ZIP)" };
-const TARJETA_TIPO = { productos: "Productos y precios", clientes: "Clientes", historial: "Historial de compras", fotos: "Fotos de productos (ZIP)" };
+const TARJETA_TIPO = { productos: "Productos y precios", clientes: "Clientes", historial: "Historial de compras", fotos: "Fotos de productos (ZIP o Excel)" };
 const nrm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 
 /**
@@ -34,6 +34,7 @@ export function detectarTipo(buf) {
       if (tiene(/^fecha/) && tiene(/documento/) && tiene(/^(unidades|cantidad)/)) return "historial";
       if (tiene(/(precio|tarifa|pvp)/) && tiene(/^(descrip|nombre|denomin|articulo)/) && !tiene(/^fecha/)) return "productos";
     }
+    if (buf.includes("xl/media/")) return "fotos"; // un Excel con fotos pero sin precios: es de fotos
   } catch { /* archivo que no se puede leer: lo dirá el proceso normal */ }
   return null;
 }
@@ -198,7 +199,18 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
   // ---------- fotos (un ZIP con «<código>.jpg|png|webp», en cualquier carpeta) ----------
   function fotos(buf) {
     if (!imgDir) throw new Error("La carpeta de fotos no está configurada.");
-    const entradas = unzip(buf, (n) => /\.(jpe?g|png|webp)$/i.test(n) && !/(^|\/)(__MACOSX|\.)/.test(n) && !/\/$/.test(n));
+    const esExcel = buf.includes("xl/workbook.xml");
+    const nombres0 = new Map(catalogDb.list({ activeOnly: false }).map((p) => [String(p.id), p.name]));
+    // Un ZIP de fotos, o un EXCEL con una foto por fila (nombre o código en la misma fila): en los dos casos salen entradas «nombre.ext → foto»
+    let entradas = {};
+    if (esExcel) {
+      let i = 0;
+      for (const f of filasConFoto(buf)) {
+        const codigo = f.textos.find((t) => nombres0.has(t)), nombre = f.textos.filter((t) => !nombres0.has(t) && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{3}/.test(t)).sort((a, b) => b.length - a.length)[0];
+        const base = String(codigo ?? nombre ?? "").replace(/[\\/:*?"<>|]/g, " ").trim(); if (!base || !/^(jpe?g|png|webp)$/.test(f.ext)) continue;
+        entradas[`${f.hoja}/${++i}/${base}.${f.ext}`] = f.data;
+      }
+    } else entradas = unzip(buf, (n) => /\.(jpe?g|png|webp)$/i.test(n) && !/(^|\/)(__MACOSX|\.)/.test(n) && !/\/$/.test(n));
     // Si el ZIP trae su Excel de control (columnas «codigo» y «tipo»), las fotos con tipo «IA» se marcan como generadas con IA
     const ia = new Set(), noIa = new Set();
     for (const data of Object.values(unzip(buf, (n) => /(^|\/)[^/]*\.xlsx$/i.test(n) && !/(^|\/)(__MACOSX|\.)/.test(n)))) {

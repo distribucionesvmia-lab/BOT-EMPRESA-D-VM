@@ -102,3 +102,46 @@ export function readXlsx(buf) {
   if (!files["xl/worksheets/sheet1.xml"]) throw new Error("No se encuentra la primera hoja del Excel");
   return sheetRows(files["xl/worksheets/sheet1.xml"].toString("utf8"), sharedOf(files));
 }
+
+/** Fotos «dentro de la celda» (Excel 365: Insertar → Imagen → Colocar en celda). Map(nombre de hoja → Map(nº de fila → { ext, data })). Solo lee. */
+export function fotosEnCelda(buf) {
+  const f = unzip(buf, (n) => /^xl\/(richData|media|worksheets)\//.test(n) || n === "xl/metadata.xml" || n === "xl/workbook.xml" || n === "xl/_rels/workbook.xml.rels");
+  const txt = (n) => f[n]?.toString("utf8") ?? "", out = new Map();
+  const rv = [...txt("xl/richData/rdrichvalue.xml").matchAll(/<rv\b[^>]*?(?:\/>|>([\s\S]*?)<\/rv>)/g)].map((m) => ({ s: Number(/\bs="(\d+)"/.exec(m[0])?.[1] ?? 0), v: [...(m[1] ?? "").matchAll(/<v>([\s\S]*?)<\/v>/g)].map((x) => x[1]) }));
+  if (!rv.length) return out;
+  const estructuras = [...txt("xl/richData/rdrichvaluestructure.xml").matchAll(/<s\b[^>]*>([\s\S]*?)<\/s>/g)].map((m) => [...m[1].matchAll(/<k\b[^>]*n="([^"]+)"/g)].map((x) => x[1]));
+  const relIds = [...txt("xl/richData/richValueRel.xml").matchAll(/<rel\b[^>]*r:id="([^"]+)"/g)].map((m) => m[1]);
+  const rels = new Map([...txt("xl/richData/_rels/richValueRel.xml.rels").matchAll(/<Relationship\b[^>]*>/g)].map((m) => [/Id="([^"]+)"/.exec(m[0])?.[1], /Target="([^"]+)"/.exec(m[0])?.[1]]));
+  // vm (nº de valor de la celda, desde 1) → qué rich value es: por metadata.xml si está; si no, el mismo orden
+  const meta = txt("xl/metadata.xml"), rvb = [...(/<futureMetadata\b[^>]*XLRICHVALUE[\s\S]*?<\/futureMetadata>/.exec(meta)?.[0] ?? "").matchAll(/<(?:xlrd:)?rvb\b[^>]*\bi="(\d+)"/g)].map((m) => Number(m[1]));
+  const bk = [...(/<valueMetadata\b[\s\S]*?<\/valueMetadata>/.exec(meta)?.[0] ?? "").matchAll(/<bk>\s*<rc\b[^>]*\bv="(\d+)"/g)].map((m) => Number(m[1]));
+  const rvDeVm = (vm) => (bk.length && rvb.length ? rvb[bk[vm - 1]] : undefined) ?? vm - 1;
+  const imagen = (vm) => {
+    const r = rv[rvDeVm(vm)]; if (!r) return null;
+    const k = (estructuras[r.s] ?? []).indexOf("_rvRel:LocalImageIdentifier"), idx = Number(r.v[k < 0 ? 0 : k]);
+    const t = rels.get(relIds[idx]); if (!t) return null;
+    const ruta = "xl/" + t.replace(/^\.\.\//, "").replace(/^\/?(xl\/)?/, ""); return f[ruta] ? { ext: ruta.split(".").pop().toLowerCase(), data: f[ruta] } : null;
+  };
+  const rels2 = new Map([...txt("xl/_rels/workbook.xml.rels").matchAll(/<Relationship\b[^>]*>/g)].map((m) => [/Id="([^"]+)"/.exec(m[0])?.[1], /Target="([^"]+)"/.exec(m[0])?.[1]]));
+  for (const h of [...txt("xl/workbook.xml").matchAll(/<sheet\b[^>]*>/g)]) {
+    const nombre = decode(/name="([^"]*)"/.exec(h[0])?.[1] ?? ""), t = rels2.get(/r:id="([^"]+)"/.exec(h[0])?.[1]); if (!t) continue;
+    const xml = txt(t.replace(/^\/?(xl\/)?/, "xl/")), porFila = new Map();
+    for (const c of xml.matchAll(/<c\b[^>]*>/g)) {
+      const vm = /\bvm="(\d+)"/.exec(c[0])?.[1], ref = /\br="[A-Z]+(\d+)"/.exec(c[0])?.[1]; if (!vm || !ref) continue;
+      const im = imagen(Number(vm)); if (im && !porFila.has(Number(ref))) porFila.set(Number(ref), im);
+    }
+    out.set(nombre, porFila);
+  }
+  return out;
+}
+
+/** Fotos de un Excel con filas «nombre/código + foto»: [{ fila, hoja, textos: string[], ext, data }]. Vale con fotos flotantes y con fotos dentro de la celda. */
+export function filasConFoto(buf) {
+  const { sheets } = libro(buf), flot = fotosPorFila(buf); let celda = new Map(); try { celda = fotosEnCelda(buf); } catch { /* sin fotos en celda */ }
+  const out = [];
+  for (const h of sheets) {
+    const a = flot.get(h.name) ?? new Map(), b = celda.get(h.name) ?? new Map();
+    for (const fila of new Set([...a.keys(), ...b.keys()])) out.push({ fila, hoja: h.name, textos: (h.rows[fila - 1] ?? []).map((x) => String(x ?? "").trim()).filter(Boolean), ...(a.get(fila) ?? b.get(fila)) });
+  }
+  return out;
+}
