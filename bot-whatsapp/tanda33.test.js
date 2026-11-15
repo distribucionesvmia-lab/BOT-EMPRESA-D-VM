@@ -106,10 +106,15 @@ test("PANEL: botones de descarga y tarjeta de copias en empresa.html; rutas de s
   assert.ok(!leer("./exporter.js").includes("estadisticas-export"), "el Excel de a3ERP no se toca");
 });
 
-test("CLIENTE (iPhone): la franja de la hora va en rojo sólido, sin degradado", () => {
-  const h = leer("./cliente.html");
-  assert.match(h, /html::before \{ content:""; position:fixed; top:0; left:0; right:0; height:env\(safe-area-inset-top\); background:var\(--bar\)/);
-  assert.match(h, /<meta name="theme-color" content="#C8102E">/);
+test("CLIENTE (iPhone): la franja de la hora es un elemento real, fijo y rojo, y la barra de estado es transparente", () => {
+  for (const f of ["./cliente.html", "./pedido.html"]) {
+    const h = leer(f);
+    assert.match(h, /<div id="vm-estado" aria-hidden="true"><\/div>/, f); // elemento real, no un ::before
+    assert.match(h, /#vm-estado \{ position:fixed; top:0; left:0; right:0; height:env\(safe-area-inset-top, 0px\); background:var\(--bar, #C8102E\);/, f);
+    assert.match(h, /apple-mobile-web-app-status-bar-style" content="black-translucent"/, f);
+    assert.match(h, /<meta name="theme-color" content="#C8102E">/, f);
+    assert.doesNotMatch(h, /html::before \{ content:""/, f);
+  }
 });
 
 test("CATÁLOGO (móvil): sin rendija sobre la barra de categoría y el título de la cabecera no pisa «Mi cuenta»", () => {

@@ -127,7 +127,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Pedidos VM">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="/icono-192.png">
 <meta name="color-scheme" content="light dark">
 <script>document.documentElement.classList.add("cargando");setTimeout(function(){document.documentElement.classList.remove("cargando")},2500);document.addEventListener("DOMContentLoaded",function(){document.documentElement.classList.remove("cargando")})</script>
@@ -410,8 +410,9 @@
   /* Logo y cabecera rojos como los originales (el logo es un óvalo blanco con letras transparentes: solo se ve sobre rojo) */
   .ds-logo { background:transparent; padding:0; height:auto; border-radius:0; }
   .ds-logo img, .bar .ds-logo img { height:34px; width:auto; }
-  /* iPhone: la franja de la hora y la batería va en el mismo rojo que la cabecera (sin degradado blanco→rojo) */
-  html::before { content:""; position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top); background:var(--bar); z-index:900; pointer-events:none; }
+  /* iPhone (iOS 26): la franja de la hora y la batería la pinta Safari con el color del elemento FIJO que haya en lo alto de la página; un trozo de estilo (::before) no cuenta, tiene que ser un elemento real.
+     Con la barra de estado transparente (black-translucent) esa franja queda en el mismo rojo que la cabecera, con la hora en blanco, sin degradado. Mide 0 donde no hay muesca (navegador normal, ordenador). */
+  #vm-estado { position:fixed; top:0; left:0; right:0; height:env(safe-area-inset-top, 0px); background:var(--bar, #C8102E); z-index:999; pointer-events:none; }
   .bar, .phone.scrolled .bar { background:var(--bar); color:var(--on-bar); border-bottom-color:transparent; -webkit-backdrop-filter:none; backdrop-filter:none; }
   .bar .bar-titulo { color:var(--on-bar); }
   @media (max-width:479px) { .bar-titulo { display:none; } .phone.scrolled .titulo-bloque { max-height:140px; opacity:1; padding-top:var(--s2); padding-bottom:var(--s2); } }
@@ -706,6 +707,7 @@
 </style>
 </head>
 <body>
+<div id="vm-estado" aria-hidden="true"></div>
 <main>
     <!-- Portada: entrar como cliente habitual, solicitar alta y cómo se pide -->
   <section id="acceso" hidden>
