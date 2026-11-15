@@ -85,11 +85,11 @@ test("Inicio: saludo por hora de Madrid, «hoy» solo con la regla de siempre, p
   assert.doesNotMatch(cli, /Hoy toca[^\n]*enviar\(/); // nunca se envía solo
 });
 
-test("fotos y estados: baldosa con foto al 82 % sin agrandar, fundido de 200 ms, aviso «Imagen orientativa» y estados con un solo botón", () => {
+test("fotos y estados: baldosa con la foto llenando el recuadro sin agrandar, fundido de 200 ms, aviso «Imagen orientativa» y estados con un solo botón", () => {
   const cli = leer("./cliente.html");
-  assert.match(pedido, /\.av img, \.pf-av img[^{]*\{[^}]*max-width:82%; max-height:82%;[^}]*opacity:0; transition:opacity 200ms/);
+  assert.match(pedido, /\.av img, \.pf-av img[^{]*\{[^}]*max-width:100%; max-height:100%;[^}]*opacity:0; transition:opacity 200ms/);
   assert.match(pedido, /Math\.min\(Math\.max\(nat \* 2\.5, 240\)/); // el zoom se ve grande: las fotos pequeñas se amplían hasta 2,5 veces assert.match(pedido, /"Imagen orientativa"/);
-  assert.match(cli, /max-width:82%; max-height:82%/); assert.equal((cli.match(/data:image\/png;base64,/g) || []).length, 1); // el logo, una sola vez
+  assert.match(cli, /max-width:100%; max-height:100%/); assert.equal((cli.match(/data:image\/png;base64,/g) || []).length, 1); // el logo, una sola vez
   for (const t of ["Aún no tienes habituales", "Sin resultados", "Tu pedido está vacío", "Sin conexión", "No se ha podido enviar"]) assert.ok(pedido.includes(t), t);
   assert.match(pedido, /\.estado svg \{ width:48px; height:48px/); assert.match(pedido, /boton: "Reintentar"/);
   assert.match(pedido, /navigator\.vibrate\(8\)/); assert.match(pedido, /sinMovimiento\(\)/); // vibración suave, nunca con «reducir movimiento»
@@ -133,7 +133,7 @@ test("fotos: cada baldosa con foto está colocada (position:relative) para que l
 
 test("Pedido: las tarjetas (entrega, pedido fijo, observaciones, resumen) ocupan todo el ancho, alineadas con el resto", () => {
   assert.match(pedido, /#cart \.cartbody > \.card, #cart \.cartbody > \.ped-res[^{]*\{ margin-left:0; margin-right:0; width:100%;/);
-  assert.match(pedido, /\.falta-fila \.falta-av img \{[^}]*max-width:82%/);
+  assert.match(pedido, /\.falta-fila \.falta-av img \{[^}]*max-width:100%/);
 });
 
 test("direcciones guardadas: lista con «Quitar», casilla para guardar una nueva y se guarda al enviar", () => {
@@ -208,8 +208,8 @@ test("acceso (tanda 1): NIF primero, validación propia en español, aviso de lo
 test("ordenador: la página se adapta al ancho (hasta 1240 px), el Inicio en dos columnas y las fotos llenan su baldosa", () => {
   const cli = leer("./cliente.html");
   assert.match(cli, /:root \{ --ancho:860px; \}/); assert.match(cli, /:root \{ --ancho:1240px; \}/); assert.doesNotMatch(cli, /calc\(\(100% - 860px\) \/ 2\)/);
-  assert.match(cli, /\.vm-inicio > \.in-secs \{ grid-column:2;/); assert.match(cli, /\.vm-inicio \.in-pim img, \.vm-inicio \.in-foto img \{ width:82%; height:82%; \}/);
-  assert.match(pedido, /\.pf-av img \{ width:82%; height:82%; max-width:none; max-height:none; \}/);
+  assert.match(cli, /\.vm-inicio > \.in-secs \{ grid-column:2;/); assert.match(cli, /\.vm-inicio \.in-pim img, \.vm-inicio \.in-foto img \{ width:100%; height:100%; \}/);
+  assert.match(pedido, /\.pf-av img \{ width:100%; height:100%; max-width:none; max-height:none; \}/);
 });
 
 test("tanda 2 (inicio y diseño general): atajos sin recorte, contenedor único, menú ordenado, título sin repetir, favoritos legibles, «Hacer pedido» arriba, sin parpadeo", () => {

@@ -979,7 +979,7 @@
   .done-btns .big { display:flex; align-items:center; justify-content:center; text-decoration:none; width:100%; min-height:50px; border-radius:var(--r-pill); }
 
   /* ═══ Fotos: baldosa cuadrada #F2F2F7, la foto «contenida» al 82 % (nunca más grande de lo que es) y fundido de 200 ms ═══ */
-  .av img, .pf-av img, .tl-av img, .falta-av img, .sug-im img { position:absolute; inset:0; margin:auto; width:auto; height:auto; max-width:82%; max-height:82%; padding:0; object-fit:contain; background:none; border-radius:0; opacity:0; transition:opacity 200ms ease; }
+  .av img, .pf-av img, .tl-av img, .falta-av img, .sug-im img { position:absolute; inset:0; margin:auto; width:auto; height:auto; max-width:100%; max-height:100%; padding:0; object-fit:contain; background:none; border-radius:0; opacity:0; transition:opacity 200ms ease; }
   .falta-av, .tl-av, .pf-av, .sug-im, .av { position:relative; overflow:hidden; } /* la foto va dentro de su baldosa: si la baldosa no está «colocada», la foto se estira por toda la tarjeta */
   .av img.cargada, .pf-av img.cargada, .tl-av img.cargada, .falta-av img.cargada, .sug-im img.cargada { opacity:1; }
   .pf-av:has(img.cargada), .tl-av:has(img.cargada), .falta-av:has(img.cargada), .sug-im:has(img.cargada) { background:var(--foto-bg) !important; color:transparent; }
@@ -1055,7 +1055,7 @@
     /* tarjeta cuadrada de producto */
     .pf { grid-template-columns:minmax(0, 1fr); grid-template-rows:auto auto auto; row-gap:var(--s2); align-items:start; padding:var(--s3); background:var(--surface); border:0; border-radius:var(--r-card); content-visibility:visible; contain-intrinsic-size:auto; }
     .pf-av { width:100%; height:auto; aspect-ratio:1 / 1; align-self:start; }
-    .pf-av img { width:82%; height:82%; max-width:none; max-height:none; } /* en ordenador la foto llena su baldosa (las pequeñas se amplían un poco) */
+    .pf-av img { width:100%; height:100%; max-width:none; max-height:none; } /* en ordenador la foto llena su baldosa (las pequeñas se amplían un poco) */
     .pf-info { align-self:start; }
     .pf-n { font-size:calc(var(--t-prod) / var(--k,1)); }
     .pf-ctl { width:100%; flex-direction:row; align-items:center; justify-content:space-between; }
@@ -1080,7 +1080,7 @@
   /* Las tarjetas del Pedido (entrega, pedido fijo, observaciones, resumen) ocupan todo el ancho, alineadas con las fichas de día */
   #cart .cartbody > .card, #cart .cartbody > .ped-res, #cart .cartbody > .tl-wrap, #cart #cartLines > .tl-wrap, #cart #cartLines > .falta { margin-left:0; margin-right:0; width:100%; box-sizing:border-box; }
   #cart .dchips { margin-right:calc(-1 * var(--gutter)); padding-right:var(--gutter); }
-  .falta-fila .falta-av img { position:absolute; inset:0; margin:auto; width:auto; height:auto; max-width:82%; max-height:82%; background:none; }
+  .falta-fila .falta-av img { position:absolute; inset:0; margin:auto; width:auto; height:auto; max-width:100%; max-height:100%; background:none; }
 
   /* Direcciones guardadas */
   .dirguard { display:flex; flex-direction:column; gap:var(--s2); margin-top:var(--s3); }
@@ -1161,7 +1161,7 @@
   html.cargando body { visibility:hidden; } html.cargando { background:var(--bg); } /* sin parpadeo de página sin estilos al recargar */
   .app > main#list { scrollbar-width:thin; }
 
-  @media (min-width:768px) and (max-width:1023px) { .pf-av img { width:82%; height:82%; max-width:none; max-height:none; } }
+  @media (min-width:768px) and (max-width:1023px) { .pf-av img { width:100%; height:100%; max-width:none; max-height:none; } }
 
   /* ═══ Tanda 3: catálogo, categorías y búsqueda ═══ */
   .cab-cat { position:sticky; top:0; z-index:4; background:var(--bg); border-bottom:.5px solid var(--line); }
@@ -1586,7 +1586,7 @@ function nitida(img) {
   if (!img.naturalWidth) return;
   const ficha = !!img.closest(".ficha-foto"); // la foto de la ficha del artículo: más grande, pero tampoco se estira sin límite
   if (!ficha && !img.closest(".av, .pf-av, .tl-av, .falta-av, .sug-im")) return;
-  const dpr = window.devicePixelRatio || 1, k = ficha ? 1.6 : 1.2, piso = ficha ? 120 : 24, tope = ficha ? "100%" : "82%";
+  const dpr = window.devicePixelRatio || 1, k = ficha ? 1.6 : 2.5, piso = ficha ? 120 : 24, tope = ficha ? "100%" : "100%";
   img.style.maxWidth = `min(${tope}, ${Math.max(piso, Math.round(img.naturalWidth / dpr * k))}px)`; img.style.maxHeight = `min(${tope}, ${Math.max(piso, Math.round(img.naturalHeight / dpr * k))}px)`;
   if (ficha) img.style.margin = "0 auto";
 }

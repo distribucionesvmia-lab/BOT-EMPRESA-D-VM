@@ -497,7 +497,7 @@
   @media (prefers-reduced-motion: reduce) { .vm-inicio, .vm-inicio .in-prod:active, .vm-inicio .in-chip:active { animation:none; transform:none; } }
 
   /* Fotos de las tarjetas del Inicio: contenidas al 82 %, nunca más grandes que su tamaño real, con fundido de 200 ms */
-  .vm-inicio .in-pim img, .vm-inicio .in-foto img { position:absolute; inset:0; margin:auto; width:auto; height:auto; max-width:82%; max-height:82%; padding:0; object-fit:contain; background:none; opacity:0; transition:opacity 200ms ease; }
+  .vm-inicio .in-pim img, .vm-inicio .in-foto img { position:absolute; inset:0; margin:auto; width:auto; height:auto; max-width:100%; max-height:100%; padding:0; object-fit:contain; background:none; opacity:0; transition:opacity 200ms ease; }
   .vm-inicio .in-foto { position:relative; }
   .vm-inicio .in-pim img.cargada, .vm-inicio .in-foto img.cargada { opacity:1; }
   .vm-inicio .in-pim:has(img.cargada), .vm-inicio .in-foto:has(img.cargada) { color:transparent; background:var(--foto-bg); }
@@ -590,7 +590,7 @@
     .quick { padding-bottom:var(--s3); }
   }
   @media (min-width:768px) { /* tablet y ordenador: las fotos llenan su baldosa (las pequeñas se amplían) */
-    .vm-inicio .in-pim img, .vm-inicio .in-foto img { width:82%; height:82%; }
+    .vm-inicio .in-pim img, .vm-inicio .in-foto img { width:100%; height:100%; }
   }
 
   /* ═══ Tanda 2: pantalla de inicio y diseño general ═══ */
@@ -1494,7 +1494,7 @@ const diaSemanaDe = (iso) => { try { return new Intl.DateTimeFormat("es-ES", { t
 function nitida(img) {
   if (!img.naturalWidth || !img.closest(".av, .pf-av, .tl-av, .falta-av, .sug-im")) return;
   const dpr = window.devicePixelRatio || 1;
-  img.style.maxWidth = `min(82%, ${Math.max(24, Math.round(img.naturalWidth / dpr * 1.2))}px)`; img.style.maxHeight = `min(82%, ${Math.max(24, Math.round(img.naturalHeight / dpr * 1.2))}px)`;
+  img.style.maxWidth = `min(100%, ${Math.max(24, Math.round(img.naturalWidth / dpr * 2.5))}px)`; img.style.maxHeight = `min(100%, ${Math.max(24, Math.round(img.naturalHeight / dpr * 2.5))}px)`;
 }
 document.addEventListener("load", (e) => { if (e.target && e.target.tagName === "IMG") { nitida(e.target); e.target.classList.add("cargada"); } }, true); // fundido de las fotos
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
