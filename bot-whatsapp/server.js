@@ -45,7 +45,7 @@ import { categorizar } from "./categorias.js";
 import { empaquetar, estatico } from "./estaticos.js";
 import { avisarCortes, horaAviso } from "./avisocorte.js";
 import { enviarProgramados } from "./avisos-programados.js";
-import { crearCorreoCliente, smtpDesdeEntorno, elegirDestino, tapar } from "./correo-cliente.js";
+import { crearCorreoCliente, smtpDesdeEntorno, elegirDestino, tapar, emailValido } from "./correo-cliente.js";
 import { zip as zipNode } from "./zip.js";
 import { limpiaError, navegadorCorto } from "./errores.js";
 const latidoLimite = rateLimiter(Number(process.env.LATIDO_LIMIT ?? 20), 60e3); // latidos por minuto y cliente (el normal es 1 cada 45 s)
@@ -505,9 +505,9 @@ const correoCliente = () => {
   const c = process.env.CORREO_CLIENTES === "0" ? null : smtpDesdeEntorno();
   return (_correoCliente = c ? crearCorreoCliente({ accounts: getAccountsDb(), smtp: c.smtp, from: c.from, customers: customerDirectory, negocio: BUSINESS.name, telefono: AYUDA.telefono }) : null);
 };
-function avisoPedido(account, guardado, modificado = false) {
+function avisoPedido(account, guardado, modificado = false, email = null) {
   if (!guardado?.ref) return;
-  correoCliente()?.notificar(account, guardado, { modificado });
+  correoCliente()?.notificar(account, guardado, { modificado, email, pdf: () => pdfDePedidoApp(account, guardado.ref)?.buf }); // con el PDF del pedido adjunto
   const pe = puedeEditarPedido(guardado);
   void avisosPush().aCliente(account.customerId, {
     title: modificado ? "Pedido modificado" : "Pedido recibido",
@@ -697,6 +697,7 @@ async function appRoutes(req, res, url) {
       priceNote: BUSINESS.priceNote,
       condiciones: condicionesPedido(),
       soloVer: !!account.soloVer, // enlace de «solo ver»: la página no deja enviar y el servidor tampoco
+      correo: { disponible: !!correoCliente(), conocido: (() => { const d = elegirDestino({ account, customer: customerDirectory.getById(account.customerId) }); return d ? tapar(d) : null; })() }, // para ofrecer «recibir la confirmación por correo» al enviar el pedido
       customer: { name: customer.name, address: customer.address, codigo: String(customer.id ?? ""), re: !!customer.recargoEquivalencia },
       used: false,
       favs: getAccountsDb().favorites(account.customerId),
@@ -907,6 +908,9 @@ async function appRoutes(req, res, url) {
     const body = await readJson(req);
     const key = typeof body?.key === "string" && /^[\w-]{8,64}$/.test(body.key) ? body.key : null;
     if (!key) return void sendJson(res, 400, { error: "Solicitud no válida" });
+    // Correo opcional para la confirmación (con el PDF): si lo escribe, tiene que ser válido; se guarda en su cuenta si aún no tenía uno
+    const correoEscrito = typeof body.email === "string" ? body.email.trim().toLowerCase().slice(0, 120) : "";
+    if (correoEscrito && !emailValido(correoEscrito)) return void sendJson(res, 400, { error: "El correo no parece válido. Revísalo o déjalo en blanco." });
     const customer = clienteConPedidos(account.customerId);
     if (typeof body.replaces === "string" && body.replaces) { // primero se comprueba que el pedido es suyo y que todavía se puede modificar
       const viejo = getDb().getOrderByRef(body.replaces);
@@ -919,13 +923,15 @@ async function appRoutes(req, res, url) {
     if (typeof body.replaces === "string" && body.replaces) { // el cliente MODIFICA un pedido ya enviado: sustituye al anterior (mismo número), nunca crea otro
       const nuevo = getDb().replaceOrder(body.replaces, priced);
       if (!nuevo) return void sendJson(res, 409, { error: "Ya no se puede modificar este pedido. Llámanos y lo cambiamos." }); // se exportó mientras tanto
-      avisoPedido(account, nuevo, true);
+      avisoPedido(account, nuevo, true, correoEscrito || null);
+      if (correoEscrito) getAccountsDb().correoCuentaSiVacio(account.id, correoEscrito);
       const pe = puedeEditarPedido(nuevo);
       return void sendJson(res, 200, { ok: true, modificado: true, ref: nuevo.ref, ...(pe.ok ? { modificable: pe.texto || "Puedes seguir modificándolo mientras no lo preparemos" } : {}), message: `✅ Pedido modificado (${nuevo.ref}). ${priced.items.length} ${priced.items.length === 1 ? "artículo" : "artículos"}, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.` });
     }
     const { duplicate, order: guardado } = await createOrder(priced);
     if (duplicate) return void sendJson(res, 409, { error: "Este pedido ya se envió" }); // doble clic o dos pestañas
-    avisoPedido(account, guardado);
+    avisoPedido(account, guardado, false, correoEscrito || null);
+    if (correoEscrito) getAccountsDb().correoCuentaSiVacio(account.id, correoEscrito);
     const pe = guardado ? puedeEditarPedido(guardado) : { ok: false };
     return void sendJson(res, 200, { ok: true, ...(guardado?.ref ? { ref: guardado.ref } : {}), ...(pe.ok ? { modificable: pe.texto || "Puedes seguir modificándolo mientras no lo preparemos" } : {}), message: `🎉 ¡Pedido recibido, ${customer.name}! ${priced.items.length} ${priced.items.length === 1 ? "artículo" : "artículos"}, total aprox. ${priced.total.toFixed(2).replace(".", ",")} ${BUSINESS.currency.trim()}.${guardado?.ref ? `\n🧾 Tu referencia: *${guardado.ref}*` : ""}\n\n${BUSINESS.payment}` });
   }

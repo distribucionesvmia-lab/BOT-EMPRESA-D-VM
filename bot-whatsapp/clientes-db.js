@@ -283,6 +283,12 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       db.prepare("SELECT c.*, (SELECT COUNT(DISTINCT doc || date) FROM purchases p WHERE p.customer_id = c.id) AS n_orders, (SELECT MAX(date) FROM purchases p WHERE p.customer_id = c.id) AS last_order FROM customers c ORDER BY name")
         .all()
         .map((r) => ({ id: r.id, name: r.name, phone: r.phone ?? "", address: r.address ?? "", recargoEquivalencia: !!r.recargo, active: !!r.active, orders: r.n_orders, lastOrder: r.last_order, updatedAt: r.updated_at })),
+    /** Nombre y correos de todos los clientes activos en una sola consulta (para escribirles): Map id → { name, emails }. */
+    contactos() {
+      const m = new Map(db.prepare("SELECT id, name FROM customers WHERE active = 1").all().map((r) => [r.id, { id: r.id, name: r.name, emails: [] }]));
+      for (const r of db.prepare("SELECT customer_id, email FROM customer_emails ORDER BY email").all()) m.get(r.customer_id)?.emails.push(r.email);
+      return m;
+    },
     count: () => db.prepare("SELECT COUNT(*) AS n FROM customers").get().n,
     /** Copia consistente de la base en un fichero nuevo (sin parar el servicio). */
     backupTo(file) {

@@ -1280,6 +1280,7 @@
 
   #resumen .ped-h, #cart .ped-h { padding:0 var(--gutter); } #resumen .card { margin-left:var(--gutter); margin-right:var(--gutter); } #resumen .cval { overflow-wrap:anywhere; }
   #resumen .nota { padding:0 var(--gutter); }
+  #resCorreo { width:100%; min-height:48px; border:1px solid var(--line); border-radius:var(--r-field, 12px); padding:0 var(--s4, 14px); background:var(--surface); color:var(--text); font-size:calc(var(--t-body, 16px) / var(--k,1)); margin-top:6px; } #resCorreo:focus { outline:3px solid var(--accent); outline-offset:2px; } .ped-h .opc { font-weight:400; color:var(--text-2); font-size:.85em; }
   #confirm .nw { display:block; font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; opacity:.92; margin-top:2px; }
   #confirm { line-height:1.2; padding-top:var(--s2); padding-bottom:var(--s2); }
   main, .app.sin-carrito main { padding-bottom:calc(var(--tb-h) + var(--pie-h, 88px) + 28px); } .app.sin-carrito main { padding-bottom:calc(var(--tb-h) + 16px); }
@@ -1432,6 +1433,10 @@
       <div class="aviso abierto" id="resAbierto" role="status" aria-live="polite" hidden></div>
       <h3 class="ped-h">Entrega</h3>
       <div class="card"><div class="ctit">Día</div><div class="cval" id="resDia"></div><div class="ctit" style="margin-top:10px">Dirección</div><div class="cval" id="resDir"></div><div class="ctit" id="resNotaT" style="margin-top:10px">Observaciones</div><div class="cval" id="resNota"></div></div>
+      <div id="resCorreoBloque" hidden>
+        <h3 class="ped-h">Confirmación por correo <span class="opc">(opcional)</span></h3>
+        <div class="card"><label class="ctit" for="resCorreo">Tu correo electrónico</label><input id="resCorreo" type="email" inputmode="email" autocomplete="email" maxlength="120" placeholder="nombre@correo.es" aria-describedby="resCorreoAyuda"><p class="nota" id="resCorreoAyuda" style="padding:0;margin:6px 0 0"></p></div>
+      </div>
       <h3 class="ped-h">Importe</h3>
       <div class="card ped-res" id="pedRes"><div class="rr"><span>Base imponible</span><b id="sumBase">0,00 €</b></div><div class="rr" id="sumIvaFila"><span>IVA</span><b id="sumIva">0,00 €</b></div><div id="sumIvaTipos"></div><div class="rr" id="sumReFila" hidden><span>Recargo de equivalencia</span><b id="sumRe">0,00 €</b></div><div class="rr tt"><span>Total con IVA</span><b id="sumTotal">0,00 €</b></div></div>
       <div class="nota" id="priceNote"></div>
@@ -2761,6 +2766,8 @@ function pintarPasoResumen() {
   $("resDia").textContent = diaElegido ? largo(diaElegido).replace(/^./, c => c.toUpperCase()) : "Sin día elegido: te lo confirmaremos";
   $("resDir").textContent = dirFinal() || "La dirección que tenemos de tu negocio";
   const n = $("note").value.trim(); $("resNota").textContent = n || "Sin observaciones";
+  const cr = data.correo || {}; $("resCorreoBloque").hidden = !cr.disponible; // solo si el servidor puede mandar correos
+  $("resCorreoAyuda").textContent = cr.conocido ? `Si lo dejas en blanco te mandaremos la confirmación, con el PDF de tu pedido, a ${cr.conocido}. Si escribes otro, irá a ese.` : "Si quieres, te mandamos la confirmación con el PDF de tu pedido. Lo guardaremos para tus próximos pedidos.";
   const cd = data.condiciones || {}, c = calc(), box = $("resCond"); box.innerHTML = "";
   const fila = (t, v) => { if (!v) return; const d = document.createElement("div"); d.className = "cond-fila"; const a = document.createElement("b"); a.textContent = t; const s = document.createElement("span"); s.textContent = v; d.append(a, s); box.appendChild(d); };
   fila("Pago", cd.pago);
@@ -2941,7 +2948,7 @@ async function enviarPedido(delivery, errBox) {
   const btn = $("confirm"), textoBtn = btn.textContent;
   btn.disabled = true; btn.innerHTML = '<span class="rueda" aria-hidden="true"></span>Enviando…'; errBox.textContent = "";
   try {
-    const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, ...(modificando ? { replaces: modificando.ref } : {}), lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value, deliveryAddress: dirEntrega(), delivery }) });
+    const r = await fetch(location.pathname, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: orderKey, ...($("resCorreo").value.trim() ? { email: $("resCorreo").value.trim() } : {}), ...(modificando ? { replaces: modificando.ref } : {}), lines: lines().map(l => ({ id: l.id, qty: l.qty, unit: unit(l.id), note: (notes.get(l.id) || "").trim() })), note: $("note").value, deliveryAddress: dirEntrega(), delivery }) });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || "No se ha podido enviar el pedido");
     btn.classList.add("hecho"); btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12.500l4.500 4.500L19 7.500" fill="none" stroke="currentColor" stroke-width="2.600" stroke-linecap="round" stroke-linejoin="round"/></svg>Pedido enviado'; vibra();

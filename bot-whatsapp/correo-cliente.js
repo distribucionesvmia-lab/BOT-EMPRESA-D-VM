@@ -17,7 +17,7 @@ export function elegirDestino({ account, customer }) {
 export const tapar = (e) => { const [u, d] = String(e).split("@"); return u ? `${u[0]}${"*".repeat(Math.max(2, Math.min(6, u.length - 1)))}@${d}` : ""; };
 
 /** Asunto y texto. `ctx`: { nombre (del cliente), negocio, telefono, modificado, ahora }. */
-export function correoPedido(o, { nombre = "", negocio = "Distribuciones Valentín Martín", telefono = "", modificado = false, ahora = new Date().toISOString() } = {}) {
+export function correoPedido(o, { nombre = "", negocio = "Distribuciones Valentín Martín", telefono = "", modificado = false, adjunto = false, ahora = new Date().toISOString() } = {}) {
   const items = (o.items ?? []).map((l) => ({ ...l, amount: l.amount ?? round2((l.units ?? l.qty) * (l.price ?? 0) * (1 - (l.discount ?? 0) / 100)), vat: l.vat_rate }));
   const t = items.length ? totals(items, o.re) : null;
   const entrega = deliveryInfo(o.delivery_date, o.created_at), pe = puedeEditarPedido(o, ahora);
@@ -33,6 +33,7 @@ export function correoPedido(o, { nombre = "", negocio = "Distribuciones Valent�
     "", "Artículos:", ...(lineas.length ? lineas : ["  (sin artículos)"]),
     ...(o.note ? ["", `Tus observaciones: ${o.note}`] : []),
     ...(t ? ["", `Total con IVA: ${eur(t.total)}`] : []),
+    ...(adjunto ? ["", "Te adjuntamos el PDF de tu pedido."] : []),
     ...(pe.ok && pe.texto ? ["", `${pe.texto}. Puedes hacerlo desde «Mi cuenta» en la aplicación.`] : []),
     ...(o.review ? ["", "Revisaremos tu pedido antes de prepararlo y te llamaremos si hace falta."] : []),
     "", "Este correo es solo informativo: no es una factura.",
@@ -48,17 +49,20 @@ export function correoPedido(o, { nombre = "", negocio = "Distribuciones Valent�
  * enviar(account, order, { modificado }) devuelve 'enviado' | 'sin-correo' | 'desactivado' | 'repetido' | 'error'.
  */
 export function crearCorreoCliente({ accounts, smtp, from, customers, negocio, telefono = "", send = sendMail, log = console, now = () => new Date().toISOString() }) {
-  async function enviar(account, order, { modificado = false } = {}) {
+  /** email: correo que el cliente ha escrito en ESTE pedido (manda sobre el de su cuenta y vale aunque tenga quitado el interruptor: lo pide él). pdf: función o Buffer con el PDF del pedido para adjuntarlo. */
+  async function enviar(account, order, { modificado = false, email = null, pdf = null } = {}) {
     try {
       if (!order?.ref || !account?.customerId) return "sin-correo";
-      if (!accounts.correoPedidoActivo(account.customerId)) return "desactivado";
-      const customer = customers?.getById?.(account.customerId), to = elegirDestino({ account, customer });
+      const escrito = emailValido(email) ? String(email).trim().toLowerCase() : null;
+      if (!escrito && !accounts.correoPedidoActivo(account.customerId)) return "desactivado";
+      const customer = customers?.getById?.(account.customerId), to = escrito ?? elegirDestino({ account, customer });
       const clave = `${order.ref}|${modificado ? (order.modified_at ?? now()) : "nuevo"}`;
       if (!accounts.correoPedidoReservar(clave, order.ref, now())) return "repetido"; // un solo correo por pedido (o por cada modificación)
       if (!to) { accounts.correoPedidoMarcar(clave, "sin-correo"); return "sin-correo"; }
       try {
-        const m = correoPedido(order, { nombre: customer?.name ?? "", negocio, telefono, modificado, ahora: now() });
-        await send(smtp, { from, to, subject: m.subject, text: m.text });
+        let adj = []; try { const buf = typeof pdf === "function" ? pdf() : pdf; if (buf?.length) adj = [{ filename: `pedido-${order.ref}.pdf`, contentType: "application/pdf", data: buf }]; } catch (e) { log.error?.(`PDF del pedido ${order.ref} para el correo: ${e.message}`); } // si el PDF falla, el correo sale igual, sin adjunto
+        const m = correoPedido(order, { nombre: customer?.name ?? "", negocio, telefono, modificado, adjunto: adj.length > 0, ahora: now() });
+        await send(smtp, { from, to, subject: m.subject, text: m.text, attachments: adj });
         accounts.correoPedidoMarcar(clave, "enviado"); return "enviado";
       } catch (e) { accounts.correoPedidoMarcar(clave, "error", String(e.message).slice(0, 200)); log.error?.(`Correo al cliente (${order.ref}): ${e.message}`); return "error"; }
     } catch (e) { log.error?.("Correo al cliente:", e.message); return "error"; }

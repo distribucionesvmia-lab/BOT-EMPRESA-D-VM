@@ -123,6 +123,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   addCol("push_log", "detalle", "TEXT");
   db.exec("CREATE TABLE IF NOT EXISTS correo_pref (customer_id TEXT PRIMARY KEY, activo INTEGER NOT NULL)"); // «Recibir por correo la confirmación de mis pedidos»: sin fila = activado
   db.exec("CREATE TABLE IF NOT EXISTS correo_pedidos (clave TEXT PRIMARY KEY, ref TEXT NOT NULL, at TEXT NOT NULL, estado TEXT NOT NULL DEFAULT 'enviando', error TEXT)"); // un correo por pedido (o por modificación): sin direcciones ni datos del cliente
+  db.exec("CREATE TABLE IF NOT EXISTS correo_ofertas (customer_id TEXT PRIMARY KEY, acepta INTEGER NOT NULL, origen TEXT NOT NULL, at TEXT NOT NULL)"); // permiso para recibir OFERTAS por correo: sin fila = NO (hay que pedirlo); origen = cliente | empresa
+  db.exec("CREATE TABLE IF NOT EXISTS baja_tokens (customer_id TEXT PRIMARY KEY, token TEXT NOT NULL UNIQUE)"); // enlace de «darme de baja de las ofertas» de cada correo (solo sirve para eso)
+  db.exec("CREATE TABLE IF NOT EXISTS campanas_correo (id INTEGER PRIMARY KEY AUTOINCREMENT, asunto TEXT NOT NULL, texto TEXT NOT NULL, tipo TEXT NOT NULL, destino TEXT NOT NULL, cliente_id TEXT, dia TEXT NOT NULL, hora TEXT NOT NULL, cuando TEXT NOT NULL, repetir TEXT NOT NULL DEFAULT 'no', estado TEXT NOT NULL DEFAULT 'pendiente', resultado TEXT, creado TEXT NOT NULL, resuelto TEXT)");
+  db.exec("CREATE TABLE IF NOT EXISTS campanas_correo_envios (campana_id INTEGER NOT NULL, customer_id TEXT NOT NULL, estado TEXT NOT NULL, error TEXT, at TEXT NOT NULL, PRIMARY KEY (campana_id, customer_id))"); // quién recibió cada correo (sin direcciones): evita repetir y cuenta el límite diario
   db.exec("CREATE TABLE IF NOT EXISTS avisos_programados (id INTEGER PRIMARY KEY AUTOINCREMENT, titulo TEXT NOT NULL, texto TEXT NOT NULL, destino TEXT NOT NULL, cliente_id TEXT, dia TEXT NOT NULL, hora TEXT NOT NULL, cuando TEXT NOT NULL, repetir TEXT NOT NULL DEFAULT 'no', abre TEXT NOT NULL DEFAULT 'inicio', estado TEXT NOT NULL DEFAULT 'pendiente', resultado TEXT, creado TEXT NOT NULL, resuelto TEXT)");
   addCol("standing_orders", "skip_week", "TEXT"); // lunes de la semana que el cliente ha saltado («Saltar esta semana»)
   addCol("registrations", "pin_hash", "TEXT");
@@ -141,6 +145,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   }
 
   const avisoProgOut = (r) => r && { id: r.id, titulo: r.titulo, texto: r.texto, destino: r.destino, clienteId: r.cliente_id, dia: r.dia, hora: r.hora, cuando: r.cuando, repetir: r.repetir, abre: r.abre, estado: r.estado, resultado: r.resultado, creado: r.creado, resuelto: r.resuelto };
+  const campanaOut = (r) => r && { id: r.id, asunto: r.asunto, texto: r.texto, tipo: r.tipo, destino: r.destino, clienteId: r.cliente_id, dia: r.dia, hora: r.hora, cuando: r.cuando, repetir: r.repetir, estado: r.estado, resultado: r.resultado, creado: r.creado, resuelto: r.resuelto };
   const accountOut = (r) => r && { id: r.id, customerId: r.customer_id, phone: r.phone, email: r.email, status: r.status, verified: !!r.verified, locked: !!r.locked_until && r.locked_until > new Date().toISOString(), lastLogin: r.last_login, createdAt: r.created_at, ownCode: !!r.code_key };
   const byPhone = db.prepare("SELECT * FROM accounts WHERE phone = ?");
   const byId = db.prepare("SELECT * FROM accounts WHERE id = ?");
@@ -528,11 +533,32 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     ajusteSiFalta(clave, crearValor) { db.prepare("INSERT OR IGNORE INTO ajustes (clave, valor) VALUES (?, ?)").run(clave, crearValor()); return db.prepare("SELECT valor FROM ajustes WHERE clave = ?").get(clave).valor; },
     pushLogAdd: (x, now = new Date().toISOString()) => db.prepare("INSERT INTO push_log (at, titulo, texto, destino, enviados, fallidos, detalle) VALUES (?, ?, ?, ?, ?, ?, ?)").run(now, x.titulo, x.texto, x.destino, x.enviados, x.fallidos, x.detalle ?? null),
     // ---- Correo de confirmación de pedido al cliente ----
+    /** Guarda el correo que el cliente escribió al pedir, si su cuenta aún no tenía uno (así le llegan las próximas confirmaciones sin volver a escribirlo). true si lo guardó. */
+    correoCuentaSiVacio: (accountId, email) => db.prepare("UPDATE accounts SET email = ? WHERE id = ? AND (email IS NULL OR email = '')").run(String(email), Number(accountId)).changes === 1,
     correoPedidoActivo: (customerId) => (db.prepare("SELECT activo FROM correo_pref WHERE customer_id = ?").get(String(customerId))?.activo ?? 1) === 1,
     correoPedidoSet: (customerId, activo) => { db.prepare("INSERT INTO correo_pref (customer_id, activo) VALUES (?, ?) ON CONFLICT(customer_id) DO UPDATE SET activo = excluded.activo").run(String(customerId), activo ? 1 : 0); },
     correoPedidoReservar: (clave, ref, now = new Date().toISOString()) => db.prepare("INSERT OR IGNORE INTO correo_pedidos (clave, ref, at) VALUES (?, ?, ?)").run(clave, ref, now).changes === 1,
     correoPedidoMarcar: (clave, estado, error = null) => { db.prepare("UPDATE correo_pedidos SET estado = ?, error = ? WHERE clave = ?").run(estado, error, clave); },
     correoPedidosResumen: (desde) => { const r = Object.fromEntries(db.prepare("SELECT estado, COUNT(*) AS n FROM correo_pedidos WHERE at >= ? GROUP BY estado").all(desde).map((x) => [x.estado, x.n])); const e = db.prepare("SELECT at, error FROM correo_pedidos WHERE estado = 'error' ORDER BY at DESC LIMIT 1").get(); return { enviados: r.enviado ?? 0, sinCorreo: r["sin-correo"] ?? 0, errores: r.error ?? 0, ultimoError: e ? { at: e.at, mensaje: e.error } : null }; },
+    // ---- Correos a clientes (promociones, descuentos, avisos de servicio) ----
+    ofertasSet: (customerId, acepta, origen, now = new Date().toISOString()) => { db.prepare("INSERT INTO correo_ofertas (customer_id, acepta, origen, at) VALUES (?, ?, ?, ?) ON CONFLICT(customer_id) DO UPDATE SET acepta = excluded.acepta, origen = excluded.origen, at = excluded.at").run(String(customerId), acepta ? 1 : 0, origen === "empresa" ? "empresa" : "cliente", now); },
+    ofertasDe: (customerId) => { const r = db.prepare("SELECT acepta, origen, at FROM correo_ofertas WHERE customer_id = ?").get(String(customerId)); return r ? { acepta: !!r.acepta, origen: r.origen, at: r.at } : null; },
+    ofertasAceptan: () => new Set(db.prepare("SELECT customer_id FROM correo_ofertas WHERE acepta = 1").all().map((r) => r.customer_id)),
+    bajaToken(customerId) { const id = String(customerId); let r = db.prepare("SELECT token FROM baja_tokens WHERE customer_id = ?").get(id); if (!r) { const t = crypto.randomBytes(24).toString("base64url"); db.prepare("INSERT OR IGNORE INTO baja_tokens (customer_id, token) VALUES (?, ?)").run(id, t); r = db.prepare("SELECT token FROM baja_tokens WHERE customer_id = ?").get(id); } return r.token; },
+    bajaPorToken: (token) => db.prepare("SELECT customer_id FROM baja_tokens WHERE token = ?").get(String(token ?? ""))?.customer_id ?? null,
+    campanaCorreoAdd: (x) => Number(db.prepare("INSERT INTO campanas_correo (asunto, texto, tipo, destino, cliente_id, dia, hora, cuando, repetir, creado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(x.asunto, x.texto, x.tipo, x.destino, x.clienteId ?? x.cliente_id ?? null, x.dia, x.hora, x.cuando, x.repetir ?? "no", x.creado ?? new Date().toISOString()).lastInsertRowid),
+    campanaCorreoPendientes: () => db.prepare("SELECT * FROM campanas_correo WHERE estado = 'pendiente' ORDER BY cuando, id").all().map(campanaOut),
+    campanaCorreoHistorial: (limit = 15) => db.prepare("SELECT * FROM campanas_correo WHERE estado NOT IN ('pendiente', 'enviando') ORDER BY COALESCE(resuelto, creado) DESC, id DESC LIMIT ?").all(limit).map(campanaOut),
+    campanaCorreoVencidas: (ahora) => db.prepare("SELECT * FROM campanas_correo WHERE estado = 'pendiente' AND cuando <= ? ORDER BY cuando, id").all(ahora).map(campanaOut),
+    campanaCorreoReservar: (id) => db.prepare("UPDATE campanas_correo SET estado = 'enviando', resuelto = ? WHERE id = ? AND estado = 'pendiente'").run(new Date().toISOString(), Number(id)).changes === 1,
+    campanaCorreoMarcar: (id, estado, resultado, ahora = new Date().toISOString()) => db.prepare("UPDATE campanas_correo SET estado = ?, resultado = ?, resuelto = ? WHERE id = ? AND estado IN ('pendiente', 'enviando')").run(estado, resultado ?? null, ahora, Number(id)).changes === 1,
+    campanaCorreoCancelar: (id) => db.prepare("UPDATE campanas_correo SET estado = 'cancelado', resuelto = ? WHERE id = ? AND estado = 'pendiente'").run(new Date().toISOString(), Number(id)).changes === 1,
+    campanaCorreoCuenta: () => db.prepare("SELECT COUNT(*) AS n FROM campanas_correo WHERE estado = 'pendiente'").get().n,
+    campanaCorreoColgadas: (antes, ahora = new Date().toISOString()) => db.prepare("UPDATE campanas_correo SET estado = 'interrumpido', resultado = 'Se interrumpió a mitad (el programa se paró). Los que ya habían recibido el correo no lo repiten.', resuelto = ? WHERE estado = 'enviando' AND resuelto < ?").run(ahora, antes).changes,
+    campanaCorreoEnvio: (campanaId, customerId, estado, error = null, now = new Date().toISOString()) => db.prepare("INSERT OR IGNORE INTO campanas_correo_envios (campana_id, customer_id, estado, error, at) VALUES (?, ?, ?, ?, ?)").run(Number(campanaId), String(customerId), estado, error, now).changes === 1,
+    campanaCorreoYaEnviado: (campanaId, customerId) => !!db.prepare("SELECT 1 FROM campanas_correo_envios WHERE campana_id = ? AND customer_id = ? AND estado = 'enviado'").get(Number(campanaId), String(customerId)),
+    correosEnviadosDesde: (desde) => db.prepare("SELECT COUNT(*) AS n FROM campanas_correo_envios WHERE estado = 'enviado' AND at >= ?").get(desde).n,
+    campanaCorreoResumenEnvios: (campanaId) => Object.fromEntries(db.prepare("SELECT estado, COUNT(*) AS n FROM campanas_correo_envios WHERE campana_id = ? GROUP BY estado").all(Number(campanaId)).map((r) => [r.estado, r.n])),
     // ---- Avisos programados (promociones y descuentos que se mandan solos a su hora) ----
     avisoProgAdd: (x) => Number(db.prepare("INSERT INTO avisos_programados (titulo, texto, destino, cliente_id, dia, hora, cuando, repetir, abre, creado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(x.titulo, x.texto, x.destino, x.clienteId ?? x.cliente_id ?? null, x.dia, x.hora, x.cuando, x.repetir ?? "no", x.abre ?? "inicio", x.creado ?? new Date().toISOString()).lastInsertRowid),
     avisoProgPendientes: () => db.prepare("SELECT * FROM avisos_programados WHERE estado = 'pendiente' ORDER BY cuando, id").all().map(avisoProgOut),
@@ -557,6 +583,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         db.prepare("DELETE FROM usual_orders WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM corte_pref WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM correo_pref WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM correo_ofertas WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM baja_tokens WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM bienvenida_vista WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM invitaciones WHERE customer_id = ?").run(row.customer_id); db.prepare("DELETE FROM presencia WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM corte_avisos WHERE customer_id = ?").run(row.customer_id);

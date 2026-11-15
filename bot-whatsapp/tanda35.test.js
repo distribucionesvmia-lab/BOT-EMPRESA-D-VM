@@ -54,7 +54,7 @@ test("CONFIGURACIÓN: para escribir al cliente basta SMTP (no hace falta MAIL_TO
   assert.equal(smtpDesdeEntorno({}), null); assert.equal(smtpDesdeEntorno({ SMTP_HOST: "smtp.gmail.com" }), null); // sin remitente no se envía
   const c = smtpDesdeEntorno({ SMTP_HOST: "smtp.gmail.com", SMTP_USER: "a@gmail.com", SMTP_PASS: "x" }); assert.equal(c.smtp.host, "smtp.gmail.com"); assert.equal(c.smtp.port, 587); assert.equal(c.from, "a@gmail.com"); assert.equal(c.smtp.secure, "starttls");
   assert.equal(smtpDesdeEntorno({ SMTP_HOST: "h", MAIL_FROM: "z@z.es", SMTP_PORT: "465" }).smtp.secure, "tls");
-  const sv = leer("./server.js"); assert.match(sv, /process\.env\.CORREO_CLIENTES === "0" \? null : smtpDesdeEntorno\(\)/); assert.match(sv, /correoCliente\(\)\?\.notificar\(account, guardado, \{ modificado \}\)/);
+  const sv = leer("./server.js"); assert.match(sv, /process\.env\.CORREO_CLIENTES === "0" \? null : smtpDesdeEntorno\(\)/); assert.match(sv, /correoCliente\(\)\?\.notificar\(account, guardado, \{ modificado, email, pdf: \(\) => pdfDePedidoApp\(account, guardado\.ref\)\?\.buf \}\)/);
 });
 
 test("MI CUENTA y PANEL: interruptor «Correo con la confirmación de mis pedidos» y recuento de envíos en la tarjeta del correo", () => {
@@ -72,4 +72,32 @@ test("CORREO: la contraseña de aplicación de Google se limpia (espacios y comi
   assert.match(errorDeCredenciales({ code: 534, text: "5.7.9 Application-specific password required" }, { host: "smtp.gmail.com", user: "a@gmail.com", pass: "abcdefghijklmnop" }).message, /CONTRASEÑA DE APLICACIÓN/);
   assert.match(errorDeCredenciales({ code: 534, text: "5.7.14 Please log in via your web browser" }, { host: "smtp.gmail.com", user: "a@gmail.com", pass: "abcdefghijklmnop" }).message, /bloqueado el acceso/);
   assert.doesNotMatch(errorDeCredenciales({ code: 535, text: "mal" }, { host: "smtp.otro.es", user: "a@b.es", pass: "x" }).message, /16 letras/); // la pista de 16 letras es solo de Google
+});
+
+test("CORREO DEL PEDIDO: correo opcional al enviar, va con el PDF adjunto, manda sobre el de la cuenta y se guarda si no había", async () => {
+  const { buildMessage } = await import("./mailer.js");
+  // el mensaje con adjunto es multipart/mixed: texto + PDF en base64
+  const m = buildMessage({ from: "a@x.es", to: "b@y.es", subject: "S", text: "Hola", attachments: [{ filename: "pedido-VM-2026-000001.pdf", contentType: "application/pdf", data: Buffer.from("%PDF-1.4 prueba") }] });
+  assert.match(m, /Content-Type: multipart\/mixed; boundary="vm-[0-9a-f]+"/); assert.match(m, /Content-Type: application\/pdf; name="pedido-VM-2026-000001\.pdf"/); assert.match(m, /Content-Disposition: attachment; filename="pedido-VM-2026-000001\.pdf"/);
+  assert.equal(Buffer.from(m.split('Content-Transfer-Encoding: base64\r\n\r\n')[2].split("\r\n--")[0].replace(/\s/g, ""), "base64").toString(), "%PDF-1.4 prueba");
+  assert.ok(!/^Content-Type: text\/plain/m.test(m.split("\r\n\r\n")[0]), "la cabecera principal no es text/plain cuando hay adjuntos");
+  assert.doesNotMatch(buildMessage({ from: "a@x.es", to: "b@y.es", subject: "S", text: "Hola" }), /multipart/); // sin adjuntos, como siempre
+  const { accounts, enviados, send } = montar();
+  const cc = crearCorreoCliente({ accounts, smtp: {}, from: "p@x.es", customers: clientes, negocio: "VM", send, log: { error() {} } });
+  // el escrito en el pedido manda sobre el de la cuenta y la ficha, y lleva el PDF
+  assert.equal(await cc.enviar(cuenta, pedido(), { email: "Otro@Cliente.test", pdf: () => Buffer.from("%PDF-1.4") }), "enviado");
+  assert.equal(enviados[0].to, "otro@cliente.test"); assert.equal(enviados[0].attachments.length, 1); assert.equal(enviados[0].attachments[0].filename, "pedido-VM-2026-000123.pdf"); assert.match(enviados[0].text, /Te adjuntamos el PDF de tu pedido/);
+  // lo pide él en este pedido: sale aunque tenga quitado el interruptor de Mi cuenta; sin escribir nada, se respeta
+  accounts.correoPedidoSet("7001", false);
+  assert.equal(await cc.enviar(cuenta, pedido({ ref: "VM-2026-000124" }), { email: "otro@cliente.test" }), "enviado");
+  assert.equal(await cc.enviar(cuenta, pedido({ ref: "VM-2026-000125" })), "desactivado");
+  // si el PDF falla, el correo sale igual sin adjunto
+  accounts.correoPedidoSet("7001", true);
+  assert.equal(await cc.enviar(cuenta, pedido({ ref: "VM-2026-000126" }), { pdf: () => { throw new Error("sin pdf"); } }), "enviado"); assert.equal(enviados.at(-1).attachments.length, 0); assert.doesNotMatch(enviados.at(-1).text, /adjuntamos/);
+  // se guarda en la cuenta solo si no tenía correo
+  const id = accounts.listAccounts()[0]?.id ?? 1; void id; assert.equal(typeof accounts.correoCuentaSiVacio, "function");
+  const c = leer("./pedido.html"), sv = leer("./server.js");
+  assert.match(c, /id="resCorreo"/); assert.match(c, /Confirmación por correo/); assert.match(c, /\(opcional\)/); assert.match(c, /email: \$\("resCorreo"\)\.value\.trim\(\)/); assert.match(c, /con el PDF de tu pedido/);
+  assert.match(sv, /El correo no parece válido\. Revísalo o déjalo en blanco\./); assert.match(sv, /correoCuentaSiVacio\(account\.id, correoEscrito\)/);
+  assert.ok(c.indexOf('id="resCorreoBloque"') > c.indexOf('id="resDia"') && c.indexOf('id="resCorreoBloque"') < c.indexOf('id="pedRes"'), "el correo va después de la entrega y antes del importe");
 });

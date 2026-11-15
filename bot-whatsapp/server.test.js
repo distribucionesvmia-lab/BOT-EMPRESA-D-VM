@@ -1519,3 +1519,11 @@ test("FICHA DE CLIENTE: incluye adónde va la confirmación de pedido por correo
   const f = (await call("GET", `/api/admin/cliente/${encodeURIComponent(cli.id)}/ficha`, { admin: true })).json;
   assert.ok(f.correoPedidos && "destino" in f.correoPedidos && typeof f.correoPedidos.activo === "boolean");
 });
+
+test("PEDIDO CON CORREO OPCIONAL: un correo mal escrito se rechaza y uno válido se guarda en la cuenta si no tenía", async () => {
+  const A = cookieOf(await entrarNif("111111")), body = (key, email) => ({ key, ...(email === undefined ? {} : { email }), lines: [{ id: "1010", qty: 1, unit: "ud" }] });
+  assert.equal((await call("POST", "/catalogo", { cookie: A, body: body("correo-malo-001", "esto no es un correo") })).status, 400);
+  const ok = await call("POST", "/catalogo", { cookie: A, body: body("correo-bueno-001", "cliente.prueba@ejemplo.es") }); assert.equal(ok.status, 200, JSON.stringify(ok.json));
+  assert.equal((await call("POST", "/catalogo", { cookie: A, body: body("correo-vacio-001", "") })).status, 200); // en blanco = sin correo escrito
+  const d = (await call("GET", "/catalogo/datos", { cookie: A })).json; assert.ok(d.correo && typeof d.correo.disponible === "boolean" && "conocido" in d.correo);
+});

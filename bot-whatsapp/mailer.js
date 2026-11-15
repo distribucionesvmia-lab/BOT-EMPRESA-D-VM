@@ -11,7 +11,7 @@ const addrOf = (s) => (/<([^>]+)>/.exec(s)?.[1] ?? String(s)).trim();
 const wrap76 = (s) => s.match(/.{1,76}/g)?.join("\r\n") ?? "";
 
 /** Mensaje completo (cabeceras + cuerpo en UTF-8 codificado en base64). */
-export function buildMessage({ from, to, subject, text, date = new Date(), messageId }) {
+export function buildMessage({ from, to, subject, text, date = new Date(), messageId, headers: extra = [], attachments = [] }) {
   const host = addrOf(from).split("@")[1] ?? "localhost";
   const headers = [
     `From: ${from}`,
@@ -22,8 +22,15 @@ export function buildMessage({ from, to, subject, text, date = new Date(), messa
     "MIME-Version: 1.0",
     "Content-Type: text/plain; charset=utf-8",
     "Content-Transfer-Encoding: base64",
+    ...extra.filter((h) => /^[A-Za-z-]+: [^\r\n]+$/.test(h)), // cabeceras añadidas (p. ej. List-Unsubscribe): una línea cada una, sin saltos
   ];
-  return headers.join("\r\n") + "\r\n\r\n" + wrap76(b64(text)) + "\r\n";
+  if (!attachments.length) return headers.join("\r\n") + "\r\n\r\n" + wrap76(b64(text)) + "\r\n";
+  // Con adjuntos (p. ej. el PDF del pedido): multipart/mixed = el texto y cada archivo en base64
+  const b = "vm-" + crypto.randomUUID().replaceAll("-", ""), cab = headers.filter((h) => !/^Content-(Type|Transfer-Encoding):/i.test(h)).concat(`Content-Type: multipart/mixed; boundary="${b}"`);
+  const nombre = (f) => String(f).replace(/[^\w.\- ]/g, "_").slice(0, 80) || "adjunto";
+  const partes = [`--${b}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap76(b64(text))}\r\n`];
+  for (const a of attachments) partes.push(`--${b}\r\nContent-Type: ${/^[\w.+-]+\/[\w.+-]+$/.test(a.contentType ?? "") ? a.contentType : "application/octet-stream"}; name="${nombre(a.filename)}"\r\nContent-Disposition: attachment; filename="${nombre(a.filename)}"\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap76(Buffer.from(a.data).toString("base64"))}\r\n`);
+  return cab.join("\r\n") + "\r\n\r\n" + partes.join("") + `--${b}--\r\n`;
 }
 
 /** Lector de respuestas SMTP (pueden venir en varias líneas «250-…», «250 …»). */
