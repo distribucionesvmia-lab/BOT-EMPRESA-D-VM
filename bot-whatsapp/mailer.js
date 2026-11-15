@@ -124,10 +124,10 @@ export async function sendMail(cfg, msg) {
       if (/\bLOGIN\b/.test(auth)) {
         await c.cmd("AUTH LOGIN", [334]);
         await c.cmd(b64(user), [334]);
-        const r = await c.cmd(b64(pass ?? ""), [235, 334, 535]).catch((e) => { throw e; });
+        const r = await c.cmd(b64(pass ?? ""), [235, 334, 534, 535]).catch((e) => { throw e; });
         if (r.code !== 235) throw errorDeCredenciales(r, { host, port, user, pass });
       } else {
-        const r = await c.cmd(`AUTH PLAIN ${b64(`\0${user}\0${pass ?? ""}`)}`, [235, 535]);
+        const r = await c.cmd(`AUTH PLAIN ${b64(`\0${user}\0${pass ?? ""}`)}`, [235, 534, 535]);
         if (r.code !== 235) throw errorDeCredenciales(r, { host, port, user, pass });
       }
     }

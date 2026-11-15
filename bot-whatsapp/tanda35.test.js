@@ -101,3 +101,10 @@ test("CORREO DEL PEDIDO: correo opcional al enviar, va con el PDF adjunto, manda
   assert.match(sv, /El correo no parece válido\. Revísalo o déjalo en blanco\./); assert.match(sv, /correoCuentaSiVacio\(account\.id, correoEscrito\)/);
   assert.ok(c.indexOf('id="resCorreoBloque"') > c.indexOf('id="resDia"') && c.indexOf('id="resCorreoBloque"') < c.indexOf('id="pedRes"'), "el correo va después de la entrega y antes del importe");
 });
+
+test("CORREO: un bloqueo de Google (534 «WebLoginRequired») se explica en claro, igual que un 535", async () => {
+  const { errorDeCredenciales } = await import("./mailer.js");
+  const e = errorDeCredenciales({ code: 534, text: "5.7.9 Please log in with your web browser and then try again. For more information, go to https://support.google.com/mail/?p=WebLoginRequired" }, { host: "smtp.gmail.com", port: 587, user: "a@gmail.com", pass: "abcdefghijklmnop" });
+  assert.match(e.message, /534/); assert.match(e.message, /bloqueado el acceso hasta que lo confirmes/); assert.match(e.message, /Seguridad/);
+  const fuente = leer("./mailer.js"); assert.match(fuente, /\[235, 334, 534, 535\]/); assert.match(fuente, /\[235, 534, 535\]/); // el 534 también llega a ese mensaje, no a un «respondió 534» crudo
+});
