@@ -554,7 +554,7 @@
         <div class="acciones"><input type="file" id="fz-fichero" accept=".zip,application/zip" aria-label="Archivo ZIP con las fotos"><button type="button" class="main" id="fz-revisar" disabled>Revisar el zip</button><span class="muted" id="fz-msg" role="status"></span></div>
         <div id="fz-res" hidden>
           <p id="fz-resumen" style="margin:12px 0 6px"></p>
-          <label class="muted" style="display:flex;gap:8px;align-items:center;margin:0 0 8px"><input type="checkbox" id="fz-forzar"> Cambiar también las que ya tienen una foto igual o más grande</label>
+          <label class="muted" style="display:flex;gap:8px;align-items:center;margin:0 0 8px"><input type="checkbox" id="fz-forzar" checked> Cambiar TODAS las fotos por las del zip (quita la marca para no tocar las que ya tienen una foto igual o más grande)</label>
           <div class="scroll"><table><thead><tr><th><input type="checkbox" id="fz-todas" checked aria-label="Marcar o desmarcar todas"></th><th>Artículo</th><th>Foto del zip</th><th>Tamaño</th><th>Qué pasa</th></tr></thead><tbody id="fz-lista"></tbody></table></div>
           <div class="acciones"><button type="button" class="main" id="fz-aplicar">Poner las fotos marcadas</button><span class="muted" id="fz-msg2" role="status"></span></div>
           <details style="margin-top:10px"><summary>Fotos dudosas (<span id="fz-n-dud">0</span>): hay que elegirlas a mano</summary><ul id="fz-dud" class="muted"></ul></details>
@@ -1262,7 +1262,7 @@ async function avisarArticulo(a, boton) {
 const recargarArticulos = () => { clearTimeout(tAr); tAr = setTimeout(() => { pagAr = 0; articulos().catch((e) => ($("ar-msg").textContent = e.message)); }, 300); };
 // ---- Poner fotos desde un ZIP (revisar → marcar → poner) ----
 {
-  let rev = null; const f = $("fz-fichero"), ESTADO = { nueva: "Foto nueva", mejor: "Sustituye a una más pequeña", ya_mejor: "Ya tiene una igual o más grande" };
+  let rev = null; const f = $("fz-fichero"), ESTADO = { nueva: "Foto nueva", mejor: "Sustituye a una más pequeña", ya_mejor: "Sustituye a una igual o más grande" };
   const marcadas = () => [...$("fz-lista").querySelectorAll("input[type=checkbox]:checked")].map((c) => c.value);
   const contar = () => { const n = marcadas().length; $("fz-aplicar").textContent = `Poner las ${n} fotos marcadas`; $("fz-aplicar").disabled = !n; };
   const pintaFilas = () => {
@@ -1283,11 +1283,11 @@ const recargarArticulos = () => { clearTimeout(tAr); tAr = setTimeout(() => { pa
       const r = await fetch("/api/admin/fotos/zip", { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": "application/zip" }, body: fi }), j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "No se ha podido revisar el zip.");
       rev = j; $("fz-msg").textContent = "";
-      $("fz-resumen").textContent = `El zip trae ${j.total} fotos: ${j.filas.length} se emparejan con un artículo, ${j.dudosas.length} son dudosas y ${j.sin.length} no tienen artículo parecido${j.ignoradas.length ? `; ${j.ignoradas.length} se han ignorado (no eran fotos válidas)` : ""}. Todavía no se ha cambiado nada.`;
+      $("fz-resumen").textContent = `El zip trae ${j.total} fotos: ${j.filas.length} se emparejan con un artículo, ${j.dudosas.length} son dudosas y ${j.sin.length} no tienen artículo parecido${j.ignoradas.filter((x) => x.motivo !== "no es una foto").length ? `; ${j.ignoradas.filter((x) => x.motivo !== "no es una foto").length} fotos no se pueden usar (pesan más de 6 MB o son demasiado pequeñas)` : ""}. Todavía no se ha cambiado nada.`;
       $("fz-n-dud").textContent = j.dudosas.length; $("fz-n-sin").textContent = j.sin.length;
       $("fz-dud").textContent = ""; for (const d of j.dudosas) $("fz-dud").appendChild(el("li", `${d.foto.split("/").pop()} → quizá: ${d.candidatos.join(" / ")}`));
       $("fz-sin").textContent = ""; for (const s of j.sin) $("fz-sin").appendChild(el("li", s.split("/").pop()));
-      $("fz-todas").checked = true; $("fz-forzar").checked = false; pintaFilas(); $("fz-res").hidden = false; $("fz-msg2").textContent = "";
+      $("fz-todas").checked = true; $("fz-forzar").checked = true; pintaFilas(); $("fz-res").hidden = false; $("fz-msg2").textContent = "";
     } catch (e) { $("fz-msg").textContent = e.message; } finally { $("fz-revisar").disabled = !f.files[0]; }
   };
   $("fz-forzar").onchange = pintaFilas;
@@ -1299,7 +1299,7 @@ const recargarArticulos = () => { clearTimeout(tAr); tAr = setTimeout(() => { pa
     try {
       const r = await fetch("/api/admin/fotos/zip/aplicar", { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": "application/json" }, body: JSON.stringify({ token: rev.token, ids, forzar: $("fz-forzar").checked, confirmo: true }) }), j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "No se han podido poner las fotos.");
-      $("fz-msg2").textContent = `Hecho: ${j.hechas} fotos puestas${j.saltadas.length ? `, ${j.saltadas.length} sin cambiar (${j.saltadas.slice(0, 3).map((x) => x.id + ": " + x.motivo).join("; ")}${j.saltadas.length > 3 ? "…" : ""})` : ""}. Los clientes las verán en un minuto.`;
+      $("fz-msg2").textContent = `Hecho: ${j.hechas} fotos puestas${j.saltadas.length ? `, ${j.saltadas.length} no se han podido poner (${j.saltadas.slice(0, 3).map((x) => x.id + ": " + x.motivo).join("; ")}${j.saltadas.length > 3 ? "…" : ""})` : ""}. Los clientes las verán en un minuto.`;
       rev = null; $("fz-lista").textContent = ""; $("fz-aplicar").disabled = true; recargarArticulos();
     } catch (e) { $("fz-msg2").textContent = e.message; $("fz-aplicar").disabled = false; }
   };
