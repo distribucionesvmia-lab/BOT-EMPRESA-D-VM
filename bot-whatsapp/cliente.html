@@ -704,6 +704,7 @@
   input:focus, textarea:focus, select:focus, input:focus-visible, textarea:focus-visible { outline:3px solid var(--accent) !important; outline-offset:1px; box-shadow:none !important; }
   .autor-pie { margin:var(--s3, 12px) 0 0; font-size:calc(var(--t-micro, 12px) / var(--k,1)); color:var(--text-2); text-align:center; line-height:1.45; } .autor-pie b { font-weight:600; color:var(--text); }
   .autor-pie details { margin-top:4px; } .autor-pie summary { cursor:pointer; color:var(--accent); font-weight:600; display:block; text-align:center; padding:6px 4px; } .autor-pie .autor-txt { text-align:left; margin-top:6px; padding:10px 12px; background:var(--surface-2, var(--field, transparent)); border-radius:10px; } .autor-pie .autor-txt p { margin:0 0 6px; }
+.trampa{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}.ts-hueco{min-height:0;margin:8px 0}
 </style>
 </head>
 <body>
@@ -733,7 +734,7 @@
         <label id="l-nif" hidden>Primeros 6 dígitos del DNI o CIF (o tu código de entrada)<input id="a-nif" type="text" inputmode="numeric" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 123456" aria-describedby="a-aviso a-err"></label>
         <div class="pista" id="a-aviso" role="status" aria-live="polite"></div>
         <button class="vm-link" type="button" id="nif-letras" hidden>Mi código tiene letras: usar el teclado completo</button>
-        <div class="err" id="a-err" role="alert"></div><div class="okmsg" id="a-ok" role="status"></div>
+        <div class="ts-hueco" id="ts-acceso" hidden></div><div class="err" id="a-err" role="alert"></div><div class="okmsg" id="a-ok" role="status"></div>
         <button class="vm-btn primary">Entrar</button>
         <div data-privacidad></div>
       </form>
@@ -778,6 +779,8 @@
         <label>Correo electrónico <small class="pista">(opcional)</small><input id="r-mail" type="email" autocomplete="email" aria-describedby="e-r-mail"><small class="err-campo" id="e-r-mail" role="alert"></small></label>
         <label>Elige un código de entrada de 6 letras o números <b class="req" aria-hidden="true">*</b><input id="r-pin" type="password" maxlength="6" autocapitalize="off" autocomplete="new-password" aria-required="true" aria-describedby="e-r-pin"><small class="err-campo" id="e-r-pin" role="alert"></small></label>
         <label>Repite el código de entrada <b class="req" aria-hidden="true">*</b><input id="r-pin2" type="password" maxlength="6" autocapitalize="off" autocomplete="new-password" aria-required="true" aria-describedby="e-r-pin2"><small class="err-campo" id="e-r-pin2" role="alert"></small></label>
+        <div class="trampa" aria-hidden="true"><label>No rellenar este campo<input id="r-web" name="sitio_web" tabindex="-1" autocomplete="off"></label></div>
+        <div class="ts-hueco" id="ts-alta"></div>
         <div class="err" id="r-err" role="alert"></div><div class="okmsg" id="r-ok" role="status"></div>
         <button class="vm-btn primary">Enviar solicitud</button>
         <p style="font-size:calc(13px / var(--k,1));color:var(--text-2,#555)">Usaremos estos datos solo para tu alta y tus pedidos. El DNI/NIE/CIF solo sirve para darte de alta y se borra al resolverla.</p>
@@ -972,11 +975,11 @@ $("f-registro").onsubmit = (e) => {
   for (const id of Object.keys(reglasAlta)) { const m = reglasAlta[id]($(id).value); errCampo(id, m); if (m) malos.push(id); }
   if (malos.length) { $("r-err").textContent = malos.length === 1 ? "Hay 1 campo por corregir (marcado en rojo)." : `Hay ${malos.length} campos por corregir (marcados en rojo).`; $(malos[0]).focus(); return; }
   return enviando($("f-registro"), $("f-registro").querySelector("button.primary"), async () => {
-  const r = await post("/api/registro", { empresa: $("r-emp").value, telefono: $("r-tel").value, correo: $("r-mail").value, nif: $("r-nif").value, pin: $("r-pin").value, direccion: $("r-dir").value });
+  const r = await post("/api/registro", { empresa: $("r-emp").value, telefono: $("r-tel").value, correo: $("r-mail").value, nif: $("r-nif").value, pin: $("r-pin").value, direccion: $("r-dir").value, sitio_web: $("r-web").value, cf: tsToken["ts-alta"] || undefined });
   const j = await r.json().catch(() => ({}));
   if (r.ok) {
     $("f-registro").reset(); altaHecha(j.estado === "activa");
-  } else $("r-err").textContent = j.error || "No se pudo enviar la solicitud.";
+  } else { $("r-err").textContent = j.error || "No se pudo enviar la solicitud."; if (j.verificacion) tsPinta("ts-alta"); }
   }, "r-err");
 };
 
@@ -1053,13 +1056,30 @@ function validaAcceso() {
   if (!$("l-emp").hidden && $("a-emp").value.trim().length < 2) return fallo("a-emp", "Escribe el nombre de tu empresa.");
   return true;
 }
+// «No soy un robot» (Cloudflare Turnstile): solo si la empresa ha puesto sus claves; el alta lo pide siempre y el acceso solo tras muchos intentos
+let tsClave = null, tsListo = null; const tsToken = {}, tsId = {};
+function tsCargar() {
+  if (tsListo) return tsListo;
+  return (tsListo = fetch("/api/seguridad").then((r) => r.json()).then((j) => {
+    tsClave = j.turnstile || null; if (!tsClave) return null;
+    return new Promise((ok) => { const s = document.createElement("script"); s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true; s.onload = () => ok(window.turnstile); s.onerror = () => ok(null); document.head.appendChild(s); });
+  }).catch(() => null));
+}
+async function tsPinta(hueco) {
+  const ts = await tsCargar(); const el = $(hueco); if (!ts || !tsClave || !el) return;
+  el.hidden = false; if (tsId[hueco] != null) { try { ts.reset(tsId[hueco]); } catch {} tsToken[hueco] = null; return; }
+  tsId[hueco] = ts.render(el, { sitekey: tsClave, callback: (tk) => { tsToken[hueco] = tk; }, "expired-callback": () => { tsToken[hueco] = null; }, "error-callback": () => { tsToken[hueco] = null; } });
+}
+tsCargar().then((ts) => { if (ts) tsPinta("ts-alta"); });
 $("f-acceso").onsubmit = (e) => {
   e.preventDefault(); $("a-err").textContent = "";
   if (!validaAcceso()) return;
   return enviando($("f-acceso"), $("f-acceso").querySelector("button.primary"), async () => {
   const body = conPin ? { telefono: $("a-tel").value, ...(!$("l-emp").hidden && { empresa: $("a-emp").value }), pin: $("a-pin").value } : { nif: limpia("a-nif"), ...(!$("l-emp").hidden && { empresa: $("a-emp").value }) };
-  const r = await post("/api/acceso", body);
+  if (tsToken["ts-acceso"]) body.cf = tsToken["ts-acceso"];
+  const r = await post("/api/acceso", body); if (body.cf) { tsToken["ts-acceso"] = null; tsPinta("ts-acceso"); } // cada comprobación vale una sola vez
   const j = await r.json().catch(() => ({}));
+  if (j.necesitaVerificacion) { $("a-err").textContent = j.error; tsPinta("ts-acceso"); return; }
   if (j.necesitaNombre) { $("l-emp").hidden = false; $("a-emp").required = true; $("a-emp").focus(); $("a-err").textContent = j.error; return; } // se conserva lo escrito // mismo NIF en varios negocios: pide el nombre
   if (!r.ok) { const f = $("f-acceso"); f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); $("a-err").textContent = j.error || "No se pudo entrar."; if (conPin) { $("a-pin").value = ""; $("a-pin").focus(); } return; } // solo se borra el código si es incorrecto; el teléfono, el nombre y el NIF se quedan para corregirlos
   $("f-acceso").reset(); $("a-aviso").textContent = ""; entrar(j.cliente.nombre);

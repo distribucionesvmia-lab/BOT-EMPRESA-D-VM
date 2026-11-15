@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import { normalizePhone, validEmail, pinValido } from "./cuentas-db.js";
 import { nifCodes, nifClean } from "./nif-codes.js";
 import { codeKey, validCode } from "./nif-key.js";
+import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad } from "./seguridad.js";
 
 const COOKIE = "vm_session";
 const MENSAJE_ELIMINADA = "Esta cuenta se eliminó. Si quieres volver a usar la aplicación, llámanos o solicita el alta de nuevo.";
@@ -62,7 +63,7 @@ function readJson(req, max = 20_000) {
     req.on("error", () => resolve(null));
   });
 }
-const send = (res, code, data, headers = {}) => res.writeHead(code, { ...JSON_HEADERS, ...headers }).end(JSON.stringify(data));
+const send = (res, code, data, headers = {}) => res.writeHead(code, { ...cabecerasSeguridad(), ...JSON_HEADERS, ...headers }).end(JSON.stringify(data));
 const sameToken = (a, b) => {
   const x = crypto.createHash("sha256").update(String(a)).digest();
   const y = crypto.createHash("sha256").update(String(b)).digest();
@@ -92,6 +93,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const nifGlobalFails = rateLimiter(Number(process.env.NIF_GLOBAL_FAILS ?? 15), 60 * 60_000); // fallos de NIF por hora, entre todos los clientes
   const usoLimit = rateLimiter(300, 10 * 60_000); // contadores: muchos permitidos, pero no infinitos por IP
   const registerLimit = rateLimiter(Number(process.env.REGISTER_LIMIT ?? 20), 60 * 60_000);
+  const intentosAcceso = contadorIntentos(Number(process.env.CAPTCHA_DESPUES_DE ?? 5), 10 * 60_000); // pasados N intentos en 10 min desde una dirección, se pide «no soy un robot»
   const ip = (req) => (trustProxy ? String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim() : "") || req.socket.remoteAddress || "?";
   const cookie = (token, maxAge) => `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? "; Secure" : ""}`;
 
@@ -130,10 +132,14 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     }
     if (!p.startsWith("/api/")) return false;
 
+    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null }), true; // solo la clave PÚBLICA, si está activada
+
     if (p === "/api/registro" && req.method === "POST") {
-      if (!registerLimit(ip(req))) return demasiados(res, registerLimit, ip(req)), true;
+      if (!registerLimit(ip(req))) return eventoSeguridad("muchas-solicitudes-de-alta", ip(req)), demasiados(res, registerLimit, ip(req)), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
+      if (String(b.sitio_web ?? "").trim()) return eventoSeguridad("alta-con-campo-trampa", ip(req)), send(res, 200, { ok: true, estado: "pendiente" }), true; // campo oculto relleno = un bot: se finge que ha ido bien y no se guarda nada
+      if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("alta-sin-comprobacion-robot", ip(req)), send(res, 400, { error: "No hemos podido comprobar que no eres un robot. Recarga la página e inténtalo de nuevo.", verificacion: true }), true;
       const empresa = String(b.empresa ?? "").trim().replace(/\s+/g, " ");
       const correo = String(b.correo ?? "").trim();
       const pin = String(b.pin ?? "");
@@ -163,6 +169,9 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (!loginLimit(ip(req))) return demasiados(res, loginLimit, ip(req)), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
+      if (turnstileActivo() && intentosAcceso.pasado(intentosAcceso.suma(ip(req)))) { // muchos intentos seguidos: a partir de aquí, «no soy un robot»
+        if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
+      }
       const empresa = String(b.empresa ?? "").slice(0, 80);
       // Cliente habitual: solo los 6 primeros dígitos del DNI/CIF (el nombre es opcional: si se envía, estrecha la búsqueda)
       if (b.nif !== undefined) {

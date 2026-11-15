@@ -10,6 +10,7 @@ import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder, totals } from "./pricing.js";
 import { createAuth, rateLimiter } from "./auth.js";
+import { cabecerasSeguridad, CSP, eventoSeguridad } from "./seguridad.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
 import { estadoSistema, crearVigilante } from "./monitor.js";
@@ -50,6 +51,7 @@ import { enviarCampanas } from "./correo-campanas.js";
 import { crearCorreoCliente, smtpDesdeEntorno, elegirDestino, tapar, emailValido } from "./correo-cliente.js";
 import { zip as zipNode } from "./zip.js";
 import { limpiaError, navegadorCorto } from "./errores.js";
+const pedidosLimite = rateLimiter(Number(process.env.PEDIDOS_LIMIT ?? 30), 3600e3); // pedidos enviados por cliente y hora (aunque alguien robara un código, no podría mandar cientos)
 const latidoLimite = rateLimiter(Number(process.env.LATIDO_LIMIT ?? 20), 60e3); // latidos por minuto y cliente (el normal es 1 cada 45 s)
 const errLimitCliente = rateLimiter(Number(process.env.ERR_LIMIT ?? 30), 3600e3), errLimitIp = rateLimiter(Number(process.env.ERR_LIMIT_IP ?? 60), 3600e3); // avisos de error por hora: por cliente y, sin sesión, por dirección
 import { puedeEditarPedido, plazoModificacion, longDate, weekday, addDays } from "./delivery.js";
@@ -206,7 +208,7 @@ const conGzip = (res, headers, body) => {
   if (buf.length < 1024 || !/\bgzip\b/.test(String(res.req?.headers?.["accept-encoding"] ?? ""))) return [headers, buf];
   return [{ ...headers, "Content-Encoding": "gzip", Vary: "Accept-Encoding" }, zlib.gzipSync(buf, { level: 6 })];
 };
-const enviar = (res, code, headers, body) => { const [h, b] = conGzip(res, headers, body); return res.writeHead(code, h).end(b); };
+const enviar = (res, code, headers, body) => { const [h, b] = conGzip(res, { ...cabecerasSeguridad(), ...headers }, body); return res.writeHead(code, h).end(b); };
 
 // Respuesta con ETag: si el navegador ya tiene exactamente lo mismo (If-None-Match), se contesta 304 sin cuerpo (el catálogo pesa más de 1 MB)
 const sendJsonEtag = (req, res, data) => {
@@ -531,7 +533,7 @@ function imgs() {
 }
 const imgUrl = (id) => (imgs().has(id) ? `/img/${encodeURIComponent(id)}?v=${imgVer.get(id) ?? 0}` : null); // ?v= cambia al cambiar la foto: el móvil no se queda con la antigua guardada
 const imgEsIa = (id) => (imgs(), imgIa.has(String(id)));
-const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow" };
+const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow", "Content-Security-Policy": CSP };
 const sendJson = (res, code, data) => enviar(res, code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify(data));
 
 // «Tu pedido de siempre» que el cliente ha editado o borrado: cambia la tarjeta del Inicio (sin fila guardada sale el último pedido, como siempre)
@@ -918,6 +920,7 @@ async function appRoutes(req, res, url) {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     if (account.soloVer) return void sendJson(res, 403, { error: SOLO_VER_TEXTO, soloVer: true }); // enlace de «solo ver»: el servidor no deja enviar pedidos, se haga como se haga
     if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
+    if (!pedidosLimite(String(account.id))) { eventoSeguridad("demasiados-pedidos", `cuenta ${account.id}`); return void sendJson(res, 429, { error: "Has enviado muchos pedidos en poco tiempo. Si necesitas más, llámanos y lo hacemos contigo." }); }
     const body = await readJson(req);
     const key = typeof body?.key === "string" && /^[\w-]{8,64}$/.test(body.key) ? body.key : null;
     if (!key) return void sendJson(res, 400, { error: "Solicitud no válida" });

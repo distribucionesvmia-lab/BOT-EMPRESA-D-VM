@@ -1,0 +1,51 @@
+// Protección contra bots y abusos: campo trampa, comprobación «no soy un robot» (Cloudflare Turnstile, opcional) y cabeceras de seguridad.
+// Todo es opcional y seguro por defecto: sin TURNSTILE_SITE / TURNSTILE_SECRET en la configuración, la comprobación no se pide.
+const SITE = () => String(process.env.TURNSTILE_SITE ?? "").trim();
+const SECRET = () => String(process.env.TURNSTILE_SECRET ?? "").trim();
+export const turnstileSite = () => (SITE() && SECRET() ? SITE() : ""); // solo se activa si están las DOS claves
+export const turnstileActivo = () => !!turnstileSite();
+
+/** Comprueba el «no soy un robot» con Cloudflare. Sin claves: vale. Con claves y sin respuesta de Cloudflare: vale (no se deja fuera a los clientes si Cloudflare falla). */
+export async function verificarTurnstile(token, ip, fetchFn = globalThis.fetch) {
+  if (!turnstileActivo()) return { ok: true };
+  if (typeof token !== "string" || token.length < 10 || token.length > 4096) return { ok: false };
+  try {
+    const cuerpo = new URLSearchParams({ secret: SECRET(), response: token }); if (ip && ip !== "?") cuerpo.set("remoteip", ip);
+    const r = await fetchFn("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: cuerpo, signal: AbortSignal.timeout(4000) });
+    const j = await r.json();
+    return { ok: j?.success === true };
+  } catch { return { ok: true, sinRespuesta: true }; }
+}
+
+/** Intentos por dirección en una ventana: pasado el tope, se pide la comprobación «no soy un robot». */
+export function contadorIntentos(tope, ventanaMs) {
+  const m = new Map();
+  return {
+    suma(clave) { const ahora = Date.now(), e = m.get(clave); if (!e || ahora - e.t > ventanaMs) { m.set(clave, { n: 1, t: ahora }); return 1; } e.n++; return e.n; },
+    pasado: (n) => n > tope,
+  };
+}
+
+let ultimoAviso = new Map();
+/** Anota un hecho sospechoso en el registro del programa (C:\vm\logs). Como máximo uno por tipo cada minuto, para no llenarlo. */
+export function eventoSeguridad(tipo, detalle = "") {
+  const ahora = Date.now();
+  if (ahora - (ultimoAviso.get(tipo) ?? 0) < 60_000) return;
+  ultimoAviso.set(tipo, ahora); if (ultimoAviso.size > 50) ultimoAviso = new Map([[tipo, ahora]]);
+  console.warn(`[VM seguridad] ${tipo}${detalle ? " · " + detalle : ""}`);
+}
+
+/** Cabeceras para todas las respuestas del cliente. HSTS solo si HSTS=1 (cuando ya hay HTTPS delante, p. ej. Cloudflare). */
+export const CSP = [
+  "default-src 'self'", "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com", "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:", "font-src 'self' data:", "connect-src 'self'", "frame-src 'self' blob: https://challenges.cloudflare.com",
+  "object-src 'self'", "worker-src 'self'", "manifest-src 'self'", "base-uri 'self'", "form-action 'self'", "frame-ancestors 'self'",
+].join("; ");
+export function cabecerasSeguridad() {
+  return {
+    "X-Content-Type-Options": "nosniff", "X-Frame-Options": "SAMEORIGIN", "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    ...(process.env.HSTS === "1" ? { "Strict-Transport-Security": "max-age=31536000" } : {}),
+  };
+}

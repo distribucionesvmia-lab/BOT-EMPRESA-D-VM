@@ -1563,3 +1563,21 @@ test("FOTOS DE ARTÍCULOS (panel): solo con la clave, comprueba que es una foto 
   const lista = (await call("GET", "/api/admin/articulos?q=1001", { admin: true })).json; assert.ok(lista.filas.length && "foto" in lista.filas[0] && "existe" in lista.filas[0].foto);
   assert.equal((await call("GET", "/api/admin/articulos?filtro=sinfoto", { admin: true })).status, 200); assert.equal((await call("GET", "/api/admin/articulos?filtro=fotopequena", { admin: true })).status, 200);
 });
+
+test("SEGURIDAD: campo trampa, cabeceras, y la clave de «no soy un robot» solo si está configurada", async () => {
+  // Un bot que rellena el campo oculto: parece que va bien, pero no se guarda nada
+  const antes = (await call("GET", "/api/admin/solicitudes", { admin: true })).json.length;
+  const bot = await call("POST", "/api/registro", { body: { telefono: "600555123", correo: "bot@ejemplo.es", empresa: "Empresa Bot Falsa", pin: "111111", nif: "12345678Z", sitio_web: "http://spam.example" } });
+  assert.equal(bot.status, 200);
+  assert.equal((await call("GET", "/api/admin/solicitudes", { admin: true })).json.length, antes);
+  assert.equal((await call("GET", "/api/admin/cuentas", { admin: true })).json.some((c) => c.phone === "600555123"), false);
+  // Cabeceras de seguridad en la página y en la API
+  const pagina = await fetch(BASE + "/cliente");
+  const csp = pagina.headers.get("content-security-policy");
+  assert.match(csp, /frame-ancestors 'self'/); assert.match(csp, /object-src 'self'/); assert.match(csp, /default-src 'self'/);
+  assert.equal(pagina.headers.get("x-content-type-options"), "nosniff");
+  const api = await call("GET", "/api/seguridad");
+  assert.equal(api.headers.get("x-frame-options"), "SAMEORIGIN");
+  assert.equal(api.json.turnstile, null); // sin claves en la configuración, no se pide nada
+  assert.equal(api.headers.get("strict-transport-security"), null); // HSTS solo con HSTS=1
+});
