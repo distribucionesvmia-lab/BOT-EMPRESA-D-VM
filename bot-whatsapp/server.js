@@ -10,7 +10,7 @@ import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder, totals } from "./pricing.js";
 import { createAuth, rateLimiter } from "./auth.js";
-import { cabecerasSeguridad, CSP, eventoSeguridad, usarRegistro, ipDe, claveDebil, crearEscudo } from "./seguridad.js";
+import { cabecerasSeguridad, CSP, eventoSeguridad, usarRegistro, ipDe, claveDebil, crearEscudo, origenAjeno, panelPermitido } from "./seguridad.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
 import { estadoSistema, crearVigilante } from "./monitor.js";
@@ -969,10 +969,22 @@ async function appRoutes(req, res, url) {
 // Escudo general: en la app pública frena inundaciones y escáneres por dirección (ESCUDO=0 lo apaga; ESCUDO_POR_MINUTO cambia el tope). No actúa en la app de la empresa (red local) ni en pruebas.
 const escudo = clientEnabled && !adminEnabled && process.env.ESCUDO !== "0" && process.env.DEMO !== "1" && (!process.env.VM_TEST || process.env.ESCUDO === "1")
   ? crearEscudo({ porMinuto: Number(process.env.ESCUDO_POR_MINUTO ?? 300), estaticoPorMinuto: Number(process.env.ESCUDO_ESTATICO_POR_MINUTO ?? 1500) }) : null;
+const panelExtra = String(process.env.PANEL_IPS_EXTRA ?? "").split(/[,;\s]+/).filter(Boolean);
+const origenesPropios = [process.env.PUBLIC_URL, process.env.CLIENTE_URL].filter(Boolean); // otros dominios propios que pueden mandar formularios
 const servidorHttp = http
   .createServer((req, res) => {
     let url;
     try { url = new URL(req.url, "http://x"); } catch { return void res.writeHead(400).end(); }
+    // Puerta del panel: solo desde la propia máquina o la red de la oficina (PANEL_PERMITIR_PUBLICO=1 lo desactiva; PANEL_IPS_EXTRA="1.2.3.4,..." añade direcciones)
+    if (adminEnabled && process.env.PANEL_PERMITIR_PUBLICO !== "1" && url.pathname !== "/health" && (!clientEnabled || url.pathname.startsWith("/api/admin") || url.pathname === "/empresa") && !panelPermitido(req, panelExtra)) {
+      eventoSeguridad("panel-desde-fuera", `${req.socket?.remoteAddress ?? "?"} ${req.method} ${url.pathname.slice(0, 40)}`);
+      return void res.writeHead(404, { "Cache-Control": "no-store" }).end(); // ni siquiera se dice que existe
+    }
+    // Una web ajena no puede mandar órdenes con la sesión del cliente o del panel (CSRF): se rechaza lo que cambia algo y no viene de nosotros
+    if (url.pathname !== "/webhook") {
+      const ajeno = origenAjeno(req, origenesPropios);
+      if (ajeno) { eventoSeguridad("peticion-de-otra-web", `${ajeno} ${req.method} ${url.pathname.slice(0, 40)}`); return void res.writeHead(403, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...cabecerasSeguridad() }).end('{"error":"Petición no permitida desde otra web"}'); }
+    }
     if (escudo && url.pathname !== "/health" && url.pathname !== "/webhook") {
       const dir = ipDe(req, process.env.TRUST_PROXY === "1"), corte = escudo.revisa(dir, url.pathname + (url.search ? "?" : ""));
       if (corte) {

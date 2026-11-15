@@ -48,6 +48,7 @@ export const claveDebil = (c) => {
 let ultimoAviso = new Map();
 /** Anota un hecho sospechoso en el registro del programa (C:\vm\logs). Como máximo uno por tipo cada minuto, para no llenarlo. */
 export function eventoSeguridad(tipo, detalle = "") {
+  detalle = String(detalle).replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, " ").slice(0, 200); // una dirección o texto con saltos de línea no puede falsear el registro
   registrarSeguridad(tipo, detalle);
   const ahora = Date.now();
   if (ahora - (ultimoAviso.get(tipo) ?? 0) < 60_000) return;
@@ -70,7 +71,7 @@ export function cabecerasSeguridad() {
   return {
     "X-Content-Type-Options": "nosniff", "X-Frame-Options": "SAMEORIGIN", "Referrer-Policy": "no-referrer",
     "Permissions-Policy": "camera=(), geolocation=(), payment=(), usb=(), microphone=(self)",
-    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Opener-Policy": "same-origin", "Cross-Origin-Resource-Policy": "same-origin", "X-Permitted-Cross-Domain-Policies": "none", "X-DNS-Prefetch-Control": "off",
     ...(process.env.HSTS === "1" ? { "Strict-Transport-Security": "max-age=31536000" } : {}),
   };
 }
@@ -108,4 +109,45 @@ export function crearEscudo({ porMinuto = 300, estaticoPorMinuto = 1500, banMin 
     },
     bloqueadas: () => bloqueos.size,
   };
+}
+
+// ───────── Cuarta capa: peticiones de otras webs (CSRF) y puerta del panel ─────────
+const METODOS_SEGUROS = new Set(["GET", "HEAD", "OPTIONS"]);
+const hostDe = (u) => { try { return new URL(u).host.toLowerCase(); } catch { return ""; } };
+/**
+ * ¿Una petición que CAMBIA algo viene de otra web? Los navegadores dicen de dónde sale (Sec-Fetch-Site / Origin) y una web ajena no puede mentir.
+ * Devuelve el motivo si hay que rechazarla o null si puede pasar. Lo que no es un navegador (la conexión MCP, Meta, pruebas) no manda esas
+ * cabeceras y no lleva la cookie de nadie, así que pasa. `permitidos`: otros dominios propios (PUBLIC_URL, CLIENTE_URL).
+ */
+export function origenAjeno(req, permitidos = []) {
+  if (METODOS_SEGUROS.has(String(req.method).toUpperCase())) return null;
+  const sfs = String(req.headers["sec-fetch-site"] ?? "").toLowerCase();
+  if (sfs && sfs !== "same-origin" && sfs !== "none") return `sec-fetch-site=${sfs}`;
+  const origen = req.headers.origin;
+  if (origen !== undefined) {
+    const o = String(origen);
+    if (o === "null") return "origin=null";
+    const h = hostDe(o), propios = [String(req.headers.host ?? "").toLowerCase(), ...permitidos.map((p) => hostDe(p) || String(p).toLowerCase())];
+    if (!h || !propios.includes(h)) return `origin=${o.slice(0, 40)}`;
+  }
+  return null;
+}
+/** ¿Es una dirección de la propia máquina o de una red privada (oficina, Tailscale)? IPv4 e IPv6, también «::ffff:a.b.c.d». */
+export function esRedPrivada(ip) {
+  let s = String(ip ?? "").toLowerCase().replace(/^::ffff:/, "").replace(/%.*$/, "");
+  if (s === "::1" || s === "localhost") return true;
+  if (/^f[cd][0-9a-f]{2}:/.test(s) || /^fe[89ab][0-9a-f]:/.test(s)) return true; // IPv6 privada y de enlace local
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s); if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254);
+}
+/**
+ * Puerta del panel: solo se atiende desde la propia máquina o la red de la oficina (o Tailscale). Si alguien publica el 3001 por error, desde
+ * internet no se abre ni con la clave. Se mira la conexión real Y, si viene por un túnel, la dirección que dice Cloudflare (el túnel entra por
+ * la propia máquina, pero Cloudflare pone la dirección pública de quien llama). `extra`: direcciones concretas permitidas (PANEL_IPS_EXTRA).
+ */
+export function panelPermitido(req, extra = []) {
+  const real = String(req.socket?.remoteAddress ?? ""), cf = String(req.headers?.["cf-connecting-ip"] ?? "").trim(), xf = String(req.headers?.["x-forwarded-for"] ?? "").split(",")[0].trim();
+  const ok = (d) => esRedPrivada(d) || extra.includes(d);
+  return ok(real) && (!cf || ok(cf)) && (!xf || ok(xf));
 }
