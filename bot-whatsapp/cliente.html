@@ -1487,7 +1487,14 @@ function arrastrable(caja, cerrar) {
 const DIAS_LARGO = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
 const saludoMadrid = () => { const h = Number(new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", hour: "numeric", hourCycle: "h23" }).format(new Date())); return h < 13 ? "Buenos días" : h < 21 ? "Buenas tardes" : "Buenas noches"; };
 const diaSemanaDe = (iso) => { try { return new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", weekday: "long" }).format(new Date(iso)); } catch { return ""; } };
-document.addEventListener("load", (e) => { if (e.target && e.target.tagName === "IMG") e.target.classList.add("cargada"); }, true); // fundido de las fotos
+// Nitidez: una foto nunca se enseña más grande de lo que la pantalla puede mostrar sin verse borrosa (1 píxel de la foto ≈ 1 píxel de la pantalla, con un 20 % de margen).
+// Las grandes siguen llenando su baldosa; las pequeñas se quedan en su tamaño nítido en vez de estirarse (en ordenador y tableta se estiraban y se veían borrosas).
+function nitida(img) {
+  if (!img.naturalWidth || !img.closest(".av, .pf-av, .tl-av, .falta-av, .sug-im")) return;
+  const dpr = window.devicePixelRatio || 1;
+  img.style.maxWidth = `min(82%, ${Math.max(24, Math.round(img.naturalWidth / dpr * 1.2))}px)`; img.style.maxHeight = `min(82%, ${Math.max(24, Math.round(img.naturalHeight / dpr * 1.2))}px)`;
+}
+document.addEventListener("load", (e) => { if (e.target && e.target.tagName === "IMG") { nitida(e.target); e.target.classList.add("cargada"); } }, true); // fundido de las fotos
 const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 const flecha = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 // Cuando algo no carga, se dice (nunca un hueco en silencio) y se ofrece «Reintentar»
