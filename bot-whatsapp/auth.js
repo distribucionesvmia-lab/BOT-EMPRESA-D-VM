@@ -113,6 +113,16 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       return !!c && customers.nameMatches(c, empresa) && [...(c.emails ?? []), accounts.emailDe(id)].map(cleanMail).includes(correo);
     });
   }
+  /** Por qué NO se ha mandado el código (solo para el registro PRIVADO de la oficina, nunca para el cliente; no lleva NIF, nombre ni correo escritos). */
+  function motivoSinCodigo(nif, correo, empresa) {
+    const porNif = customers.findByNif(nif);
+    if (!porNif.length) return "ningún cliente tiene ese NIF (¿falta el NIF en su ficha de a3ERP o está mal escrito?)";
+    const conNombre = porNif.filter((id) => customers.nameMatches(customers.getById(id), empresa));
+    if (!conNombre.length) return `hay cliente con ese NIF (código ${porNif.join(", ")}) pero el nombre escrito no coincide con el suyo`;
+    const conCorreo = conNombre.filter((id) => [...(customers.getById(id)?.emails ?? []), accounts.emailDe(id)].map(cleanMail).includes(correo));
+    if (!conCorreo.length) return `el cliente ${conNombre.join(", ")} no tiene ESE correo en su ficha ni en su cuenta (correos guardados en la ficha: ${conNombre.map((id) => (customers.getById(id)?.emails ?? []).length).join(", ")}); añádelo en «Editar datos» de su ficha`;
+    return conCorreo.length > 1 ? "el NIF, el nombre y el correo encajan con varios clientes a la vez: no se adivina cuál" : "";
+  }
   const pedirNombre = (res, b) => String(b.empresa ?? "").trim().length < 2 ? (send(res, 400, { error: "Escribe el nombre de tu empresa o negocio, tal como lo conocemos." }), true) : false;
   const ip = (req) => ipDe(req, trustProxy);
   /** Aparato desde el que se entra: huella corta del navegador (nunca se guarda la cadena entera). Avisa al servidor para que pueda decirle al cliente «alguien ha entrado desde un aparato nuevo». */
@@ -218,8 +228,12 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (ids.length === 1 && correoGlobal("todos")) {
         const id = ids[0], codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
         const r = accounts.codigoCorreoCrear(id, claveCodigoCorreo(id, codigo));
-        if (r.ok) void Promise.resolve(enviarCodigo({ to: correo, nombre: customers.getById(id)?.name ?? "", codigo, minutos: 10 })).catch((e) => console.error("Código por correo:", e?.message));
+        if (r.ok) {
+          console.log(`[VM acceso] Código enviado al cliente ${id} (${tapar(correo)})`);
+          void Promise.resolve(enviarCodigo({ to: correo, nombre: customers.getById(id)?.name ?? "", codigo, minutos: 10 })).catch((e) => { console.error("[VM acceso] El servidor de correo NO ha enviado el código:", e?.message); eventoSeguridad("codigo-correo-error", String(e?.message ?? "error").slice(0, 120)); });
+        } else console.warn(`[VM acceso] Código NO enviado al cliente ${id}: ya se mandó uno hace menos de ${r.espera} s`);
       } else if (ids.length === 1) eventoSeguridad("codigo-correo-tope-global", "se alcanzó el máximo de códigos por hora");
+      else console.warn(`[VM acceso] Código NO enviado: ${motivoSinCodigo(b.nif, correo, b.empresa) || "no coincide"}`);
       return send(res, 200, { ok: true, espera: 60, mensaje: MSG_CODIGO_ENVIADO, correo: tapar(correo) }), true;
     }
     // Paso 2: con el código recibido se entra. Vale una vez, caduca a los 10 minutos y se anula tras 5 fallos.

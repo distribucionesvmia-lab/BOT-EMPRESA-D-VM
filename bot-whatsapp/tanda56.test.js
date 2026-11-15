@@ -192,3 +192,20 @@ test("el panel de la empresa ya no habla de PIN ni de altas automáticas: toda a
   assert.match(e, /Toda alta nueva pasa por ti/); assert.match(e, /nombre de su empresa, su NIF y su correo/);
   assert.doesNotMatch(e, /Las que coinciden entran automáticamente|vale el PIN que eligió|mostrarPin\(`Cuenta creada|mostrarPin\(`Cliente creado/);
 });
+
+test("la oficina puede saber POR QUÉ no llegó un código: el motivo queda en el registro privado (sin NIF, nombre ni correo escritos) y los fallos del correo se apuntan", async () => {
+  const m = await montar({ tope: { clave: 50 } }); const log = []; const w = console.warn, l = console.log, e = console.error;
+  console.warn = (x) => log.push(String(x)); console.log = (x) => log.push(String(x)); console.error = (x, y) => log.push(String(x) + String(y ?? ""));
+  try {
+    await enviar(m, "999999", "cliente@ejemplo.es");                    // no hay cliente con ese NIF
+    await enviar(m, "12345678Z", "cliente@ejemplo.es", "Negocio Raro"); // nombre distinto
+    await enviar(m, "12345678Z", "otro@ejemplo.es");                    // correo que no consta
+    await enviar(m, "111222AB", "x@ejemplo.es", "Sin Correo");          // cliente sin correos
+    await enviar(m, "12345678Z", "cliente@ejemplo.es");                 // bien
+    await enviar(m, "12345678Z", "cliente@ejemplo.es");                 // repetido: espera de 60 s
+  } finally { console.warn = w; console.log = l; console.error = e; m.cerrar(); }
+  const t = log.join("\n");
+  assert.match(t, /Código NO enviado: ningún cliente tiene ese NIF/); assert.match(t, /nombre escrito no coincide/); assert.match(t, /no tiene ESE correo en su ficha/); assert.match(t, /Código enviado al cliente C1 \(c\*+@ejemplo\.es\)/); assert.match(t, /ya se mandó uno hace menos de \d+ s/);
+  assert.doesNotMatch(t, /12345678Z|cliente@ejemplo\.es|otro@ejemplo\.es|Negocio Raro|Bar La Plaza/, "el registro no lleva lo que escribió el cliente");
+  const s = leer("./auth.js"); assert.match(s, /eventoSeguridad\("codigo-correo-error"/);
+});
