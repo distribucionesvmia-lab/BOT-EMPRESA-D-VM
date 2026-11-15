@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { clasificar, categorizar } from "./categorias.js";
 
-const mapa = JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8"));
+const mapa = JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8").replace(/\r\n/g, "\n"));
 const donde = (name, family) => { const c = clasificar({ name, family }, mapa); const k = categorizar({ name, category: c.category, subcategory: c.subcategory }); return `${k.catNombre} › ${k.subNombre}`; };
 const familiaDe = (re) => Object.keys(mapa).find((f) => re.test(`${mapa[f].category}/${mapa[f].subcategory}`));
 
