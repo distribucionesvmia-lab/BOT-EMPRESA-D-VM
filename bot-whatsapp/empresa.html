@@ -326,6 +326,7 @@
   /* marca de autoría y derechos de uso */
   .autor { margin-top:28px; padding:16px 0 4px; border-top:1px solid var(--line); color:var(--muted); font-size:12.5px; line-height:1.5; } .autor b { color:var(--fg); font-weight:600; }
   .autor details { margin-top:6px; } .autor summary { cursor:pointer; color:var(--accent); font-weight:600; width:fit-content; padding:4px 0; } .autor .autor-txt { max-width:90ch; margin-top:6px; padding:12px 14px; background:var(--th); border:1px solid var(--line); border-radius:10px; } .autor .autor-txt p { margin:0 0 8px; } .autor .autor-txt p:last-child { margin:0; }
+.doc-etq{display:inline-block;margin-top:4px;padding:2px 8px;border-radius:6px;color:#fff;font-weight:700;font-size:11px;letter-spacing:.04em}.doc-etq.alb{background:#C00000}.doc-etq.fac{background:#595959}
 </style>
 </head>
 <body>
@@ -380,7 +381,7 @@
         <h2>Pedidos recibidos</h2>
         <p class="muted" id="correo-estado" style="margin:0 0 8px"></p>
         <p class="muted" id="correo-clientes" style="margin:0 0 8px"></p>
-        <div class="acciones" id="ped-acciones"><div class="grupo"><button class="main" id="exportar-sel" disabled>Exportar seleccionados (0)</button><button id="exportar">Exportar todos los pendientes</button><button id="ver-excel" type="button" title="Enseña cómo quedará el Excel sin exportar nada">Ver cómo queda el Excel</button></div><div class="grupo der"><button type="button" id="marcar-todos" title="Marca todos los pedidos que se ven ahora (sean del estado que sean)">Marcar todos los que se ven</button><button type="button" id="borrar-sel" class="peligro" disabled>Borrar seleccionados (0)</button></div><span class="muted" id="expmsg" role="status"></span></div>
+        <div class="acciones" id="ped-acciones"><div class="grupo"><button class="main" id="exportar-sel" disabled>Exportar seleccionados (0)</button><button id="exportar">Exportar todos los pendientes</button><button id="ver-excel" type="button" title="Enseña cómo quedará el Excel sin exportar nada">Ver cómo queda el Excel</button><button id="imprimir-ya" type="button" title="Imprime ahora la hoja de los pedidos marcados (o de todos los pendientes), sin exportar ni marcar nada">Imprimir</button></div><div class="grupo der"><button type="button" id="marcar-todos" title="Marca todos los pedidos que se ven ahora (sean del estado que sean)">Marcar todos los que se ven</button><button type="button" id="borrar-sel" class="peligro" disabled>Borrar seleccionados (0)</button></div><span class="muted" id="expmsg" role="status"></span></div>
         <form class="filtros" id="f-filtro" aria-label="Filtrar pedidos">
           <label class="campo"><span>Día</span><input type="date" id="fl-dia"></label>
           <label class="campo"><span>hasta el día (opcional)</span><input type="date" id="fl-dia2"></label>
@@ -837,7 +838,8 @@ async function pedidos() {
       const c = el("input", "", { type: "checkbox", className: "sel" + (o.estado === "exportado" ? " re" : o.estado === "retenido" ? " ret" : "") }); c.dataset.ref = o.ref; c.checked = sel.has(o.ref); c.setAttribute("aria-label", "Marcar " + o.ref);
       c.onchange = () => { c.checked ? sel.add(o.ref) : sel.delete(o.ref); actualizarSel(); }; chk.appendChild(c);
     }
-    tr.append(chk, el("td", o.ref, { className: "ref" }), el("td", hora(o.fecha)), cli, detTd, el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
+    const refTd = el("td", o.ref, { className: "ref" }); if (o.documento) refTd.appendChild(el("div", o.documento, { className: "doc-etq " + (o.documento === "ALBARÁN" ? "alb" : "fac"), title: "Así saldrá en el Excel y en la hoja para imprimir" })); // para no confundir albarán con factura
+    tr.append(chk, refTd, el("td", hora(o.fecha)), cli, detTd, el("td", eur(o.total), { className: "num" }), est); tb.appendChild(tr);
   }
   const vivos = new Set(list.map((o) => o.ref)); for (const r of [...sel]) if (!vivos.has(r)) sel.delete(r); // los que ya no se ven (filtrados o borrados) dejan de estar marcados: así nunca se borra algo que no se ve
   actualizarSel();
@@ -855,12 +857,26 @@ async function pedidos() {
 async function imprimir(e) {
   const r = await call(`/api/admin/exportaciones/${e.id}/imprimir`, null, true);
   if (!r.ok) return alert("No se puede preparar la impresión.");
-  const html = await r.text();
+  mandarAImprimir(await r.text());
+}
+/** Abre el cuadro de impresión con esa página (sin descargar nada). */
+function mandarAImprimir(html) {
   let fr = document.getElementById("marco-imprimir"); if (fr) fr.remove();
   fr = document.createElement("iframe"); fr.id = "marco-imprimir"; fr.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
   fr.onload = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (x) { alert("No se pudo abrir la impresión."); } };
   fr.srcdoc = html; document.body.appendChild(fr);
 }
+// «Imprimir» directo (junto a Exportar): imprime ya los pedidos marcados o, si no hay ninguno, todos los pendientes. NO exporta ni marca nada: el Excel se exporta aparte.
+$("imprimir-ya").onclick = async () => {
+  const b = $("imprimir-ya"); b.disabled = true;
+  try {
+    const refs = exportables(), r = await call("/api/admin/imprimir", refs.length ? { refs } : {}, true);
+    if (!r.ok) throw new Error("No se puede preparar la impresión.");
+    if ((r.headers.get("content-type") || "").includes("application/json")) { const v = await r.json(); $("expmsg").textContent = "No hay pedidos listos para imprimir." + (v.retenidos ? ` (${v.retenidos} retenidos para revisar)` : ""); return; }
+    $("expmsg").textContent = `Preparando la impresión de ${r.headers.get("X-Pedidos") || ""} pedido(s). No se ha exportado ni marcado nada.`;
+    mandarAImprimir(await r.text());
+  } catch (e) { $("expmsg").textContent = e.message; } finally { b.disabled = false; }
+};
 async function descargar(e) {
   const r = await call(`/api/admin/exportaciones/${e.id}/descargar`, null, true);
   if (!r.ok) return alert("No se encuentra el archivo.");

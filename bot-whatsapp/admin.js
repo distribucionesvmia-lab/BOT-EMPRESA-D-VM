@@ -28,7 +28,7 @@ import { detectarTipo } from "./actualizar-datos.js";
 import { crearAvisos } from "./avisos.js";
 import { execFile } from "node:child_process";
 import { recordatoriosDeHoy } from "./recordatorios.js";
-import { imprimirHtml, FORMAT, madrid } from "./export-format.js";
+import { imprimirHtml, FORMAT, madrid, tipoDocumento } from "./export-format.js";
 import { estiloCss, estiloDecimales } from "./xlsx-files.js";
 
 const amountOf = (l) => l.amount ?? round2((l.units ?? l.qty) * (l.price ?? 0) * (1 - (l.discount ?? 0) / 100));
@@ -57,6 +57,7 @@ function orderView(o) {
     estado: o.export_status === "exported" ? "exportado" : retenido ? "retenido" : "pendiente",
     motivo: o.export_status === "exported" ? "" : !o.customer_id ? "Cliente sin código de ERP" : o.review ? o.reason || "Pedido dudoso: revisar antes de exportar" : "",
     exportId: o.export_id,
+    documento: tipoDocumento(o.customer_id), // ALBARÁN o FACTURA (según el modelo de pedido del cliente), o null
   };
 }
 
@@ -287,6 +288,14 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       const { ready, held } = orders.previewPending({ refs: body.refs ?? null });
       if (!ready.length) return send(res, 200, { vacio: true, retenidos: held }), true;
       return send(res, 200, { ...vistaExcel(ready), retenidos: held }), true;
+    }
+    if (p === "/api/admin/imprimir" && post) { // IMPRIMIR DIRECTO: la hoja para imprimir de los pedidos marcados (o de todos los pendientes) SIN exportar ni marcar nada
+      const body = (await readJson(req)) ?? {};
+      if (body.refs !== undefined && (!Array.isArray(body.refs) || !body.refs.length || body.refs.length > 500 || !body.refs.every((r) => /^VM-\d{4}-\d{6}$/.test(String(r))))) return send(res, 400, { error: "Elige al menos un pedido válido." }), true;
+      const { ready, held } = orders.previewPending({ refs: body.refs ?? null });
+      if (!ready.length) return send(res, 200, { vacio: true, retenidos: held }), true;
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Pedidos": String(ready.length) }).end(imprimirHtml(ready, { autoprint: false }));
+      return true;
     }
     if (p === "/api/admin/exportar" && post) {
       // Sin cuerpo o sin «refs»: se exportan todos los pendientes; con «refs»: solo los pedidos elegidos

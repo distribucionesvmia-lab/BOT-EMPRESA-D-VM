@@ -9,7 +9,7 @@ import { openDb } from "./db.js";
 import { runExport } from "./exporter.js";
 import { buildXlsx, buildWorkbook } from "./xlsx.js";
 import { priceOrder } from "./pricing.js";
-import { madrid, madridDate, FORMAT, capacidadPagina, imprimirHtml, esPorKilo } from "./export-format.js";
+import { madrid, madridDate, FORMAT, capacidadPagina, imprimirHtml, esPorKilo, tipoDocumento, usarModeloPedido } from "./export-format.js";
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "vm-exp-"));
 const catalogo = [
@@ -357,4 +357,47 @@ test("imprimir directamente: una página por pedido con casilla ☐ y cajas gran
   assert.match(html, /Artículo A &amp; &lt;B&gt;/); assert.match(html, /Llamar &lt;antes&gt;/); // nada sin escapar
   assert.match(html, /TOTAL PEDIDO/); assert.doesNotMatch(html, /<script>/); // sin autoimpresión cuando va dentro de la aplicación
   assert.match(imprimirHtml(db.exportedOrders(e.export.id)), /<script>addEventListener\('load'/); // abierta sola, se imprime sola
+});
+
+test("la descripción del artículo va en negrita (Excel y página para imprimir)", () => {
+  const f = exportar([pedido("k1", {})]), xml = f["xl/worksheets/sheet1.xml"];
+  assert.equal(estiloDe(f, xml, "D5").negrita, true); assert.equal(estiloDe(f, xml, "D6").negrita, true); // filas blanca y gris
+  assert.equal(estiloDe(f, xml, "D5").alineado, "left"); // sigue a la izquierda
+  const o = { ref: "VM-1", customer_id: "C1", name: "X", created_at: "2026-10-28T10:00:00Z", items: [{ id: "A", name: "ARTICULO A", units: 1, price: 1, amount: 1 }] };
+  assert.match(imprimirHtml([o], { autoprint: false }), /td\.d \{[^}]*font-weight:700/);
+});
+
+test("ALBARÁN: los modelos de pedido que acaban en 002, 003 y 008 salen como ALBARÁN; el resto, FACTURA; sin dato, nada", () => {
+  const modelos = { a: "LSTIMPRPEDV.002", b: "LSTIMPRPEDV.003", c: "LSTIMPRPEDV.008", d: "LSTIMPRPEDV.001", e: "LSTIMPRPEDV.012", f: "LSTIMPRPEDV.028", g: "LSTIMPRPEDV.102", h: "", i: "2" };
+  usarModeloPedido((id) => modelos[id] ?? null);
+  try {
+    assert.deepEqual(["a", "b", "c"].map(tipoDocumento), ["ALBARÁN", "ALBARÁN", "ALBARÁN"]);
+    assert.deepEqual(["d", "e", "f", "g"].map(tipoDocumento), ["FACTURA", "FACTURA", "FACTURA", "FACTURA"]); // 001, 012, 028 y 102 NO son 002/003/008
+    assert.equal(tipoDocumento("h"), null); assert.equal(tipoDocumento("zz"), null);
+    assert.equal(tipoDocumento("i"), "ALBARÁN");
+    // y la hoja del Excel lo escribe
+    const db = openDb(":memory:"), dir = tmp(); db.createOrder(pedido("kalb", { customerId: "b" }));
+    const f = unzip(fs.readFileSync(runExport(db, { dir }).filePath));
+    assert.ok(JSON.stringify(grid(f["xl/worksheets/sheet1.xml"])).includes("ALBARÁN"));
+  } finally { usarModeloPedido(null); }
+});
+
+test("ALBARÁN en muchos sitios (para no confundirlo con una factura): pestaña, cartel, cabecera, total, pie de cada página, hoja «Líneas» y página para imprimir", () => {
+  usarModeloPedido((id) => (id === "C1" ? "LSTIMPRPEDV.002" : null));
+  try {
+    const f = exportar([pedido("kalb2", {})]), xml = f["xl/worksheets/sheet1.xml"], rows = grid(xml);
+    assert.deepEqual([...f["xl/workbook.xml"].matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]), ["ALBARÁN C1 · 000001", "Líneas"]); // la pestaña
+    assert.equal(rows[0][0], "ALBARÁN"); assert.equal(rows[rows.length - 1][0], "ALBARÁN"); // franja arriba y abajo
+    assert.ok(rows.some((r) => r[0] === "ALBARÁN" && r.includes("Cliente de prueba") === false && rows.indexOf(r) === 2), "ALBARÁN otra vez en el cartel azul (a la izquierda de la población)");
+    assert.ok(rows.some((r) => r[0] === "ALBARÁN · Nº pedido")); // cabecera
+    assert.ok(rows.some((r) => r[3] === "TOTAL ALBARÁN")); assert.ok(!rows.some((r) => r[3] === "TOTAL PEDIDO")); // total
+    assert.match(xml, /<oddFooter>&amp;L&amp;&quot;Arial,Bold&quot;&amp;14ALBARÁN&amp;R&amp;9&amp;P\/&amp;N<\/oddFooter>/); // pie de cada página
+    const lineas = grid(f["xl/worksheets/sheet2.xml"]); assert.equal(lineas[0][lineas[0].length - 1], "Documento"); assert.equal(lineas[1][lineas[1].length - 1], "ALBARÁN"); // hoja plana
+    const o = { ref: "VM-1", customer_id: "C1", name: "X", city: "MEDINA", created_at: "2026-10-28T10:00:00Z", items: [{ id: "A", name: "ARTICULO A", units: 1, price: 1, amount: 1 }] };
+    const h = imprimirHtml([o], { autoprint: false });
+    assert.match(h, /<b class="dc">ALBARÁN<\/b>MEDINA/); assert.match(h, /<small>ALBARÁN · Nº pedido<\/small>/); assert.match(h, /TOTAL ALBARÁN/);
+  } finally { usarModeloPedido(null); }
+  // sin tipo de documento todo queda como antes (ya lo comprueban las demás pruebas); y una FACTURA lo dice igual
+  usarModeloPedido(() => "LSTIMPRPEDV.001");
+  try { const rows = grid(exportar([pedido("kfac", {})])["xl/worksheets/sheet1.xml"]); assert.equal(rows[0][0], "FACTURA"); assert.ok(rows.some((r) => r[3] === "TOTAL FACTURA")); } finally { usarModeloPedido(null); }
 });
