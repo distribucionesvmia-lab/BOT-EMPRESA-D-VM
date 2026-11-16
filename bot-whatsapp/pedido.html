@@ -1461,7 +1461,7 @@
       <div class="card" id="resCond"></div>
       <div class="err" id="errRes" role="alert"></div>
     </div>
-    <div class="cartfoot cartfoot-res"><button class="big" id="confirm" type="button">Enviar pedido a Distribuciones Valentín Martín</button><button class="keepbtn" id="resVolver" type="button">Volver al pedido</button><p class="plazo" id="plazo">Después de enviarlo verás hasta cuándo puedes modificarlo.</p></div>
+    <div class="cartfoot cartfoot-res"><button class="big" id="confirm" type="button">Enviar pedido a Distribuciones Valentín Martín</button><button class="keepbtn" id="resVolver" type="button">Volver al pedido</button><p class="plazo" id="plazo" hidden></p></div>
   </section>
     <div class="cal-fondo" id="calFondo" hidden>
       <div class="cal" role="dialog" aria-modal="true" aria-label="Elegir otro día de entrega">
@@ -2894,7 +2894,7 @@ function plazoDe(date) { // texto ya sabido (botones) o pedido al servidor (cale
 }
 function pintarPlazo() {
   const pz = plazoDe(diaElegido);
-  $("plazo").textContent = pz ? pz.texto + ". Después de enviarlo lo verás también aquí." : "Después de enviarlo verás hasta cuándo puedes modificarlo.";
+  $("plazo").textContent = pz ? pz.texto + ". Después de enviarlo lo verás también aquí." : ""; $("plazo").hidden = !pz; // los pedidos enviados no se modifican: sin plazo no se dice nada
 }
 // Pedido ya enviado que se puede cambiar: se avisa donde se compra y se deja AÑADIR a él (sin duplicar el envío)
 function abiertosDeDia(date) { return (data.abiertos || []).filter(a => a.entrega === date); }
