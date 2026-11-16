@@ -136,3 +136,16 @@ test("TOPES DE PEDIDOS: por cliente y hora, por cliente y día, en total en 10 m
   for (const t of ["PEDIDOS_DIA_LIMIT", "PEDIDOS_GLOBAL_LIMIT", "const topePedidos = (cuentaId", "demasiados-pedidos-dia", "pedidos-tope-global"]) assert.ok(s.includes(t), t);
   assert.equal((s.match(/topePedidos\(account\.id/g) ?? []).length, 2, "lo usan el catálogo y el chat");
 });
+
+test("del NIF solo se piden y se mandan los 6 primeros dígitos (las letras no cuentan)", async () => {
+  const h = leer("./cliente.html"), tarjeta = h.slice(h.indexOf('id="f-pw"'), h.indexOf('id="f-correo"'));
+  for (const t of ["Los 6 primeros dígitos de tu DNI o CIF", 'inputmode="numeric"', 'id="pw-aviso"']) assert.ok(tarjeta.includes(t), t);
+  assert.ok(!/NIF \(DNI, NIE o CIF\)/.test(tarjeta)); assert.match(h, /const nif6 = \(\) => \$\("pw-nif"\)\.value\.replace\(\/\\D\/g, ""\)\.slice\(0, 6\)/); assert.match(h, /nif: nif6\(\), password/);
+  // el servidor reconoce al cliente solo con esos 6 dígitos, y la contraseña no puede contenerlos
+  const m = await montar();
+  try {
+    const c = await crear(m, "Mesa-Verde-42", { nif: "123456" }); assert.equal(c.status, 200); assert.equal(c.json.cliente.nombre, "BAR LA PLAZA S.L.");
+    assert.equal((await entrar(m, "Mesa-Verde-42", { nif: "123456" })).status, 200);
+    const m2 = await montar(); try { assert.match((await crear(m2, "abc123456xyz", { nif: "123456" })).json.error, /NIF/); } finally { m2.cerrar(); }
+  } finally { m.cerrar(); }
+});
