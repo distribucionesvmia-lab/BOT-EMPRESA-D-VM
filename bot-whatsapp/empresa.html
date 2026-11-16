@@ -168,6 +168,14 @@
   /* Hoy */
   #p-hoy { display:grid; gap:14px; } #p-hoy[hidden] { display:none; }
   .acc-banner { display:flex; gap:12px; align-items:center; justify-content:space-between; background:var(--accent); color:#fff; padding:10px 14px; border-radius:10px; font-weight:700; } .acc-banner[hidden] { display:none; } .acc-banner button { background:#fff; color:var(--accent); border-color:#fff; }
+  .pausa-cab { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:6px; } .pausa-cab h2 { margin:0; }
+  .pausa-pill { font-size:12.5px; font-weight:700; padding:4px 12px; border-radius:999px; border:1px solid #1f6f43; color:#1f6f43; background:rgba(31,111,67,.08); } .pausa-pill.on { color:#fff; background:var(--accent); border-color:var(--accent); }
+  .pausa-desc { margin:0 0 12px !important; max-width:72ch; }
+  .pausa-botones { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; }
+  .pausa-btn { display:flex; flex-direction:column; align-items:flex-start; gap:2px; text-align:left; height:auto; min-height:56px; padding:10px 14px; margin:0 !important; } .pausa-btn small { font-weight:400; opacity:.85; font-size:12px; } .pausa-btn.main small { opacity:.95; }
+  @media (max-width: 640px) { .pausa-botones { grid-template-columns:1fr; } }
+  @media (prefers-color-scheme: dark) { .pausa-pill { color:#6fd49b; border-color:#6fd49b; background:rgba(111,212,155,.1); } .pausa-pill.on { color:#fff; background:var(--accent); border-color:var(--accent); } }
+  #nuevos-lista { max-height:280px; overflow:auto; } .hoy-tareas details { margin-top:4px; } .hoy-tareas summary { cursor:pointer; color:var(--accent); font-size:12px; } .hoy-tareas details p { margin:4px 0 0; font-size:12px; color:var(--muted); word-break:break-word; }
   .rev-fila { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line-2); } .rev-fila:last-child { border-bottom:0; }
   .rev-fila small { color:var(--muted); display:block; margin-top:2px; } .rev-fila .rev-fix { color:var(--text); }
   .rev-b { flex:none; min-width:64px; text-align:center; font-size:12px; font-weight:700; padding:3px 8px; border-radius:999px; border:1px solid var(--line); }
@@ -377,11 +385,13 @@
         <p class="muted" style="margin:0 0 8px">Los clientes con correo en su ficha entran solos con el código que les llega; aquí solo salen los que <b>pulsan «Necesito ayuda»</b>, no tienen correo o no se les pudo enviar. Pregúntales por teléfono qué <b>número de comprobación</b> les sale en la pantalla: si coincide con el de aquí, es él. Entonces pulsa «Dejarle entrar», o «Dar un código» y díselo (por teléfono o WhatsApp).</p>
         <div id="acc-lista"></div>
       </section>
-      <section class="panel" id="pausa-panel">
-        <h2>Pausa de emergencia</h2>
-        <p class="muted" style="margin:0 0 8px">Si ves que pasa algo raro (muchos pedidos falsos, alguien probando contraseñas), puedes cerrar la puerta desde aquí. <b>Los clientes que ya están dentro siguen</b>; los que lleguen verán un aviso. Se reabre con un clic.</p>
-        <div class="acciones"><button type="button" id="pausa-ent" class="peligro">Pausar entradas nuevas</button><button type="button" id="pausa-ped" class="peligro">Pausar pedidos</button></div>
-        <p class="muted" id="pausa-txt" style="margin:8px 0 0"></p>
+      <section class="panel pausa-card" id="pausa-panel">
+        <div class="pausa-cab"><h2>Pausa de emergencia</h2><span class="pausa-pill" id="pausa-txt">Todo abierto</span></div>
+        <p class="muted pausa-desc">Si pasa algo raro (muchos pedidos falsos, alguien probando contraseñas), cierra la puerta desde aquí. <b>Los clientes que ya están dentro siguen</b>; los que lleguen verán un aviso. Se reabre con un clic.</p>
+        <div class="pausa-botones">
+          <button type="button" id="pausa-ent" class="pausa-btn peligro"><b>Pausar entradas nuevas</b><small>Nadie nuevo podrá iniciar sesión</small></button>
+          <button type="button" id="pausa-ped" class="pausa-btn peligro"><b>Pausar pedidos</b><small>Nadie podrá enviar pedidos nuevos</small></button>
+        </div>
       </section>
       <section class="panel" id="nuevos-panel" hidden>
         <h2>Accesos nuevos (últimos 30 días)</h2>
@@ -1882,10 +1892,10 @@ async function accesosNuevos() {
 // ═════════ Pausa de emergencia y revisión de seguridad ═════════
 async function pausaPanel() {
   const p = await call("/api/admin/pausa"), b = $("pausa-banner");
-  const ponBoton = (id, activa, textoPausar, textoReabrir) => { const x = $(id); x.textContent = activa ? textoReabrir : textoPausar; x.className = activa ? "main" : "peligro"; };
+  const ponBoton = (id, activa, textoPausar, textoReabrir) => { const x = $(id); x.querySelector("b").textContent = activa ? textoReabrir : textoPausar; x.querySelector("small").textContent = activa ? "Los clientes podrán volver a " + (id === "pausa-ent" ? "entrar" : "enviar pedidos") : (id === "pausa-ent" ? "Nadie nuevo podrá iniciar sesión" : "Nadie podrá enviar pedidos nuevos"); x.className = "pausa-btn " + (activa ? "main" : "peligro"); };
   ponBoton("pausa-ent", p.entradas, "Pausar entradas nuevas", "Reabrir las entradas"); ponBoton("pausa-ped", p.pedidos, "Pausar pedidos", "Reabrir los pedidos");
   const dice = [p.entradas ? "entradas nuevas CERRADAS" : "", p.pedidos ? "pedidos CERRADOS" : ""].filter(Boolean).join(" y ");
-  $("pausa-txt").textContent = dice ? `Ahora mismo: ${dice}${p.desde ? " desde " + fechaCorta(p.desde) : ""}.` : "Ahora mismo todo está abierto.";
+  $("pausa-txt").textContent = dice ? `PAUSA ACTIVA · ${dice}${p.desde ? " · desde " + fechaCorta(p.desde) : ""}` : "Todo abierto"; $("pausa-txt").className = "pausa-pill" + (dice ? " on" : "");
   if (!b.dataset.listo) { b.dataset.listo = "1"; b.querySelector("button").onclick = () => { irA("hoy"); $("pausa-panel").scrollIntoView({ behavior: "smooth" }); }; }
   b.hidden = !dice || !$("p-hoy").hidden; b.querySelector("span").textContent = `PAUSA ACTIVA: ${dice}`;
 }
@@ -1937,11 +1947,13 @@ async function hoy() {
   for (const pr of d.problemas) {
     if (["pedidos-sin-exportar", "pedidos-retenidos", "altas-sin-resolver"].includes(pr.clave)) continue; // ya salen arriba
     const copia = /copia/.test(pr.clave);
-    tarea(pr.gravedad === "alta" ? "alta" : "media", pr.texto, copia ? "Las copias de seguridad protegen todos los datos" : "", copia ? "Ver copias" : "", copia ? () => irA("datos") : null);
+    const largo = pr.texto.length > 150, corto = largo ? pr.texto.slice(0, 140).replace(/\s+\S*$/, "") + "…" : pr.texto; // un mensaje técnico largo se pliega: «Ver el mensaje completo»
+    let detalle = copia ? "Las copias de seguridad protegen todos los datos" : ""; if (largo) { detalle = el("details"); detalle.append(el("summary", "Ver el mensaje completo"), el("p", pr.texto)); }
+    tarea(pr.gravedad === "alta" ? "alta" : "media", corto, detalle, copia ? "Ver copias" : "", copia ? () => irA("datos") : null);
   }
   const ul = $("hoy-tareas"); ul.replaceChildren();
   if (!T.length) ul.append(el("li", "", { className: "bien" })), ul.lastChild.append(el("span", "✓ Todo al día. No hay nada pendiente ahora mismo."));
-  for (const t of T) { const li = el("li", "", { className: t.nivel }), sp = el("span", t.texto); if (t.sub) sp.append(el("small", t.sub)); li.append(sp); if (t.boton) { const b = el("button", t.boton, { type: "button" }); b.onclick = t.fn; li.append(b); } ul.append(li); }
+  for (const t of T) { const li = el("li", "", { className: t.nivel }), sp = el("span", t.texto); if (t.sub) sp.append(t.sub instanceof Node ? t.sub : el("small", t.sub)); li.append(sp); if (t.boton) { const b = el("button", t.boton, { type: "button" }); b.onclick = t.fn; li.append(b); } ul.append(li); }
   const nT = T.filter((t) => t.nivel !== "info").length; $("n-hoy").hidden = !nT; $("n-hoy").textContent = nT;
   // pedidos para exportar (y retenidos)
   const lp = $("hoy-listos"); lp.replaceChildren();
