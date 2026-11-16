@@ -6,7 +6,9 @@ const h = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").re
 const visible = h.replace(/<script[\s\S]*?<\/script>/g, " ");
 
 test("un solo término: «código de entrada» en la pantalla del cliente (ya no «contraseña»)", () => {
-  assert.doesNotMatch(h, /[Cc]ontrase[ñn]a/);
+  // Decisión posterior de la empresa: el acceso nuevo (nombre + NIF + contraseña, #f-pw y #f-pass) SÍ usa «contraseña». El «código de entrada» sigue en las pantallas antiguas (#f-acceso y #m-codigo).
+  const antiguas = h.slice(h.indexOf('id="f-acceso"'), h.indexOf("</form>", h.indexOf('id="f-acceso"'))) + h.slice(h.indexOf('id="m-codigo"'), h.indexOf("</form>", h.indexOf('id="m-codigo"')));
+  assert.doesNotMatch(antiguas, /[Cc]ontrase[ñn]a/);
   assert.match(h, /<h2 id="t-codigo">Cambiar mi código de entrada<\/h2>/);
   assert.match(h, /Guardar código de entrada/); assert.match(h, /id="cambiar">Cambiar código de entrada</);
 });

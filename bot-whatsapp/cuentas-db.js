@@ -132,6 +132,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   // Solo se guardan las huellas del secreto del navegador y del código; la «referencia» (4 cifras) la ven el cliente y la oficina para comprobar que es la misma persona.
   db.exec("CREATE TABLE IF NOT EXISTS acceso_solicitudes (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, secret_hash TEXT NOT NULL UNIQUE, ref TEXT NOT NULL, aparato TEXT, ip TEXT, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, estado TEXT NOT NULL DEFAULT 'pendiente', code_hash TEXT, attempts INTEGER NOT NULL DEFAULT 0, resuelta_at TEXT)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_acceso_sol_cliente ON acceso_solicitudes(customer_id)");
+  // Contraseña personal (nombre + NIF + contraseña): se guarda solo transformada con scrypt (sal propia); mayúsculas y minúsculas SÍ cuentan. Se crea la primera vez que el cliente entra.
+  addCol("accounts", "pw_hash", "TEXT"); addCol("accounts", "pw_at", "TEXT");
+  db.exec("CREATE TABLE IF NOT EXISTS accesos_nuevos (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, at TEXT NOT NULL, aparato TEXT, ip TEXT, tipo TEXT NOT NULL DEFAULT 'primera')"); // quién creó su contraseña (o se la restableció la oficina), cuándo y desde qué navegador: para que la oficina lo vea y lo pueda deshacer
+  db.exec("CREATE INDEX IF NOT EXISTS idx_accesos_nuevos_at ON accesos_nuevos(at)");
   addCol("acceso_solicitudes", "visible", "INTEGER NOT NULL DEFAULT 1"); // 0 = el cliente va a entrar solo con el código que le llega por correo: la oficina NO lo ve hasta que pida ayuda
   addCol("acceso_solicitudes", "motivo", "TEXT");
   // Aparatos de confianza: tras UNA aprobación de la oficina, ese navegador queda recordado (cookie con un secreto de 32 bytes; aquí solo su huella) y vuelve a entrar solo, sin pedir nada.
@@ -475,6 +479,48 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       db.prepare("UPDATE acceso_solicitudes SET attempts = attempts + 1 WHERE id = ?").run(r.id);
       return { ok: false, reason: "invalid" };
     },
+    // ── Contraseña personal ──
+    passwordTiene: (customerId) => !!byCustomer.get(String(customerId))?.pw_hash,
+    passwordInfo(customerId) { const r = byCustomer.get(String(customerId)); return { tiene: !!r?.pw_hash, creada: r?.pw_at ?? null }; },
+    /** Crea la contraseña SOLO si la cuenta aún no tiene ninguna (una sola vez: el UPDATE es atómico). { ok:true } o { ok:false, reason: deleted | locked | existe }. */
+    passwordCrear(customerId, plain, { aparato = "", ip = "", now = new Date().toISOString() } = {}) {
+      const row = ensure(customerId, now);
+      if (row.status === "deleted") return { ok: false, reason: "deleted" };
+      if (row.status !== "active" || (row.locked_until && row.locked_until > now)) return { ok: false, reason: "locked" };
+      if (db.prepare("UPDATE accounts SET pw_hash = ?, pw_at = ?, failed = 0 WHERE id = ? AND pw_hash IS NULL").run(hashPin(String(plain)), now, row.id).changes !== 1) return { ok: false, reason: "existe" };
+      db.prepare("INSERT INTO accesos_nuevos (customer_id, at, aparato, ip, tipo) VALUES (?, ?, ?, ?, 'primera')").run(String(customerId), now, String(aparato).slice(0, 60), String(ip).slice(0, 60));
+      return { ok: true };
+    },
+    /** Comprueba la contraseña. 5 fallos seguidos bloquean la cuenta 15 minutos (y tras 3 bloqueos, hasta que la oficina la reactive), como en el resto de accesos. */
+    passwordComprobar(customerId, plain, now = new Date().toISOString()) {
+      const row = byCustomer.get(String(customerId));
+      if (!row || !row.pw_hash) { checkPin(String(plain ?? ""), DUMMY); return { ok: false, reason: "invalid" }; }
+      if (row.status === "deleted") return { ok: false, reason: "deleted" };
+      if (row.status !== "active" || (row.locked_until && row.locked_until > now)) return { ok: false, reason: "locked" };
+      if (!checkPin(String(plain ?? ""), row.pw_hash)) { recordFail(row, now); return { ok: false, reason: "invalid" }; }
+      db.prepare("UPDATE accounts SET failed = 0, lock_count = 0, locked_until = NULL, verified = 1, last_login = ? WHERE id = ?").run(now, row.id);
+      return { ok: true, token: openSession(row, now), account: accountOut(byId.get(row.id)) };
+    },
+    /** Gasta el mismo tiempo que una comprobación real (cuando no hay cliente que coincida): así no se averigua nada por lo que tarda. */
+    passwordFalso() { checkPin("x", DUMMY); },
+    /** El cliente (ya con sesión) cambia su contraseña. Cierra sus OTRAS sesiones. */
+    passwordCambiar(accountId, plain, tokenActual = "") {
+      db.prepare("UPDATE accounts SET pw_hash = ?, pw_at = ? WHERE id = ?").run(hashPin(String(plain)), new Date().toISOString(), accountId);
+      db.prepare("DELETE FROM sessions WHERE account_id = ? AND token_hash != ?").run(accountId, tokenActual ? sha(tokenActual) : "");
+      return true;
+    },
+    /** La oficina restablece: quita la contraseña, cierra sesiones, olvida los aparatos y reactiva la cuenta; el cliente vuelve a crear una la próxima vez. */
+    passwordQuitar(customerId, now = new Date().toISOString()) {
+      const row = byCustomer.get(String(customerId)); if (!row) return false;
+      db.prepare("UPDATE accounts SET pw_hash = NULL, pw_at = NULL, failed = 0, lock_count = 0, locked_until = NULL, status = CASE WHEN status = 'blocked' THEN 'active' ELSE status END WHERE id = ?").run(row.id);
+      dropSessions.run(row.id); db.prepare("DELETE FROM aparatos_confiables WHERE customer_id = ?").run(String(customerId));
+      db.prepare("INSERT INTO accesos_nuevos (customer_id, at, aparato, ip, tipo) VALUES (?, ?, '', '', 'restablecida')").run(String(customerId), now);
+      return true;
+    },
+    /** Para el panel: quién ha creado su contraseña (o se la han restablecido) en los últimos días. */
+    accesosNuevos({ dias = 30, now = new Date().toISOString() } = {}) {
+      return db.prepare("SELECT customer_id AS customerId, at, aparato, ip, tipo FROM accesos_nuevos WHERE at >= ? ORDER BY id DESC LIMIT 100").all(plus(now, -dias * 86_400_000));
+    },
     // ── Aparatos de confianza (sin volver a pedir permiso a la oficina) ──
     /** Recuerda un aparato (máximo `max` por cliente: al pasarse, se olvida el más antiguo). */
     aparatoCrear(customerId, tokenHash, aparato = "", { now = new Date().toISOString(), dias = 365, max = 5 } = {}) {
@@ -745,6 +791,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         db.prepare("DELETE FROM login_codes WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM acceso_solicitudes WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM aparatos_confiables WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM accesos_nuevos WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("UPDATE accounts SET pw_hash = NULL, pw_at = NULL WHERE id = ?").run(row.id);
         db.prepare("DELETE FROM correo_pref WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM correo_ofertas WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM baja_tokens WHERE customer_id = ?").run(row.customer_id);

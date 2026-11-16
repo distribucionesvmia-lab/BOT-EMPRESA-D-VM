@@ -705,6 +705,7 @@
   .autor-pie { margin:var(--s3, 12px) 0 0; font-size:calc(var(--t-micro, 12px) / var(--k,1)); color:var(--text-2); text-align:center; line-height:1.45; } .autor-pie b { font-weight:600; color:var(--text); }
   .autor-pie details { margin-top:4px; } .autor-pie summary { cursor:pointer; color:var(--accent); font-weight:600; display:block; text-align:center; padding:6px 4px; } .autor-pie .autor-txt { text-align:left; margin-top:6px; padding:10px 12px; background:var(--surface-2, var(--field, transparent)); border-radius:10px; } .autor-pie .autor-txt p { margin:0 0 6px; }
 .trampa{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}.ts-hueco{min-height:0;margin:8px 0}
+  html.acceso-pw #cambiar-pw { display:block !important; }
   html.solo-correo #cambiar, html.solo-correo .in-codigo, html.solo-correo .bv-codigo { display:none !important; }
   #co-cod { font-size:calc(24px / var(--k,1)); letter-spacing:.35em; text-align:center; font-variant-numeric:tabular-nums; }
   .co-ref-p { margin:10px 0; } .co-ref-p small { display:block; color:var(--text-2); } .co-ref { font:700 28px/1 ui-monospace, Consolas, monospace; letter-spacing:.2em; color:var(--accent); }
@@ -721,6 +722,24 @@
         <h1>Bienvenido</h1>
         <p>Haz tu pedido en un momento, desde el móvil o el ordenador.</p>
       </header>
+
+      <form class="vm-card" id="f-pw" novalidate hidden>
+        <span class="tag">Cliente habitual</span>
+        <h2>Inicia sesión</h2>
+        <p id="pw-intro">Escribe el <b>nombre de tu empresa</b>, tu <b>NIF</b> y tu <b>contraseña</b>. En este móvil o navegador no te lo volveremos a pedir.</p>
+        <label>Nombre de tu empresa o negocio<input id="pw-emp" type="text" maxlength="80" autocomplete="organization" placeholder="Tal como lo conocemos" aria-describedby="pw-err"></label>
+        <label>NIF (DNI, NIE o CIF)<input id="pw-nif" type="text" maxlength="12" autocomplete="username" autocapitalize="characters" placeholder="Ej.: 12345678Z" aria-describedby="pw-err"></label>
+        <label>Contraseña<input id="pw-pass" type="password" maxlength="64" autocomplete="current-password" aria-describedby="pw-err"></label>
+        <div id="pw-crear" hidden>
+          <div class="okmsg" role="status"><b>Es tu primera vez.</b> Elige una contraseña (mínimo 8 caracteres, que no sea tu NIF ni el nombre de tu empresa). La próxima vez te la pediremos igual.</div>
+          <label>Repite la contraseña<input id="pw-pass2" type="password" maxlength="64" autocomplete="new-password" aria-describedby="pw-err"></label>
+        </div>
+        <div class="ts-hueco" id="ts-pw" hidden></div>
+        <div class="trampa" aria-hidden="true"><label>No rellenar este campo<input id="pw-web" name="sitio_web" tabindex="-1" autocomplete="off"></label></div>
+        <div class="err" id="pw-err" role="alert"></div>
+        <button class="vm-btn primary" id="pw-boton">Entrar</button>
+        <p class="acc-ayuda"><button class="vm-link" type="button" id="pw-ayuda">¿No recuerdas tu contraseña? Llámanos</button><button class="vm-link" type="button" id="pw-registro">¿Cliente nuevo? Solicitar acceso</button></p>
+      </form>
 
       <form class="vm-card" id="f-correo" novalidate hidden>
         <span class="tag">Cliente habitual</span>
@@ -831,7 +850,7 @@
       <div class="bar-acciones">
         <button type="button" id="micuenta" class="ds-circ cuenta" aria-haspopup="dialog" aria-label="Mi cuenta: mis datos y mis pedidos"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Mi cuenta</span></button>
         <div id="letraChat"></div>
-        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar">Cambiar código de entrada</button><button type="button" id="mispedidos">Histórico de pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><button type="button" id="instalar-menu">Instalar la app</button><button type="button" id="legal-menu">Privacidad y aviso legal</button><button type="button" id="salir">Salir</button></div></div>
+        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar-pw" hidden>Cambiar mi contraseña</button><button type="button" id="cambiar">Cambiar código de entrada</button><button type="button" id="mispedidos">Histórico de pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><button type="button" id="instalar-menu">Instalar la app</button><button type="button" id="legal-menu">Privacidad y aviso legal</button><button type="button" id="salir">Salir</button></div></div>
       </div>
     </div>
     <div class="titulo-bloque"><h1 class="titulo-grande">Asistente de pedidos</h1><p class="titulo-sub"><i class="dot"></i><span id="cli">Cliente</span></p></div>
@@ -928,6 +947,19 @@
   </div>
 
   <!-- Cambiar el código de entrada -->
+  <div class="vm-modal" id="m-pass" hidden>
+    <form class="vm-card" id="f-pass" role="dialog" aria-modal="true" aria-labelledby="t-pass" autocomplete="off" novalidate>
+      <h2 id="t-pass">Cambiar mi contraseña</h2>
+      <p>Elige una contraseña de <b>8 caracteres o más</b>. No uses tu NIF ni el nombre de tu empresa.</p>
+      <label id="p-actual-l">Contraseña actual<input id="p-actual" type="password" maxlength="64" autocomplete="current-password"></label>
+      <label>Nueva contraseña<input id="p-nueva" type="password" maxlength="64" autocomplete="new-password"></label>
+      <label>Repite la nueva contraseña<input id="p-nueva2" type="password" maxlength="64" autocomplete="new-password"></label>
+      <div class="err" id="p-err" role="alert"></div><div class="okmsg" id="p-ok" role="status"></div>
+      <button class="vm-btn primary">Guardar contraseña</button>
+      <button class="vm-link" type="button" id="p-cerrar">Cerrar</button>
+    </form>
+  </div>
+
   <div class="vm-modal" id="m-codigo" hidden>
     <form class="vm-card" id="f-codigo" role="dialog" aria-modal="true" aria-labelledby="t-codigo" autocomplete="off" novalidate>
       <h2 id="t-codigo">Cambiar mi código de entrada</h2>
@@ -1171,10 +1203,68 @@ $("f-acceso").onsubmit = (e) => {
     const c1 = $("como-1"); if (c1) c1.innerHTML = "<b>Entra</b> con el <b>nombre de tu empresa y tu NIF</b>: avisamos a la oficina y, cuando te dé paso, entras.";
   }
   fetch("/api/seguridad").then((r) => r.json()).then((j) => {
+    if (j.accesoPassword) { f.hidden = true; fa.hidden = true; fa.inert = true; modoSoloOficina(); return; } // el formulario de contraseña (#f-pw) se encarga solo
     if (!j.accesoOficina) return; soloOficina = !!j.soloOficina; f.hidden = false; fa.hidden = true; $("co-otra").hidden = soloOficina; $("ac-volver-p").hidden = true;
     if (soloOficina) { fa.hidden = true; fa.inert = true; modoSoloOficina(); } // se queda oculto (no se quita: sus botones de «Cliente nuevo» y «¿No puedes entrar?» los usa la tarjeta nueva); el servidor ya rechaza esa forma de entrar
   }).catch(() => { f.hidden = true; fa.hidden = false; }); // si no se puede saber, queda la pantalla de acceso de siempre
 })();
+// ── Entrar con nombre + NIF + contraseña (la primera vez, la crea) ──
+(() => {
+  const f = $("f-pw"); if (!f) return;
+  let creando = false;
+  const err = (m, id) => { $("pw-err").textContent = m || ""; for (const x of ["pw-emp", "pw-nif", "pw-pass", "pw-pass2"]) $(x).removeAttribute("aria-invalid"); if (id) { $(id).setAttribute("aria-invalid", "true"); $(id).focus(); } };
+  const rotulo = () => { $("pw-boton").textContent = creando ? "Crear mi contraseña y entrar" : "Entrar"; };
+  const modoCrear = (si) => { creando = si; $("pw-crear").hidden = !si; $("pw-pass").autocomplete = si ? "new-password" : "current-password"; $("pw-intro").hidden = si; rotulo(); };
+  const valida = () => {
+    if ($("pw-emp").value.trim().length < 2) { err("Escribe el nombre de tu empresa o negocio, tal como lo conocemos.", "pw-emp"); return false; }
+    if ($("pw-nif").value.replace(/\D/g, "").length < 6) { err("Escribe tu NIF: tu DNI, NIE o CIF (con 6 dígitos como mínimo).", "pw-nif"); return false; }
+    if (!$("pw-pass").value) { err(creando ? "Elige una contraseña." : "Escribe tu contraseña.", "pw-pass"); return false; }
+    if (creando) {
+      if ($("pw-pass").value.length < 8) { err("La contraseña tiene que tener al menos 8 caracteres.", "pw-pass"); return false; }
+      if ($("pw-pass2").value !== $("pw-pass").value) { err("Las dos contraseñas no coinciden.", "pw-pass2"); return false; }
+    }
+    return true;
+  };
+  for (const id of ["pw-emp", "pw-nif"]) $(id).addEventListener("input", () => { if (creando) modoCrear(false); }); // si cambia los datos, vuelve a «entrar»
+  f.onsubmit = (e) => {
+    e.preventDefault(); err("");
+    if (!valida()) return;
+    return Promise.resolve(enviando(f, $("pw-boton"), async () => {
+      const body = { empresa: $("pw-emp").value.trim(), nif: $("pw-nif").value.trim(), password: $("pw-pass").value, sitio_web: $("pw-web").value, t: Math.round(performance.now()) }; // «sitio_web» es un campo trampa y «t» lo que tardó una persona en llegar hasta aquí
+      if (creando) body.password2 = $("pw-pass2").value;
+      if (tsToken["ts-pw"]) body.cf = tsToken["ts-pw"];
+      const r = await post(creando ? "/api/acceso/pw/crear" : "/api/acceso/pw/entrar", body); if (body.cf) { tsToken["ts-pw"] = null; tsPinta("ts-pw"); }
+      const j = await r.json().catch(() => ({}));
+      if (j.necesitaVerificacion) { err(j.error); tsPinta("ts-pw"); return; }
+      if (j.necesitaCrear) { modoCrear(true); $("pw-pass").value = ""; $("pw-pass").focus(); tsPinta("ts-pw"); return; } // crear una contraseña pide «no soy un robot» si está configurado
+      if (!r.ok) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error || "No se pudo entrar."); if (!creando) { $("pw-pass").value = ""; $("pw-pass").focus(); } return; }
+      f.reset(); modoCrear(false); entrar(j.cliente.nombre);
+    }, "pw-err")).then(rotulo);
+  };
+  $("pw-ayuda").onclick = () => $("no-entro").click(); $("pw-registro").onclick = () => $("ir-registro-2").click();
+  fetch("/api/seguridad").then((r) => r.json()).then((j) => {
+    if (!j.accesoPassword) return; f.hidden = false; document.documentElement.classList.add("acceso-pw"); $("cambiar-pw").hidden = false;
+  }).catch(() => { f.hidden = true; }); // si no se puede saber, queda la pantalla de acceso de siempre
+})();
+// ── Cambiar mi contraseña (dentro de la aplicación) ──
+$("cambiar-pw").onclick = async () => {
+  $("p-err").textContent = ""; $("p-ok").textContent = ""; $("f-pass").reset(); $("m-pass").hidden = false;
+  try { const y = await fetch("/api/yo").then((r) => r.json()); $("p-actual-l").hidden = !y.cliente?.tienePassword; } catch {}
+  ($("p-actual-l").hidden ? $("p-nueva") : $("p-actual")).focus();
+};
+$("p-cerrar").onclick = () => { $("m-pass").hidden = true; };
+$("f-pass").onsubmit = async (e) => {
+  e.preventDefault(); $("p-err").textContent = ""; $("p-ok").textContent = "";
+  const n1 = $("p-nueva").value, n2 = $("p-nueva2").value;
+  if (!$("p-actual-l").hidden && !$("p-actual").value) { $("p-err").textContent = "Escribe tu contraseña actual."; return $("p-actual").focus(); }
+  if (n1.length < 8) { $("p-err").textContent = "La contraseña nueva tiene que tener al menos 8 caracteres."; return $("p-nueva").focus(); }
+  if (n1 !== n2) { $("p-err").textContent = "Las dos contraseñas nuevas no coinciden."; return $("p-nueva2").focus(); }
+  try {
+    const r = await post("/api/password", { actual: $("p-actual").value, nueva: n1, nueva2: n2 }), j = await r.json().catch(() => ({}));
+    if (!r.ok) { $("p-err").textContent = j.error || "No se pudo cambiar la contraseña."; return; }
+    $("p-ok").textContent = "Listo: desde ahora entras con tu nueva contraseña."; $("f-pass").reset(); setTimeout(() => ($("m-pass").hidden = true), 1800);
+  } catch { $("p-err").textContent = SIN_RED; }
+};
 $("cambiar").onclick = () => { $("c-err").textContent = ""; $("c-ok").textContent = ""; $("f-codigo").reset(); $("m-codigo").hidden = false; $("c-nuevo").focus(); };
 $("c-cerrar").onclick = () => { $("m-codigo").hidden = true; $("c-nota").hidden = true; };
 $("f-codigo").onsubmit = async (e) => {

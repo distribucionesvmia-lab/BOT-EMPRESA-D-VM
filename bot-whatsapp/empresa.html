@@ -371,6 +371,11 @@
         <p class="muted" style="margin:0 0 8px">Los clientes con correo en su ficha entran solos con el código que les llega; aquí solo salen los que <b>pulsan «Necesito ayuda»</b>, no tienen correo o no se les pudo enviar. Pregúntales por teléfono qué <b>número de comprobación</b> les sale en la pantalla: si coincide con el de aquí, es él. Entonces pulsa «Dejarle entrar», o «Dar un código» y díselo (por teléfono o WhatsApp).</p>
         <div id="acc-lista"></div>
       </section>
+      <section class="panel" id="nuevos-panel" hidden>
+        <h2>Accesos nuevos (últimos 30 días)</h2>
+        <p class="muted" style="margin:0 0 8px">Clientes que han creado su contraseña la primera vez que entraron. Si alguna te parece rara (no es el cliente), pulsa <b>«Restablecer»</b>: se borra su contraseña, se cierran sus sesiones y tendrá que crearla otra vez.</p>
+        <div id="nuevos-lista"></div>
+      </section>
       <section class="hoy-kpis" id="hoy-kpis" aria-label="Resumen de hoy"></section>
       <div class="hoy-grid">
         <section class="panel"><h2>Qué hay que hacer</h2><ul class="hoy-tareas" id="hoy-tareas"></ul></section>
@@ -1612,7 +1617,7 @@ async function copias(comprobar = false) {
   finally { if (comprobar) { b.disabled = false; b.textContent = "Comprobar copias ahora"; } }
 }
 $("copias-comprobar").onclick = () => copias(true);
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), seguridadPanel(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), correoClientes(), accesos(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), seguridadPanel(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), correoClientes(), accesos(), accesosNuevos(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 // ═════════ Estadísticas y patrones ═════════
 const est = { rango: "30d", d0: "", d1: "", datos: null, modo: "uds", mas: false, timerVivo: 0, timerDatos: 0, cliente: null };
@@ -1838,6 +1843,20 @@ async function accesos() {
   if (n > (accesos.n ?? 0)) { try { document.title = `(${n}) Empresa`; } catch {} } else if (!n) { try { document.title = "Empresa"; } catch {} }
   accesos.n = n;
 }
+async function accesosNuevos() {
+  const d = await call("/api/admin/accesos-nuevos"), caja = $("nuevos-lista");
+  $("nuevos-panel").hidden = !d.lista.length;
+  const hace = (iso) => { const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)); return m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`; };
+  const huella = JSON.stringify(d.lista.map((x) => [x.customerId, x.at, x.tipo]));
+  if (caja.dataset.huella === huella) return; caja.dataset.huella = huella;
+  caja.replaceChildren(...d.lista.slice(0, 12).map((x) => {
+    const f = el("div", "", { className: "acc-fila" }), izq = el("div");
+    izq.append(verCliente(x.customerId, x.cliente), el("small", `${x.tipo === "restablecida" ? "Contraseña restablecida por la oficina" : "Creó su contraseña"} · ${hace(x.at)}${x.aparato ? " · " + x.aparato : ""}${x.ip ? " · IP " + x.ip : ""}`));
+    f.append(izq);
+    if (x.tipo !== "restablecida") { const b = el("button", "Restablecer", { type: "button", className: "peligro" }); b.onclick = async () => { if (!confirm("Se borrará su contraseña y se cerrarán sus sesiones. Tendrá que crearla otra vez. ¿Restablecer?")) return; try { await call(`/api/admin/cliente/${encodeURIComponent(x.customerId)}/password/restablecer`, {}); } catch (e) { alert(e.message); } caja.dataset.huella = ""; await accesosNuevos(); }; f.append(b); }
+    return f;
+  }));
+}
 async function hoy() {
   const d = await call("/api/admin/hoy");
   $("hoy-sub").textContent = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Madrid" }).replace(/^./, (c) => c.toUpperCase()) + " · lo que necesita tu atención ahora mismo.";
@@ -1944,7 +1963,8 @@ async function abrirFicha(id) {
   if (pa?.sinPedirDeMas) cuerpo.push(el("div", `Lleva ${pa.sinPedirDeMas.dias} días sin pedir y suele pedir cada ${String(pa.sinPedirDeMas.ciclo).replace(".", ",")}.`, { className: "fi-aviso" }));
   cuerpo.push(seccionDatos(f));
   const cp = f.correoPedidos, correoTxt = !cp.activo ? "El cliente la ha desactivado en «Mi cuenta»." : cp.destino ? `Se envía a ${cp.destino}${cp.delaCuenta ? " (el correo de su cuenta; tiene prioridad sobre los de su ficha)" : ""}.` : "No tiene ningún correo: añade uno en «Editar datos».";
-  cuerpo.push(fiSec("Cuenta en la aplicación", f.cuenta ? fiDl([["Estado", f.cuenta.bloqueada ? "Bloqueo temporal" : f.cuenta.estado === "blocked" ? "Bloqueada" : f.cuenta.confirmada ? "Activa" : "Sin confirmar"], ["Último acceso", fechaCorta(f.cuenta.ultimoAcceso)], ["Aparatos recordados", f.aparatos ? `${f.aparatos} (entran solos, sin pedir permiso)` : "Ninguno"], ["Cuenta creada", fechaCorta(f.cuenta.creada)], ["Confirmación de pedido por correo", correoTxt]]) : fiDl([["Confirmación de pedido por correo", correoTxt]])));
+  cuerpo.push(fiSec("Cuenta en la aplicación", f.cuenta ? fiDl([["Estado", f.cuenta.bloqueada ? "Bloqueo temporal" : f.cuenta.estado === "blocked" ? "Bloqueada" : f.cuenta.confirmada ? "Activa" : "Sin confirmar"], ["Último acceso", fechaCorta(f.cuenta.ultimoAcceso)], ["Contraseña", f.password?.tiene ? `Creada el ${fechaCorta(f.password.creada)}` : "Aún no la ha creado"], ["Aparatos recordados", f.aparatos ? `${f.aparatos} (entran solos, sin pedir permiso)` : "Ninguno"], ["Cuenta creada", fechaCorta(f.cuenta.creada)], ["Confirmación de pedido por correo", correoTxt]]) : fiDl([["Confirmación de pedido por correo", correoTxt]])));
+  if (f.password?.tiene) { const bp = el("button", "Restablecer su contraseña", { type: "button", className: "peligro", style: "margin:8px 8px 0 0" }); bp.onclick = async () => { if (!confirm("Se borrará su contraseña, se cerrarán sus sesiones y tendrá que crearla otra vez. ¿Restablecer?")) return; try { await call(`/api/admin/cliente/${encodeURIComponent(id)}/password/restablecer`, {}); abrirFicha(id); } catch (e) { alert(e.message); } }; cuerpo[cuerpo.length - 1].append(bp); }
   if (f.aparatos) { const bo = el("button", "Olvidar sus aparatos", { type: "button", className: "peligro", style: "margin-top:8px" }); bo.onclick = async () => { if (!confirm("Este cliente tendrá que volver a pedir permiso a la oficina desde cada aparato. ¿Olvidar sus aparatos?")) return; try { await call(`/api/admin/cliente/${encodeURIComponent(id)}/aparatos/olvidar`, {}); abrirFicha(id); } catch (e) { alert(e.message); } }; cuerpo[cuerpo.length - 1].append(bo); }
   const chips = el("div", "", { className: "fi-chips" });
   if (pa?.pedidos) {

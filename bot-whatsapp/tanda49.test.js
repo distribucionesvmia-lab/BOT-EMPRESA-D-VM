@@ -91,7 +91,7 @@ test("unzip: una «bomba» ZIP (pequeña que se hincha) se rechaza en vez de lle
 test("piezas del servidor: tiempos máximos, límite de pedidos en el chat, avisos al cliente y registro de actividad", () => {
   const sv = src("./server.js"), ad = src("./admin.js"), au = src("./auth.js");
   assert.match(sv, /servidorHttp\.headersTimeout = 20_000/); assert.match(sv, /servidorHttp\.requestTimeout = clientEnabled && !adminEnabled \? 60_000/);
-  assert.match(sv, /\(chat\)/); assert.match(sv, /pedidosLimite\(String\(account\.id\)\)\) \{ eventoSeguridad\("demasiados-pedidos", `cuenta \$\{account\.id\} \(chat\)`\)/);
+  assert.match(sv, /\(chat\)/); assert.match(sv, /topePedidos\(account\.id, " \(chat\)"\)/); assert.match(sv, /eventoSeguridad\("demasiados-pedidos", `cuenta \$\{cuentaId\}\$\{via\}`\)/);
   assert.match(sv, /Nuevo acceso a tu cuenta/); assert.match(sv, /Código de entrada cambiado/); assert.match(sv, /usarRegistro\(/);
   assert.match(sv, /clave-panel-debil/); assert.match(sv, /intentos-sospechosos/);
   assert.match(ad, /etiquetaAccion\(req\.method, p\)/); assert.match(ad, /p === "\/api\/admin\/seguridad"/); assert.match(ad, /panel-clave-incorrecta/);

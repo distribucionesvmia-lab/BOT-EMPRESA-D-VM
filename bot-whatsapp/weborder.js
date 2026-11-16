@@ -139,6 +139,7 @@ export function webOrderFromBody(body, customer, { key, phone, at = new Date().t
   }
   const items = [...merged.values()];
   if (!items.length) return { error: "El pedido está vacío" };
+  if (items.length > (Number(process.env.PEDIDO_MAX_LINEAS) || 200)) return { error: "El pedido tiene demasiadas líneas (máximo 200). Divídelo en dos pedidos o llámanos." }; // un pedido de verdad no pasa de ahí; un bot sí podría intentarlo
   const nota = typeof body?.note === "string" ? body.note.trim().slice(0, 200) : "";
   // Dirección de entrega: la de siempre, o la que escribe el cliente («otra dirección»). Un cliente nuevo (sin dirección guardada) tiene que ponerla.
   const otra = typeof body?.deliveryAddress === "string" ? body.deliveryAddress.replace(/\s+/g, " ").trim().slice(0, 160) : "";

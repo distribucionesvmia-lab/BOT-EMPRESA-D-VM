@@ -50,6 +50,15 @@ import { enviarCampanas } from "./correo-campanas.js";
 import { crearCorreoCliente, smtpDesdeEntorno, elegirDestino, tapar, emailValido, correoCodigoAcceso } from "./correo-cliente.js";
 import { zip as zipNode } from "./zip.js";
 import { limpiaError, navegadorCorto } from "./errores.js";
+const pedidosDia = rateLimiter(Number(process.env.PEDIDOS_DIA_LIMIT ?? 40), 24 * 3600e3); // pedidos por cliente y día
+const pedidosGlobal = rateLimiter(Number(process.env.PEDIDOS_GLOBAL_LIMIT ?? 300), 600e3); // pedidos entre TODOS los clientes en 10 minutos: freno general (si alguien robara muchas cuentas o hubiera un fallo, la oficina no se inunda)
+/** Topes de pedidos: por cliente y hora, por cliente y día y en total. Devuelve el texto a enseñar si se pasa de alguno, o "" si puede seguir. */
+const topePedidos = (cuentaId, via = "") => {
+  if (!pedidosLimite(String(cuentaId))) { eventoSeguridad("demasiados-pedidos", `cuenta ${cuentaId}${via}`); return "Has enviado muchos pedidos en poco tiempo. Si necesitas más, llámanos y lo hacemos contigo."; }
+  if (!pedidosDia(String(cuentaId))) { eventoSeguridad("demasiados-pedidos-dia", `cuenta ${cuentaId}${via}`); return "Hoy has enviado muchos pedidos. Si necesitas más, llámanos y lo hacemos contigo."; }
+  if (!pedidosGlobal("todos")) { eventoSeguridad("pedidos-tope-global", `se alcanzó el máximo de pedidos en 10 minutos${via}`); return "Ahora mismo estamos recibiendo muchos pedidos a la vez. Inténtalo de nuevo en unos minutos o llámanos."; }
+  return "";
+};
 const pedidosLimite = rateLimiter(Number(process.env.PEDIDOS_LIMIT ?? 30), 3600e3); // pedidos enviados por cliente y hora (aunque alguien robara un código, no podría mandar cientos)
 const latidoLimite = rateLimiter(Number(process.env.LATIDO_LIMIT ?? 20), 60e3); // latidos por minuto y cliente (el normal es 1 cada 45 s)
 const errLimitCliente = rateLimiter(Number(process.env.ERR_LIMIT ?? 30), 3600e3), errLimitIp = rateLimiter(Number(process.env.ERR_LIMIT_IP ?? 60), 3600e3); // avisos de error por hora: por cliente y, sin sesión, por dirección
@@ -578,7 +587,7 @@ async function accountChat(account, text, msgId, carrito = null) {
   const out = handleMessage(cur, text, { carritoExterno: itemsDeCarrito(carrito) });
   chatSessions.set(account.id, { session: out.session, last: Date.now() });
   if (out.order && account.soloVer) { out.order = null; out.reply = SOLO_VER_TEXTO; } // enlace de «solo ver»: nada se envía
-  if (out.order && !pedidosLimite(String(account.id))) { eventoSeguridad("demasiados-pedidos", `cuenta ${account.id} (chat)`); out.order = null; out.reply = "Has enviado muchos pedidos en poco tiempo. Si necesitas más, llámanos y lo hacemos contigo."; } // el mismo tope que el catálogo
+  if (out.order) { const tope = topePedidos(account.id, " (chat)"); if (tope) { out.order = null; out.reply = tope; } } // el mismo tope que el catálogo
   if (out.order) {
     const key = `chat:${account.id}:${msgId ?? crypto.randomUUID()}`; // el mismo mensaje reenviado no duplica el pedido
     const { order: guardado } = await createOrder(priceOrder({ at: new Date().toISOString(), phone: account.phone, key, ...holdIfUnconfirmed(account, out.order) }, customer, catalogNow()));
@@ -942,7 +951,7 @@ async function appRoutes(req, res, url) {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     if (account.soloVer) return void sendJson(res, 403, { error: SOLO_VER_TEXTO, soloVer: true }); // enlace de «solo ver»: el servidor no deja enviar pedidos, se haga como se haga
     if (!isJson(req)) return void sendJson(res, 415, { error: "Formato no válido" });
-    if (!pedidosLimite(String(account.id))) { eventoSeguridad("demasiados-pedidos", `cuenta ${account.id}`); return void sendJson(res, 429, { error: "Has enviado muchos pedidos en poco tiempo. Si necesitas más, llámanos y lo hacemos contigo." }); }
+    { const tope = topePedidos(account.id); if (tope) return void sendJson(res, 429, { error: tope }); }
     const body = await readJson(req);
     const key = typeof body?.key === "string" && /^[\w-]{8,64}$/.test(body.key) ? body.key : null;
     if (!key) return void sendJson(res, 400, { error: "Solicitud no válida" });

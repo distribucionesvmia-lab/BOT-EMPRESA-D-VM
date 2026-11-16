@@ -439,6 +439,10 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
         if (!accounts.accesoSolicitudResolver(id, ma[2] === "aprobar" ? "aprobada" : "rechazada")) return send(res, 409, { error: "Esa solicitud ya no está pendiente." }), true;
         return send(res, 200, { ok: true }), true;
       } }
+    // ---- Contraseñas de los clientes: quién se ha activado (creó su contraseña) y restablecer si hace falta ----
+    if (p === "/api/admin/accesos-nuevos" && get) return send(res, 200, { lista: accounts.accesosNuevos({ dias: 30 }).map((x) => ({ ...x, cliente: customers.getById(x.customerId)?.name ?? `Cliente ${x.customerId}`, telefono: customers.getById(x.customerId)?.phone ?? "" })) }), true;
+    if (post) { const mr = /^\/api\/admin\/cliente\/([\w-]{1,20})\/password\/restablecer$/.exec(p);
+      if (mr) { if (!customers.getById(mr[1])) return send(res, 404, { error: "No existe ese cliente." }), true; accounts.passwordQuitar(mr[1]); return send(res, 200, { ok: true }), true; } }
     if (p === "/api/admin/invitaciones" && get) {
       const nom = (x) => (x.tipo === "alta" ? x.nombre : customers.getById(x.cliente)?.name ?? x.nombre ?? "Cliente " + x.cliente);
       return send(res, 200, { enlaces: accounts.invitacionesLista().map((x) => ({ ...x, nombre: nom(x) })), plantilla: accounts.ajuste("plantilla_enlace") || PLANTILLA_DEFECTO, plantillaDefecto: PLANTILLA_DEFECTO }), true;
@@ -571,7 +575,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
             ofertasCorreo: accounts.ofertasDe(id),
             correoPedidos: { destino: elegirDestino({ account: cu, customer: c }), activo: accounts.correoPedidoActivo(id), delaCuenta: !!cu?.email && elegirDestino({ account: cu, customer: c }) === cu.email },
             cuenta: cu ? { estado: cu.status, confirmada: cu.verified, bloqueada: cu.locked, ultimoAcceso: cu.lastLogin, creada: cu.createdAt, codigoPropio: cu.ownCode } : null,
-            aparatos: accounts.aparatosDe(id).length,
+            aparatos: accounts.aparatosDe(id).length, password: accounts.passwordInfo(id),
             totalPedidosApp: todos.length,
             pedidos: todos.slice(0, 12).map(orderView).map((o) => ({ ref: o.ref, fecha: o.fecha, entrega: o.entrega?.texto ?? "", total: o.total, estado: o.estado, modificado: o.modificado, lineas: o.lineas.slice(0, 30).map((l) => ({ nombre: l.nombre, unidades: l.unidades, cajas: l.unidad === "caja" ? l.cajas : 0 })) })),
             erp: { pedidos: c.orders?.length ?? 0, ultimo: compra?.date ?? null },

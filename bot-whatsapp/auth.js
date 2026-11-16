@@ -102,6 +102,24 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const registerLimit = rateLimiter(Number(process.env.REGISTER_LIMIT ?? 20), 60 * 60_000);
   const intentosAcceso = contadorIntentos(Number(process.env.CAPTCHA_DESPUES_DE ?? 5), 10 * 60_000); // pasados N intentos en 10 min desde una dirección, se pide «no soy un robot»
   // Entrada aprobada por la oficina: topes por dirección, por cliente y en total (que nadie pueda llenar el panel de la empresa de solicitudes)
+  // Entrada con NOMBRE + NIF + CONTRASEÑA (por defecto). La primera vez, el cliente crea su contraseña; después solo la escribe (y el aparato queda recordado un año). ACCESO_MODO=oficina vuelve a «la oficina da paso / código por correo».
+  const pwActiva = () => process.env.ACCESO_MODO !== "oficina";
+  const pwIp = rateLimiter(Number(process.env.PW_IP_LIMIT ?? 12), 10 * 60_000); // intentos de entrar por dirección
+  const pwCrearIp = rateLimiter(Number(process.env.PW_CREAR_IP_LIMIT ?? 5), 60 * 60_000); // contraseñas nuevas por dirección y hora
+  const pwCrearGlobal = rateLimiter(Number(process.env.PW_CREAR_GLOBAL_LIMIT ?? 100), 60 * 60_000);
+  const pwFallosGlobal = rateLimiter(Number(process.env.PW_FALLOS_GLOBAL ?? 120), 60 * 60_000); // intentos con datos que no coinciden con ningún cliente
+  const PW_TRIVIAL = new Set(["12345678", "123456789", "1234567890", "87654321", "11111111", "00000000", "12341234", "password", "password1", "contrasena", "contraseña", "qwertyui", "qwertyuiop", "abcdefgh", "abc12345", "abcd1234", "iloveyou", "asdfghjk", "12345678a", "a1234567"]);
+  const sinAcentos = (t) => String(t ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+  /** ¿Sirve como contraseña? 8 a 64 caracteres, no de las típicas, no repetida y NO relacionada con su NIF ni con el nombre de su empresa (es lo primero que probaría alguien). Devuelve el motivo o "". */
+  const motivoPassword = (p, nif, empresa) => {
+    if (typeof p !== "string" || p.length < 8) return "La contraseña tiene que tener al menos 8 caracteres.";
+    if (p.length > 64) return "La contraseña es demasiado larga (máximo 64 caracteres).";
+    if (PW_TRIVIAL.has(p.toLowerCase()) || /^(.)\1+$/.test(p)) return "Esa contraseña es demasiado fácil de adivinar. Elige otra.";
+    const q = sinAcentos(p), n = sinAcentos(nif), e = sinAcentos(empresa), cifras = n.replace(/[a-z]/g, "");
+    const comoNif = n.length >= 6 && (q.includes(n) || (q.length >= 6 && n.includes(q)) || (cifras.length >= 6 && q.includes(cifras.slice(0, 6))));
+    if (comoNif || (e.length >= 4 && (q === e || q.includes(e)))) return "No uses tu NIF ni el nombre de tu empresa: son datos que conoce cualquiera.";
+    return "";
+  };
   const codigoPorCorreo = () => !!enviarCodigo && process.env.CODIGO_CORREO !== "0"; // con correo configurado, el cliente entra SOLO con el código que le llega al correo que ya tenemos (sin que la oficina apruebe nada)
   const oficinaActiva = () => process.env.ACCESO_OFICINA !== "0";
   const soloOficina = () => oficinaActiva() && process.env.ACCESO_SOLO_OFICINA !== "0"; // por defecto SOLO se entra así (ACCESO_SOLO_OFICINA=0 reabre las otras formas, solo para emergencias)
@@ -182,7 +200,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     }
     if (!p.startsWith("/api/")) return false;
 
-    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null, accesoOficina: oficinaActiva(), soloOficina: soloOficina(), codigoCorreo: codigoPorCorreo() }), true; // solo la clave PÚBLICA, si está activada
+    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null, accesoOficina: oficinaActiva(), soloOficina: soloOficina(), codigoCorreo: codigoPorCorreo(), accesoPassword: pwActiva() }), true; // solo la clave PÚBLICA, si está activada
 
     if (p === "/api/registro" && req.method === "POST") {
       if (!registerLimit(ip(req))) return eventoSeguridad("muchas-solicitudes-de-alta", ip(req)), demasiados(res, registerLimit, ip(req)), true;
@@ -295,6 +313,71 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       return send(res, 200, { estado: ["pendiente", "rechazada", "caducada", "usada", "reemplazada"].includes(e.estado) ? e.estado : "pendiente", ...(e.estado === "pendiente" ? { ref: e.ref } : {}) }), true; // «desconocida» (NIF que no coincide) se enseña como pendiente: no se puede averiguar
     }
 
+    // ── Entrar con nombre + NIF + CONTRASEÑA ──
+    // Respuestas que no dicen si un NIF existe: datos que no coinciden → siempre «los datos no son correctos». Solo cuando nombre + NIF encajan con UN cliente que
+    // todavía no tiene contraseña se le propone crearla (esa es la decisión de la empresa: crearla en el momento, sin esperar a nadie; la oficina lo ve en el panel y lo puede deshacer).
+    if ((p === "/api/acceso/pw/entrar" || p === "/api/acceso/pw/crear") && req.method === "POST") {
+      const crear = p.endsWith("/crear");
+      if (!pwActiva()) return send(res, 503, { error: "Esta forma de entrar no está disponible ahora. Llámanos." }), true;
+      if (!loginLimit(ip(req))) return demasiados(res, loginLimit, ip(req)), true;
+      if (!pwIp(ip(req))) return eventoSeguridad("pw-muchos-intentos", ip(req)), demasiados(res, pwIp, ip(req)), true;
+      const b = await readJson(req);
+      if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
+      const MAL = { error: "Los datos no son correctos. Revisa el nombre de tu empresa, tu NIF y tu contraseña. Si no la recuerdas, llámanos." };
+      // Contra bots: campo trampa o enviado más rápido de lo que escribe una persona (o sin decirlo) → se responde como un fallo normal y no se prueba nada
+      if (String(b.sitio_web ?? "").trim()) return eventoSeguridad("acceso-con-campo-trampa", ip(req)), send(res, 401, MAL), true;
+      if (!(Number(b.t) >= 1500)) return eventoSeguridad("acceso-demasiado-rapido", ip(req)), send(res, 401, MAL), true;
+      if (turnstileActivo() && (crear || intentosAcceso.pasado(intentosAcceso.suma(ip(req))))) { // «no soy un robot»: siempre para crear una contraseña, y al entrar cuando hay muchos intentos
+        if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
+      }
+      if (pedirNombre(res, b)) return true;
+      if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe tu NIF: los 6 primeros dígitos de tu DNI o CIF, o el NIF completo." }), true;
+      const password = typeof b.password === "string" ? b.password : "";
+      if (!password) return send(res, 400, { error: crear ? "Elige una contraseña." : "Escribe tu contraseña." }), true;
+      const ids = clientesPorNombreYNif(b.nif, b.empresa);
+      const abrir = (customerId) => {
+        const r = abrirConAparato(customerId, req, { nuevo: true }); // este aparato queda recordado: la próxima vez entra solo
+        if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." }), true;
+        return send(res, 200, { ok: true, cliente: { nombre: customers.getById(r.account.customerId)?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), r.cookies) }), true;
+      };
+      if (crear) {
+        const motivo = motivoPassword(password, b.nif, b.empresa); // se mira SIEMPRE (coincida o no el cliente): así no se averigua nada
+        if (motivo) return send(res, 400, { error: motivo }), true;
+        if (typeof b.password2 === "string" && b.password2 !== password) return send(res, 400, { error: "Las dos contraseñas no coinciden." }), true;
+        if (!pwCrearIp(ip(req))) return eventoSeguridad("pw-muchas-altas", ip(req)), demasiados(res, pwCrearIp, ip(req), "Demasiadas contraseñas nuevas desde esta conexión. Llámanos si necesitas ayuda."), true;
+        if (!pwCrearGlobal("todas")) return eventoSeguridad("pw-tope-global", "se alcanzó el máximo de contraseñas nuevas por hora"), send(res, 429, { error: "Ahora mismo no podemos crear más accesos. Llámanos." }), true;
+        if (ids.length !== 1) { accounts.passwordFalso(); return send(res, 409, { error: "No hemos podido crear tu acceso con esos datos. Si ya tienes contraseña, entra con ella; si no la recuerdas, llámanos." }), true; }
+        const c = accounts.passwordCrear(ids[0], password, { aparato: navegadorCorto(req.headers["user-agent"]), ip: ip(req) });
+        if (!c.ok) return send(res, c.reason === "deleted" ? 401 : 409, { error: c.reason === "deleted" ? MENSAJE_ELIMINADA : c.reason === "locked" ? "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." : "No hemos podido crear tu acceso con esos datos. Si ya tienes contraseña, entra con ella; si no la recuerdas, llámanos." }), true;
+        console.log(`[VM acceso] Contraseña creada por primera vez para el cliente ${ids[0]} (${navegadorCorto(req.headers["user-agent"])})`);
+        const r = abrir(ids[0]); try { const acc = accounts.listAccounts().find((a) => a.customerId === ids[0]); if (acc) onCodigo?.(acc); } catch {} // aviso al móvil del cliente, si lo tiene: «si no has sido tú, llama»
+        return r;
+      }
+      if (ids.length !== 1) { accounts.passwordFalso(); if (!pwFallosGlobal("fallos")) return demasiados(res, pwFallosGlobal, "fallos", "Demasiados intentos. Si lo necesitas, llama a la empresa."), true; return send(res, 401, MAL), true; }
+      if (!accounts.passwordTiene(ids[0])) return send(res, 409, { necesitaCrear: true, error: "Es tu primera vez: elige una contraseña para tu cuenta." }), true;
+      const r = accounts.passwordComprobar(ids[0], password);
+      if (r.reason === "deleted") return send(res, 401, { error: MENSAJE_ELIMINADA }), true;
+      if (r.reason === "locked") return send(res, 401, { error: "Cuenta bloqueada temporalmente por varios intentos fallidos. Inténtalo más tarde o llama a la empresa." }), true;
+      if (!r.ok) return send(res, 401, MAL), true;
+      return abrir(ids[0]);
+    }
+    // El cliente (con sesión) cambia su contraseña: si ya tenía una, tiene que escribir la actual.
+    if (p === "/api/password" && req.method === "POST") {
+      const acc = sessionOf(req);
+      if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
+      if (!loginLimit(ip(req)) || !pwIp(ip(req))) return demasiados(res, pwIp, ip(req)), true;
+      const b = await readJson(req);
+      if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
+      if (accounts.passwordTiene(acc.customerId)) {
+        if (!accounts.passwordComprobar(acc.customerId, String(b.actual ?? "")).ok) return send(res, 401, { error: "La contraseña actual no es correcta." }), true;
+      }
+      const motivo = motivoPassword(b.nueva, "", ""); if (motivo) return send(res, 400, { error: motivo }), true;
+      if (typeof b.nueva2 === "string" && b.nueva2 !== b.nueva) return send(res, 400, { error: "Las dos contraseñas no coinciden." }), true;
+      accounts.passwordCambiar(acc.id, b.nueva, parseCookies(req.headers.cookie)[COOKIE]);
+      try { onCodigo?.(acc); } catch {}
+      return send(res, 200, { ok: true }), true;
+    }
+
     // «Necesito ayuda»: el código por correo no llega (o no hay correo): la solicitud pasa a verse en el panel de la oficina, que le puede dejar entrar o darle un código
     if (p === "/api/acceso/oficina/ayuda" && req.method === "POST") {
       if (!oficinaActiva()) return send(res, 503, { error: "Esta forma de entrar no está disponible ahora. Llámanos." }), true;
@@ -371,7 +454,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         if (r?.ok) { acc = r.account; extra = { "Set-Cookie": (avisoAcceso(r.token, req), r.cookies) }; }
       }
       if (!acc) return send(res, 200, { cliente: null }), true; // invitado: sin sesión no es un error (la consola del navegador queda limpia)
-      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode || soloOficina(), soloOficina: soloOficina(), soloVer: !!acc.soloVer, mensajeEnlace: acc.mensajeEnlace || "", carrito: "vm_carrito_c_" + String(acc.customerId) } }, extra), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
+      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode || soloOficina(), soloOficina: soloOficina(), tienePassword: accounts.passwordTiene(acc.customerId), soloVer: !!acc.soloVer, mensajeEnlace: acc.mensajeEnlace || "", carrito: "vm_carrito_c_" + String(acc.customerId) } }, extra), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
     }
 
     // El cliente cambia el código de entrada (los 6 del NIF) por uno personal de 6 letras o números
