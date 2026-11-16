@@ -90,3 +90,13 @@ test("piezas: server arranca el planificador y pasa la copia previa; admin ense�
   assert.match(ad, /s\.startsWith\(pre\)/); assert.match(ad, /BASES_DIR/); assert.match(ad, /route\.autoBases = autoBases/);
   assert.match(html, /ACTUALIZACIÓN AUTOMÁTICA ACTIVADA/); assert.match(html, /No se ha aplicado solo/);
 });
+
+test("la política de scripts acepta el script en línea aunque la página llegue con saltos de línea de Windows (CRLF)", async () => {
+  const { cspEstricta } = await import("./seguridad.js");
+  const crypto = await import("node:crypto");
+  const h = (t) => `'sha256-${crypto.createHash("sha256").update(t, "utf8").digest("base64")}'`;
+  const js = "var a = 1;\nvar b = 2;\n";
+  const csp = cspEstricta(`<html><script>${js.replace(/\n/g, "\r\n")}</script></html>`);
+  assert.ok(csp.includes(h(js)), "falta la huella con LF (la que calcula el navegador)");
+  assert.ok(csp.includes(h(js.replace(/\n/g, "\r\n"))));
+});

@@ -164,7 +164,9 @@ export function cspEstricta(html) {
   const huellas = new Set();
   for (const m of String(html).matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
     if (/\bsrc\s*=/i.test(m[1]) || !m[2].trim()) continue;
-    huellas.add(`'sha256-${crypto.createHash("sha256").update(m[2], "utf8").digest("base64")}'`);
+    // El navegador cambia los saltos de línea de Windows (CRLF) por LF al leer la página, y su huella es la del texto ya cambiado: se admiten las dos versiones
+    // (si no, con git en Windows el script en línea se bloqueaba y el panel de la empresa no dejaba entrar, sin ningún mensaje).
+    for (const t of new Set([m[2], m[2].replace(/\r\n?/g, "\n")])) huellas.add(`'sha256-${crypto.createHash("sha256").update(t, "utf8").digest("base64")}'`);
   }
   return CSP.replace("script-src 'self' 'unsafe-inline'", ["script-src 'self'", ...huellas].join(" "));
 }
