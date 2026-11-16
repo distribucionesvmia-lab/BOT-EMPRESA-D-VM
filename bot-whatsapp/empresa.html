@@ -768,8 +768,10 @@ const eurp = (n) => Number(n).toFixed(3).replace(".", ",") + " €"; // precio d
 const el = (tag, text, props = {}) => Object.assign(document.createElement(tag), { textContent: text ?? "" }, props);
 const hora = (iso) => new Date(iso).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
+/** Cabecera con la clave: si lleva caracteres que una cabecera no admite («€», «—», emojis…) se manda en base64 (el servidor lo entiende), así nunca falla en silencio. */
+function cabClave() { const k = String(clave ?? "").trim(); return "Bearer " + (/^[\x20-\x7e]*$/.test(k) ? k : "b64:" + btoa(String.fromCharCode(...new TextEncoder().encode(k)))); }
 async function call(path, body, raw) {
-  const r = await fetch(path, { method: body ? "POST" : "GET", headers: { Authorization: "Bearer " + clave, ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(path, { method: body ? "POST" : "GET", headers: { Authorization: cabClave(), ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
   if (r.status === 429) { clearInterval(timer); $("app").hidden = true; $("login").hidden = false; throw new Error("Demasiados intentos con una clave errónea. Espera unos minutos y vuelve a probar."); }
   if (r.status === 403) { try { sessionStorage.removeItem("vm_admin"); } catch {} clearInterval(timer); $("app").hidden = true; $("login").hidden = false; throw new Error("Clave incorrecta"); }
   if (raw) return r;
@@ -1181,7 +1183,7 @@ function adPinta(r, p) {
 async function adLlamar(ruta, p, fichero, extra = "") {
   const max = $(p + "-tipo").value === "fotos" ? 80e6 : 25e6;
   if (fichero.size > max) throw new Error(`El archivo pesa ${Math.round(fichero.size / 1e6)} MB y el máximo es ${max / 1e6} MB. Haz un ZIP con las fotos (pesa mucho menos que un Excel con fotos) o súbelo en dos partes.`);
-  const r = await fetch(`/api/admin/${ruta}/${$(p + "-tipo").value}?fichero=${encodeURIComponent(fichero.name)}${extra}`, { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": "application/octet-stream" }, body: fichero });
+  const r = await fetch(`/api/admin/${ruta}/${$(p + "-tipo").value}?fichero=${encodeURIComponent(fichero.name)}${extra}`, { method: "POST", headers: { Authorization: cabClave(), "Content-Type": "application/octet-stream" }, body: fichero });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || "No se pudo procesar el Excel");
   return j;
@@ -1254,7 +1256,7 @@ async function articulos() {
         if (f.existe && !confirm(`¿Cambiar la foto de «${a.nombre}»?\n\nLa foto actual no se borra: se guarda en la carpeta «anteriores».`)) return;
         bt.disabled = true; etq.textContent = "Subiendo…";
         try {
-          const r = await fetch(`/api/admin/articulos/${encodeURIComponent(a.id)}/foto`, { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": fi.type }, body: fi }), j = await r.json().catch(() => ({}));
+          const r = await fetch(`/api/admin/articulos/${encodeURIComponent(a.id)}/foto`, { method: "POST", headers: { Authorization: cabClave(), "Content-Type": fi.type }, body: fi }), j = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(j.error || "No se ha podido guardar la foto.");
           etq.textContent = `Foto ${j.w}×${j.h} px · ${{ pequena: "pequeña: se ve borrosa", justa: "justa", buena: "buena" }[j.calidad]} · guardada (los clientes la verán en un minuto)`; etq.className = j.calidad === "pequena" ? "foto-mala" : "";
         } catch (e) { etq.textContent = e.message; etq.className = "foto-mala"; } finally { bt.disabled = false; }
@@ -1326,7 +1328,7 @@ const recargarArticulos = () => { clearTimeout(tAr); tAr = setTimeout(() => { pa
   $("fz-revisar").onclick = async () => {
     const fi = f.files[0]; if (!fi) return; $("fz-revisar").disabled = true; $("fz-msg").textContent = "Leyendo el zip y emparejando…";
     try {
-      const r = await fetch("/api/admin/fotos/zip", { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": "application/zip" }, body: fi }), j = await r.json().catch(() => ({}));
+      const r = await fetch("/api/admin/fotos/zip", { method: "POST", headers: { Authorization: cabClave(), "Content-Type": "application/zip" }, body: fi }), j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "No se ha podido revisar el zip.");
       rev = j; $("fz-msg").textContent = "";
       $("fz-resumen").textContent = `El zip trae ${j.total} fotos: ${j.filas.length} se emparejan con un artículo, ${j.dudosas.length} son dudosas y ${j.sin.length} no tienen artículo parecido${j.ignoradas.filter((x) => x.motivo !== "no es una foto").length ? `; ${j.ignoradas.filter((x) => x.motivo !== "no es una foto").length} fotos no se pueden usar (pesan más de 6 MB o son demasiado pequeñas)` : ""}. Todavía no se ha cambiado nada.`;
@@ -1343,7 +1345,7 @@ const recargarArticulos = () => { clearTimeout(tAr); tAr = setTimeout(() => { pa
     if (!confirm(`¿Poner ${ids.length} fotos nuevas?\n\nLas fotos que había antes no se borran: se guardan en la carpeta «anteriores».`)) return;
     $("fz-aplicar").disabled = true; $("fz-msg2").textContent = "Poniendo las fotos…";
     try {
-      const r = await fetch("/api/admin/fotos/zip/aplicar", { method: "POST", headers: { Authorization: "Bearer " + clave, "Content-Type": "application/json" }, body: JSON.stringify({ token: rev.token, ids, forzar: $("fz-forzar").checked, confirmo: true }) }), j = await r.json().catch(() => ({}));
+      const r = await fetch("/api/admin/fotos/zip/aplicar", { method: "POST", headers: { Authorization: cabClave(), "Content-Type": "application/json" }, body: JSON.stringify({ token: rev.token, ids, forzar: $("fz-forzar").checked, confirmo: true }) }), j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "No se han podido poner las fotos.");
       $("fz-msg2").textContent = `Hecho: ${j.hechas} fotos puestas${j.saltadas.length ? `, ${j.saltadas.length} no se han podido poner (${j.saltadas.slice(0, 3).map((x) => x.id + ": " + x.motivo).join("; ")}${j.saltadas.length > 3 ? "…" : ""})` : ""}. Los clientes las verán en un minuto.`;
       rev = null; $("fz-lista").textContent = ""; $("fz-aplicar").disabled = true; recargarArticulos();
@@ -1954,7 +1956,7 @@ $("bg-res").addEventListener("keydown", (e) => { const bs = [...$("bg-res").quer
 document.addEventListener("click", (e) => { if (!e.target.closest(".busca-g")) bgCerrar(); });
 document.addEventListener("keydown", (e) => { if (e.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) && !$("app").hidden) { e.preventDefault(); $("bg-q").focus(); } });
 async function entrar() { try { await refrescar(); if ($("app").hidden && clave) { await call("/api/admin/resumen"); $("login").hidden = true; $("app").hidden = false; clearInterval(timer); timer = setInterval(refrescar, 15000); } } catch (e) { $("l-err").textContent = e.message; } }
-$("f-login").onsubmit = (e) => { e.preventDefault(); clave = $("clave").value; try { sessionStorage.setItem("vm_admin", clave); } catch {} $("l-err").textContent = ""; entrar(); };
+$("f-login").onsubmit = (e) => { e.preventDefault(); clave = $("clave").value.trim(); try { sessionStorage.setItem("vm_admin", clave); } catch {} $("l-err").textContent = ""; entrar(); };
 if (clave) entrar();
 </script>
 </body>

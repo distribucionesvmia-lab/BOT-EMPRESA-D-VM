@@ -86,3 +86,12 @@ Es lo que más protege: no abres puertos del router, tienes HTTPS y Cloudflare f
 **Quién no podrá entrar hasta que lo arregles**: los clientes **sin correo en su ficha** y los que **no tienen NIF** en a3ERP. Míralos en «Datos y Excel» → Clientes → «Ver cambios»: listas **«sin correo»** y **«sin NIF»**. Se arregla añadiendo el correo en la ficha del cliente (**«Editar datos»**) o volviendo a subir el Excel de clientes con el dato.
 
 **Lo que sigue funcionando sin código** (lo crea la empresa a propósito): los **enlaces de acceso** que generas en el panel y el enlace del chat de WhatsApp.
+
+## Si no puedes entrar al panel de la empresa («Clave incorrecta» aunque la sepas)
+La clave del panel es `ADMIN_TOKEN` en **`C:\vm\config\empresa.env`** (no es la del correo: esa es `SMTP_PASS`). Causas, de más a menos habitual:
+1. **Cambiaste la clave en `empresa.env` y no reiniciaste** «VM Empresa»: sigue valiendo la antigua. `schtasks /End /TN "VM Empresa"` y `schtasks /Run /TN "VM Empresa"`.
+2. **Espacios pegados** al copiar la clave, o **comillas / espacios** en el archivo: ya no importan (el programa los quita en los dos lados).
+3. **Caracteres especiales** (`€`, `—`, `ñ`, emojis…): ya valen (el panel los manda codificados). Si no quieres líos, usa una clave de letras y números.
+4. **Bloqueo temporal**: 10 claves distintas erróneas en 10 minutos desde el mismo ordenador bloquean el panel 10 minutos, **incluso con la clave buena**. El panel avisa «Demasiados intentos». Espera 10 minutos, o reinicia «VM Empresa» (borra el contador).
+5. **Estás en otra red**: el panel solo abre desde el propio ordenador, la red de la oficina o Tailscale (si no, ni carga la pantalla: ver «Quinta tanda»).
+6. La clave se guarda en el navegador solo mientras la pestaña esté abierta: al cerrarla hay que escribirla otra vez.

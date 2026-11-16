@@ -73,10 +73,14 @@ const sameToken = (a, b) => {
 
 /** Comprueba la clave de la empresa (cabecera Authorization: Bearer …). Sin clave configurada, nadie es administrador. */
 export function makeAdminCheck(adminToken) {
+  const clave = String(adminToken ?? "").trim().replace(/^(["'])(.*)\1$/, "$2").trim(); // sin espacios ni comillas sobrantes del archivo de configuración
   return (req) => {
-    if (!adminToken) return false;
-    const m = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
-    return !!m && sameToken(m[1], adminToken);
+    if (!clave) return false;
+    const m = /^Bearer\s+(.+?)\s*$/.exec(req.headers.authorization ?? "");
+    if (!m) return false;
+    let presentada = m[1]; // el navegador no puede mandar en una cabecera caracteres como «€» o «—»: el panel los manda en base64 con el prefijo «b64:»
+    if (presentada.startsWith("b64:")) { try { presentada = Buffer.from(presentada.slice(4), "base64").toString("utf8"); } catch { return false; } }
+    return sameToken(presentada.trim(), clave);
   };
 }
 export { send, readJson };
