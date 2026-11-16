@@ -29,5 +29,7 @@ export function nifMatches(customerId, typed, keys) {
 export const codeKey = (code) => crypto.createHmac("sha256", pepper()).update(`codigo:${nifClean(code)}`).digest("hex");
 export const validCode = (code) => /^[A-Z0-9]{6}$/.test(nifClean(code)); // la contraseña personal: exactamente 6 letras o números (mayúsculas y minúsculas valen igual)
 
-/** Huella del código de 6 cifras que se manda por correo para entrar (solo se guarda esto, nunca el código; va atada al cliente). */
+/** Huella del código de 6 cifras que da la oficina para entrar (solo se guarda esto, nunca el código; va atada al cliente). */
+export const claveCodigoOficina = (customerId, code) => crypto.createHmac("sha256", pepper()).update(`oficina:${customerId}:${String(code).replace(/\D/g, "")}`).digest("hex");
+/** (en desuso) Huella del código de 6 cifras que se mandaba por correo para entrar (solo se guarda esto, nunca el código; va atada al cliente). */
 export const claveCodigoCorreo = (customerId, code) => crypto.createHmac("sha256", pepper()).update(`correo:${customerId}:${String(code).replace(/\D/g, "")}`).digest("hex");

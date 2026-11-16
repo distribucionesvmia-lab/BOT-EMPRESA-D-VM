@@ -24,7 +24,7 @@ before(async () => {
   proc = spawn(process.execPath, ["server.js"], {
     cwd: path.dirname(fileURLToPath(import.meta.url)),
     env: {
-      ...process.env, VM_HOY: "2026-11-15", DEMO: "1", ALTA_AUTOMATICA: "1" /* estas pruebas usan el alta automática como preparación; por defecto (producción) TODA alta la acepta la empresa: tanda57.test.js */, PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
+      ...process.env, VM_HOY: "2026-11-15", DEMO: "1", OFICINA_ESPERA_S: "0", ACCESO_SOLO_OFICINA: "0" /* estas pruebas usan las otras formas de entrar; por defecto (producción) SOLO se entra con la aprobación de la oficina: tanda56 */, ALTA_AUTOMATICA: "1" /* estas pruebas usan el alta automática como preparación; por defecto (producción) TODA alta la acepta la empresa: tanda57.test.js */, PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
       DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: syncDir, BACKUP_DIR: path.join(dir, "respaldos"), ENTRADA_DIR: path.join(dir, "entrada"), PUSH_ALLOW_HTTP: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -442,6 +442,34 @@ test("ACCESO CON NIF: las cuentas ya están creadas y el cliente entra solo con 
   assert.match(b.json.error, /bloqueada/);
   await call("POST", `/api/admin/cuentas/${c.id}/bloquear`, { admin: true, body: { bloquear: false } });
   assert.equal((await entrarNif("111111")).status, 200);
+});
+
+test("ENTRADA POR LA OFICINA: el cliente pide con nombre + NIF, la empresa lo ve con su referencia y lo deja entrar con un clic o con un código", async () => {
+  const pedir = () => call("POST", "/api/acceso/oficina/pedir", { body: { nif: "111111", empresa: "Cafeteria Importada" } });
+  const estado = (solicitud, codigo) => call("POST", "/api/acceso/oficina/estado", { body: { solicitud, ...(codigo ? { codigo } : {}) } });
+  assert.equal((await call("GET", "/api/admin/accesos")).status, 403, "sin la clave de la oficina no se ve nada");
+  // 1) aprobar con un clic
+  const a = await pedir(); assert.equal(a.status, 200); assert.match(a.json.ref, /^\d{4}$/);
+  const lista = (await call("GET", "/api/admin/accesos", { admin: true })).json; assert.equal(lista.pendientes.length, 1);
+  const p = lista.pendientes[0]; assert.equal(p.ref, a.json.ref); assert.equal(p.cliente, "CAFETERIA IMPORTADA"); assert.equal(JSON.stringify(lista).includes(a.json.solicitud), false);
+  assert.equal((await call("GET", "/api/admin/hoy", { admin: true })).json.accesos.length, 1, "«Hoy» lo avisa");
+  assert.equal((await estado(a.json.solicitud)).json.estado, "pendiente");
+  assert.equal((await call("POST", `/api/admin/accesos/${p.id}/aprobar`, { body: {} })).status, 403);
+  assert.equal((await call("POST", `/api/admin/accesos/${p.id}/aprobar`, { admin: true, body: {} })).status, 200);
+  assert.equal((await call("POST", `/api/admin/accesos/${p.id}/aprobar`, { admin: true, body: {} })).status, 404, "ya no está pendiente");
+  const e = await estado(a.json.solicitud); assert.equal(e.json.estado, "entra"); assert.equal((await call("GET", "/api/yo", { cookie: cookieOf(e) })).json.cliente.nombre, "CAFETERIA IMPORTADA");
+  assert.notEqual((await estado(a.json.solicitud)).json.estado, "entra", "una sola vez");
+  // 2) código de 6 cifras por teléfono o WhatsApp
+  const b = await pedir(), pb = (await call("GET", "/api/admin/accesos", { admin: true })).json.pendientes[0];
+  const c = await call("POST", `/api/admin/accesos/${pb.id}/codigo`, { admin: true, body: {} }); assert.equal(c.status, 200); assert.match(c.json.codigo, /^\d{6}$/);
+  assert.equal((await estado(b.json.solicitud, c.json.codigo === "000000" ? "111111" : "000000")).status, 401);
+  const ok = await estado(b.json.solicitud, c.json.codigo); assert.equal(ok.status, 200); assert.equal(ok.json.cliente.nombre, "CAFETERIA IMPORTADA");
+  assert.equal((await call("GET", "/api/admin/accesos", { admin: true })).json.pendientes.length, 0);
+  // 3) rechazar
+  const d = await pedir(), pd = (await call("GET", "/api/admin/accesos", { admin: true })).json.pendientes[0];
+  assert.equal((await call("POST", `/api/admin/accesos/${pd.id}/rechazar`, { admin: true, body: {} })).status, 200); assert.equal((await estado(d.json.solicitud)).json.estado, "rechazada");
+  // quien no coincide no llega a la oficina y recibe la misma respuesta
+  const raro = await call("POST", "/api/acceso/oficina/pedir", { body: { nif: "999999", empresa: "Nadie" } }); assert.equal(raro.status, 200); assert.equal((await call("GET", "/api/admin/accesos", { admin: true })).json.pendientes.length, 0);
 });
 
 test("CAMBIAR EL CÓDIGO: el cliente sustituye los 6 del NIF por uno personal; el NIF deja de valer y la empresa puede restablecerlo", async () => {

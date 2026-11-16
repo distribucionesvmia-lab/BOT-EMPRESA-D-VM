@@ -17,7 +17,7 @@ const CLI = `http://127.0.0.1:${P1}`, EMP = `http://127.0.0.1:${P2}`;
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vm-dos-"));
 const aqui = path.dirname(fileURLToPath(import.meta.url));
 const procs = [];
-const comunes = { ...process.env, DEMO: "1", LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", NIF_PEPPER: "pimienta-de-prueba",
+const comunes = { ...process.env, DEMO: "1", ACCESO_SOLO_OFICINA: "0", LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", NIF_PEPPER: "pimienta-de-prueba",
   DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: path.join(dir, "sync"), EXPORT_DIR: path.join(dir, "exp"), BACKUP_DIR: path.join(dir, "resp") };
 
 function arrancar(env) {

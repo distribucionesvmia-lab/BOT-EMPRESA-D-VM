@@ -707,6 +707,7 @@
 .trampa{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}.ts-hueco{min-height:0;margin:8px 0}
   html.solo-correo #cambiar, html.solo-correo .in-codigo, html.solo-correo .bv-codigo { display:none !important; }
   #co-cod { font-size:calc(24px / var(--k,1)); letter-spacing:.35em; text-align:center; font-variant-numeric:tabular-nums; }
+  .co-ref-p { margin:10px 0; } .co-ref-p small { display:block; color:var(--text-2); } .co-ref { font:700 28px/1 ui-monospace, Consolas, monospace; letter-spacing:.2em; color:var(--accent); }
 </style>
 </head>
 <body>
@@ -724,21 +725,21 @@
       <form class="vm-card" id="f-correo" novalidate hidden>
         <span class="tag">Cliente habitual</span>
         <h2>Inicia sesión</h2>
-        <p id="co-intro">Escribe el <b>nombre de tu empresa</b>, tu <b>NIF</b> y el <b>correo electrónico</b> que nos diste. Te enviaremos un <b>código de 6 cifras</b> a ese correo y con él entras.</p>
+        <p id="co-intro">Escribe el <b>nombre de tu empresa</b> y tu <b>NIF</b>. Avisaremos a la oficina y, en cuanto te dé paso, <b>entras solo</b>. No hace falta correo.</p>
         <div id="co-paso1">
           <label>Nombre de tu empresa o negocio<input id="co-emp" type="text" maxlength="80" autocomplete="organization" placeholder="Tal como lo conocemos" aria-describedby="co-err"></label>
           <label>NIF (DNI, NIE o CIF)<input id="co-nif" type="text" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 12345678Z" aria-describedby="co-err"></label>
-          <label>Correo electrónico<input id="co-mail" type="email" inputmode="email" maxlength="120" autocomplete="email" placeholder="tucorreo@ejemplo.es" aria-describedby="co-err"></label>
           <div class="ts-hueco" id="ts-correo" hidden></div>
         </div>
         <div id="co-paso2" hidden>
           <div class="okmsg" id="co-ok" role="status"></div>
-          <label>Código de 6 cifras<input id="co-cod" type="text" inputmode="numeric" maxlength="7" autocomplete="one-time-code" placeholder="······" aria-describedby="co-err"></label>
-          <p class="acc-ayuda"><button class="vm-link" type="button" id="co-reenviar" disabled>Reenviar código</button><button class="vm-link" type="button" id="co-cambiar">Cambiar los datos</button></p>
+          <p class="co-ref-p">Tu número de comprobación: <b class="co-ref" id="co-ref">····</b><small>Si la oficina te lo pide por teléfono, díselo.</small></p>
+          <label>¿Te han dado un código de 6 cifras? Escríbelo aquí<input id="co-cod" type="text" inputmode="numeric" maxlength="7" autocomplete="one-time-code" placeholder="······" aria-describedby="co-err"></label>
+          <p class="acc-ayuda"><button class="vm-link" type="button" id="co-cambiar">Cambiar los datos</button></p>
         </div>
         <div class="err" id="co-err" role="alert"></div>
-        <button class="vm-btn primary" id="co-boton">Enviar código</button>
-        <p class="acc-ayuda"><button class="vm-link" type="button" id="co-ayuda">¿No puedes entrar? Llámanos o escríbenos</button><button class="vm-link" type="button" id="co-registro">¿Cliente nuevo? Solicitar acceso</button><button class="vm-link" type="button" id="co-otra" hidden>Entrar de otra forma (sin correo)</button></p>
+        <button class="vm-btn primary" id="co-boton">Avisar a la oficina</button>
+        <p class="acc-ayuda"><button class="vm-link" type="button" id="co-ayuda">¿No puedes entrar? Llámanos o escríbenos</button><button class="vm-link" type="button" id="co-registro">¿Cliente nuevo? Solicitar acceso</button><button class="vm-link" type="button" id="co-otra" hidden>Entrar de otra forma</button></p>
       </form>
 
       <form class="vm-card" id="f-acceso" novalidate>
@@ -1108,62 +1109,64 @@ $("f-acceso").onsubmit = (e) => {
   $("f-acceso").reset(); $("a-aviso").textContent = ""; entrar(j.cliente.nombre);
   }, "a-err");
 };
-// ── Entrar con NIF + correo + código (el código llega al correo que consta en la ficha del cliente) ──
+// ── Entrar con la aprobación de la oficina (nombre + NIF; sin correo) ──
 (() => {
   const f = $("f-correo"), fa = $("f-acceso"); if (!f || !fa) return;
-  let paso = 1, cuenta = 0, reloj = 0, soloCorreo = false;
-  const err = (m, id) => { $("co-err").textContent = m || ""; for (const x of ["co-emp", "co-nif", "co-mail", "co-cod"]) $(x).removeAttribute("aria-invalid"); if (id) { $(id).setAttribute("aria-invalid", "true"); $(id).focus(); } };
-  const verPaso = (n) => { paso = n; $("co-paso1").hidden = n !== 1; $("co-paso2").hidden = n !== 2; $("co-intro").hidden = n !== 1; $("co-boton").textContent = n === 1 ? "Enviar código" : "Entrar"; err(""); if (n === 2) { $("co-cod").value = ""; $("co-cod").focus(); } };
-  const cuentaAtras = (s) => { clearInterval(reloj); cuenta = s; const b = $("co-reenviar"); const pinta = () => { b.disabled = cuenta > 0; b.textContent = cuenta > 0 ? `Reenviar código (${cuenta} s)` : "Reenviar código"; }; pinta(); reloj = setInterval(() => { cuenta--; pinta(); if (cuenta <= 0) clearInterval(reloj); }, 1000); };
-  const datos = () => ({ empresa: $("co-emp").value.trim(), nif: $("co-nif").value.trim(), correo: $("co-mail").value.trim() });
+  let paso = 1, secreto = "", reloj = 0, soloOficina = false;
+  const err = (m, id) => { $("co-err").textContent = m || ""; for (const x of ["co-emp", "co-nif", "co-cod"]) $(x).removeAttribute("aria-invalid"); if (id) { $(id).setAttribute("aria-invalid", "true"); $(id).focus(); } };
+  const rotulo = () => { $("co-boton").textContent = paso === 1 ? "Avisar a la oficina" : "Entrar con el código"; $("co-boton").hidden = false; };
+  const verPaso = (n) => { paso = n; $("co-paso1").hidden = n !== 1; $("co-paso2").hidden = n !== 2; $("co-intro").hidden = n !== 1; rotulo(); err(""); if (n === 2) { $("co-cod").value = ""; } else { clearInterval(reloj); secreto = ""; } };
+  const datos = () => ({ empresa: $("co-emp").value.trim(), nif: $("co-nif").value.trim() });
   const valida = () => {
     const d = datos();
     if (d.empresa.length < 2) { err("Escribe el nombre de tu empresa o negocio, tal como lo conocemos.", "co-emp"); return false; }
     if ((d.nif.replace(/\D/g, "").length < 6)) { err("Escribe tu NIF: tu DNI, NIE o CIF (con 6 dígitos como mínimo).", "co-nif"); return false; }
-    if (!/^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]{2,}$/.test(d.correo)) { err("Escribe tu correo electrónico, el mismo que nos diste.", "co-mail"); return false; }
     return true;
   };
+  const entrarYa = (j) => { f.reset(); verPaso(1); entrar(j.cliente.nombre); };
+  async function preguntar() { // cada pocos segundos: ¿ya te han dejado entrar?
+    if (!secreto) return;
+    try {
+      const r = await post("/api/acceso/oficina/estado", { solicitud: secreto }), j = await r.json().catch(() => ({}));
+      if (r.ok && j.estado === "entra") return entrarYa(j);
+      if (!r.ok && r.status !== 429) { err(j.error || ""); if (r.status === 401) { clearInterval(reloj); } return; }
+      if (j.estado === "rechazada") { clearInterval(reloj); $("co-ok").textContent = "La oficina no ha podido darte paso. Llámanos y lo solucionamos."; return; }
+      if (j.estado === "caducada" || j.estado === "reemplazada") { clearInterval(reloj); $("co-ok").textContent = "La solicitud ha caducado. Cambia los datos y vuelve a avisar a la oficina."; return; }
+    } catch { /* sin red: se vuelve a intentar */ }
+  }
   async function pedir() {
     const body = datos(); if (tsToken["ts-correo"]) body.cf = tsToken["ts-correo"];
-    const r = await post("/api/acceso/correo/enviar", body); if (body.cf) { tsToken["ts-correo"] = null; tsPinta("ts-correo"); }
+    const r = await post("/api/acceso/oficina/pedir", body); if (body.cf) { tsToken["ts-correo"] = null; tsPinta("ts-correo"); }
     const j = await r.json().catch(() => ({}));
     if (j.necesitaVerificacion) { err(j.error); tsPinta("ts-correo"); return false; }
-    if (!r.ok) { err(j.error || "No se pudo enviar el código."); return false; }
-    $("co-ok").textContent = (j.correo ? `Revisa tu correo (${j.correo}). ` : "") + "Si los datos coinciden, te hemos enviado un código de 6 cifras; mira también el spam. Vale 10 minutos.";
-    verPaso(2); cuentaAtras(j.espera || 60); return true;
+    if (!r.ok) { err(j.error || "No se pudo avisar a la oficina."); return false; }
+    secreto = j.solicitud; $("co-ref").textContent = j.ref || "····"; $("co-ok").textContent = j.mensaje || "Hemos avisado a la oficina.";
+    verPaso(2); secreto = j.solicitud; clearInterval(reloj); reloj = setInterval(preguntar, 3000); return true;
   }
   f.onsubmit = (e) => {
     e.preventDefault(); err("");
-    const rotulo = () => { $("co-boton").textContent = paso === 1 ? "Enviar código" : "Entrar"; }; // «enviando» devuelve el texto de antes: se pone el del paso en el que estamos
     if (paso === 1) { if (!valida()) return; return Promise.resolve(enviando(f, $("co-boton"), pedir, "co-err")).then(rotulo); }
     const cod = $("co-cod").value.replace(/\D/g, "");
-    if (cod.length !== 6) return err("El código tiene 6 cifras. Míralo en el correo que te hemos enviado.", "co-cod");
+    if (cod.length !== 6) return err("Escribe el código de 6 cifras que te ha dado la oficina (o espera: cuando te dejen entrar, entrarás solo).", "co-cod");
     return Promise.resolve(enviando(f, $("co-boton"), async () => {
-      const r = await post("/api/acceso/correo/entrar", { ...datos(), codigo: cod }); const j = await r.json().catch(() => ({}));
+      const r = await post("/api/acceso/oficina/estado", { solicitud: secreto, codigo: cod }); const j = await r.json().catch(() => ({}));
       if (!r.ok) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error || "No se pudo entrar.", "co-cod"); $("co-cod").value = ""; return; }
-      f.reset(); verPaso(1); clearInterval(reloj); entrar(j.cliente.nombre);
+      entrarYa(j);
     }, "co-err")).then(rotulo);
   };
-  $("co-reenviar").onclick = async () => { // aparte de «enviando»: ese devolvería el texto y el botón activo antes de que pase la espera
-    if (cuenta > 0 || f.dataset.enviando) return; err(""); f.dataset.enviando = "1"; $("co-reenviar").disabled = true;
-    try { await pedir(); } catch { err(SIN_RED); } finally { delete f.dataset.enviando; $("co-reenviar").disabled = cuenta > 0; }
-  };
-  $("co-cambiar").onclick = () => { clearInterval(reloj); verPaso(1); $("co-emp").focus(); };
+  $("co-cambiar").onclick = () => { verPaso(1); $("co-emp").focus(); };
   $("co-ayuda").onclick = () => $("no-entro").click(); $("co-registro").onclick = () => $("ir-registro-2").click();
-  const aOtra = (otra) => { f.hidden = otra; fa.hidden = !otra; $("ac-volver-p").hidden = !otra || soloCorreo; };
+  const aOtra = (otra) => { f.hidden = otra; fa.hidden = !otra; $("ac-volver-p").hidden = !otra || soloOficina; };
   $("co-otra").onclick = () => aOtra(true); $("ac-volver").onclick = () => aOtra(false);
-  /** Solo se entra con nombre + NIF + correo + código: el alta pide el correo (sin él no se podría entrar) y ya no hay «código de entrada» que elegir ni cambiar. */
-  function modoSoloCorreo() {
+  /** Solo se entra con nombre + NIF y la aprobación de la oficina: el alta ya no pide correo ni «código de entrada» que elegir. */
+  function modoSoloOficina() {
     document.documentElement.classList.add("solo-correo");
     for (const id of ["r-pin", "r-pin2"]) { const l = $(id).closest("label"); if (l) l.hidden = true; reglasAlta[id] = () => ""; $(id).required = false; }
-    reglasAlta["r-mail"] = (v) => (!v.trim() ? "Escribe tu correo electrónico: lo necesitas para entrar (te enviaremos un código)." : /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim()) ? "" : "Escribe un correo válido, por ejemplo nombre@empresa.es.");
-    const pista = $("r-mail").closest("label")?.querySelector("small.pista"); if (pista) pista.textContent = "(lo necesitas para entrar)";
-    const c1 = $("como-1"); if (c1) c1.innerHTML = "<b>Entra</b> con el <b>nombre de tu empresa, tu NIF y tu correo</b>: te enviamos un código de 6 cifras y con él entras.";
+    const c1 = $("como-1"); if (c1) c1.innerHTML = "<b>Entra</b> con el <b>nombre de tu empresa y tu NIF</b>: avisamos a la oficina y, cuando te dé paso, entras.";
   }
-  // Solo se enseña si el servidor tiene correo configurado (si no, queda la pantalla de siempre)
   fetch("/api/seguridad").then((r) => r.json()).then((j) => {
-    if (!j.codigoCorreo) return; soloCorreo = !!j.soloCorreo; f.hidden = false; fa.hidden = true; $("co-otra").hidden = soloCorreo; $("ac-volver-p").hidden = true;
-    if (soloCorreo) { fa.hidden = true; fa.inert = true; modoSoloCorreo(); } // se queda oculto (no se quita: sus botones de «Cliente nuevo» y «¿No puedes entrar?» los usa la tarjeta nueva); el servidor ya rechaza esa forma de entrar
+    if (!j.accesoOficina) return; soloOficina = !!j.soloOficina; f.hidden = false; fa.hidden = true; $("co-otra").hidden = soloOficina; $("ac-volver-p").hidden = true;
+    if (soloOficina) { fa.hidden = true; fa.inert = true; modoSoloOficina(); } // se queda oculto (no se quita: sus botones de «Cliente nuevo» y «¿No puedes entrar?» los usa la tarjeta nueva); el servidor ya rechaza esa forma de entrar
   }).catch(() => { f.hidden = true; fa.hidden = false; }); // si no se puede saber, queda la pantalla de acceso de siempre
 })();
 $("cambiar").onclick = () => { $("c-err").textContent = ""; $("c-ok").textContent = ""; $("f-codigo").reset(); $("m-codigo").hidden = false; $("c-nuevo").focus(); };

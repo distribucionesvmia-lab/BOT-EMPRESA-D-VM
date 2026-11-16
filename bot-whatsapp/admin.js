@@ -1,5 +1,6 @@
 // Rutas HTTP de la EMPRESA (el empresario): pedidos recibidos y su exportación a Excel, solicitudes de alta de
 // clientes y cuentas. Es una aplicación aparte de la del cliente: todo va bajo /api/admin y exige la clave de la empresa.
+import crypto from "node:crypto";
 import { deliveryInfo, madridDay } from "./delivery.js";
 import { leerExcluidos, resolverExcluidos, excluidosValidos, prepararPedidos, rangoDe, calcular, atrasados, patronesCliente } from "./estadisticas.js";
 import { xlsxDeEstadisticas, csvDeEstadisticas } from "./estadisticas-export.js";
@@ -10,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { send, readJson, makeAdminCheck } from "./auth.js";
 import { ipDe, eventoSeguridad } from "./seguridad.js";
 import { etiquetaAccion } from "./actividad.js";
+import { claveCodigoOficina } from "./nif-key.js";
 import { crearAutoBases } from "./auto-bases.js";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2, promoVigente, precioEfectivo, hoyMadrid } from "./pricing.js";
@@ -419,6 +421,24 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       return send(res, 200, { ok: true, cliente: nombre, codigoCliente: customerId || null, tipo, url, caduca, usos: op.usos, soloVer: tipo !== "pedir", pedirCodigo: op.pedirCodigo, texto, whatsapp: `https://wa.me/${/^\d{9}$/.test(tel) ? "34" + tel : ""}?text=${encodeURIComponent(texto)}`, tieneTelefono: /^\d{9}$/.test(tel) }), true;
     }
     // Lista de enlaces (sin el enlace en sí: no se guarda) y «Anular»
+    // ---- Entrada de clientes aprobada por la oficina: quién la ha pedido (con la referencia que ve él en su pantalla), aprobar, rechazar o dar un código ----
+    if (p === "/api/admin/accesos" && get) {
+      const vista = (x) => ({ ...x, cliente: customers.getById(x.customerId)?.name ?? `Cliente ${x.customerId}`, telefono: customers.getById(x.customerId)?.phone ?? "" });
+      const r = accounts.accesoSolicitudes();
+      return send(res, 200, { pendientes: r.pendientes.map(vista), recientes: r.recientes.map(vista) }), true;
+    }
+    { const ma = /^\/api\/admin\/accesos\/(\d+)\/(aprobar|rechazar|codigo)$/.exec(p);
+      if (ma && post) {
+        const id = Number(ma[1]), q = accounts.accesoSolicitudes().pendientes.find((x) => x.id === id);
+        if (!q) return send(res, 404, { error: "Esa solicitud ya no está pendiente (la aprobó otra persona, caducó o se pidió otra)." }), true;
+        if (ma[2] === "codigo") { // código de 6 cifras para decírselo al cliente por teléfono o WhatsApp; solo se guarda su huella (se puede generar otro)
+          const codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+          if (!accounts.accesoSolicitudCodigo(id, claveCodigoOficina(q.customerId, codigo))) return send(res, 409, { error: "No se pudo generar el código: la solicitud ya no está pendiente." }), true;
+          return send(res, 200, { ok: true, codigo, cliente: customers.getById(q.customerId)?.name ?? "", ref: q.ref }), true;
+        }
+        if (!accounts.accesoSolicitudResolver(id, ma[2] === "aprobar" ? "aprobada" : "rechazada")) return send(res, 409, { error: "Esa solicitud ya no está pendiente." }), true;
+        return send(res, 200, { ok: true }), true;
+      } }
     if (p === "/api/admin/invitaciones" && get) {
       const nom = (x) => (x.tipo === "alta" ? x.nombre : customers.getById(x.cliente)?.name ?? x.nombre ?? "Cliente " + x.cliente);
       return send(res, 200, { enlaces: accounts.invitacionesLista().map((x) => ({ ...x, nombre: nom(x) })), plantilla: accounts.ajuste("plantilla_enlace") || PLANTILLA_DEFECTO, plantillaDefecto: PLANTILLA_DEFECTO }), true;
@@ -517,6 +537,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
           dia: dia && { pedidos: dia.resumen.actual.pedidos, importe: dia.resumen.actual.importe, ayer: dia.resumen.anterior ? { pedidos: dia.resumen.anterior.pedidos, importe: dia.resumen.anterior.importe } : null },
           pedidos: { pendientes: listos.length, retenidos: ret.length, masAntiguoHoras: pend.length ? Math.max(...pend.map((o) => horasDesde(o.fecha))) : 0, listos: listos.slice(0, 6).map(vista), retenidosLista: ret.slice(0, 6).map(vista) },
           altas: { pendientes: regs.length, lista: regs.slice(0, 5).map((x) => ({ id: x.id, negocio: x.business, telefono: x.phone, creada: x.createdAt })) },
+          accesos: accounts.accesoSolicitudes().pendientes.slice(0, 5).map((x) => ({ id: x.id, cliente: customers.getById(x.customerId)?.name ?? `Cliente ${x.customerId}`, ref: x.ref, creada: x.creada })),
           cuentasSinConfirmar: accounts.listAccounts().filter((a) => !a.verified && a.status !== "deleted").length, derechosPendientes: accounts.listRightsRequests("pendiente").length,
           atrasados: atrasados(b.validos, ahora, 6), recordatorios: recordatorios().filas.length, avisosHoy: accounts.avisoProgPendientes().filter((x) => x.dia === hoy).length, problemas, copias: { ok: estadoCopias(process.env.BACKUP_DIR ?? "respaldos").ok },
         }), true;

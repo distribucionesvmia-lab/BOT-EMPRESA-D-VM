@@ -167,6 +167,11 @@
   @media (max-width:760px) { .busca-g { order:3; flex:1 1 100%; max-width:none; margin:6px 0 0; } }
   /* Hoy */
   #p-hoy { display:grid; gap:14px; } #p-hoy[hidden] { display:none; }
+  .acc-banner { display:flex; gap:12px; align-items:center; justify-content:space-between; background:var(--accent); color:#fff; padding:10px 14px; border-radius:10px; font-weight:700; } .acc-banner[hidden] { display:none; } .acc-banner button { background:#fff; color:var(--accent); border-color:#fff; }
+  .acc-panel { border-left:4px solid var(--accent); } .acc-panel[hidden] { display:none; }
+  .acc-fila { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line-2); } .acc-fila:last-child { border-bottom:0; }
+  .acc-fila small { color:var(--muted); display:block; } .acc-ref { font:700 22px/1 ui-monospace, Consolas, monospace; letter-spacing:.15em; padding:6px 10px; border:2px solid var(--accent); border-radius:8px; }
+  .acc-cod { font:700 26px/1 ui-monospace, Consolas, monospace; letter-spacing:.2em; padding:8px 12px; background:var(--line-2); border-radius:8px; }
   .hoy-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; }
   .hoy-kpi { text-align:left; display:grid; gap:2px; padding:14px 16px; background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--line); border-radius:12px; cursor:pointer; box-shadow:var(--shadow); color:var(--fg); min-height:0; }
   .hoy-kpi:hover { border-color:var(--accent); } .hoy-kpi span { font-size:12px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); } .hoy-kpi b { font-size:28px; line-height:1.15; font-variant-numeric:tabular-nums; } .hoy-kpi small { color:var(--muted); font-size:12.5px; }
@@ -339,6 +344,7 @@
   </div>
 
   <div id="app" hidden style="display:grid;gap:14px">
+    <div id="acc-banner" class="acc-banner" role="alert" hidden><span></span><button type="button" class="main">Ver</button></div>
     <div class="pin" id="pin" role="status" hidden></div>
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-t="hoy" aria-selected="true">Hoy <span class="n" id="n-hoy" hidden></span></button>
@@ -360,6 +366,11 @@
     <!-- Hoy: lo que hay que mirar al abrir el panel -->
     <div id="p-hoy">
       <div class="pag-cab"><h1>Hoy</h1><p id="hoy-sub">Lo que necesita tu atención ahora mismo.</p></div>
+      <section class="panel acc-panel" id="acc-panel" aria-live="polite" hidden>
+        <h2>Clientes esperando entrar</h2>
+        <p class="muted" style="margin:0 0 8px">Pregúntales por teléfono qué <b>número de comprobación</b> les sale en la pantalla: si coincide con el de aquí, es él. Entonces pulsa «Dejarle entrar», o «Dar un código» y díselo (por teléfono o WhatsApp).</p>
+        <div id="acc-lista"></div>
+      </section>
       <section class="hoy-kpis" id="hoy-kpis" aria-label="Resumen de hoy"></section>
       <div class="hoy-grid">
         <section class="panel"><h2>Qué hay que hacer</h2><ul class="hoy-tareas" id="hoy-tareas"></ul></section>
@@ -488,7 +499,7 @@
       <div class="pag-cab"><h1>Solicitudes de alta</h1><p>Clientes nuevos que han pedido acceso y que el sistema no ha podido comprobar solo.</p></div>
       <div class="panel">
       <h2>Solicitudes de alta pendientes</h2>
-      <p class="muted"><b>Toda alta nueva pasa por ti:</b> nadie entra hasta que la aceptes (aunque se parezca a un cliente que ya tienes; en «Qué encajó» ves con cuál y si su NIF coincide). Al aceptarla, el cliente entra con <b>el nombre de su empresa, su NIF y su correo</b>: le llega un código a ese correo.</p>
+      <p class="muted"><b>Toda alta nueva pasa por ti:</b> nadie entra hasta que la aceptes (aunque se parezca a un cliente que ya tienes; en «Qué encajó» ves con cuál y si su NIF coincide). Al aceptarla, el cliente entra con <b>el nombre de su empresa y su NIF</b>: te aparece su solicitud en «Hoy» y tú le dejas entrar (o le das un código).</p>
       <div class="scroll"><table id="sol-tabla"><thead><tr><th>Empresa</th><th>Contacto</th><th>DNI/CIF</th><th>Qué encajó</th><th>Cliente de la base de datos</th><th></th></tr></thead><tbody id="sol"></tbody></table></div>
       <p class="vacio" id="sol-vacio" hidden><b>No hay solicitudes pendientes.</b><span>Cuando alguien pida acceso, saldrá aquí para que lo aceptes o lo rechaces.</span></p>
       </div>
@@ -1601,7 +1612,7 @@ async function copias(comprobar = false) {
   finally { if (comprobar) { b.disabled = false; b.textContent = "Comprobar copias ahora"; } }
 }
 $("copias-comprobar").onclick = () => copias(true);
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), seguridadPanel(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), correoClientes(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), seguridadPanel(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), correoClientes(), accesos(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 // ═════════ Estadísticas y patrones ═════════
 const est = { rango: "30d", d0: "", d1: "", datos: null, modo: "uds", mas: false, timerVivo: 0, timerDatos: 0, cliente: null };
@@ -1802,6 +1813,31 @@ document.querySelectorAll(".tab").forEach((b) => (b.onclick = () => irA(b.datase
 const nfH = new Intl.NumberFormat("es-ES"), eurH = (n) => Number(n).toFixed(2).replace(".", ",") + " €";
 const verCliente = (id, texto) => { const b = el("button", texto, { type: "button", className: "enlace-cli" }); b.title = "Abrir la ficha del cliente"; b.onclick = () => abrirFicha(id); return b; };
 const sinDatos = (t) => el("p", t, { className: "muted", style: "margin:0" });
+// ═════════ Entrada de clientes aprobada por la oficina ═════════
+async function accesos() {
+  const d = await call("/api/admin/accesos"), caja = $("acc-lista"), cod = accesos.codigos ?? (accesos.codigos = {});
+  $("acc-panel").hidden = !d.pendientes.length;
+  for (const k of Object.keys(cod)) if (!d.pendientes.some((x) => String(x.id) === k)) delete cod[k]; // el código solo se enseña mientras la solicitud sigue pendiente
+  const hace = (iso) => { const m = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000)); return m < 1 ? "ahora mismo" : `hace ${m} min`; };
+  if (caja.dataset.huella !== JSON.stringify([d.pendientes.map((x) => x.id), cod])) { // no se repinta si nada cambió (así no se pierde lo que se está haciendo)
+    caja.dataset.huella = JSON.stringify([d.pendientes.map((x) => x.id), cod]);
+    caja.replaceChildren(...d.pendientes.map((x) => {
+      const f = el("div", "", { className: "acc-fila" }), izq = el("div");
+      izq.append(verCliente(x.customerId, x.cliente), el("small", `${x.telefono ? "Tel. " + x.telefono + " · " : ""}${hace(x.creada)}${x.aparato ? " · " + x.aparato : ""}`));
+      const ref = el("div"); ref.append(el("small", "Número de comprobación"), el("span", x.ref, { className: "acc-ref" }));
+      const bs = el("div", "", { style: "display:flex; gap:8px; flex-wrap:wrap; align-items:center" });
+      const accion = (txt, ruta, clase) => { const b = el("button", txt, { type: "button", className: clase }); b.onclick = async () => { b.disabled = true; try { const r = await call(`/api/admin/accesos/${x.id}/${ruta}`, {}); if (ruta === "codigo") cod[x.id] = r.codigo; } catch (e) { alert(e.message); } await accesos(); b.disabled = false; }; return b; };
+      if (cod[x.id]) bs.append(el("span", `${cod[x.id].slice(0, 3)} ${cod[x.id].slice(3)}`, { className: "acc-cod", title: "Díselo al cliente" }), accion("Otro código", "codigo", ""));
+      else bs.append(accion("Dar un código", "codigo", ""));
+      bs.append(accion("Dejarle entrar", "aprobar", "main"), accion("Rechazar", "rechazar", "peligro"));
+      f.append(izq, ref, bs); return f;
+    }));
+  }
+  const n = d.pendientes.length, b = $("acc-banner"); if (b && !b.dataset.listo) { b.dataset.listo = "1"; b.querySelector("button").onclick = () => irA("hoy"); }
+  if (b) { b.hidden = !n || !$("p-hoy").hidden; if (n) b.querySelector("span").textContent = `${n} cliente${n === 1 ? "" : "s"} esperando que les dejes entrar`; }
+  if (n > (accesos.n ?? 0)) { try { document.title = `(${n}) Empresa`; } catch {} } else if (!n) { try { document.title = "Empresa"; } catch {} }
+  accesos.n = n;
+}
 async function hoy() {
   const d = await call("/api/admin/hoy");
   $("hoy-sub").textContent = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Madrid" }).replace(/^./, (c) => c.toUpperCase()) + " · lo que necesita tu atención ahora mismo.";
@@ -1817,6 +1853,7 @@ async function hoy() {
   );
   // tareas, por orden de urgencia
   const T = [], tarea = (nivel, texto, sub, boton, fn) => T.push({ nivel, texto, sub, boton, fn });
+  if (d.accesos?.length) tarea("alta", `${d.accesos.length} cliente${d.accesos.length === 1 ? "" : "s"} esperando entrar`, d.accesos.map((x) => x.cliente).slice(0, 3).join(" · "), "Ver arriba", () => $("acc-panel").scrollIntoView({ behavior: "smooth" }));
   if (p.retenidos) tarea("alta", `${p.retenidos} pedido${p.retenidos === 1 ? "" : "s"} retenido${p.retenidos === 1 ? "" : "s"}: hay que revisarlo${p.retenidos === 1 ? "" : "s"} antes de exportar`, p.retenidosLista[0]?.motivo, "Revisar", () => irA("pedidos"));
   if (p.pendientes) tarea("media", `${p.pendientes} pedido${p.pendientes === 1 ? " listo" : "s listos"} para exportar a a3ERP`, p.masAntiguoHoras >= 12 ? `El más antiguo lleva ${p.masAntiguoHoras} horas` : "", "Ir a Pedidos", () => irA("pedidos"));
   if (d.altas.pendientes) tarea("media", `${d.altas.pendientes} solicitud${d.altas.pendientes === 1 ? "" : "es"} de alta sin resolver`, d.altas.lista.map((x) => x.negocio).filter(Boolean).slice(0, 3).join(" · "), "Ver solicitudes", () => irA("solicitudes"));

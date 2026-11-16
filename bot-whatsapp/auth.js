@@ -5,8 +5,8 @@
 import crypto from "node:crypto";
 import { normalizePhone, validEmail, pinValido } from "./cuentas-db.js";
 import { nifCodes, nifClean } from "./nif-codes.js";
-import { codeKey, validCode, claveCodigoCorreo } from "./nif-key.js";
-import { tapar } from "./correo-cliente.js";
+import { codeKey, validCode, claveCodigoOficina } from "./nif-key.js";
+import { navegadorCorto } from "./errores.js";
 import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
 
 const COOKIE = "vm_session";
@@ -90,7 +90,7 @@ export { send, readJson };
  * secure: cookie solo por HTTPS · trustProxy: usar X-Forwarded-For para la IP
  */
 const paginaEntrar = (titulo, texto, boton) => `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${titulo} · Distribuciones Valentín Martín</title><style>:root{--bg:#F5F5F7;--card:#fff;--t:#1D1D1F;--t2:#5F5F65;--a:#C8102E;--on:#fff}@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1C1C1E;--t:#F5F5F7;--t2:#A8A8B0;--a:#FF6B7D;--on:#1D1D1F}}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--t);font:16px/1.45 system-ui,sans-serif}header{background:#C8102E;color:#fff;padding:20px 16px;text-align:center;font-weight:700;font-size:20px}main{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px}.c{background:var(--card);border-radius:20px;padding:28px 22px;max-width:420px;width:100%;text-align:center}h1{margin:0 0 8px;font-size:24px}p{margin:0 0 14px;color:var(--t2)}a.b,button{display:flex;align-items:center;justify-content:center;width:100%;min-height:52px;border:0;border-radius:26px;background:var(--a);color:var(--on);font:inherit;font-weight:700;font-size:17px;cursor:pointer;text-decoration:none}a.s{display:block;margin-top:8px;padding:12px 0;color:var(--a);font-weight:600;min-height:44px;line-height:1.35}</style><body><header>Distribuciones Valentín Martín</header><main><div class="c"><h1>${titulo}</h1><p>${texto}</p>${boton}</div></main></body></html>`;
-export function createAuth({ accounts, customers, misDatos = null, secure = false, trustProxy = false, onAcceso = null, onCodigo = null, enviarCodigo = null }) {
+export function createAuth({ accounts, customers, misDatos = null, secure = false, trustProxy = false, onAcceso = null, onCodigo = null }) {
   // Límites por IP (configurables para las pruebas): accesos cada 10 minutos y solicitudes de alta cada hora
   const loginLimit = rateLimiter(Number(process.env.LOGIN_LIMIT ?? 20), 10 * 60_000);
   // Acceso solo con NIF (sin nombre): no hay una cuenta a la que contar los fallos, así que se limita más por IP y en conjunto
@@ -99,33 +99,28 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const usoLimit = rateLimiter(300, 10 * 60_000); // contadores: muchos permitidos, pero no infinitos por IP
   const registerLimit = rateLimiter(Number(process.env.REGISTER_LIMIT ?? 20), 60 * 60_000);
   const intentosAcceso = contadorIntentos(Number(process.env.CAPTCHA_DESPUES_DE ?? 5), 10 * 60_000); // pasados N intentos en 10 min desde una dirección, se pide «no soy un robot»
-  // Entrada con código por correo: topes por dirección, por cliente+correo y en total (que nadie pueda usarlo para llenar buzones)
-  const codigoActivo = () => !!enviarCodigo && process.env.CODIGO_CORREO !== "0";
-  const soloCorreo = () => codigoActivo() && process.env.ACCESO_SOLO_CORREO !== "0"; // con el código por correo disponible, SOLO se entra con nombre + NIF + correo + código (ACCESO_SOLO_CORREO=0 reabre las otras formas, solo para emergencias)
+  // Entrada aprobada por la oficina: topes por dirección, por cliente y en total (que nadie pueda llenar el panel de la empresa de solicitudes)
+  const oficinaActiva = () => process.env.ACCESO_OFICINA !== "0";
+  const soloOficina = () => oficinaActiva() && process.env.ACCESO_SOLO_OFICINA !== "0"; // por defecto SOLO se entra así (ACCESO_SOLO_OFICINA=0 reabre las otras formas, solo para emergencias)
   const altaAutomatica = () => process.env.ALTA_AUTOMATICA === "1"; // por defecto TODA alta la acepta la empresa; esto la dejaría entrar sola si coincide con un cliente (no recomendado)
-  const correoIp = rateLimiter(Number(process.env.CODIGO_IP_LIMIT ?? 8), 10 * 60_000);
-  const correoClave = rateLimiter(Number(process.env.CODIGO_CLAVE_LIMIT ?? 3), 10 * 60_000);
-  const correoGlobal = rateLimiter(Number(process.env.CODIGO_GLOBAL_LIMIT ?? 120), 60 * 60_000);
-  const correoVerificar = rateLimiter(Number(process.env.CODIGO_VERIFICAR_LIMIT ?? 15), 10 * 60_000);
-  const MSG_CODIGO_ENVIADO = "Si los datos coinciden con un cliente, te hemos enviado un código a ese correo. Mira también la carpeta de spam. Vale 10 minutos.";
-  const cleanMail = (v) => String(v ?? "").trim().toLowerCase();
-  /** Clientes con ese NIF (o 6 primeros dígitos) que tienen ESE correo en su ficha o en su cuenta. El nombre de la empresa, si se escribe, estrecha la búsqueda. */
-  function clientesConCorreo(nif, correo, empresa) {
+  const solicitudIp = rateLimiter(Number(process.env.OFICINA_IP_LIMIT ?? 8), 10 * 60_000);
+  const solicitudGlobal = rateLimiter(Number(process.env.OFICINA_GLOBAL_LIMIT ?? 200), 60 * 60_000);
+  const estadoIp = rateLimiter(Number(process.env.OFICINA_ESTADO_LIMIT ?? 600), 10 * 60_000); // el navegador pregunta cada pocos segundos
+  const codigoVerificar = rateLimiter(Number(process.env.OFICINA_CODIGO_LIMIT ?? 15), 10 * 60_000);
+  const MSG_SOLICITUD = "Hemos avisado a la oficina. En cuanto lo apruebe, entrarás solo. Si te dan un código, escríbelo aquí.";
+  const huellaSecreto = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
+  /** Clientes con ese NIF (o 6 primeros dígitos) cuyo nombre se parece al escrito. */
+  function clientesPorNombreYNif(nif, empresa) {
     if (String(empresa ?? "").trim().length < 2) return [];
-    return customers.findByNif(nif).filter((id) => {
-      const c = customers.getById(id);
-      return !!c && customers.nameMatches(c, empresa) && [...(c.emails ?? []), accounts.emailDe(id)].map(cleanMail).includes(correo);
-    });
+    return customers.findByNif(nif).filter((id) => { const c = customers.getById(id); return !!c && customers.nameMatches(c, empresa); });
   }
-  /** Por qué NO se ha mandado el código (solo para el registro PRIVADO de la oficina, nunca para el cliente; no lleva NIF, nombre ni correo escritos). */
-  function motivoSinCodigo(nif, correo, empresa) {
+  /** Por qué NO se ha creado la solicitud (solo para el registro PRIVADO de la oficina, nunca para el cliente; no lleva NIF ni nombre escritos). */
+  function motivoSinSolicitud(nif, empresa) {
     const porNif = customers.findByNif(nif);
     if (!porNif.length) return "ningún cliente tiene ese NIF (¿falta el NIF en su ficha de a3ERP o está mal escrito?)";
     const conNombre = porNif.filter((id) => customers.nameMatches(customers.getById(id), empresa));
     if (!conNombre.length) return `hay cliente con ese NIF (código ${porNif.join(", ")}) pero el nombre escrito no coincide con el suyo`;
-    const conCorreo = conNombre.filter((id) => [...(customers.getById(id)?.emails ?? []), accounts.emailDe(id)].map(cleanMail).includes(correo));
-    if (!conCorreo.length) return `el cliente ${conNombre.join(", ")} no tiene ESE correo en su ficha ni en su cuenta (correos guardados en la ficha: ${conNombre.map((id) => (customers.getById(id)?.emails ?? []).length).join(", ")}); añádelo en «Editar datos» de su ficha`;
-    return conCorreo.length > 1 ? "el NIF, el nombre y el correo encajan con varios clientes a la vez: no se adivina cuál" : "";
+    return conNombre.length > 1 ? "el NIF y el nombre encajan con varios clientes a la vez: no se adivina cuál" : "";
   }
   const pedirNombre = (res, b) => String(b.empresa ?? "").trim().length < 2 ? (send(res, 400, { error: "Escribe el nombre de tu empresa o negocio, tal como lo conocemos." }), true) : false;
   const ip = (req) => ipDe(req, trustProxy);
@@ -171,7 +166,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     }
     if (!p.startsWith("/api/")) return false;
 
-    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null, codigoCorreo: codigoActivo(), soloCorreo: soloCorreo() }), true; // solo la clave PÚBLICA, si está activada
+    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null, accesoOficina: oficinaActiva(), soloOficina: soloOficina() }), true; // solo la clave PÚBLICA, si está activada
 
     if (p === "/api/registro" && req.method === "POST") {
       if (!registerLimit(ip(req))) return eventoSeguridad("muchas-solicitudes-de-alta", ip(req)), demasiados(res, registerLimit, ip(req)), true;
@@ -186,9 +181,8 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (!/^[A-Z0-9]{8,10}$/.test(nif) || nif.replace(/\D/g, "").length < 6) return send(res, 400, { error: "Escribe tu DNI, NIE o CIF (por ejemplo 12345678Z o B12345678)." }), true;
       if (empresa.length < 2 || empresa.length > 80) return send(res, 400, { error: "Escribe el nombre de tu empresa." }), true;
       if (!normalizePhone(b.telefono)) return send(res, 400, { error: "El teléfono no es válido." }), true;
-      if (correo && !validEmail(correo)) return send(res, 400, { error: "El correo no es válido." }), true; // opcional solo si no se entra con código por correo
-      if (codigoActivo() && !correo) return send(res, 400, { error: "Escribe tu correo electrónico: lo necesitas para entrar (te enviaremos un código a ese correo)." }), true;
-      const sinCodigoEntrada = soloCorreo(); // con el acceso nuevo no hay «código de entrada»: ni se pide ni se guarda
+      if (correo && !validEmail(correo)) return send(res, 400, { error: "El correo no es válido." }), true; // el correo es opcional: ya no se usa para entrar
+      const sinCodigoEntrada = soloOficina(); // con el acceso por la oficina no hay «código de entrada»: ni se pide ni se guarda
       if (!sinCodigoEntrada && !pinValido(pin)) return send(res, 400, { error: "Elige un código de entrada de 6 letras o números." }), true;
       // El sistema comprueba la solicitud contra la base de clientes. Acceso automático si el nombre de la empresa coincide
       // con un cliente guardado Y su teléfono o su correo también; si no, queda pendiente para que la revise la empresa.
@@ -210,58 +204,61 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       return send(res, 200, { ok: true, estado: "pendiente", mensaje: "Hemos recibido tu solicitud. En un plazo de 24 a 48 horas nos pondremos en contacto contigo y se aceptará tu cuenta para que puedas hacer pedidos." }), true;
     }
 
-    // ── Entrar con NIF + correo + código que llega al correo ──
-    // Paso 1: el cliente escribe su NIF y su correo; si coinciden con su ficha, se le manda un código. La respuesta es SIEMPRE la misma (coincida o no):
-    // así nadie puede averiguar qué NIF o correos existen. El código solo va a un correo que ya consta en su ficha de a3ERP o en su cuenta.
-    if (p === "/api/acceso/correo/enviar" && req.method === "POST") {
-      if (!codigoActivo()) return send(res, 503, { error: "Esta forma de entrar no está disponible ahora. Entra de otra forma o llámanos." }), true;
+    // ── Entrar con la aprobación de la OFICINA (sin correo) ──
+    // Paso 1: el cliente escribe el nombre de su empresa y su NIF. La respuesta es SIEMPRE la misma (coincida o no): así nadie puede averiguar qué NIF existen.
+    // Si coincide con UN cliente, aparece una solicitud en el panel de la empresa, con una «referencia» de 4 cifras que ve también el cliente (la oficina comprueba
+    // por teléfono que es él). La oficina la aprueba con un clic o le da un código de 6 cifras. El navegador guarda un secreto que solo sirve para esa solicitud.
+    if (p === "/api/acceso/oficina/pedir" && req.method === "POST") {
+      if (!oficinaActiva()) return send(res, 503, { error: "Esta forma de entrar no está disponible ahora. Llámanos." }), true;
       if (!loginLimit(ip(req))) return demasiados(res, loginLimit, ip(req)), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
-      if (!correoIp(ip(req))) return eventoSeguridad("codigo-correo-muchas-peticiones", ip(req)), demasiados(res, correoIp, ip(req)), true;
+      if (!solicitudIp(ip(req))) return eventoSeguridad("acceso-oficina-muchas-peticiones", ip(req)), demasiados(res, solicitudIp, ip(req)), true;
       if (turnstileActivo() && intentosAcceso.pasado(intentosAcceso.suma(ip(req)))) {
         if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
       }
-      const correo = cleanMail(b.correo);
       if (pedirNombre(res, b)) return true;
       if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe tu NIF: los 6 primeros dígitos de tu DNI o CIF, o el NIF completo." }), true;
-      if (!validEmail(correo)) return send(res, 400, { error: "Escribe tu correo electrónico, el mismo que nos diste." }), true;
-      const clave = `${nifCodes(b.nif)[0]}|${correo}`; // el tope es por NIF + correo (el nombre no cuenta: así no se esquiva escribiéndolo distinto)
-      if (!correoClave(clave)) return demasiados(res, correoClave, clave, "Ya te hemos enviado códigos hace poco. Espera unos minutos."), true;
-      const ids = clientesConCorreo(b.nif, correo, b.empresa);
-      if (ids.length === 1 && correoGlobal("todos")) {
-        const id = ids[0], codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
-        const r = accounts.codigoCorreoCrear(id, claveCodigoCorreo(id, codigo));
-        if (r.ok) {
-          console.log(`[VM acceso] Código enviado al cliente ${id} (${tapar(correo)})`);
-          void Promise.resolve(enviarCodigo({ to: correo, nombre: customers.getById(id)?.name ?? "", codigo, minutos: 10 })).catch((e) => { console.error("[VM acceso] El servidor de correo NO ha enviado el código:", e?.message); eventoSeguridad("codigo-correo-error", String(e?.message ?? "error").slice(0, 120)); });
-        } else console.warn(`[VM acceso] Código NO enviado al cliente ${id}: ya se mandó uno hace menos de ${r.espera} s`);
-      } else if (ids.length === 1) eventoSeguridad("codigo-correo-tope-global", "se alcanzó el máximo de códigos por hora");
-      else console.warn(`[VM acceso] Código NO enviado: ${motivoSinCodigo(b.nif, correo, b.empresa) || "no coincide"}`);
-      return send(res, 200, { ok: true, espera: 60, mensaje: MSG_CODIGO_ENVIADO, correo: tapar(correo) }), true;
+      const secreto = crypto.randomBytes(32).toString("base64url"), ref = String(crypto.randomInt(0, 10_000)).padStart(4, "0");
+      const ids = clientesPorNombreYNif(b.nif, b.empresa);
+      if (ids.length === 1 && solicitudGlobal("todas")) {
+        const r = accounts.accesoSolicitudCrear({ customerId: ids[0], secretHash: huellaSecreto(secreto), ref, aparato: navegadorCorto(req.headers["user-agent"]), ip: ip(req), esperaS: Number(process.env.OFICINA_ESPERA_S ?? 20) });
+        if (r.ok) console.log(`[VM acceso] Solicitud de entrada del cliente ${ids[0]} (referencia ${ref}): esperando a la oficina`);
+        else console.warn(`[VM acceso] Solicitud NO creada para el cliente ${ids[0]}: ya pidió otra hace menos de ${r.espera} s`);
+      } else if (ids.length === 1) eventoSeguridad("acceso-oficina-tope-global", "se alcanzó el máximo de solicitudes por hora");
+      else console.warn(`[VM acceso] Solicitud NO creada: ${motivoSinSolicitud(b.nif, b.empresa)}`);
+      return send(res, 200, { ok: true, solicitud: secreto, ref, mensaje: MSG_SOLICITUD }), true;
     }
-    // Paso 2: con el código recibido se entra. Vale una vez, caduca a los 10 minutos y se anula tras 5 fallos.
-    if (p === "/api/acceso/correo/entrar" && req.method === "POST") {
-      if (!codigoActivo()) return send(res, 503, { error: "Esta forma de entrar no está disponible ahora. Entra de otra forma o llámanos." }), true;
-      if (!loginLimit(ip(req)) || !correoVerificar(ip(req))) return demasiados(res, correoVerificar, ip(req)), true;
+    // Paso 2: el navegador pregunta cada pocos segundos si la oficina ya aprobó (o escribe el código de 6 cifras que le dieron). Vale una sola vez.
+    if (p === "/api/acceso/oficina/estado" && req.method === "POST") {
+      if (!oficinaActiva()) return send(res, 503, { error: "Esta forma de entrar no está disponible ahora. Llámanos." }), true;
+      if (!estadoIp(ip(req))) return demasiados(res, estadoIp, ip(req)), true;
       const b = await readJson(req);
-      if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
-      const correo = cleanMail(b.correo), codigo = String(b.codigo ?? "").replace(/\s/g, "");
-      if (pedirNombre(res, b)) return true;
-      if (nifCodes(b.nif).length === 0 || !validEmail(correo)) return send(res, 400, { error: "Escribe el nombre de tu empresa, tu NIF y tu correo." }), true;
-      if (!/^\d{6}$/.test(codigo)) return send(res, 400, { error: "El código tiene 6 cifras. Míralo en el correo que te hemos enviado." }), true;
-      const ids = clientesConCorreo(b.nif, correo, b.empresa);
-      const c = ids.length === 1 ? accounts.codigoCorreoComprobar(ids, (id) => claveCodigoCorreo(id, codigo)) : { ok: false, reason: "invalid" };
-      if (!c.ok) return send(res, 401, { error: c.reason === "expired" ? "Ese código ha caducado. Pide uno nuevo." : c.reason === "agotado" ? "Has fallado demasiadas veces con ese código. Pide uno nuevo." : "Código incorrecto. Revísalo o pide uno nuevo." }), true;
-      const r = accounts.loginNif([c.customerId], () => true); // misma apertura de sesión que el resto (cuenta eliminada o bloqueada incluidas)
-      if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." }), true;
-      const customer = customers.getById(r.account.customerId);
-      return send(res, 200, { ok: true, cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400, req)) }), true;
+      const secreto = typeof b?.solicitud === "string" ? b.solicitud : "";
+      if (secreto.length < 20 || secreto.length > 100) return send(res, 400, { error: "Solicitud no válida." }), true;
+      const h = huellaSecreto(secreto);
+      const abrir = (customerId) => {
+        const r = accounts.loginNif([customerId], () => true); // misma apertura de sesión que el resto (cuenta eliminada o bloqueada incluidas)
+        if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." }), true;
+        const customer = customers.getById(r.account.customerId);
+        return send(res, 200, { ok: true, estado: "entra", cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400, req)) }), true;
+      };
+      const codigo = String(b?.codigo ?? "").replace(/\s/g, "");
+      if (codigo) {
+        if (!codigoVerificar(ip(req))) return demasiados(res, codigoVerificar, ip(req)), true;
+        if (!/^\d{6}$/.test(codigo)) return send(res, 400, { error: "El código tiene 6 cifras. Te lo da la oficina." }), true;
+        const c = accounts.accesoSolicitudCodigoComprobar(h, (id) => claveCodigoOficina(id, codigo));
+        if (!c.ok) return send(res, 401, { error: c.reason === "expired" ? "Esa solicitud ha caducado. Pide el acceso otra vez." : c.reason === "agotado" ? "Has fallado demasiadas veces. Pide el acceso otra vez." : c.reason === "sincodigo" ? "La oficina todavía no te ha dado ningún código." : "Código incorrecto. Revísalo con la oficina." }), true;
+        return abrir(c.customerId);
+      }
+      const e = accounts.accesoSolicitudEstado(h);
+      if (e.estado === "aprobada") { const c = accounts.accesoSolicitudConsumir(h); return c.ok ? abrir(c.customerId) : send(res, 200, { estado: "caducada" }), true; }
+      return send(res, 200, { estado: ["pendiente", "rechazada", "caducada", "usada", "reemplazada"].includes(e.estado) ? e.estado : "pendiente", ...(e.estado === "pendiente" ? { ref: e.ref } : {}) }), true; // «desconocida» (NIF que no coincide) se enseña como pendiente: no se puede averiguar
     }
 
     if (p === "/api/acceso" && req.method === "POST") {
       if (!loginLimit(ip(req))) return demasiados(res, loginLimit, ip(req)), true;
-      if (soloCorreo()) return send(res, 403, { error: "Para entrar, usa tu NIF, tu correo y el código que te enviamos por correo." }), true;
+      if (soloOficina()) return send(res, 403, { error: "Para entrar, escribe el nombre de tu empresa y tu NIF: la oficina te dará paso." }), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       if (turnstileActivo() && intentosAcceso.pasado(intentosAcceso.suma(ip(req)))) { // muchos intentos seguidos: a partir de aquí, «no soy un robot»
@@ -319,7 +316,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (p === "/api/yo" && req.method === "GET") {
       const acc = sessionOf(req);
       if (!acc) return send(res, 200, { cliente: null }), true; // invitado: sin sesión no es un error (la consola del navegador queda limpia)
-      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode || soloCorreo(), soloCorreo: soloCorreo(), soloVer: !!acc.soloVer, mensajeEnlace: acc.mensajeEnlace || "", carrito: "vm_carrito_c_" + String(acc.customerId) } }), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
+      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode || soloOficina(), soloOficina: soloOficina(), soloVer: !!acc.soloVer, mensajeEnlace: acc.mensajeEnlace || "", carrito: "vm_carrito_c_" + String(acc.customerId) } }), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
     }
 
     // El cliente cambia el código de entrada (los 6 del NIF) por uno personal de 6 letras o números
