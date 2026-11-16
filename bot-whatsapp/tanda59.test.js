@@ -61,12 +61,34 @@ test("no se averigua nada: datos que no coinciden dan siempre el mismo error y n
   const m = await montar();
   try {
     await crear(m, "Mesa-Verde-42");
-    const casos = [{ nif: "99999999R" }, { empresa: "Otro Negocio" }, { nif: "65432199A", empresa: "Local" } /* dos clientes con ese NIF y nombre que encaja con ambos */];
+    const casos = [{ nif: "99999999R" }, { nif: "65432199A", empresa: "Local" } /* dos clientes con esos dígitos y una palabra que encaja con ambos */, { nif: "65432199A", empresa: "" }];
     const base = await entrar(m, "mala-clave-1");
     for (const extra of casos) { const r = await entrar(m, "mala-clave-1", extra); assert.equal(r.status, 401); assert.deepEqual(r.json, base.json); }
     for (const extra of casos) { const r = await crear(m, "Clave-Nueva-55", extra); assert.ok([409].includes(r.status), JSON.stringify(extra)); assert.equal(r.cab.getSetCookie().length, 0); }
     assert.equal(m.accounts.passwordTiene("C2"), false); assert.equal(m.accounts.passwordTiene("C3"), false);
   } finally { m.cerrar(); }
+});
+
+test("EL NOMBRE ES SECUNDARIO: lo que identifica al cliente son los 6 dígitos del NIF; vale cualquier nombre (o ninguno) y solo desempata cuando varios comparten esos dígitos", async () => {
+  const m = await montar();
+  try {
+    // un solo cliente con esos dígitos: da igual lo que se escriba como nombre
+    for (const emp of ["Plaza", "plaza", "bar plaza", "PLAZA SL", "Alegría", "", "lo que sea"]) { const r = await entrar(m, "mala-clave-1", { empresa: emp }); assert.notEqual(r.json.error?.match?.(/Los datos no son correctos/) ? "no" : "si", "no", "«" + emp + "»: el NIF identifica al cliente (debe pedir crear la contraseña, no decir que no existe)"); assert.equal(r.status, 409, emp); assert.equal(r.json.necesitaCrear, true); }
+    const c = await crear(m, "Mesa-Verde-42", { empresa: "otra cosa", nif: "123456" }); assert.equal(c.status, 200); assert.equal(c.json.cliente.nombre, "BAR LA PLAZA S.L.");
+    assert.equal((await entrar(m, "Mesa-Verde-42", { empresa: "", nif: "123456" })).status, 200);
+    // varios clientes con los mismos dígitos: el nombre (una palabra, sin tildes ni mayúsculas) desempata
+    assert.equal((await entrar(m, "x1y2z3w4", { nif: "654321", empresa: "uno" })).json.necesitaCrear, true);
+    assert.equal(m.accounts.passwordTiene("C2"), false);
+    assert.equal((await crear(m, "Clave-Local-77", { nif: "654321", empresa: "BAR LOCAL UNO" })).status, 200); assert.equal(m.accounts.passwordTiene("C2"), true); assert.equal(m.accounts.passwordTiene("C3"), false);
+    assert.equal((await crear(m, "Clave-Local-88", { nif: "654321", empresa: "dos" })).status, 200); assert.equal(m.accounts.passwordTiene("C3"), true);
+    assert.equal((await entrar(m, "Clave-Local-77", { nif: "654321", empresa: "uno" })).status, 200);
+    assert.equal((await entrar(m, "Clave-Local-77", { nif: "654321", empresa: "dos" })).status, 401, "con la palabra del otro local, la contraseña del primero no vale");
+    assert.equal((await entrar(m, "Clave-Local-77", { nif: "654321", empresa: "" })).status, 401, "sin nombre no se sabe cuál de los dos");
+  } finally { m.cerrar(); }
+  const h = leer("./cliente.html"), t = h.slice(h.indexOf('id="f-pw"'), h.indexOf('id="f-correo"'));
+  assert.ok(t.includes("basta con una palabra"));
+  const js = h.slice(h.indexOf("// ── Entrar con nombre + NIF + contraseña"), h.indexOf("// ── Cambiar mi contraseña"));
+  assert.ok(!/Escribe el nombre de tu empresa/.test(js), "el nombre ya no es obligatorio en la pantalla");
 });
 
 test("fuerza bruta: 5 fallos bloquean la cuenta 15 min (y la contraseña buena tampoco entra); tope por dirección", async () => {

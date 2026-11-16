@@ -131,6 +131,20 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const codigoVerificar = rateLimiter(Number(process.env.OFICINA_CODIGO_LIMIT ?? 15), 10 * 60_000);
   const MSG_SOLICITUD = "Si los datos coinciden con un cliente, te hemos enviado un código de 6 cifras al correo que tenemos de ti (mira también el spam). Escríbelo aquí. Si no tienes correo o no te llega, pulsa «Necesito ayuda» y la oficina te dará paso.";
   const huellaSecreto = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
+  // Entrada con contraseña: lo que IDENTIFICA al cliente son los 6 primeros dígitos de su NIF. El nombre ayuda solo cuando varios clientes comparten esos dígitos
+  // (p. ej. un mismo titular con dos locales): basta con UNA palabra de su nombre o de su razón social (sin tildes ni mayúsculas, sin «bar», «restaurante», «S.L.»…).
+  const NOMBRE_RUIDO = new Set(["bar", "cafe", "cafeteria", "restaurante", "taberna", "pub", "hotel", "hostal", "bodega", "pizzeria", "mesón", "meson", "asador", "los", "las", "del", "con", "por", "para", "sociedad", "limitada", "anonima", "slu", "sll", "cb"]);
+  const palabrasNombre = (t) => String(t ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter((w) => w.length >= 3 && !NOMBRE_RUIDO.has(w));
+  /** Cuántas palabras de lo escrito encajan con el nombre (o la razón social) de ese cliente. */
+  const aciertosNombre = (c, escrito) => { const mias = palabrasNombre(escrito), suyas = palabrasNombre(`${c?.name ?? ""} ${c?.legalName ?? ""}`); return mias.filter((w) => suyas.some((s) => s === w || (w.length >= 4 && s.length >= 4 && (s.startsWith(w) || w.startsWith(s))))).length; };
+  /** Clientes con esos 6 dígitos: si es UNO, vale cualquier nombre (o ninguno); si son varios, se queda el único cuyo nombre encaje con una palabra de lo escrito. */
+  function clientesPorNif(nif, empresa) {
+    const ids = customers.findByNif(nif);
+    if (ids.length <= 1) return ids;
+    const puntos = ids.map((id) => [id, aciertosNombre(customers.getById(id), empresa)]), mejor = Math.max(0, ...puntos.map((p) => p[1]));
+    const ganadores = mejor > 0 ? puntos.filter((p) => p[1] === mejor).map((p) => p[0]) : [];
+    return ganadores.length === 1 ? ganadores : []; // gana el que más palabras acierta; si hay empate, no se adivina
+  }
   /** Clientes con ese NIF (o 6 primeros dígitos) cuyo nombre se parece al escrito. */
   function clientesPorNombreYNif(nif, empresa) {
     if (String(empresa ?? "").trim().length < 2) return [];
@@ -330,11 +344,10 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (turnstileActivo() && (crear || intentosAcceso.pasado(intentosAcceso.suma(ip(req))))) { // «no soy un robot»: siempre para crear una contraseña, y al entrar cuando hay muchos intentos
         if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
       }
-      if (pedirNombre(res, b)) return true;
       if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe tu NIF: los 6 primeros dígitos de tu DNI o CIF, o el NIF completo." }), true;
       const password = typeof b.password === "string" ? b.password : "";
       if (!password) return send(res, 400, { error: crear ? "Elige una contraseña." : "Escribe tu contraseña." }), true;
-      const ids = clientesPorNombreYNif(b.nif, b.empresa);
+      const ids = clientesPorNif(b.nif, b.empresa);
       const abrir = (customerId) => {
         const r = abrirConAparato(customerId, req, { nuevo: true }); // este aparato queda recordado: la próxima vez entra solo
         if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." }), true;

@@ -726,8 +726,8 @@
       <form class="vm-card" id="f-pw" novalidate hidden>
         <span class="tag">Cliente habitual</span>
         <h2>Inicia sesión</h2>
-        <p id="pw-intro">Escribe el <b>nombre de tu empresa</b>, los <b>6 primeros dígitos de tu DNI o CIF</b> y tu <b>contraseña</b>. En este móvil o navegador no te lo volveremos a pedir.</p>
-        <label>Nombre de tu empresa o negocio<input id="pw-emp" type="text" maxlength="80" autocomplete="organization" placeholder="Tal como lo conocemos" aria-describedby="pw-err"></label>
+        <p id="pw-intro">Escribe los <b>6 primeros dígitos de tu DNI o CIF</b>, el <b>nombre de tu negocio</b> (con una palabra basta) y tu <b>contraseña</b>. En este móvil o navegador no te lo volveremos a pedir.</p>
+        <label>Nombre de tu empresa o negocio <small class="pista">(basta con una palabra, por ejemplo «Alegría»)</small><input id="pw-emp" type="text" maxlength="80" autocomplete="organization" placeholder="Ej.: Alegría" aria-describedby="pw-err"></label>
         <label>Los 6 primeros dígitos de tu DNI o CIF<input id="pw-nif" type="text" inputmode="numeric" maxlength="12" autocomplete="username" placeholder="Ej.: 123456" aria-describedby="pw-err pw-aviso"></label>
         <div class="okmsg" id="pw-aviso" role="status"></div>
         <label>Contraseña<input id="pw-pass" type="password" maxlength="64" autocomplete="current-password" aria-describedby="pw-err"></label>
@@ -1222,7 +1222,6 @@ $("f-acceso").onsubmit = (e) => {
     $("pw-aviso").textContent = dig.length > 6 ? `Solo cuentan los 6 primeros dígitos del DNI o CIF: ${dig.slice(0, 6)}.` + (/[A-Za-z]/.test(v) ? " Las letras no cuentan." : "") : "";
   });
   const valida = () => {
-    if ($("pw-emp").value.trim().length < 2) { err("Escribe el nombre de tu empresa o negocio, tal como lo conocemos.", "pw-emp"); return false; }
     if (nif6().length < 6) { err("Escribe los 6 primeros dígitos de tu DNI o CIF (solo números; las letras no cuentan).", "pw-nif"); return false; }
     if (!$("pw-pass").value) { err(creando ? "Elige una contraseña." : "Escribe tu contraseña.", "pw-pass"); return false; }
     if (creando) {
