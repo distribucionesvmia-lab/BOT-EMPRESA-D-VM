@@ -3,6 +3,8 @@
 // desde la carpeta «datos» de Drive: clientes.xlsx, productos.xlsx y historial-ventas.xlsx (ver docs/GOOGLE_DRIVE.md).
 //
 // Uso:   node extraer-a3erp.js --db VALENTIN --salida ./salida-datos [--meses 12]
+//   o:   node extraer-a3erp.js --db VALENTIN --bases C:\vm   → deja cada Excel en su carpeta BASE-CLIENTES / BASE-ARTICULOS / BASE-HISTORICO… (con la fecha en el nombre)
+//        para que el programa los recoja y se actualice SOLO (ver auto-bases.js). No pisa los anteriores: cada ejecución crea un archivo nuevo.
 // Conexión (variable SQLCMD_JSON = comando de sqlcmd como lista JSON, sin -d ni -Q). Ejemplos:
 //   Servidor con SQL Server:  SQLCMD_JSON='["sqlcmd","-S",".\\A3ERP","-E","-C"]'
 //   SQL Server en Docker:     SQLCMD_JSON='["docker","exec","-i","sql","/opt/mssql-tools18/bin/sqlcmd","-C","-S","localhost","-U","sa","-P","…"]'
@@ -71,13 +73,29 @@ export function aExcel(def, filas, nombre) {
   return buildXlsx(rows, { sheetName: nombre, widths: def.cabecera.map(() => 18) });
 }
 
+const norm = (s) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+const CARPETA_BASE = { clientes: ["baseclientes", "BASE-CLIENTES"], productos: ["basearticulos", "BASE-ARTICULOS"], historial: ["basehistorico", "BASE-HISTORICO PEDIDOS"] };
+/** Carpeta BASE-… de ese tipo dentro de `raiz` (la que ya exista, escrita como sea: con tilde, mayúsculas, palabras detrás) o, si no hay, la crea con el nombre de siempre. */
+export function carpetaBase(raiz, tipo) {
+  const [prefijo, nombre] = CARPETA_BASE[tipo];
+  fs.mkdirSync(raiz, { recursive: true });
+  const ya = fs.readdirSync(raiz, { withFileTypes: true }).find((d) => d.isDirectory() && norm(d.name).startsWith(prefijo));
+  const dir = path.join(raiz, ya ? ya.name : nombre);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+/** Sello de fecha para el nombre del archivo: AAAAMMDD-HHMM (hora local). */
+export const sello = (d = new Date()) => { const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`; };
+
 function main() {
   const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ? process.argv[i + 1] : d; };
   const db = arg("db", "VALENTIN");
+  const bases = arg("bases", "");
   const salida = arg("salida", "./salida-datos");
   const meses = Number(arg("meses", "12"));
   const cmd = JSON.parse(process.env.SQLCMD_JSON ?? '["sqlcmd","-S",".","-E","-C"]');
-  fs.mkdirSync(salida, { recursive: true });
+  if (!bases) fs.mkdirSync(salida, { recursive: true });
+  const ahora = sello();
   const ficheros = { clientes: "clientes.xlsx", productos: "productos.xlsx", historial: "historial-ventas.xlsx" };
   for (const [tipo, def] of Object.entries(CONSULTAS)) {
     const filas = consultar(cmd, db, def.sql(meses));
@@ -85,10 +103,11 @@ function main() {
     if (mal.length) throw new Error(`${tipo}: ${mal.length} filas con un número de columnas distinto de ${def.cabecera.length} (ej.: ${JSON.stringify(mal[0]).slice(0, 200)})`);
     if (!filas.length) throw new Error(`${tipo}: la consulta no devolvió ninguna fila`);
     // Escritura atómica: un corte no deja un Excel a medias en la carpeta que lee la web
-    const destino = path.join(salida, ficheros[tipo]);
+    // Con --bases cada Excel va a su carpeta BASE-… con la fecha en el nombre (así el programa sabe cuál es el más reciente); sin ella, a la carpeta de salida con el nombre de siempre
+    const destino = bases ? path.join(carpetaBase(bases, tipo), `${ficheros[tipo].replace(/\.xlsx$/, "")}-${ahora}.xlsx`) : path.join(salida, ficheros[tipo]);
     fs.writeFileSync(destino + ".tmp", aExcel(def, filas, tipo));
-    fs.renameSync(destino + ".tmp", destino);
-    console.log(`${ficheros[tipo]}: ${filas.length} filas`);
+    fs.renameSync(destino + ".tmp", destino); // el programa no lee archivos .tmp: nunca ve un Excel a medias
+    console.log(`${bases ? destino : ficheros[tipo]}: ${filas.length} filas`);
   }
 }
 

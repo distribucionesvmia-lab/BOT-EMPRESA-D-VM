@@ -35,3 +35,22 @@ test("historial: agrupa por cliente y documento, con fecha y cantidad", () => {
 test("las consultas son SELECT fijos y de solo lectura", () => {
   for (const def of Object.values(CONSULTAS)) assert.match(def.sql(12).trim(), /^SELECT/i), assert.doesNotMatch(def.sql(12), /\b(INSERT|UPDATE|DELETE|DROP|EXEC)\b/i);
 });
+
+test("--bases: cada Excel va a su carpeta BASE-… (la que ya exista, con tilde o palabras detrás) con la fecha en el nombre, y las que faltan se crean", async () => {
+  const fs = await import("node:fs"), os = await import("node:os"), path = await import("node:path");
+  const { carpetaBase, sello } = await import("./extraer-a3erp.js");
+  const raiz = fs.mkdtempSync(path.join(os.tmpdir(), "vm-bases-"));
+  fs.mkdirSync(path.join(raiz, "BASE-ARTÍCULOS")); fs.mkdirSync(path.join(raiz, "BASE-HISTORICO PEDIDOS")); fs.mkdirSync(path.join(raiz, "otra"));
+  assert.equal(path.basename(carpetaBase(raiz, "productos")), "BASE-ARTÍCULOS"); // la que ya estaba, tal cual
+  assert.equal(path.basename(carpetaBase(raiz, "historial")), "BASE-HISTORICO PEDIDOS");
+  assert.equal(path.basename(carpetaBase(raiz, "clientes")), "BASE-CLIENTES"); // no existía: se crea
+  assert.ok(fs.existsSync(path.join(raiz, "BASE-CLIENTES")));
+  assert.equal(fs.readdirSync(raiz).filter((n) => /^base/i.test(n)).length, 3); // no se crean duplicadas
+  assert.match(sello(new Date(2026, 10, 16, 9, 5)), /^20261116-0905$/);
+  // el archivo que deja es un Excel que ya entiende la importación (y que el programa reconocerá en su carpeta)
+  const filas = [["954", "CARNICERIA JESUS", "JESUS ALONSO ARRIBAS", "MEDINA DEL CAMPO", "47085", "CL. VALLADOLID 67, 67", "983812329", "a@b.es", "123456789", "No", "No"]];
+  const f = path.join(carpetaBase(raiz, "clientes"), `clientes-${sello()}.xlsx`); fs.writeFileSync(f, aExcel(CONSULTAS.clientes, filas, "clientes"));
+  assert.equal(parseClientesXlsx(fs.readFileSync(f)).customers.length, 1);
+  const bat = fs.readFileSync(new URL("./deploy/windows/extraer-excels.bat", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.match(bat, /extraer-a3erp\.js --db %BASE% --bases C:\\vm/); assert.match(bat, /set "SERVIDOR=\."/); assert.match(bat, /set "SQLCMD_JSON=\["sqlcmd","-S","%SERVIDOR%","-E","-C"\]"/);
+});
