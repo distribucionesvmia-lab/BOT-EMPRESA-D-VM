@@ -730,6 +730,7 @@
           <label>Nombre de tu empresa o negocio<input id="co-emp" type="text" maxlength="80" autocomplete="organization" placeholder="Tal como lo conocemos" aria-describedby="co-err"></label>
           <label>NIF (DNI, NIE o CIF)<input id="co-nif" type="text" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 12345678Z" aria-describedby="co-err"></label>
           <div class="ts-hueco" id="ts-correo" hidden></div>
+          <div class="trampa" aria-hidden="true"><label>No rellenar este campo<input id="co-web" name="sitio_web" tabindex="-1" autocomplete="off"></label></div>
         </div>
         <div id="co-paso2" hidden>
           <div class="okmsg" id="co-ok" role="status"></div>
@@ -1135,11 +1136,12 @@ $("f-acceso").onsubmit = (e) => {
     } catch { /* sin red: se vuelve a intentar */ }
   }
   async function pedir() {
-    const body = datos(); if (tsToken["ts-correo"]) body.cf = tsToken["ts-correo"];
+    const body = { ...datos(), sitio_web: $("co-web").value, t: Math.round(performance.now()) }; if (tsToken["ts-correo"]) body.cf = tsToken["ts-correo"]; // «sitio_web» es un campo trampa y «t» lo que tardó una persona en llegar hasta aquí (un bot no lo rellena bien)
     const r = await post("/api/acceso/oficina/pedir", body); if (body.cf) { tsToken["ts-correo"] = null; tsPinta("ts-correo"); }
     const j = await r.json().catch(() => ({}));
     if (j.necesitaVerificacion) { err(j.error); tsPinta("ts-correo"); return false; }
     if (!r.ok) { err(j.error || "No se pudo avisar a la oficina."); return false; }
+    if (j.entra) { entrarYa(j); return true; } // este aparato ya lo aprobó la oficina otra vez: entra directamente
     secreto = j.solicitud; $("co-ref").textContent = j.ref || "····"; $("co-ok").textContent = j.mensaje || "Hemos avisado a la oficina.";
     verPaso(2); secreto = j.solicitud; clearInterval(reloj); reloj = setInterval(preguntar, 3000); return true;
   }

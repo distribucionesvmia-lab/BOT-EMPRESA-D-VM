@@ -545,6 +545,9 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       // ---- Ficha de un cliente: todo lo suyo en un sitio (sin NIF: no se guarda) ----
       { const mf = /^\/api\/admin\/cliente\/([\w-]{1,20})\/ficha$/.exec(p);
         // Editar la ficha a mano (teléfonos, correos, dirección…): se guarda aparte y las importaciones de a3ERP no lo borran
+        // Olvidar los aparatos de confianza de un cliente (si perdió el móvil o se sospecha de un acceso): tendrán que volver a pedir permiso
+        { const mo = /^\/api\/admin\/cliente\/([\w-]{1,20})\/aparatos\/olvidar$/.exec(p);
+          if (mo && post) return send(res, 200, { ok: true, olvidados: accounts.aparatosBorrar(mo[1]) }), true; }
         if (mf && post) {
           const id = mf[1], c0 = customers.getById(id); if (!c0) return send(res, 404, { error: "No existe ese cliente." }), true;
           const v = validarEdicion((await readJson(req)) ?? {}); if (v.error) return send(res, 400, { error: v.error }), true;
@@ -568,6 +571,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
             ofertasCorreo: accounts.ofertasDe(id),
             correoPedidos: { destino: elegirDestino({ account: cu, customer: c }), activo: accounts.correoPedidoActivo(id), delaCuenta: !!cu?.email && elegirDestino({ account: cu, customer: c }) === cu.email },
             cuenta: cu ? { estado: cu.status, confirmada: cu.verified, bloqueada: cu.locked, ultimoAcceso: cu.lastLogin, creada: cu.createdAt, codigoPropio: cu.ownCode } : null,
+            aparatos: accounts.aparatosDe(id).length,
             totalPedidosApp: todos.length,
             pedidos: todos.slice(0, 12).map(orderView).map((o) => ({ ref: o.ref, fecha: o.fecha, entrega: o.entrega?.texto ?? "", total: o.total, estado: o.estado, modificado: o.modificado, lineas: o.lineas.slice(0, 30).map((l) => ({ nombre: l.nombre, unidades: l.unidades, cajas: l.unidad === "caja" ? l.cajas : 0 })) })),
             erp: { pedidos: c.orders?.length ?? 0, ultimo: compra?.date ?? null },

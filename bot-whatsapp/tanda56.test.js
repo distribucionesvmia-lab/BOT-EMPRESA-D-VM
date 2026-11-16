@@ -25,9 +25,9 @@ async function montar({ tope = {} } = {}) {
   const port = await libre(); await new Promise((ok) => srv.listen(port, "127.0.0.1", ok));
   const post = async (ruta, cuerpo, cab = {}) => { const r = await fetch(`http://127.0.0.1:${port}${ruta}`, { method: "POST", headers: { "Content-Type": "application/json", ...cab }, body: JSON.stringify(cuerpo) }); return { status: r.status, json: await r.json().catch(() => ({})), cab: r.headers }; };
   const get = async (ruta, cab = {}) => { const r = await fetch(`http://127.0.0.1:${port}${ruta}`, { headers: cab }); return { status: r.status, json: await r.json().catch(() => ({})) }; };
-  return { accounts, post, get, cerrar: () => srv.close() };
+  return { accounts, port, post, get, cerrar: () => srv.close() };
 }
-const pedir = (m, nif = "12345678Z", empresa = "Bar La Plaza") => m.post("/api/acceso/oficina/pedir", { nif, empresa });
+const pedir = (m, nif = "12345678Z", empresa = "Bar La Plaza", extra = {}, cab = {}) => m.post("/api/acceso/oficina/pedir", { nif, empresa, t: 5000, ...extra }, cab);
 const estado = (m, solicitud, codigo) => m.post("/api/acceso/oficina/estado", { solicitud, ...(codigo ? { codigo } : {}) });
 
 test("flujo completo: nombre + NIF → aparece en la oficina con su referencia → la oficina aprueba → entra solo, una sola vez", async () => {
@@ -109,8 +109,8 @@ test("contra solicitudes en masa: tope por dirección y en total", async () => {
 test("datos mal escritos se explican y SOLO se entra así: el acceso con solo el NIF y con teléfono viene cerrado (ACCESO_SOLO_OFICINA=0 lo reabre)", async () => {
   const m = await montar();
   try {
-    assert.equal((await m.post("/api/acceso/oficina/pedir", { nif: "12345678Z", empresa: "" })).status, 400);
-    assert.equal((await m.post("/api/acceso/oficina/pedir", { nif: "", empresa: "Bar La Plaza" })).status, 400);
+    assert.equal((await pedir(m, "12345678Z", "")).status, 400);
+    assert.equal((await pedir(m, "", "Bar La Plaza")).status, 400);
     assert.equal((await m.post("/api/acceso/oficina/estado", { solicitud: "corto" })).status, 400);
     const seg = (await m.get("/api/seguridad")).json; assert.equal(seg.accesoOficina, true); assert.equal(seg.soloOficina, true);
     assert.equal((await m.post("/api/acceso", { nif: "123456" })).status, 403);
@@ -120,6 +120,56 @@ test("datos mal escritos se explican y SOLO se entra así: el acceso con solo el
     process.env.ACCESO_OFICINA = "0";
     try { assert.equal((await pedir(m)).status, 503); } finally { delete process.env.ACCESO_OFICINA; }
   } finally { m.cerrar(); }
+});
+
+test("FÁCIL: tras UNA aprobación el aparato queda recordado y vuelve a entrar solo (sin la oficina), también al caducar la sesión", async () => {
+  const m = await montar();
+  try {
+    const a = await pedir(m), id = m.accounts.accesoSolicitudes().pendientes[0].id; m.accounts.accesoSolicitudResolver(id, "aprobada");
+    const e = await estado(m, a.json.solicitud), cks = e.cab.getSetCookie(); assert.equal(cks.length, 2, "sesión + aparato");
+    const ses = cks.find((c) => c.startsWith("vm_session=")).split(";")[0], apa = cks.find((c) => c.startsWith("vm_aparato=")); assert.match(apa, /HttpOnly/); assert.match(apa, /SameSite=Strict/); assert.match(apa, /Max-Age=31536000/);
+    const apaCk = apa.split(";")[0];
+    assert.equal(JSON.stringify(m.accounts.aparatosDe("C1")).includes(apaCk.split("=")[1]), false, "el secreto del aparato no se guarda en claro");
+    // la sesión caduca / se cierra el navegador: solo queda el aparato → /api/yo lo reconoce y abre una sesión nueva
+    const yo = await fetch(`http://127.0.0.1:${m.port}/api/yo`, { headers: { Cookie: apaCk } }); const j = await yo.json();
+    assert.equal(j.cliente?.nombre, "BAR LA PLAZA S.L."); assert.match(yo.headers.get("set-cookie"), /vm_session=/);
+    // y si la sesión se perdió, pedir otra vez con su nombre y NIF entra directo, sin avisar a la oficina
+    const antes = m.accounts.accesoSolicitudes().pendientes.length;
+    const d = await pedir(m, "12345678Z", "Bar La Plaza", {}, { Cookie: apaCk }); assert.equal(d.json.entra, true); assert.equal(d.json.cliente.nombre, "BAR LA PLAZA S.L.");
+    assert.equal(m.accounts.accesoSolicitudes().pendientes.length, antes, "no molesta a la oficina");
+    // el aparato de un cliente NO sirve para otro, ni un secreto inventado
+    const otro = await pedir(m, "65432199A", "Local Uno", {}, { Cookie: apaCk }); assert.notEqual(otro.json.entra, true);
+    assert.equal((await fetch(`http://127.0.0.1:${m.port}/api/yo`, { headers: { Cookie: "vm_aparato=" + "x".repeat(43) } }).then((r) => r.json())).cliente, null);
+    // «Cerrar sesión» olvida este aparato: la próxima vez hará falta la oficina
+    const sal = await fetch(`http://127.0.0.1:${m.port}/api/salir`, { method: "POST", headers: { Cookie: `${ses}; ${apaCk}` } }); assert.equal(sal.status, 200);
+    assert.equal((await fetch(`http://127.0.0.1:${m.port}/api/yo`, { headers: { Cookie: apaCk } }).then((r) => r.json())).cliente, null);
+    assert.equal(m.accounts.aparatosDe("C1").length, 0);
+  } finally { m.cerrar(); }
+});
+
+test("aparatos: máximo 5 por cliente, caducan al año sin usarse, la oficina puede olvidarlos todos y se borran con la cuenta", () => {
+  const cu = openAccountsDb(":memory:"), base = "2026-11-16T10:00:00.000Z", dia = (n) => new Date(Date.parse(base) + n * 86_400_000).toISOString();
+  for (let i = 1; i <= 7; i++) cu.aparatoCrear("C1", `h${i}`, "Chrome", { now: base });
+  assert.equal(cu.aparatosDe("C1").length, 5); assert.equal(cu.aparatoValido("h1", { now: base }), null, "el más antiguo se olvidó"); assert.equal(cu.aparatoValido("h7", { now: base }), "C1");
+  assert.equal(cu.aparatoValido("h7", { now: dia(300) }), "C1", "se renueva al usarlo"); assert.equal(cu.aparatoValido("h7", { now: dia(300 + 364) }), "C1"); assert.equal(cu.aparatoValido("h6", { now: dia(366) }), null, "sin usar un año: caduca");
+  assert.equal(cu.aparatosBorrar("C1") > 0, true); assert.equal(cu.aparatoValido("h7", { now: base }), null);
+});
+
+test("contra bots: el campo trampa y enviar demasiado rápido (o sin decir cuánto) parecen ir bien pero no llegan a la oficina; tope por cliente y hora", async () => {
+  const m = await montar();
+  try {
+    const bien = await pedir(m, "12345678Z", "Bar La Plaza", { t: 5000 });
+    const lista = () => m.accounts.accesoSolicitudes().pendientes.length; assert.equal(lista(), 1);
+    for (const extra of [{ sitio_web: "http://spam" }, { t: 100 }, { t: undefined }]) { const r = await pedir(m, "12345678Z", "Bar La Plaza", extra); assert.equal(r.status, 200); assert.deepEqual(Object.keys(r.json).sort(), Object.keys(bien.json).sort()); }
+    assert.equal(lista(), 1, "ninguna de esas llegó a la oficina (ni reemplazó a la buena)");
+    assert.equal((await estado(m, (await pedir(m, "12345678Z", "Bar La Plaza", { t: 10 })).json.solicitud)).json.estado, "pendiente");
+  } finally { m.cerrar(); }
+  process.env.OFICINA_CLIENTE_LIMIT = "2"; process.env.OFICINA_ESPERA_S = "0";
+  const m2 = await montar();
+  try {
+    for (let i = 0; i < 4; i++) await pedir(m2);
+    const l = m2.accounts.accesoSolicitudes(); assert.equal(l.pendientes.length, 1); assert.equal(l.recientes.filter((x) => x.estado === "reemplazada").length, 1, "solo 2 solicitudes por hora para el mismo cliente: la 3.ª y la 4.ª no llegan");
+  } finally { m2.cerrar(); delete process.env.OFICINA_CLIENTE_LIMIT; delete process.env.OFICINA_ESPERA_S; }
 });
 
 test("ALTAS: toda alta queda pendiente hasta que la empresa la acepte; el correo es OPCIONAL y no hay código de entrada", async () => {

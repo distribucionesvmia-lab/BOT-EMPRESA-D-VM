@@ -10,6 +10,7 @@ import { navegadorCorto } from "./errores.js";
 import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
 
 const COOKIE = "vm_session";
+const COOKIE_APARATO = "vm_aparato"; // aparato de confianza: tras una aprobación de la oficina, este navegador vuelve a entrar solo
 const MENSAJE_ELIMINADA = "Esta cuenta se eliminó. Si quieres volver a usar la aplicación, llámanos o solicita el alta de nuevo.";
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 
@@ -104,6 +105,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const soloOficina = () => oficinaActiva() && process.env.ACCESO_SOLO_OFICINA !== "0"; // por defecto SOLO se entra así (ACCESO_SOLO_OFICINA=0 reabre las otras formas, solo para emergencias)
   const altaAutomatica = () => process.env.ALTA_AUTOMATICA === "1"; // por defecto TODA alta la acepta la empresa; esto la dejaría entrar sola si coincide con un cliente (no recomendado)
   const solicitudIp = rateLimiter(Number(process.env.OFICINA_IP_LIMIT ?? 8), 10 * 60_000);
+  const solicitudCliente = rateLimiter(Number(process.env.OFICINA_CLIENTE_LIMIT ?? 6), 60 * 60_000); // solicitudes por hora para el mismo cliente (nadie puede llenar el panel con el NIF de otro)
   const solicitudGlobal = rateLimiter(Number(process.env.OFICINA_GLOBAL_LIMIT ?? 200), 60 * 60_000);
   const estadoIp = rateLimiter(Number(process.env.OFICINA_ESTADO_LIMIT ?? 600), 10 * 60_000); // el navegador pregunta cada pocos segundos
   const codigoVerificar = rateLimiter(Number(process.env.OFICINA_CODIGO_LIMIT ?? 15), 10 * 60_000);
@@ -132,6 +134,18 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const cookie = (token, maxAge, req) => `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${esHttps(req) ? "; Secure" : ""}`;
 
   /** Cuenta de la sesión de esta petición (o null). */
+  const cookieAparato = (token, maxAge, req) => `${COOKIE_APARATO}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${esHttps(req) ? "; Secure" : ""}`;
+  const huella = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
+  /** Cliente al que pertenece el aparato de confianza de esta petición (o null). */
+  const aparatoDe = (req) => { const t = parseCookies(req.headers.cookie)[COOKIE_APARATO]; return t && t.length >= 20 && t.length <= 100 ? accounts.aparatoValido(huella(t)) : null; };
+  /** Abre sesión como ese cliente y deja (o renueva) el aparato de confianza. Devuelve { ok, token, account, cookies } o { ok:false, reason }. */
+  const abrirConAparato = (customerId, req, { nuevo = false } = {}) => {
+    const r = accounts.loginNif([String(customerId)], () => true); if (!r.ok) return r;
+    const cookies = [cookie(r.token, 30 * 86400, req)];
+    if (nuevo) { const t = crypto.randomBytes(32).toString("base64url"); accounts.aparatoCrear(customerId, huella(t), navegadorCorto(req.headers["user-agent"])); cookies.push(cookieAparato(t, 365 * 86400, req)); }
+    else { const t = parseCookies(req.headers.cookie)[COOKIE_APARATO]; if (t) cookies.push(cookieAparato(t, 365 * 86400, req)); } // se renueva el plazo en el navegador
+    return { ...r, cookies };
+  };
   const sessionOf = (req) => accounts.sessionAccount(parseCookies(req.headers.cookie)[COOKIE]);
 
   /** Atiende las rutas del cliente: /api/registro, /api/acceso, /api/salir y /api/yo. Devuelve true si la ruta era suya. */
@@ -214,14 +228,26 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       if (!solicitudIp(ip(req))) return eventoSeguridad("acceso-oficina-muchas-peticiones", ip(req)), demasiados(res, solicitudIp, ip(req)), true;
-      if (turnstileActivo() && intentosAcceso.pasado(intentosAcceso.suma(ip(req)))) {
+      if (turnstileActivo() && !aparatoDe(req)) { // un aparato nuevo (el único caso que molesta a la oficina) tiene que pasar «no soy un robot» si está configurado
+        intentosAcceso.suma(ip(req));
         if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
       }
       if (pedirNombre(res, b)) return true;
       if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe tu NIF: los 6 primeros dígitos de tu DNI o CIF, o el NIF completo." }), true;
+      // Contra bots: campo trampa relleno, o enviado más rápido de lo que escribe una persona (o sin decir cuánto tardó): se finge que ha ido bien y no llega nada a la oficina
+      const falso = () => (send(res, 200, { ok: true, solicitud: crypto.randomBytes(32).toString("base64url"), ref: String(crypto.randomInt(0, 10_000)).padStart(4, "0"), mensaje: MSG_SOLICITUD }), true);
+      if (String(b.sitio_web ?? "").trim()) return eventoSeguridad("acceso-con-campo-trampa", ip(req)), falso();
+      if (!(Number(b.t) >= 1500)) return eventoSeguridad("acceso-demasiado-rapido", ip(req)), falso();
+      // Aparato ya aprobado antes por la oficina: entra directamente (con su nombre y NIF otra vez, por si hubiera dos personas en el mismo aparato)
+      const idsPre = clientesPorNombreYNif(b.nif, b.empresa), recordado = aparatoDe(req);
+      if (recordado && idsPre.length === 1 && idsPre[0] === recordado) {
+        const r = abrirConAparato(recordado, req);
+        if (r.ok) return send(res, 200, { ok: true, entra: true, cliente: { nombre: customers.getById(recordado)?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), r.cookies) }), true;
+      }
       const secreto = crypto.randomBytes(32).toString("base64url"), ref = String(crypto.randomInt(0, 10_000)).padStart(4, "0");
       const ids = clientesPorNombreYNif(b.nif, b.empresa);
-      if (ids.length === 1 && solicitudGlobal("todas")) {
+      if (ids.length === 1 && !solicitudCliente(ids[0])) { eventoSeguridad("acceso-oficina-muchas-por-cliente", `cliente ${ids[0]}`); }
+      else if (ids.length === 1 && solicitudGlobal("todas")) {
         const r = accounts.accesoSolicitudCrear({ customerId: ids[0], secretHash: huellaSecreto(secreto), ref, aparato: navegadorCorto(req.headers["user-agent"]), ip: ip(req), esperaS: Number(process.env.OFICINA_ESPERA_S ?? 20) });
         if (r.ok) console.log(`[VM acceso] Solicitud de entrada del cliente ${ids[0]} (referencia ${ref}): esperando a la oficina`);
         else console.warn(`[VM acceso] Solicitud NO creada para el cliente ${ids[0]}: ya pidió otra hace menos de ${r.espera} s`);
@@ -238,10 +264,10 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (secreto.length < 20 || secreto.length > 100) return send(res, 400, { error: "Solicitud no válida." }), true;
       const h = huellaSecreto(secreto);
       const abrir = (customerId) => {
-        const r = accounts.loginNif([customerId], () => true); // misma apertura de sesión que el resto (cuenta eliminada o bloqueada incluidas)
+        const r = abrirConAparato(customerId, req, { nuevo: true }); // la oficina ya lo ha aprobado: este aparato queda recordado y no hará falta volver a pedir permiso
         if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." }), true;
         const customer = customers.getById(r.account.customerId);
-        return send(res, 200, { ok: true, estado: "entra", cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), cookie(r.token, 30 * 86400, req)) }), true;
+        return send(res, 200, { ok: true, estado: "entra", cliente: { nombre: customer?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), r.cookies) }), true;
       };
       const codigo = String(b?.codigo ?? "").replace(/\s/g, "");
       if (codigo) {
@@ -309,14 +335,20 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     }
 
     if (p === "/api/salir" && req.method === "POST") {
-      accounts.logout(parseCookies(req.headers.cookie)[COOKIE]);
-      return send(res, 200, { ok: true }, { "Set-Cookie": cookie("", 0, req) }), true;
+      const ck = parseCookies(req.headers.cookie);
+      accounts.logout(ck[COOKIE]);
+      if (ck[COOKIE_APARATO]) accounts.aparatoOlvidar(huella(ck[COOKIE_APARATO])); // cerrar sesión también olvida ESTE aparato: la próxima vez tendrá que aprobarlo la oficina (seguro en ordenadores compartidos)
+      return send(res, 200, { ok: true }, { "Set-Cookie": [cookie("", 0, req), cookieAparato("", 0, req)] }), true;
     }
 
     if (p === "/api/yo" && req.method === "GET") {
-      const acc = sessionOf(req);
+      let acc = sessionOf(req), extra = {};
+      if (!acc) { // sin sesión (caducó, o se cerró el navegador) pero con un aparato ya aprobado por la oficina: entra solo
+        const rec = aparatoDe(req), r = rec ? abrirConAparato(rec, req) : null;
+        if (r?.ok) { acc = r.account; extra = { "Set-Cookie": (avisoAcceso(r.token, req), r.cookies) }; }
+      }
       if (!acc) return send(res, 200, { cliente: null }), true; // invitado: sin sesión no es un error (la consola del navegador queda limpia)
-      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode || soloOficina(), soloOficina: soloOficina(), soloVer: !!acc.soloVer, mensajeEnlace: acc.mensajeEnlace || "", carrito: "vm_carrito_c_" + String(acc.customerId) } }), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
+      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode || soloOficina(), soloOficina: soloOficina(), soloVer: !!acc.soloVer, mensajeEnlace: acc.mensajeEnlace || "", carrito: "vm_carrito_c_" + String(acc.customerId) } }, extra), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
     }
 
     // El cliente cambia el código de entrada (los 6 del NIF) por uno personal de 6 letras o números

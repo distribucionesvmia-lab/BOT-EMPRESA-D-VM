@@ -445,7 +445,7 @@ test("ACCESO CON NIF: las cuentas ya están creadas y el cliente entra solo con 
 });
 
 test("ENTRADA POR LA OFICINA: el cliente pide con nombre + NIF, la empresa lo ve con su referencia y lo deja entrar con un clic o con un código", async () => {
-  const pedir = () => call("POST", "/api/acceso/oficina/pedir", { body: { nif: "111111", empresa: "Cafeteria Importada" } });
+  const pedir = () => call("POST", "/api/acceso/oficina/pedir", { body: { nif: "111111", empresa: "Cafeteria Importada", t: 5000 } });
   const estado = (solicitud, codigo) => call("POST", "/api/acceso/oficina/estado", { body: { solicitud, ...(codigo ? { codigo } : {}) } });
   assert.equal((await call("GET", "/api/admin/accesos")).status, 403, "sin la clave de la oficina no se ve nada");
   // 1) aprobar con un clic
@@ -469,7 +469,7 @@ test("ENTRADA POR LA OFICINA: el cliente pide con nombre + NIF, la empresa lo ve
   const d = await pedir(), pd = (await call("GET", "/api/admin/accesos", { admin: true })).json.pendientes[0];
   assert.equal((await call("POST", `/api/admin/accesos/${pd.id}/rechazar`, { admin: true, body: {} })).status, 200); assert.equal((await estado(d.json.solicitud)).json.estado, "rechazada");
   // quien no coincide no llega a la oficina y recibe la misma respuesta
-  const raro = await call("POST", "/api/acceso/oficina/pedir", { body: { nif: "999999", empresa: "Nadie" } }); assert.equal(raro.status, 200); assert.equal((await call("GET", "/api/admin/accesos", { admin: true })).json.pendientes.length, 0);
+  const raro = await call("POST", "/api/acceso/oficina/pedir", { body: { nif: "999999", empresa: "Nadie", t: 5000 } }); assert.equal(raro.status, 200); assert.equal((await call("GET", "/api/admin/accesos", { admin: true })).json.pendientes.length, 0);
 });
 
 test("CAMBIAR EL CÓDIGO: el cliente sustituye los 6 del NIF por uno personal; el NIF deja de valer y la empresa puede restablecerlo", async () => {

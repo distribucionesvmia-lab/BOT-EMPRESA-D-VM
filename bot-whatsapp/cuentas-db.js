@@ -132,6 +132,9 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   // Solo se guardan las huellas del secreto del navegador y del código; la «referencia» (4 cifras) la ven el cliente y la oficina para comprobar que es la misma persona.
   db.exec("CREATE TABLE IF NOT EXISTS acceso_solicitudes (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, secret_hash TEXT NOT NULL UNIQUE, ref TEXT NOT NULL, aparato TEXT, ip TEXT, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, estado TEXT NOT NULL DEFAULT 'pendiente', code_hash TEXT, attempts INTEGER NOT NULL DEFAULT 0, resuelta_at TEXT)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_acceso_sol_cliente ON acceso_solicitudes(customer_id)");
+  // Aparatos de confianza: tras UNA aprobación de la oficina, ese navegador queda recordado (cookie con un secreto de 32 bytes; aquí solo su huella) y vuelve a entrar solo, sin pedir nada.
+  db.exec("CREATE TABLE IF NOT EXISTS aparatos_confiables (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, aparato TEXT, created_at TEXT NOT NULL, last_used TEXT NOT NULL, expires_at TEXT NOT NULL)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_aparatos_cliente ON aparatos_confiables(customer_id)");
   db.exec("CREATE TABLE IF NOT EXISTS correo_pref (customer_id TEXT PRIMARY KEY, activo INTEGER NOT NULL)"); // «Recibir por correo la confirmación de mis pedidos»: sin fila = activado
   db.exec("CREATE TABLE IF NOT EXISTS correo_pedidos (clave TEXT PRIMARY KEY, ref TEXT NOT NULL, at TEXT NOT NULL, estado TEXT NOT NULL DEFAULT 'enviando', error TEXT)"); // un correo por pedido (o por modificación): sin direcciones ni datos del cliente
   db.exec("CREATE TABLE IF NOT EXISTS correo_ofertas (customer_id TEXT PRIMARY KEY, acepta INTEGER NOT NULL, origen TEXT NOT NULL, at TEXT NOT NULL)"); // permiso para recibir OFERTAS por correo: sin fila = NO (hay que pedirlo); origen = cliente | empresa
@@ -466,6 +469,26 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       db.prepare("UPDATE acceso_solicitudes SET attempts = attempts + 1 WHERE id = ?").run(r.id);
       return { ok: false, reason: "invalid" };
     },
+    // ── Aparatos de confianza (sin volver a pedir permiso a la oficina) ──
+    /** Recuerda un aparato (máximo `max` por cliente: al pasarse, se olvida el más antiguo). */
+    aparatoCrear(customerId, tokenHash, aparato = "", { now = new Date().toISOString(), dias = 365, max = 5 } = {}) {
+      const id = String(customerId);
+      db.prepare("INSERT INTO aparatos_confiables (customer_id, token_hash, aparato, created_at, last_used, expires_at) VALUES (?, ?, ?, ?, ?, ?)").run(id, String(tokenHash), String(aparato).slice(0, 60), now, now, plus(now, dias * 86_400_000));
+      db.prepare("DELETE FROM aparatos_confiables WHERE customer_id = ? AND id NOT IN (SELECT id FROM aparatos_confiables WHERE customer_id = ? ORDER BY id DESC LIMIT ?)").run(id, id, max);
+      db.prepare("DELETE FROM aparatos_confiables WHERE expires_at < ?").run(now);
+      return true;
+    },
+    /** ¿Este aparato está recordado? Devuelve el código de cliente (y renueva su plazo si hace más de un día que no se usaba) o null. */
+    aparatoValido(tokenHash, { now = new Date().toISOString(), dias = 365 } = {}) {
+      const r = db.prepare("SELECT * FROM aparatos_confiables WHERE token_hash = ?").get(String(tokenHash));
+      if (!r || r.expires_at <= now) return null;
+      if (new Date(now) - new Date(r.last_used) > 86_400_000) db.prepare("UPDATE aparatos_confiables SET last_used = ?, expires_at = ? WHERE id = ?").run(now, plus(now, dias * 86_400_000), r.id);
+      return r.customer_id;
+    },
+    aparatoOlvidar: (tokenHash) => db.prepare("DELETE FROM aparatos_confiables WHERE token_hash = ?").run(String(tokenHash)).changes > 0,
+    aparatosDe: (customerId) => db.prepare("SELECT aparato, created_at AS creado, last_used AS ultimo FROM aparatos_confiables WHERE customer_id = ? ORDER BY id DESC").all(String(customerId)),
+    /** La oficina (o el cliente) olvida todos los aparatos de un cliente: tendrán que volver a pedir permiso. */
+    aparatosBorrar: (customerId) => db.prepare("DELETE FROM aparatos_confiables WHERE customer_id = ?").run(String(customerId)).changes,
     /** Para el panel: las pendientes (con su referencia) y las últimas resueltas. Nunca incluye secretos ni códigos. */
     accesoSolicitudes({ now = new Date().toISOString() } = {}) {
       const fila = (r) => ({ id: r.id, customerId: r.customer_id, ref: r.ref, aparato: r.aparato || "", creada: r.created_at, caduca: r.expires_at, estado: r.estado, conCodigo: !!r.code_hash, resuelta: r.resuelta_at });
@@ -715,6 +738,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         db.prepare("DELETE FROM corte_pref WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM login_codes WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM acceso_solicitudes WHERE customer_id = ?").run(row.customer_id);
+        db.prepare("DELETE FROM aparatos_confiables WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM correo_pref WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM correo_ofertas WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM baja_tokens WHERE customer_id = ?").run(row.customer_id);

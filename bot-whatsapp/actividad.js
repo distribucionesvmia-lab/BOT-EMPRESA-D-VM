@@ -14,6 +14,7 @@ const ETIQUETAS = [
   [/^\/api\/admin\/clientes\/[^/]+\/invitacion$/, () => "Creó un enlace de acceso"],
   [/^\/api\/admin\/invitaciones\/persona-nueva$/, () => "Creó un enlace para una persona nueva"],
   [/^\/api\/admin\/invitaciones\/\d+\/anular$/, () => "Anuló un enlace de acceso"],
+  [/^\/api\/admin\/cliente\/[\w-]{1,20}\/aparatos\/olvidar$/, () => "Olvidó los aparatos de confianza de un cliente"],
   [/^\/api\/admin\/accesos\/\d+\/aprobar$/, () => "Aprobó la entrada de un cliente"],
   [/^\/api\/admin\/accesos\/\d+\/rechazar$/, () => "Rechazó la entrada de alguien"],
   [/^\/api\/admin\/accesos\/\d+\/codigo$/, () => "Dio un código de entrada a un cliente"],
