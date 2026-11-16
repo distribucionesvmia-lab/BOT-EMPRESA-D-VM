@@ -1640,3 +1640,21 @@ test("BANDEJA DE ENTRADA: «BASE-HISTORICO PEDIDOS» y «BASE-ARTÍCULOS» (con 
   await new Promise((r) => setTimeout(r, 300));
   assert.ok(fs.existsSync(path.join(carpeta, "BASE-ARTÍCULOS", "a.xlsx")), "con DEMO=1 el planificador no corre: el archivo sigue ahí");
 });
+
+test("IMPRIMIR DIRECTO: la hoja para imprimir sale ya, sin exportar ni marcar nada, y solo con la clave de la empresa", async () => {
+  const { cookie } = await entrarNif("111111").then((r) => ({ cookie: cookieOf(r) }));
+  const rr = await call("POST", "/catalogo", { cookie, body: { key: "clave-imprimir-directo", lines: [{ id: "1010", qty: 3 }] } });
+  assert.equal(rr.status, 200, JSON.stringify(rr.json));
+  const lista = async () => (await call("GET", "/api/admin/pedidos", { admin: true })).json;
+  const ref = (await lista()).filter((o) => o.estado === "pendiente").pop().ref;
+  assert.equal((await call("POST", "/api/admin/imprimir", { body: {} })).status, 403);
+  assert.equal((await call("POST", "/api/admin/imprimir", { admin: true, body: { refs: ["x; DROP"] } })).status, 400);
+  const antes = (await call("GET", "/api/admin/exportaciones", { admin: true })).json.length;
+  const r = await fetch(`${BASE}/api/admin/imprimir`, { method: "POST", headers: { Authorization: `Bearer ${ADMIN}`, "Content-Type": "application/json" }, body: JSON.stringify({ refs: [ref] }) });
+  assert.equal(r.status, 200); assert.match(r.headers.get("content-type"), /text\/html/); assert.equal(r.headers.get("x-pedidos"), "1");
+  const html = await r.text(); assert.match(html, /<section class="hoja">/); assert.ok(html.includes(ref)); assert.doesNotMatch(html, /print\(\)/); // la página no se imprime sola: lo hace el panel
+  assert.equal((await lista()).find((o) => o.ref === ref).estado, "pendiente"); // imprimir NO exporta ni marca
+  assert.equal((await call("GET", "/api/admin/exportaciones", { admin: true })).json.length, antes);
+  assert.equal((await call("POST", "/api/admin/imprimir", { admin: true, body: { refs: ["VM-2000-000001"] } })).json.vacio, true); // sin pedidos listos: avisa
+  assert.match(fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8").replace(/\r\n/g, "\n"), /id="imprimir-ya"/);
+});

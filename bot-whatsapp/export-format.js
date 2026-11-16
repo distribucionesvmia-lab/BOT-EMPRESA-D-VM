@@ -59,14 +59,14 @@ export function esPorKilo(nombre) {
   return false;
 }
 
-// ── ALBARÁN o FACTURA: lo dice el «Modelo pedido» del cliente en a3ERP (LSTIMPRPEDV.002 = ALBARÁN; cualquier otro modelo = FACTURA; sin dato = no se escribe nada) ──
+// ── ALBARÁN o FACTURA: lo dice el «Modelo pedido» del cliente en a3ERP (LSTIMPRPEDV.002, .003 y .008 = ALBARÁN; cualquier otro modelo = FACTURA; sin dato = no se escribe nada) ──
 let modeloDe = () => null;
 /** Dice cómo averiguar el «Modelo pedido» de un cliente por su código (lo pone erp.js). */
 export const usarModeloPedido = (fn) => { modeloDe = typeof fn === "function" ? fn : () => null; };
 export function tipoDocumento(customerId) {
   let m; try { m = modeloDe(String(customerId ?? "")); } catch { m = null; }
   m = String(m ?? "").trim(); if (!m) return null;
-  return /(^|\.)0*2$/.test(m) ? "ALBARÁN" : "FACTURA";
+  return /(^|\.)0*(2|3|8)$/.test(m) ? "ALBARÁN" : "FACTURA"; // modelos que acaban en 002, 003 y 008
 }
 
 // ── Estilos de la hoja de pedido (el diseño sale de la hoja modelo de la empresa) ──
@@ -94,7 +94,7 @@ const LS = (gris) => ({
   box: linea({ sz: 40, name: "Segoe UI Symbol" }, gris), // casilla grande para tachar o marcar lo ya añadido
   cajas: linea({ b: 1, sz: 22 }, gris),
   texto: linea({}, gris),
-  descripcion: linea({ h: "left", indent: 1 }, gris),
+  descripcion: linea({ h: "left", indent: 1, b: 1 }, gris), // descripción del artículo en negrita
   negrita: linea({ b: 1 }, gris),
   grisNum: linea({ color: GRIS }, gris),
   unidadesNegras: linea({ b: 1, sz: 22, color: "000000" }, gris), // solo unidades (sin cajas): en grande, como el nº de cajas
@@ -231,7 +231,7 @@ ${conNota.length ? `<div class="obsl"><b>Observaciones línea</b>${conNota.map((
 table { width:100%; border-collapse:collapse; } th { background:#dce6f4; padding:4px; border:1px solid #404040; font-size:11px; }
 td { border:1px solid #404040; padding:0 4px; height:13mm; vertical-align:middle; } tr.g td { background:#e4e4e4; }
 td.c { text-align:center; width:20mm; } td.chk { text-align:center; width:17mm; font-size:44px; line-height:1; padding:0; } td.cajas { text-align:center; width:15mm; font-weight:700; font-size:24px; }
-td.d { padding-left:6px; } td.n { text-align:right; white-space:nowrap; width:20mm; } td.u { font-weight:700; font-size:24px; text-align:center; } td.u.conCajas { font-size:12px; } td.peso { width:24mm; background:#fff !important; border:2px solid #000; } .gr { color:#808080; } .b { font-weight:700; color:#000; }
+td.d { padding-left:6px; font-weight:700; } td.n { text-align:right; white-space:nowrap; width:20mm; } td.u { font-weight:700; font-size:24px; text-align:center; } td.u.conCajas { font-size:12px; } td.peso { width:24mm; background:#fff !important; border:2px solid #000; } .gr { color:#808080; } .b { font-weight:700; color:#000; }
 .tot { width:60%; margin-left:auto; } .tot td { border:0; height:6mm; font-weight:700; } .tot td.n { font-weight:400; color:#808080; } .tot tr.fin td.n { color:#000; font-weight:700; }
 .entrega { margin:6px 0; padding:6px 10px; font-weight:700; border-radius:6px; }
 .caja { border:1px solid #7f7f7f; min-height:20mm; padding:6px 8px; white-space:pre-wrap; } .caja.rojo { color:#c00000; font-weight:700; }
