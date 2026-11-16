@@ -631,7 +631,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
             ofertasCorreo: accounts.ofertasDe(id),
             correoPedidos: { destino: elegirDestino({ account: cu, customer: c }), activo: accounts.correoPedidoActivo(id), delaCuenta: !!cu?.email && elegirDestino({ account: cu, customer: c }) === cu.email },
             cuenta: cu ? { estado: cu.status, confirmada: cu.verified, bloqueada: cu.locked, ultimoAcceso: cu.lastLogin, creada: cu.createdAt, codigoPropio: cu.ownCode } : null,
-            aparatos: accounts.aparatosDe(id).length, password: accounts.passwordInfo(id),
+            aparatos: accounts.aparatosDe(id).length, password: { ...accounts.passwordInfo(id), dobleFactor: accounts.dobleFactor(id).activo },
             totalPedidosApp: todos.length,
             pedidos: todos.slice(0, 12).map(orderView).map((o) => ({ ref: o.ref, fecha: o.fecha, entrega: o.entrega?.texto ?? "", total: o.total, estado: o.estado, modificado: o.modificado, lineas: o.lineas.slice(0, 30).map((l) => ({ nombre: l.nombre, unidades: l.unidades, cajas: l.unidad === "caja" ? l.cajas : 0 })) })),
             erp: { pedidos: c.orders?.length ?? 0, ultimo: compra?.date ?? null },

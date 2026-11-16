@@ -5,7 +5,8 @@
 import crypto from "node:crypto";
 import { normalizePhone, validEmail, pinValido } from "./cuentas-db.js";
 import { nifCodes, nifClean } from "./nif-codes.js";
-import { codeKey, validCode, claveCodigoOficina } from "./nif-key.js";
+import { codeKey, validCode, claveCodigoOficina, sellar, abrirSello } from "./nif-key.js";
+import { nuevoSecreto, verificarTotp, urlOtp, agrupar } from "./totp.js";
 import { navegadorCorto } from "./errores.js";
 import { leerPausa, TEXTO_PAUSA_ENTRADAS } from "./pausa.js";
 import { modoGeo, claseDe } from "./geoip.js";
@@ -123,6 +124,13 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     const comoNif = n.length >= 6 && (q.includes(n) || (q.length >= 6 && n.includes(q)) || (cifras.length >= 6 && q.includes(cifras.slice(0, 6))));
     if (comoNif || (e.length >= 4 && (q === e || q.includes(e)))) return "No uses tu NIF ni el nombre de tu empresa: son datos que conoce cualquiera.";
     return "";
+  };
+  /** ¿Es bueno el código del segundo factor de este cliente? Código de la aplicación (cada uno vale una vez) o código de emergencia (se gasta). */
+  const comprobarSegundoFactor = (customerId, codigo) => {
+    const s = abrirSello(accounts.totpSecreto(customerId) ?? ""); if (!s) return false;
+    const c = verificarTotp(s, codigo); if (c !== null) return accounts.totpUsar(customerId, c);
+    const t = String(codigo ?? "").trim().toUpperCase();
+    return /^[0-9A-F]{5}-[0-9A-F]{5}$/.test(t) ? accounts.totpGastarEmergencia(customerId, huellaSecreto(t)) : false;
   };
   const codigoPorCorreo = () => !!enviarCodigo && process.env.CODIGO_CORREO !== "0"; // con correo configurado, el cliente entra SOLO con el código que le llega al correo que ya tenemos (sin que la oficina apruebe nada)
   const oficinaActiva = () => process.env.ACCESO_OFICINA !== "0";
@@ -398,11 +406,47 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       }
       if (ids.length !== 1) { accounts.passwordFalso(); if (!pwFallosGlobal("fallos")) return demasiados(res, pwFallosGlobal, "fallos", "Demasiados intentos. Si lo necesitas, llama a la empresa."), true; return send(res, 401, MAL), true; }
       if (!accounts.passwordTiene(ids[0])) return send(res, 409, { necesitaCrear: true, error: "Es tu primera vez: elige una contraseña para tu cuenta." }), true;
-      const r = accounts.passwordComprobar(ids[0], password);
+      const pideCodigo = accounts.dobleFactor(ids[0]).activo && aparatoDe(req) !== ids[0];
+      const r = accounts.passwordComprobar(ids[0], password, undefined, { sinReiniciar: pideCodigo });
       if (r.reason === "deleted") return send(res, 401, { error: MENSAJE_ELIMINADA }), true;
       if (r.reason === "locked") return send(res, 401, { error: "Cuenta bloqueada temporalmente por varios intentos fallidos. Inténtalo más tarde o llama a la empresa." }), true;
       if (!r.ok) return send(res, 401, MAL), true;
+      // Verificación en dos pasos (si el cliente la activó): contraseña bien + código de su aplicación (o uno de emergencia). Un aparato ya recordado de ESE cliente no lo vuelve a pedir.
+      if (pideCodigo) {
+        const codigo = typeof b.codigo === "string" ? b.codigo.trim() : "";
+        if (!codigo) return send(res, 409, { necesitaCodigo: true, error: "Escribe el código de la aplicación de tu móvil (o uno de tus códigos de emergencia)." }), true;
+        if (!comprobarSegundoFactor(ids[0], codigo)) { accounts.passwordFallo(ids[0]); eventoSeguridad("cliente-2fa-incorrecto", "código de segundo factor incorrecto"); return send(res, 401, { necesitaCodigo: true, error: "El código no es correcto o ya se usó. Espera al siguiente de la aplicación o usa uno de emergencia." }), true; }
+        accounts.passwordReiniciarFallos(ids[0]); // contraseña y código bien: ahora sí se borran los fallos
+      }
       return abrir(ids[0]);
+    }
+    // ── Verificación en dos pasos del cliente (opcional; se activa en «Mi cuenta» con una aplicación tipo Google Authenticator) ──
+    if (/^\/api\/2fa\/(preparar|activar|desactivar)$/.test(p) && req.method === "POST") {
+      const acc = sessionOf(req);
+      if (!acc) return send(res, 401, { error: "No has iniciado sesión." }), true;
+      if (!loginLimit(ip(req)) || !pwIp(ip(req))) return demasiados(res, pwIp, ip(req)), true;
+      const b = await readJson(req); if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
+      const id = acc.customerId, df = accounts.dobleFactor(id), accion = p.slice(9);
+      if (accion === "preparar") {
+        if (df.activo) return send(res, 409, { error: "Ya tienes la verificación en dos pasos activada." }), true;
+        if (!accounts.passwordTiene(id)) return send(res, 409, { error: "Primero crea tu contraseña (menú ⋮ → «Cambiar mi contraseña»)." }), true;
+        if (!accounts.passwordComprobar(id, String(b.password ?? "")).ok) return send(res, 401, { error: "La contraseña no es correcta." }), true;
+        const s = nuevoSecreto(); accounts.totpPendienteGuardar(id, sellar(s));
+        return send(res, 200, { clave: agrupar(s), url: urlOtp(s, customers.getById(id)?.name || "cliente", "Distribuciones VM") }), true;
+      }
+      if (accion === "activar") {
+        const sello = accounts.totpPendiente(id), s = sello ? abrirSello(sello) : null; if (!s) return send(res, 409, { error: "Empieza de nuevo: pulsa «Activar»." }), true;
+        const c = verificarTotp(s, b.codigo); if (c === null) { accounts.passwordFallo(id); return send(res, 400, { error: "El código no es correcto. Comprueba que has escrito la clave en la aplicación y escribe el código que muestra ahora." }), true; }
+        const emergencia = Array.from({ length: 8 }, () => { const h = crypto.randomBytes(5).toString("hex").toUpperCase(); return `${h.slice(0, 5)}-${h.slice(5)}`; });
+        accounts.totpActivar(id, sello, emergencia.map(huellaSecreto), c);
+        try { onCodigo?.(acc); } catch {} // aviso al móvil del cliente
+        return send(res, 200, { ok: true, emergencia }), true; // los códigos de emergencia solo se enseñan ahora
+      }
+      if (!df.activo) return send(res, 409, { error: "La verificación en dos pasos no está activada." }), true;
+      if (!accounts.passwordComprobar(id, String(b.password ?? ""), undefined, { sinReiniciar: true }).ok) return send(res, 401, { error: "La contraseña no es correcta." }), true;
+      if (!comprobarSegundoFactor(id, String(b.codigo ?? "").trim())) { accounts.passwordFallo(id); return send(res, 401, { error: "El código no es correcto." }), true; }
+      accounts.passwordReiniciarFallos(id); accounts.totpQuitar(id); try { onCodigo?.(acc); } catch {}
+      return send(res, 200, { ok: true }), true;
     }
     // El navegador pregunta si la oficina ya ha dado el «pase» (NO abre sesión ni gasta nada: después hay que escribir la contraseña). Un secreto desconocido se contesta como «pendiente».
     if (p === "/api/acceso/pw/pase" && req.method === "POST") {
@@ -505,7 +549,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         if (r?.ok) { acc = r.account; extra = { "Set-Cookie": (avisoAcceso(r.token, req), r.cookies) }; }
       }
       if (!acc) return send(res, 200, { cliente: null }), true; // invitado: sin sesión no es un error (la consola del navegador queda limpia)
-      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode || soloOficina(), soloOficina: soloOficina(), tienePassword: accounts.passwordTiene(acc.customerId), soloVer: !!acc.soloVer, mensajeEnlace: acc.mensajeEnlace || "", carrito: "vm_carrito_c_" + String(acc.customerId) } }, extra), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
+      return send(res, 200, { cliente: { nombre: customers.getById(acc.customerId)?.name ?? "", codigoPropio: !!acc.ownCode || soloOficina(), soloOficina: soloOficina(), tienePassword: accounts.passwordTiene(acc.customerId), dobleFactor: accounts.dobleFactor(acc.customerId).activo, soloVer: !!acc.soloVer, mensajeEnlace: acc.mensajeEnlace || "", carrito: "vm_carrito_c_" + String(acc.customerId) } }, extra), true; // «carrito»: dónde guarda el móvil el pedido del catálogo (no se enseña; sirve para que el asistente lo lea)
     }
 
     // El cliente cambia el código de entrada (los 6 del NIF) por uno personal de 6 letras o números

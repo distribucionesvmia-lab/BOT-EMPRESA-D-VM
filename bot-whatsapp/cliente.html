@@ -705,7 +705,8 @@
   .autor-pie { margin:var(--s3, 12px) 0 0; font-size:calc(var(--t-micro, 12px) / var(--k,1)); color:var(--text-2); text-align:center; line-height:1.45; } .autor-pie b { font-weight:600; color:var(--text); }
   .autor-pie details { margin-top:4px; } .autor-pie summary { cursor:pointer; color:var(--accent); font-weight:600; display:block; text-align:center; padding:6px 4px; } .autor-pie .autor-txt { text-align:left; margin-top:6px; padding:10px 12px; background:var(--surface-2, var(--field, transparent)); border-radius:10px; } .autor-pie .autor-txt p { margin:0 0 6px; }
 .trampa{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}.ts-hueco{min-height:0;margin:8px 0}
-  html.acceso-pw #cambiar-pw { display:block !important; }
+  .d2-lista { margin:0 0 10px 18px; padding:0; display:grid; gap:6px; } .d2-clave { display:block; margin-top:4px; font:700 18px/1.3 ui-monospace, Consolas, monospace; letter-spacing:.12em; word-break:break-all; padding:8px 10px; background:var(--bg, #F5F5F7); border-radius:8px; } .d2-codigos { display:grid; grid-template-columns:1fr 1fr; gap:8px; } .d2-codigos span { font:700 14px/1 ui-monospace, Consolas, monospace; padding:8px; background:var(--bg, #F5F5F7); border-radius:8px; text-align:center; }
+  html.acceso-pw #cambiar-pw, html.acceso-pw #abrir-2fa { display:block !important; }
   html.solo-correo #cambiar, html.solo-correo .in-codigo, html.solo-correo .bv-codigo { display:none !important; }
   #co-cod { font-size:calc(24px / var(--k,1)); letter-spacing:.35em; text-align:center; font-variant-numeric:tabular-nums; }
   .co-ref-p { margin:10px 0; } .co-ref-p small { display:block; color:var(--text-2); } .co-ref { font:700 28px/1 ui-monospace, Consolas, monospace; letter-spacing:.2em; color:var(--accent); }
@@ -734,6 +735,10 @@
         <div id="pw-crear" hidden>
           <div class="okmsg" role="status"><b>Es tu primera vez.</b> Elige una contraseña (mínimo 8 caracteres, que no sea tu NIF ni el nombre de tu empresa). La próxima vez te la pediremos igual.</div>
           <label>Repite la contraseña<input id="pw-pass2" type="password" maxlength="64" autocomplete="new-password" aria-describedby="pw-err"></label>
+        </div>
+        <div id="pw-cod-fila" hidden>
+          <div class="okmsg" role="status"><b>Verificación en dos pasos.</b> Abre la aplicación de códigos de tu móvil y escribe el número que te muestra (o uno de tus códigos de emergencia).</div>
+          <label>Código de la aplicación<input id="pw-cod" type="text" inputmode="numeric" maxlength="11" autocomplete="one-time-code" placeholder="123456" aria-describedby="pw-err"></label>
         </div>
         <div class="ts-hueco" id="ts-pw" hidden></div>
         <div class="trampa" aria-hidden="true"><label>No rellenar este campo<input id="pw-web" name="sitio_web" tabindex="-1" autocomplete="off"></label></div>
@@ -852,7 +857,7 @@
       <div class="bar-acciones">
         <button type="button" id="micuenta" class="ds-circ cuenta" aria-haspopup="dialog" aria-label="Mi cuenta: mis datos y mis pedidos"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Mi cuenta</span></button>
         <div id="letraChat"></div>
-        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar-pw" hidden>Cambiar mi contraseña</button><button type="button" id="cambiar">Cambiar código de entrada</button><button type="button" id="mispedidos">Histórico de pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><button type="button" id="instalar-menu">Instalar la app</button><button type="button" id="legal-menu">Privacidad y aviso legal</button><button type="button" id="salir">Salir</button></div></div>
+        <div class="bmenu"><button type="button" id="mbtn" class="ds-circ" aria-label="Menú" aria-expanded="false" aria-controls="mpop"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg></button><div class="mpop" id="mpop" hidden><button type="button" id="cambiar-pw" hidden>Cambiar mi contraseña</button><button type="button" id="abrir-2fa" hidden>Verificación en dos pasos</button><button type="button" id="cambiar">Cambiar código de entrada</button><button type="button" id="mispedidos">Histórico de pedidos</button><button type="button" id="mifijo">Mi pedido fijo</button><button type="button" id="misdatos">Mis datos y privacidad</button><button type="button" id="ayuda-menu">Ayuda y ajustes de pantalla</button><button type="button" id="instalar-menu">Instalar la app</button><button type="button" id="legal-menu">Privacidad y aviso legal</button><button type="button" id="salir">Salir</button></div></div>
       </div>
     </div>
     <div class="titulo-bloque"><h1 class="titulo-grande">Asistente de pedidos</h1><p class="titulo-sub"><i class="dot"></i><span id="cli">Cliente</span></p></div>
@@ -949,6 +954,27 @@
   </div>
 
   <!-- Cambiar el código de entrada -->
+  <div class="vm-modal" id="m-2fa" hidden>
+    <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-2fa">
+      <h2 id="t-2fa">Verificación en dos pasos</h2>
+      <p id="d2-estado"></p>
+      <form id="d2-form-pass" hidden novalidate><label>Tu contraseña<input id="d2-pass" type="password" maxlength="64" autocomplete="current-password"></label><div class="err" id="d2-err1" role="alert"></div><button class="vm-btn primary" id="d2-b1">Continuar</button></form>
+      <div id="d2-pasos" hidden>
+        <ol class="d2-lista">
+          <li>En tu móvil instala una aplicación de códigos: <b>Google Authenticator</b> o <b>Microsoft Authenticator</b>.</li>
+          <li>Elige <b>«Añadir cuenta»</b> → <b>«Introducir clave de configuración»</b>.</li>
+          <li>Escribe esta clave: <span class="d2-clave" id="d2-clave"></span></li>
+          <li>Escribe aquí el código de 6 cifras que te muestra la aplicación:</li>
+        </ol>
+        <form id="d2-form-cod" novalidate><input id="d2-cod" type="text" inputmode="numeric" maxlength="8" autocomplete="one-time-code" placeholder="123456" aria-label="Código de la aplicación"><div class="err" id="d2-err2" role="alert"></div><button class="vm-btn primary" id="d2-b2">Activar</button></form>
+      </div>
+      <div id="d2-rec" hidden><p><b>Guarda estos códigos de emergencia</b> (en papel, o en una nota segura). Cada uno sirve <b>una sola vez</b> si pierdes el móvil. No se vuelven a enseñar.</p><div class="d2-codigos" id="d2-codigos"></div></div>
+      <form id="d2-form-off" hidden novalidate><label>Tu contraseña<input id="d2-pass2" type="password" maxlength="64" autocomplete="current-password"></label><label>Código de la aplicación (o de emergencia)<input id="d2-cod2" type="text" maxlength="11" autocomplete="one-time-code"></label><div class="err" id="d2-err3" role="alert"></div><button class="vm-btn primary" id="d2-b3">Desactivar</button></form>
+      <button class="vm-btn primary" id="d2-activar" hidden>Activar</button>
+      <button class="vm-link" type="button" id="d2-cerrar">Cerrar</button>
+    </div>
+  </div>
+
   <div class="vm-modal" id="m-pass" hidden>
     <form class="vm-card" id="f-pass" role="dialog" aria-modal="true" aria-labelledby="t-pass" autocomplete="off" novalidate>
       <h2 id="t-pass">Cambiar mi contraseña</h2>
@@ -1234,7 +1260,7 @@ $("f-acceso").onsubmit = (e) => {
     }
     return true;
   };
-  for (const id of ["pw-emp", "pw-nif"]) $(id).addEventListener("input", () => { if (creando) modoCrear(false); }); // si cambia los datos, vuelve a «entrar»
+  for (const id of ["pw-emp", "pw-nif"]) $(id).addEventListener("input", () => { if (creando) modoCrear(false); $("pw-cod-fila").hidden = true; }); // si cambia los datos, vuelve a «entrar»
   f.onsubmit = (e) => {
     e.preventDefault(); err("");
     if (!valida()) return;
@@ -1242,6 +1268,7 @@ $("f-acceso").onsubmit = (e) => {
       const body = { empresa: $("pw-emp").value.trim(), nif: nif6(), password: $("pw-pass").value, sitio_web: $("pw-web").value, t: Math.round(performance.now()) }; // «sitio_web» es un campo trampa y «t» lo que tardó una persona en llegar hasta aquí
       if (creando) body.password2 = $("pw-pass2").value;
       if (pase) body.pase = pase;
+      if (!$("pw-cod-fila").hidden) body.codigo = $("pw-cod").value.trim();
       if (tsToken["ts-pw"]) body.cf = tsToken["ts-pw"];
       const r = await post(creando ? "/api/acceso/pw/crear" : "/api/acceso/pw/entrar", body); if (body.cf) { tsToken["ts-pw"] = null; tsPinta("ts-pw"); }
       const j = await r.json().catch(() => ({}));
@@ -1250,15 +1277,47 @@ $("f-acceso").onsubmit = (e) => {
         if (j.solicitud !== pase) { pase = j.solicitud; clearInterval(relojPase); relojPase = setInterval(preguntaPase, 4000); }
         verPase(j.error, j.ref); $("pw-err").textContent = ""; return;
       }
+      if (j.necesitaCodigo) { // el cliente tiene la verificación en dos pasos: se pide el código de su aplicación
+        $("pw-cod-fila").hidden = false; $("pw-cod").focus(); if (r.status === 401) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error); $("pw-cod").value = ""; } return;
+      }
       if (j.necesitaCrear) { modoCrear(true); $("pw-pass").value = ""; $("pw-pass").focus(); tsPinta("ts-pw"); return; } // crear una contraseña pide «no soy un robot» si está configurado
       if (!r.ok) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error || "No se pudo entrar."); if (!creando) { $("pw-pass").value = ""; $("pw-pass").focus(); } return; }
-      quitaPase(); f.reset(); modoCrear(false); entrar(j.cliente.nombre);
+      quitaPase(); f.reset(); $("pw-cod-fila").hidden = true; modoCrear(false); entrar(j.cliente.nombre);
     }, "pw-err")).then(rotulo);
   };
   $("pw-ayuda").onclick = () => $("no-entro").click(); $("pw-registro").onclick = () => $("ir-registro-2").click();
   fetch("/api/seguridad").then((r) => r.json()).then((j) => {
-    if (!j.accesoPassword) return; f.hidden = false; document.documentElement.classList.add("acceso-pw"); $("cambiar-pw").hidden = false;
+    if (!j.accesoPassword) return; f.hidden = false; document.documentElement.classList.add("acceso-pw"); $("cambiar-pw").hidden = false; $("abrir-2fa").hidden = false;
   }).catch(() => { f.hidden = true; }); // si no se puede saber, queda la pantalla de acceso de siempre
+})();
+// ── Verificación en dos pasos (opcional, dentro de la aplicación) ──
+(() => {
+  const fases = ["d2-form-pass", "d2-pasos", "d2-rec", "d2-form-off", "d2-activar"], ver = (cual) => { for (const id of fases) $(id).hidden = id !== cual; }, borra = () => { for (const id of ["d2-err1", "d2-err2", "d2-err3"]) $(id).textContent = ""; };
+  const error = (id, e, j) => { $(id).textContent = (j && j.error) || e || "No se pudo hacer."; };
+  let clave = "";
+  async function abrir() {
+    borra(); $("m-2fa").hidden = false; $("d2-estado").textContent = "Cargando…"; ver("");
+    try {
+      const y = await fetch("/api/yo").then((r) => r.json());
+      if (!y.cliente?.tienePassword) { $("d2-estado").textContent = "Primero crea tu contraseña: menú ⋮ → «Cambiar mi contraseña»."; return; }
+      if (y.cliente.dobleFactor) { $("d2-estado").textContent = "ACTIVADA. Cuando entres desde un móvil o navegador nuevo te pediremos el código de tu aplicación. En este aparato no hace falta."; ver("d2-form-off"); $("d2-pass2").focus(); }
+      else { $("d2-estado").textContent = "Es opcional y añade una capa más de seguridad: además de tu contraseña, hará falta un código de tu móvil al entrar desde un aparato nuevo."; ver("d2-activar"); }
+    } catch { $("d2-estado").textContent = SIN_RED; }
+  }
+  $("abrir-2fa").onclick = abrir; $("d2-cerrar").onclick = () => { $("m-2fa").hidden = true; $("d2-codigos").replaceChildren(); };
+  $("d2-activar").onclick = () => { borra(); ver("d2-form-pass"); $("d2-pass").value = ""; $("d2-pass").focus(); };
+  $("d2-form-pass").onsubmit = async (e) => {
+    e.preventDefault(); borra(); if (!$("d2-pass").value) return error("d2-err1", "Escribe tu contraseña.");
+    try { const r = await post("/api/2fa/preparar", { password: $("d2-pass").value }), j = await r.json().catch(() => ({})); if (!r.ok) return error("d2-err1", "", j); clave = j.clave; $("d2-clave").textContent = j.clave; $("d2-pass").value = ""; ver("d2-pasos"); $("d2-cod").value = ""; $("d2-cod").focus(); } catch { error("d2-err1", SIN_RED); }
+  };
+  $("d2-form-cod").onsubmit = async (e) => {
+    e.preventDefault(); borra();
+    try { const r = await post("/api/2fa/activar", { codigo: $("d2-cod").value.trim() }), j = await r.json().catch(() => ({})); if (!r.ok) return error("d2-err2", "", j); $("d2-codigos").replaceChildren(...j.emergencia.map((c) => Object.assign(document.createElement("span"), { textContent: c }))); $("d2-estado").textContent = "Verificación en dos pasos ACTIVADA."; ver("d2-rec"); } catch { error("d2-err2", SIN_RED); }
+  };
+  $("d2-form-off").onsubmit = async (e) => {
+    e.preventDefault(); borra(); if (!$("d2-pass2").value || !$("d2-cod2").value) return error("d2-err3", "Escribe tu contraseña y un código.");
+    try { const r = await post("/api/2fa/desactivar", { password: $("d2-pass2").value, codigo: $("d2-cod2").value.trim() }), j = await r.json().catch(() => ({})); if (!r.ok) return error("d2-err3", "", j); $("d2-pass2").value = ""; $("d2-cod2").value = ""; $("d2-estado").textContent = "Verificación en dos pasos DESACTIVADA."; ver(""); } catch { error("d2-err3", SIN_RED); }
+  };
 })();
 // ── Cambiar mi contraseña (dentro de la aplicación) ──
 $("cambiar-pw").onclick = async () => {

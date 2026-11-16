@@ -144,7 +144,7 @@ test("ACCESO_MODO=oficina apaga la contraseña; el acceso con solo el NIF sigue 
   assert.doesNotMatch(tarjeta, /\son[a-z]+=/i); assert.doesNotMatch(tarjeta, /correo electrónico/i);
   for (const t of ["/api/acceso/pw/entrar", "/api/acceso/pw/crear", "/api/password", 'id="f-pass"', 'id="cambiar-pw"']) assert.ok(h.includes(t), t);
   for (const t of ['id="nuevos-panel"', "Restablecer", "/api/admin/accesos-nuevos", "password/restablecer"]) assert.ok(e.includes(t), t);
-  assert.match(a, /password\\\/restablecer/); assert.match(db, /DELETE FROM accesos_nuevos WHERE customer_id = \?/); assert.match(db, /UPDATE accounts SET pw_hash = NULL, pw_at = NULL WHERE id = \?/);
+  assert.match(a, /password\\\/restablecer/); assert.match(db, /DELETE FROM accesos_nuevos WHERE customer_id = \?/); assert.match(db, /UPDATE accounts SET pw_hash = NULL, pw_at = NULL, totp_enc = NULL/);
 });
 
 test("TOPES DE PEDIDOS: por cliente y hora, por cliente y día, en total en 10 minutos, y un máximo de líneas por pedido", async () => {

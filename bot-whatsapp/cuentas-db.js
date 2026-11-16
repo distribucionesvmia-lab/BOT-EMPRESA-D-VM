@@ -134,6 +134,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   db.exec("CREATE INDEX IF NOT EXISTS idx_acceso_sol_cliente ON acceso_solicitudes(customer_id)");
   // Contraseña personal (nombre + NIF + contraseña): se guarda solo transformada con scrypt (sal propia); mayúsculas y minúsculas SÍ cuentan. Se crea la primera vez que el cliente entra.
   addCol("accounts", "pw_hash", "TEXT"); addCol("accounts", "pw_at", "TEXT");
+  // Verificación en dos pasos del CLIENTE (opcional): secreto cifrado, último código usado y huellas de los códigos de emergencia
+  addCol("accounts", "totp_enc", "TEXT"); addCol("accounts", "totp_pend", "TEXT"); addCol("accounts", "totp_last", "INTEGER NOT NULL DEFAULT 0"); addCol("accounts", "totp_emerg", "TEXT"); addCol("accounts", "totp_at", "TEXT");
   db.exec("CREATE TABLE IF NOT EXISTS accesos_nuevos (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, at TEXT NOT NULL, aparato TEXT, ip TEXT, tipo TEXT NOT NULL DEFAULT 'primera')"); // quién creó su contraseña (o se la restableció la oficina), cuándo y desde qué navegador: para que la oficina lo vea y lo pueda deshacer
   db.exec("CREATE INDEX IF NOT EXISTS idx_accesos_nuevos_at ON accesos_nuevos(at)");
   addCol("acceso_solicitudes", "visible", "INTEGER NOT NULL DEFAULT 1"); // 0 = el cliente va a entrar solo con el código que le llega por correo: la oficina NO lo ve hasta que pida ayuda
@@ -487,6 +489,19 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       return { ok: false, reason: "invalid" };
     },
     // ── Contraseña personal ──
+    // ── Verificación en dos pasos del cliente (opcional) ──
+    dobleFactor(customerId) { const r = byCustomer.get(String(customerId)); let n = 0; try { n = JSON.parse(r?.totp_emerg || "[]").length; } catch { /* sin códigos */ } return { activo: !!r?.totp_enc, creado: r?.totp_at ?? null, emergencia: n }; },
+    totpSecreto: (customerId) => byCustomer.get(String(customerId))?.totp_enc ?? null,
+    totpPendienteGuardar(customerId, sello) { const r = ensure(customerId, new Date().toISOString()); db.prepare("UPDATE accounts SET totp_pend = ? WHERE id = ?").run(sello, r.id); },
+    totpPendiente: (customerId) => byCustomer.get(String(customerId))?.totp_pend ?? null,
+    /** Activa el segundo factor: guarda el secreto (ya cifrado), las huellas de los códigos de emergencia y el contador con el que se activó. */
+    totpActivar(customerId, sello, huellas, contador, now = new Date().toISOString()) { const r = byCustomer.get(String(customerId)); if (!r) return false; db.prepare("UPDATE accounts SET totp_enc = ?, totp_pend = NULL, totp_last = ?, totp_emerg = ?, totp_at = ? WHERE id = ?").run(sello, Number(contador), JSON.stringify(huellas), now, r.id); return true; },
+    /** Gasta un contador de código (cada código vale una sola vez). */
+    totpUsar: (customerId, contador) => db.prepare("UPDATE accounts SET totp_last = ? WHERE customer_id = ? AND totp_last < ?").run(Number(contador), String(customerId), Number(contador)).changes === 1,
+    totpGastarEmergencia(customerId, huella) { const r = byCustomer.get(String(customerId)); if (!r) return false; let l = []; try { l = JSON.parse(r.totp_emerg || "[]"); } catch { /* vacía */ } const i = l.indexOf(huella); if (i < 0) return false; l.splice(i, 1); db.prepare("UPDATE accounts SET totp_emerg = ? WHERE id = ?").run(JSON.stringify(l), r.id); return true; },
+    totpQuitar(customerId) { const r = byCustomer.get(String(customerId)); if (!r) return false; db.prepare("UPDATE accounts SET totp_enc = NULL, totp_pend = NULL, totp_last = 0, totp_emerg = NULL, totp_at = NULL WHERE id = ?").run(r.id); return true; },
+    /** Un fallo (p. ej. un código incorrecto) cuenta como los demás: 5 seguidos bloquean la cuenta 15 minutos. */
+    passwordFallo(customerId, now = new Date().toISOString()) { const r = byCustomer.get(String(customerId)); if (r) recordFail(r, now); },
     passwordTiene: (customerId) => !!byCustomer.get(String(customerId))?.pw_hash,
     passwordInfo(customerId) { const r = byCustomer.get(String(customerId)); return { tiene: !!r?.pw_hash, creada: r?.pw_at ?? null }; },
     /** Crea la contraseña SOLO si la cuenta aún no tiene ninguna (una sola vez: el UPDATE es atómico). { ok:true } o { ok:false, reason: deleted | locked | existe }. */
@@ -499,15 +514,18 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       return { ok: true };
     },
     /** Comprueba la contraseña. 5 fallos seguidos bloquean la cuenta 15 minutos (y tras 3 bloqueos, hasta que la oficina la reactive), como en el resto de accesos. */
-    passwordComprobar(customerId, plain, now = new Date().toISOString()) {
+    passwordComprobar(customerId, plain, now = new Date().toISOString(), { sinReiniciar = false } = {}) {
       const row = byCustomer.get(String(customerId));
       if (!row || !row.pw_hash) { checkPin(String(plain ?? ""), DUMMY); return { ok: false, reason: "invalid" }; }
       if (row.status === "deleted") return { ok: false, reason: "deleted" };
       if (row.status !== "active" || (row.locked_until && row.locked_until > now)) return { ok: false, reason: "locked" };
       if (!checkPin(String(plain ?? ""), row.pw_hash)) { recordFail(row, now); return { ok: false, reason: "invalid" }; }
-      db.prepare("UPDATE accounts SET failed = 0, lock_count = 0, locked_until = NULL, verified = 1, last_login = ? WHERE id = ?").run(now, row.id);
+      // Con segundo factor, acertar la contraseña NO borra los fallos: si no, se podrían probar códigos sin límite (cada intento reiniciaría el contador). Se reinician al acabar de entrar (passwordReiniciarFallos).
+      if (sinReiniciar) db.prepare("UPDATE accounts SET verified = 1, last_login = ? WHERE id = ?").run(now, row.id);
+      else db.prepare("UPDATE accounts SET failed = 0, lock_count = 0, locked_until = NULL, verified = 1, last_login = ? WHERE id = ?").run(now, row.id);
       return { ok: true, token: openSession(row, now), account: accountOut(byId.get(row.id)) };
     },
+    passwordReiniciarFallos(customerId) { db.prepare("UPDATE accounts SET failed = 0, lock_count = 0, locked_until = NULL WHERE customer_id = ?").run(String(customerId)); },
     /** Gasta el mismo tiempo que una comprobación real (cuando no hay cliente que coincida): así no se averigua nada por lo que tarda. */
     passwordFalso() { checkPin("x", DUMMY); },
     /** El cliente (ya con sesión) cambia su contraseña. Cierra sus OTRAS sesiones. */
@@ -519,7 +537,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     /** La oficina restablece: quita la contraseña, cierra sesiones, olvida los aparatos y reactiva la cuenta; el cliente vuelve a crear una la próxima vez. */
     passwordQuitar(customerId, now = new Date().toISOString()) {
       const row = byCustomer.get(String(customerId)); if (!row) return false;
-      db.prepare("UPDATE accounts SET pw_hash = NULL, pw_at = NULL, failed = 0, lock_count = 0, locked_until = NULL, status = CASE WHEN status = 'blocked' THEN 'active' ELSE status END WHERE id = ?").run(row.id);
+      db.prepare("UPDATE accounts SET pw_hash = NULL, pw_at = NULL, totp_enc = NULL, totp_pend = NULL, totp_last = 0, totp_emerg = NULL, totp_at = NULL, failed = 0, lock_count = 0, locked_until = NULL, status = CASE WHEN status = 'blocked' THEN 'active' ELSE status END WHERE id = ?").run(row.id); // restablecer también quita la verificación en dos pasos (si no, quien creara la contraseña nueva se saltaría el segundo factor)
       dropSessions.run(row.id); db.prepare("DELETE FROM aparatos_confiables WHERE customer_id = ?").run(String(customerId));
       db.prepare("INSERT INTO accesos_nuevos (customer_id, at, aparato, ip, tipo) VALUES (?, ?, '', '', 'restablecida')").run(String(customerId), now);
       return true;
@@ -799,7 +817,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
         db.prepare("DELETE FROM acceso_solicitudes WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM aparatos_confiables WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM accesos_nuevos WHERE customer_id = ?").run(row.customer_id);
-        db.prepare("UPDATE accounts SET pw_hash = NULL, pw_at = NULL WHERE id = ?").run(row.id);
+        db.prepare("UPDATE accounts SET pw_hash = NULL, pw_at = NULL, totp_enc = NULL, totp_pend = NULL, totp_last = 0, totp_emerg = NULL, totp_at = NULL WHERE id = ?").run(row.id);
         db.prepare("DELETE FROM correo_pref WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM correo_ofertas WHERE customer_id = ?").run(row.customer_id);
         db.prepare("DELETE FROM baja_tokens WHERE customer_id = ?").run(row.customer_id);
