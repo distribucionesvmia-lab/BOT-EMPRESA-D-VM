@@ -688,7 +688,7 @@ test("USO: el catálogo anota contadores (repetir, abandono, pedido) sin datos p
 
 test("AYUDA y «LO MÁS PEDIDO»: /api/ayuda es público y solo trae teléfono y horario de la oficina; el catálogo trae «top» sin datos personales", async () => {
   const j = (await call("GET", "/api/ayuda")).json;
-  assert.equal(j.ayuda.telHref, "tel:+34635098044"); assert.equal(j.ayuda.horario, "De 7:00 a 15:00"); assert.equal(j.ayuda.whatsappHref, undefined); // datos de la oficina; WhatsApp aún sin configurar
+  assert.equal(j.ayuda.telHref, "tel:+34635098044"); assert.equal(j.ayuda.horario, "De 7:00 a 15:00"); assert.equal(j.ayuda.whatsappHref, "https://wa.me/34636971266"); // datos de la oficina
   const enlace = (await call("GET", "/api/admin/exportaciones", { admin: true })).status; assert.equal(enlace, 200);
   const cat = (await call("GET", "/catalogo/datos", { cookie: await (async () => { const r = await call("POST", "/api/login-nif", { body: { nif: "123456", empresa: "ejemplo" } }); return r.cookie; })() })).json;
   if (cat && cat.products) { assert.ok(Array.isArray(cat.top)); assert.ok(cat.top.every((id) => typeof id === "string")); assert.ok("ayuda" in cat); }

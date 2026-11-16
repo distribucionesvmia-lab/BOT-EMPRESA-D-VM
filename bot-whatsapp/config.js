@@ -18,7 +18,7 @@ export const HORARIO_REPARTO = () => envTexto("HORARIO_REPARTO"); // p. ej. «Lu
 const ayudaEnv = envTexto;
 export const AYUDA = {
   telefono: ayudaEnv("AYUDA_TEL") || "635 09 80 44", // teléfono de la oficina (se puede cambiar con AYUDA_TEL)
-  whatsapp: ayudaEnv("AYUDA_WHATSAPP") || "", // p. ej. "600 000 000" (con o sin el 34 delante)
+  whatsapp: ayudaEnv("AYUDA_WHATSAPP") || "636 97 12 66", // WhatsApp de la oficina (se puede cambiar con AYUDA_WHATSAPP)
   horario: ayudaEnv("AYUDA_HORARIO") || "De 7:00 a 15:00", // horario de atención (se puede cambiar con AYUDA_HORARIO)
 };
 // ── CONDICIONES DEL PEDIDO que se enseñan al cliente antes de enviarlo. RELLENAR en C:\vm\config: PEDIDO_MINIMO (euros sin IVA; vacío = sin mínimo) y
