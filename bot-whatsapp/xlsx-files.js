@@ -102,7 +102,8 @@ export function workbookFiles(sheets) {
     let pre = "", post = "";
     if (print) {
       const m = { l: 0.25, r: 0.25, t: 0.4, b: 0.6, h: 0.2, f: 0.25, ...(print.margins ?? {}) };
-      const pie = `&L&8${(print.footerLeft ?? "").replace(/&/g, "&&")}&R&9&P/&N`;
+      const izq = (print.footerLeft ?? "").replace(/&/g, "&&"); // si hay texto a la izquierda (ALBARÁN / FACTURA), en negrita y grande para que se vea
+      const pie = `&L${izq ? `&"Arial,Bold"&14${izq}` : "&8"}&R&9&P/&N`;
       pre = `<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView showGridLines="0" workbookViewId="0"/></sheetViews>`;
       post = `<printOptions horizontalCentered="1"/><pageMargins left="${m.l}" right="${m.r}" top="${m.t}" bottom="${m.b}" header="${m.h}" footer="${m.f}"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/><headerFooter><oddFooter>${esc(pie)}</oddFooter></headerFooter>`;
     }

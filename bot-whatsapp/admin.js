@@ -28,7 +28,7 @@ import { detectarTipo } from "./actualizar-datos.js";
 import { crearAvisos } from "./avisos.js";
 import { execFile } from "node:child_process";
 import { recordatoriosDeHoy } from "./recordatorios.js";
-import { imprimirHtml, FORMAT, madrid } from "./export-format.js";
+import { imprimirHtml, FORMAT, madrid, tipoDocumento } from "./export-format.js";
 import { estiloCss, estiloDecimales } from "./xlsx-files.js";
 
 const amountOf = (l) => l.amount ?? round2((l.units ?? l.qty) * (l.price ?? 0) * (1 - (l.discount ?? 0) / 100));
@@ -57,6 +57,7 @@ function orderView(o) {
     estado: o.export_status === "exported" ? "exportado" : retenido ? "retenido" : "pendiente",
     motivo: o.export_status === "exported" ? "" : !o.customer_id ? "Cliente sin código de ERP" : o.review ? o.reason || "Pedido dudoso: revisar antes de exportar" : "",
     exportId: o.export_id,
+    documento: tipoDocumento(o.customer_id), // ALBARÁN o FACTURA (según el modelo de pedido del cliente), o null
   };
 }
 

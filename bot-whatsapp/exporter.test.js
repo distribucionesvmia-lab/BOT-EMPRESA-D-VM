@@ -381,3 +381,23 @@ test("ALBARÁN: los modelos de pedido que acaban en 002, 003 y 008 salen como AL
     assert.ok(JSON.stringify(grid(f["xl/worksheets/sheet1.xml"])).includes("ALBARÁN"));
   } finally { usarModeloPedido(null); }
 });
+
+test("ALBARÁN en muchos sitios (para no confundirlo con una factura): pestaña, cartel, cabecera, total, pie de cada página, hoja «Líneas» y página para imprimir", () => {
+  usarModeloPedido((id) => (id === "C1" ? "LSTIMPRPEDV.002" : null));
+  try {
+    const f = exportar([pedido("kalb2", {})]), xml = f["xl/worksheets/sheet1.xml"], rows = grid(xml);
+    assert.deepEqual([...f["xl/workbook.xml"].matchAll(/<sheet name="([^"]+)"/g)].map((m) => m[1]), ["ALBARÁN C1 · 000001", "Líneas"]); // la pestaña
+    assert.equal(rows[0][0], "ALBARÁN"); assert.equal(rows[rows.length - 1][0], "ALBARÁN"); // franja arriba y abajo
+    assert.ok(rows.some((r) => r[0] === "ALBARÁN" && r.includes("Cliente de prueba") === false && rows.indexOf(r) === 2), "ALBARÁN otra vez en el cartel azul (a la izquierda de la población)");
+    assert.ok(rows.some((r) => r[0] === "ALBARÁN · Nº pedido")); // cabecera
+    assert.ok(rows.some((r) => r[3] === "TOTAL ALBARÁN")); assert.ok(!rows.some((r) => r[3] === "TOTAL PEDIDO")); // total
+    assert.match(xml, /<oddFooter>&amp;L&amp;&quot;Arial,Bold&quot;&amp;14ALBARÁN&amp;R&amp;9&amp;P\/&amp;N<\/oddFooter>/); // pie de cada página
+    const lineas = grid(f["xl/worksheets/sheet2.xml"]); assert.equal(lineas[0][lineas[0].length - 1], "Documento"); assert.equal(lineas[1][lineas[1].length - 1], "ALBARÁN"); // hoja plana
+    const o = { ref: "VM-1", customer_id: "C1", name: "X", city: "MEDINA", created_at: "2026-10-28T10:00:00Z", items: [{ id: "A", name: "ARTICULO A", units: 1, price: 1, amount: 1 }] };
+    const h = imprimirHtml([o], { autoprint: false });
+    assert.match(h, /<b class="dc">ALBARÁN<\/b>MEDINA/); assert.match(h, /<small>ALBARÁN · Nº pedido<\/small>/); assert.match(h, /TOTAL ALBARÁN/);
+  } finally { usarModeloPedido(null); }
+  // sin tipo de documento todo queda como antes (ya lo comprueban las demás pruebas); y una FACTURA lo dice igual
+  usarModeloPedido(() => "LSTIMPRPEDV.001");
+  try { const rows = grid(exportar([pedido("kfac", {})])["xl/worksheets/sheet1.xml"]); assert.equal(rows[0][0], "FACTURA"); assert.ok(rows.some((r) => r[3] === "TOTAL FACTURA")); } finally { usarModeloPedido(null); }
+});
