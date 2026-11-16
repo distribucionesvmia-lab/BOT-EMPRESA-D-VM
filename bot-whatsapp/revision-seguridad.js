@@ -4,12 +4,12 @@
 import { claveDebil } from "./seguridad.js";
 
 /** Lo que la aplicación de los clientes cuenta de sí misma (sin claves ni datos personales). */
-export function estadoCliente(env, { turnstile = false, smtp = false } = {}, ahora = new Date().toISOString()) {
+export function estadoCliente(env, { turnstile = false, smtp = false, geo = null } = {}, ahora = new Date().toISOString()) {
   const https = /^https:\/\//i.test(String(env.PUBLIC_URL ?? ""));
   return {
     at: ahora, https, trustProxy: env.TRUST_PROXY === "1", hsts: env.HSTS === "1", turnstile: !!turnstile, smtp: !!smtp,
     modo: env.ACCESO_MODO === "oficina" ? "oficina" : "contraseña", legacyAbierto: env.ACCESO_SOLO_OFICINA === "0", altaAutomatica: env.ALTA_AUTOMATICA === "1",
-    cspEstricta: env.CSP_ESTRICTA !== "0", escudo: !(env.DEMO === "1" || env.VM_TEST) || env.ESCUDO === "1",
+    geo: geo && { modo: geo.modo, lista: !!geo.lista, fecha: geo.fecha ?? null, es: geo.es ?? 0, fuera: geo.fuera ?? 0, local: geo.local ?? 0, sinDato: geo.sinDato ?? 0 }, cspEstricta: env.CSP_ESTRICTA !== "0", escudo: !(env.DEMO === "1" || env.VM_TEST) || env.ESCUDO === "1",
   };
 }
 
@@ -42,6 +42,16 @@ export function revisar({ cliente = null, env = {}, copias = null, eventos24h = 
     else add("turnstile", "ok", "«No soy un robot» está activado");
     if (!cliente.cspEstricta) add("csp", "aviso", "La política estricta de scripts está desactivada (CSP_ESTRICTA=0)", "Protege contra código inyectado en las páginas.", "Quita CSP_ESTRICTA=0 de cliente.env cuando ya no haga falta.");
     if (!cliente.escudo) add("escudo", "aviso", "El escudo contra inundaciones de peticiones está apagado", "", "Es normal solo en pruebas (DEMO).");
+    // Filtro por país (lista local de rangos de IP de España)
+    const g = cliente.geo;
+    if (!g || g.modo === "off") add("geo", "aviso", g && !g.lista ? "No hay lista de direcciones de España: el filtro por país no funciona" : "El filtro por país está apagado", "Las conexiones desde fuera de España pasan sin controles extra.", "Ejecuta deploy\\windows\\actualizar-geo.bat y quita GEO_MODO=off de cliente.env si lo tiene.");
+    else {
+      const total = g.es + g.fuera + g.local + g.sinDato, internas = g.local + g.sinDato;
+      const dias = g.fecha ? Math.floor((ahora - Date.parse(g.fecha)) / 86_400_000) : null;
+      if (cliente.https && total >= 20 && internas / total >= 0.9) add("geo-ip", "aviso", "El programa no está viendo la dirección real de los clientes", "Casi todas las conexiones parecen internas, así que el filtro por país no puede distinguir a nadie.", "Comprueba TRUST_PROXY=1 en cliente.env y que el túnel (Tailscale Funnel o Cloudflare) pasa la dirección del cliente.");
+      else if (dias !== null && dias > 120) add("geo", "aviso", `La lista de direcciones de España tiene ${dias} días`, "Los rangos de direcciones cambian poco a poco.", "Ejecuta deploy\\windows\\actualizar-geo.bat.");
+      else add("geo", "ok", g.modo === "aprobar" ? "Filtro por país activo: un aparato nuevo desde fuera de España necesita que la oficina dé paso" : "Filtro por país en modo vigilar (solo anota)", g.fuera ? `${g.fuera} conexión${g.fuera === 1 ? "" : "es"} desde fuera de España desde que arrancó el programa.` : "");
+    }
     add("correo", cliente.smtp ? "ok" : "info", cliente.smtp ? "El correo de salida está configurado" : "El correo de salida no está configurado", cliente.smtp ? "" : "Sin él no salen las confirmaciones de pedido ni los códigos por correo.");
   }
   // ── Copias de seguridad ──

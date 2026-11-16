@@ -1851,9 +1851,12 @@ async function accesos() {
       const ref = el("div"); ref.append(el("small", "Número de comprobación"), el("span", x.ref, { className: "acc-ref" }));
       const bs = el("div", "", { style: "display:flex; gap:8px; flex-wrap:wrap; align-items:center" });
       const accion = (txt, ruta, clase) => { const b = el("button", txt, { type: "button", className: clase }); b.onclick = async () => { b.disabled = true; try { const r = await call(`/api/admin/accesos/${x.id}/${ruta}`, {}); if (ruta === "codigo") cod[x.id] = r.codigo; } catch (e) { alert(e.message); } await accesos(); b.disabled = false; }; return b; };
+      if (x.pase) bs.append(accion("Dar paso (aún necesita su contraseña)", "aprobar", "main"), accion("Rechazar", "rechazar", "peligro")); // conexión desde fuera de España: el pase no abre sesión
+      else {
       if (cod[x.id]) bs.append(el("span", `${cod[x.id].slice(0, 3)} ${cod[x.id].slice(3)}`, { className: "acc-cod", title: "Díselo al cliente" }), accion("Otro código", "codigo", ""));
       else bs.append(accion("Dar un código", "codigo", ""));
       bs.append(accion("Dejarle entrar", "aprobar", "main"), accion("Rechazar", "rechazar", "peligro"));
+      }
       f.append(izq, ref, bs); return f;
     }));
   }

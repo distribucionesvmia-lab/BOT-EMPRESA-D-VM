@@ -738,6 +738,7 @@
         <div class="ts-hueco" id="ts-pw" hidden></div>
         <div class="trampa" aria-hidden="true"><label>No rellenar este campo<input id="pw-web" name="sitio_web" tabindex="-1" autocomplete="off"></label></div>
         <div class="err" id="pw-err" role="alert"></div>
+        <div class="okmsg" id="pw-pase" role="status" hidden><span id="pw-pase-txt"></span> <b class="co-ref" id="pw-pase-ref"></b></div>
         <button class="vm-btn primary" id="pw-boton">Entrar</button>
         <p class="acc-ayuda"><button class="vm-link" type="button" id="pw-ayuda">¿No recuerdas tu contraseña? Llámanos</button><button class="vm-link" type="button" id="pw-registro">¿Cliente nuevo? Solicitar acceso</button></p>
       </form>
@@ -1212,7 +1213,10 @@ $("f-acceso").onsubmit = (e) => {
 // ── Entrar con nombre + NIF + contraseña (la primera vez, la crea) ──
 (() => {
   const f = $("f-pw"); if (!f) return;
-  let creando = false;
+  let creando = false, pase = "", relojPase = 0; // «pase»: si se conecta desde fuera de España con un aparato nuevo, la oficina tiene que dar paso (una vez)
+  const verPase = (txt, ref) => { $("pw-pase").hidden = !txt; $("pw-pase-txt").textContent = txt || ""; $("pw-pase-ref").textContent = ref ? `Tu número de comprobación: ${ref}` : ""; };
+  const quitaPase = () => { clearInterval(relojPase); pase = ""; verPase(""); };
+  const preguntaPase = async () => { if (!pase) return; try { const r = await post("/api/acceso/pw/pase", { solicitud: pase }), j = await r.json().catch(() => ({})); if (j.estado === "aprobada") { clearInterval(relojPase); verPase("La oficina te ha dado paso. Escribe tu contraseña y pulsa el botón."); } else if (j.estado === "rechazada" || j.estado === "caducada") { quitaPase(); err(j.estado === "rechazada" ? "La oficina no ha podido darte paso. Llámanos y lo solucionamos." : "La solicitud ha caducado. Vuelve a intentarlo."); } } catch { /* sin red: se vuelve a preguntar */ } };
   const err = (m, id) => { $("pw-err").textContent = m || ""; for (const x of ["pw-emp", "pw-nif", "pw-pass", "pw-pass2"]) $(x).removeAttribute("aria-invalid"); if (id) { $(id).setAttribute("aria-invalid", "true"); $(id).focus(); } };
   const rotulo = () => { $("pw-boton").textContent = creando ? "Crear mi contraseña y entrar" : "Entrar"; };
   const modoCrear = (si) => { creando = si; $("pw-crear").hidden = !si; $("pw-pass").autocomplete = si ? "new-password" : "current-password"; $("pw-intro").hidden = si; rotulo(); };
@@ -1237,13 +1241,18 @@ $("f-acceso").onsubmit = (e) => {
     return Promise.resolve(enviando(f, $("pw-boton"), async () => {
       const body = { empresa: $("pw-emp").value.trim(), nif: nif6(), password: $("pw-pass").value, sitio_web: $("pw-web").value, t: Math.round(performance.now()) }; // «sitio_web» es un campo trampa y «t» lo que tardó una persona en llegar hasta aquí
       if (creando) body.password2 = $("pw-pass2").value;
+      if (pase) body.pase = pase;
       if (tsToken["ts-pw"]) body.cf = tsToken["ts-pw"];
       const r = await post(creando ? "/api/acceso/pw/crear" : "/api/acceso/pw/entrar", body); if (body.cf) { tsToken["ts-pw"] = null; tsPinta("ts-pw"); }
       const j = await r.json().catch(() => ({}));
       if (j.necesitaVerificacion) { err(j.error); tsPinta("ts-pw"); return; }
+      if (j.necesitaPase) { // conexión desde fuera de España con un aparato nuevo: se espera a que la oficina dé paso
+        if (j.solicitud !== pase) { pase = j.solicitud; clearInterval(relojPase); relojPase = setInterval(preguntaPase, 4000); }
+        verPase(j.error, j.ref); $("pw-err").textContent = ""; return;
+      }
       if (j.necesitaCrear) { modoCrear(true); $("pw-pass").value = ""; $("pw-pass").focus(); tsPinta("ts-pw"); return; } // crear una contraseña pide «no soy un robot» si está configurado
       if (!r.ok) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error || "No se pudo entrar."); if (!creando) { $("pw-pass").value = ""; $("pw-pass").focus(); } return; }
-      f.reset(); modoCrear(false); entrar(j.cliente.nombre);
+      quitaPase(); f.reset(); modoCrear(false); entrar(j.cliente.nombre);
     }, "pw-err")).then(rotulo);
   };
   $("pw-ayuda").onclick = () => $("no-entro").click(); $("pw-registro").onclick = () => $("ir-registro-2").click();

@@ -61,7 +61,7 @@ test("pausa de PEDIDOS y panel: el servidor la aplica al catálogo y al chat; el
 });
 
 test("REVISIÓN DE SEGURIDAD: lo mal puesto sale en rojo con qué hacer, lo bien puesto en verde, y nunca lleva claves", () => {
-  const ahora = Date.parse("2026-11-16T12:00:00Z"), cli = (x = {}) => ({ ...estadoCliente({ PUBLIC_URL: "https://pedidos.ejemplo.es", TRUST_PROXY: "1", HSTS: "1" }, { turnstile: true, smtp: true }, "2026-11-16T11:55:00Z"), ...x });
+  const ahora = Date.parse("2026-11-16T12:00:00Z"), cli = (x = {}) => ({ ...estadoCliente({ PUBLIC_URL: "https://pedidos.ejemplo.es", TRUST_PROXY: "1", HSTS: "1" }, { turnstile: true, smtp: true, geo: { modo: "aprobar", lista: true, fecha: "2026-11-10", es: 10, fuera: 0, local: 0, sinDato: 0 } }, "2026-11-16T11:55:00Z"), ...x });
   const copiasOk = { ok: true, problemas: [] };
   const bien = revisar({ cliente: cli(), env: { ADMIN_TOKEN: "Abc9Xk2LmQ7ZpR4tVw8Y", BACKUP_DIR2: "E:\\copias" }, copias: copiasOk, ahora });
   assert.equal(bien.resumen.mal, 0); assert.equal(bien.resumen.aviso, 0); assert.ok(bien.resumen.ok >= 8);

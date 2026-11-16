@@ -433,6 +433,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       if (ma && post) {
         const id = Number(ma[1]), q = accounts.accesoSolicitudes().pendientes.find((x) => x.id === id);
         if (!q) return send(res, 404, { error: "Esa solicitud ya no está pendiente (la aprobó otra persona, caducó o se pidió otra)." }), true;
+        if (ma[2] === "codigo" && q.pase) return send(res, 409, { error: "A este acceso solo se le puede «dar paso»: el cliente sigue necesitando su contraseña." }), true;
         if (ma[2] === "codigo") { // código de 6 cifras para decírselo al cliente por teléfono o WhatsApp; solo se guarda su huella (se puede generar otro)
           const codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
           if (!accounts.accesoSolicitudCodigo(id, claveCodigoOficina(q.customerId, codigo))) return send(res, 409, { error: "No se pudo generar el código: la solicitud ya no está pendiente." }), true;

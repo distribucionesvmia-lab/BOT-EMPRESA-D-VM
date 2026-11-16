@@ -8,6 +8,7 @@ import { nifCodes, nifClean } from "./nif-codes.js";
 import { codeKey, validCode, claveCodigoOficina } from "./nif-key.js";
 import { navegadorCorto } from "./errores.js";
 import { leerPausa, TEXTO_PAUSA_ENTRADAS } from "./pausa.js";
+import { modoGeo, claseDe } from "./geoip.js";
 import { elegirDestino, tapar } from "./correo-cliente.js";
 import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
 
@@ -109,6 +110,8 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const pwCrearIp = rateLimiter(Number(process.env.PW_CREAR_IP_LIMIT ?? 5), 60 * 60_000); // contraseñas nuevas por dirección y hora
   const pwCrearGlobal = rateLimiter(Number(process.env.PW_CREAR_GLOBAL_LIMIT ?? 100), 60 * 60_000);
   const pwFallosGlobal = rateLimiter(Number(process.env.PW_FALLOS_GLOBAL ?? 120), 60 * 60_000); // intentos con datos que no coinciden con ningún cliente
+  const pwFuera = rateLimiter(Number(process.env.GEO_FUERA_LIMIT ?? 4), 10 * 60_000); // intentos de entrar desde fuera de España por dirección: muy pocos
+  const MSG_PASE = "Estás conectando desde fuera de España. Por seguridad, la oficina tiene que dar paso a este aparato (solo la primera vez). Ya la hemos avisado: espera su respuesta aquí o llámanos y dile tu número de comprobación.";
   const PW_TRIVIAL = new Set(["12345678", "123456789", "1234567890", "87654321", "11111111", "00000000", "12341234", "password", "password1", "contrasena", "contraseña", "qwertyui", "qwertyuiop", "abcdefgh", "abc12345", "abcd1234", "iloveyou", "asdfghjk", "12345678a", "a1234567"]);
   const sinAcentos = (t) => String(t ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
   /** ¿Sirve como contraseña? 8 a 64 caracteres, no de las típicas, no repetida y NO relacionada con su NIF ni con el nombre de su empresa (es lo primero que probaría alguien). Devuelve el motivo o "". */
@@ -355,8 +358,31 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       const abrir = (customerId) => {
         const r = abrirConAparato(customerId, req, { nuevo: true }); // este aparato queda recordado: la próxima vez entra solo
         if (!r.ok) return send(res, 401, { error: r.reason === "deleted" ? MENSAJE_ELIMINADA : "Cuenta bloqueada temporalmente. Inténtalo más tarde o llama a la empresa." }), true;
+        if (typeof b.pase === "string" && b.pase) accounts.accesoPaseGastar(huellaSecreto(b.pase)); // el pase vale una sola vez
         return send(res, 200, { ok: true, cliente: { nombre: customers.getById(r.account.customerId)?.name ?? "" } }, { "Set-Cookie": (avisoAcceso(r.token, req), r.cookies) }), true;
       };
+      // ── Conexión desde FUERA DE ESPAÑA (lista de rangos de IP del programa, sin servicios externos; ver geoip.js) ──
+      // Más estricto, no bloqueado: pocos intentos y, si el aparato es nuevo, la oficina tiene que dar un «pase» (el cliente sigue necesitando su contraseña: el pase nunca abre sesión). Un aparato ya recordado de ESE cliente pasa (está de viaje).
+      const geoModo = modoGeo();
+      if (geoModo !== "off" && claseDe(ip(req)) === "fuera") {
+        eventoSeguridad("acceso-desde-otro-pais", `conexión desde fuera de España (${geoModo})`);
+        if (!pwFuera(ip(req))) return demasiados(res, pwFuera, ip(req), "Demasiados intentos desde fuera de España. Llámanos si necesitas ayuda."), true;
+        if (geoModo === "aprobar") {
+          const pase = typeof b.pase === "string" ? b.pase : "", recordado = aparatoDe(req), confiado = ids.length === 1 && recordado === ids[0];
+          const aprobado = ids.length === 1 && pase.length >= 20 && accounts.accesoPaseAprobado(huellaSecreto(pase), ids[0]);
+          if (!confiado && !aprobado) {
+            const falso = () => crypto.randomBytes(32).toString("base64url"), refNueva = () => String(crypto.randomInt(0, 10_000)).padStart(4, "0");
+            const previo = pase.length >= 20 && ids.length === 1 ? accounts.accesoSolicitudEstado(huellaSecreto(pase)) : null;
+            if (previo?.estado === "pendiente" && previo.customerId === ids[0]) return send(res, 403, { necesitaPase: true, solicitud: pase, pendiente: true, error: "Todavía no ha respondido la oficina. Espera un momento o llámanos." }), true;
+            let secreto = null, ref = refNueva();
+            if (ids.length === 1 && solicitudCliente(ids[0])) {
+              const s = falso(), r = accounts.accesoSolicitudCrear({ customerId: ids[0], secretHash: huellaSecreto(s), ref, aparato: navegadorCorto(req.headers["user-agent"]), ip: ip(req), esperaS: Number(process.env.OFICINA_ESPERA_S ?? 20), visible: true, motivo: "Desde fuera de España", pase: true });
+              if (r.ok) secreto = s;
+            }
+            return send(res, 403, { necesitaPase: true, solicitud: secreto ?? (pase || falso()), ref, error: MSG_PASE }), true; // misma respuesta coincida o no el cliente
+          }
+        }
+      }
       if (crear) {
         const motivo = motivoPassword(password, b.nif, b.empresa); // se mira SIEMPRE (coincida o no el cliente): así no se averigua nada
         if (motivo) return send(res, 400, { error: motivo }), true;
@@ -377,6 +403,14 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (r.reason === "locked") return send(res, 401, { error: "Cuenta bloqueada temporalmente por varios intentos fallidos. Inténtalo más tarde o llama a la empresa." }), true;
       if (!r.ok) return send(res, 401, MAL), true;
       return abrir(ids[0]);
+    }
+    // El navegador pregunta si la oficina ya ha dado el «pase» (NO abre sesión ni gasta nada: después hay que escribir la contraseña). Un secreto desconocido se contesta como «pendiente».
+    if (p === "/api/acceso/pw/pase" && req.method === "POST") {
+      if (!estadoIp(ip(req))) return demasiados(res, estadoIp, ip(req)), true;
+      const b = await readJson(req), s = typeof b?.solicitud === "string" ? b.solicitud : "";
+      if (s.length < 20 || s.length > 100) return send(res, 400, { error: "Solicitud no válida." }), true;
+      const e = accounts.accesoSolicitudEstado(huellaSecreto(s));
+      return send(res, 200, { estado: e.estado === "aprobada" ? "aprobada" : e.estado === "rechazada" ? "rechazada" : e.estado === "pendiente" || e.estado === "desconocida" ? "pendiente" : "caducada" }), true;
     }
     // El cliente (con sesión) cambia su contraseña: si ya tenía una, tiene que escribir la actual.
     if (p === "/api/password" && req.method === "POST") {
