@@ -572,3 +572,6 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 
 ## Filas más finas y casilla más grande en el Excel de pedidos (nov 2026)
 - Cada línea de producto mide **32 pt** (antes 40; en la página para imprimir/vista, 10 mm en vez de 13) y la casilla ☐ sube a **42 pt** (antes 40; 50 px en la vista): filas ~20 % más finas y casilla algo mayor, ajustadas para que la casilla no se salga de su fila. Más grande no cabe en una fila fina porque la casilla es un carácter de la celda. **No probado en el Excel ni en la impresora de la oficina** (solo la vista HTML en Chromium); si en Excel se ve cortada, bajar `sz` de `box` en `export-format.js`. Sustituye a lo dicho antes de 30 pt/40 pt. Prueba: `exporter.test.js`.
+
+## Fluidez de las fotos (`/img/<código>`)
+- La app del cliente servía cada foto leyéndola entera de forma **síncrona** (`readFileSync`): con cientos de fotos por pantalla todas las peticiones esperaban unas a otras. Ahora se lee en flujo (`createReadStream`) y con `ETag` (fecha+tamaño): si la foto no ha cambiado, el móvil recibe un 304 sin bajar nada. Sigue exigiendo sesión. Prueba: `tanda64.test.js` (de código; **no probado con fotos y sesión reales en la oficina**).

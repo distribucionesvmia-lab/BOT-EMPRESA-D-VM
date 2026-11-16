@@ -762,7 +762,17 @@ async function appRoutes(req, res, url) {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     const file = imgs().get(decodeURIComponent(p.slice(5)));
     if (!file) return void sendJson(res, 404, { error: "Sin foto" });
-    return void res.writeHead(200, { "Content-Type": IMG_TYPES[file.split(".").pop().toLowerCase()], "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" }).end(fs.readFileSync(IMG_DIR + file));
+    // Sin bloquear el programa (antes se leía el archivo entero de forma síncrona: con cientos de fotos por pantalla, todos esperaban) y con ETag: si la foto no cambió, 304 sin enviar nada
+    try {
+      const st = await fs.promises.stat(IMG_DIR + file), etag = `"${Math.floor(st.mtimeMs)}-${st.size}"`;
+      const cab = { "Content-Type": IMG_TYPES[file.split(".").pop().toLowerCase()], "Cache-Control": "private, max-age=86400", "ETag": etag, "X-Content-Type-Options": "nosniff" };
+      if (req.headers["if-none-match"] === etag) return void res.writeHead(304, cab).end();
+      res.writeHead(200, { ...cab, "Content-Length": st.size });
+      if (req.method === "HEAD") return void res.end();
+      const flujo = fs.createReadStream(IMG_DIR + file);
+      flujo.on("error", () => res.destroy());
+      return void flujo.pipe(res);
+    } catch { return void sendJson(res, 404, { error: "Sin foto" }); }
   }
   if (p === "/catalogo/favorito" && req.method === "POST") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
