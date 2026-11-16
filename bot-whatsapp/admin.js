@@ -14,6 +14,7 @@ import { etiquetaAccion } from "./actividad.js";
 import { claveCodigoOficina } from "./nif-key.js";
 import { leerPausa, guardarPausa } from "./pausa.js";
 import { revisar } from "./revision-seguridad.js";
+import { crear2fa } from "./panel-2fa.js";
 import { crearAutoBases } from "./auto-bases.js";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2, promoVigente, precioEfectivo, hoyMadrid } from "./pricing.js";
@@ -97,6 +98,15 @@ function vistaExcel(lista) {
 }
 export function createAdmin({ imgDir = null, sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "", catalogDb = null, respaldar = () => {} }) {
   const isAdmin = makeAdminCheck(adminToken);
+  const dosFactores = crear2fa(accounts, { token: () => adminToken }); // segundo factor del panel (código del móvil), si se ha activado
+  /** Acciones peligrosas (borrar pedidos, restablecer contraseñas, cambiar la tarifa): hay que volver a escribir la clave del panel (cabecera X-VM-Reclave). true = ya se ha contestado. */
+  const exigeReclave = (req, res, who) => {
+    const v = String(req.headers["x-vm-reclave"] ?? "").trim();
+    if (v && isAdmin({ headers: { authorization: "Bearer " + v } })) return false;
+    if (v) { const prev = recentFailures(who); if (!prev.some((f) => f.h === "r:" + v)) { failures.set(who, [...prev, { t: Date.now(), h: "r:" + v }]); eventoSeguridad("panel-reclave-incorrecta", who); } } // una clave equivocada cuenta como cualquier otro intento
+    send(res, 401, { necesitaReconfirmar: true, error: v ? "La clave no es correcta." : "Para esta acción hay que volver a escribir la clave del panel." });
+    return true;
+  };
   const fotos = crearFotos(imgDir);
   const fotosZip = catalogDb ? crearImportadorZip({ catalogDb, fotos }) : null;
   const avisos = crearAvisos({ accountsDb: accounts });
@@ -211,6 +221,8 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       if (presented && !prev.some((f) => f.h === presented)) { failures.set(who, [...prev, { t: Date.now(), h: presented }]); eventoSeguridad("panel-clave-incorrecta", who); }
       return send(res, 403, { error: "Acceso no autorizado." }), true;
     }
+    // Segundo factor: con la clave bien pero SIN el permiso del código del móvil, solo se puede preguntar si hace falta y ponerlo
+    if (dosFactores.activo() && p !== "/api/admin/2fa/estado" && p !== "/api/admin/2fa/entrar" && !dosFactores.permitida(req)) return send(res, 401, { error: "Falta el código de verificación del móvil.", necesita2fa: true }), true;
     { // registro de actividad: lo que cambia algo, con la hora y la dirección (sin datos de clientes ni contenido)
       const accion = etiquetaAccion(req.method, p);
       if (accion) res.on("finish", () => { try { accounts.actividadRegistrar({ ip: who, accion, ruta: p, estado: res.statusCode }); } catch {} });
@@ -274,6 +286,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       return send(res, 200, lista.slice(0, 500).map(orderView)), true;
     }
     if (p === "/api/admin/pedidos/borrar" && post) { // borra los pedidos elegidos (con copia de seguridad antes y confirmación expresa)
+      if (exigeReclave(req, res, who)) return true;
       const body = (await readJson(req)) ?? {};
       if (body.confirmo !== true) return send(res, 400, { error: "Falta la confirmación para borrar." }), true;
       if (!Array.isArray(body.refs) || !body.refs.length || body.refs.length > 500 || !body.refs.every((r) => /^VM-\d{4}-\d{6}$/.test(String(r)))) return send(res, 400, { error: "Elige al menos un pedido válido para borrar." }), true;
@@ -446,7 +459,31 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
     if (p === "/api/admin/seguridad/revision" && get) {
       let cliente = null; try { cliente = JSON.parse(accounts.ajuste("estado_cliente") || "null"); } catch { /* sin datos */ }
       let copias = null; try { copias = estadoCopias(process.env.BACKUP_DIR ?? "respaldos"); } catch { /* sin carpeta */ }
-      return send(res, 200, revisar({ cliente, env: process.env, copias, eventos24h: accounts.seguridadResumen({ horas: 24 }), bloqueadas: accounts.listAccounts().filter((a) => a.locked || a.status === "blocked").length, accesosNuevos7: accounts.accesosNuevos({ dias: 7 }).filter((x) => x.tipo === "primera").length, pausa: leerPausa(accounts, { fresco: true }) })), true;
+      return send(res, 200, revisar({ cliente, env: process.env, copias, eventos24h: accounts.seguridadResumen({ horas: 24 }), bloqueadas: accounts.listAccounts().filter((a) => a.locked || a.status === "blocked").length, accesosNuevos7: accounts.accesosNuevos({ dias: 7 }).filter((x) => x.tipo === "primera").length, pausa: leerPausa(accounts, { fresco: true }), panel2fa: { activo: dosFactores.activo(), ilegible: dosFactores.ilegible() } })), true;
+    }
+    // ---- Segundo factor del panel (código del móvil) ----
+    if (p === "/api/admin/2fa/estado" && get) return send(res, 200, { activo: dosFactores.activo(), ilegible: dosFactores.ilegible(), emergencia: dosFactores.recuperacionRestante(), permiso: dosFactores.permitida(req) }), true;
+    if (p === "/api/admin/2fa/entrar" && post) {
+      const b = (await readJson(req)) ?? {};
+      if (!dosFactores.activo()) return send(res, 200, { ok: true, sinFactor: true }), true;
+      if (!dosFactores.puedeProbar(who)) return eventoSeguridad("panel-2fa-bloqueado", who), send(res, 429, { error: "Demasiados códigos incorrectos. Espera 15 minutos." }), true;
+      if (!dosFactores.verificar(b.codigo)) { dosFactores.fallo(who); eventoSeguridad("panel-2fa-incorrecto", who); return send(res, 401, { codigoIncorrecto: true, error: "El código no es correcto o ya se usó. Espera al siguiente de la aplicación." }), true; }
+      dosFactores.acierto(who); return send(res, 200, { ok: true, token: dosFactores.abrirSesion(), emergencia: dosFactores.recuperacionRestante() }), true;
+    }
+    if (p === "/api/admin/2fa/preparar" && post) { if (dosFactores.activo()) return send(res, 409, { error: "El segundo factor ya está activado." }), true; return send(res, 200, dosFactores.preparar()), true; }
+    if (p === "/api/admin/2fa/activar" && post) {
+      const b = (await readJson(req)) ?? {};
+      if (b.confirmo !== true) return send(res, 400, { error: "Hace falta confirmar." }), true;
+      if (!dosFactores.puedeProbar(who)) return send(res, 429, { error: "Demasiados códigos incorrectos. Espera 15 minutos." }), true;
+      const rec = dosFactores.activar(b.codigo); if (!rec) { dosFactores.fallo(who); return send(res, 400, { error: "El código no es correcto. Mira que la aplicación tenga la clave de arriba y escribe el código actual." }), true; }
+      dosFactores.acierto(who); eventoSeguridad("panel-2fa-activado", "segundo factor activado"); return send(res, 200, { ok: true, emergencia: rec, token: dosFactores.abrirSesion() }), true; // los códigos de emergencia solo se enseñan ahora
+    }
+    if (p === "/api/admin/2fa/desactivar" && post) {
+      const b = (await readJson(req)) ?? {};
+      if (!dosFactores.activo()) return send(res, 409, { error: "El segundo factor no está activado." }), true;
+      if (!dosFactores.puedeProbar(who)) return send(res, 429, { error: "Demasiados códigos incorrectos. Espera 15 minutos." }), true;
+      if (!dosFactores.verificar(b.codigo)) { dosFactores.fallo(who); return send(res, 401, { error: "El código no es correcto." }), true; }
+      dosFactores.desactivar(); eventoSeguridad("panel-2fa-desactivado", "segundo factor desactivado"); return send(res, 200, { ok: true }), true;
     }
     // ---- Pausa de emergencia: cierra las entradas nuevas y/o los pedidos nuevos hasta que se reactive ----
     if (p === "/api/admin/pausa" && get) return send(res, 200, leerPausa(accounts, { fresco: true })), true;
@@ -461,7 +498,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
     // ---- Contraseñas de los clientes: quién se ha activado (creó su contraseña) y restablecer si hace falta ----
     if (p === "/api/admin/accesos-nuevos" && get) return send(res, 200, { lista: accounts.accesosNuevos({ dias: 30 }).map((x) => ({ ...x, cliente: customers.getById(x.customerId)?.name ?? `Cliente ${x.customerId}`, telefono: customers.getById(x.customerId)?.phone ?? "" })) }), true;
     if (post) { const mr = /^\/api\/admin\/cliente\/([\w-]{1,20})\/password\/restablecer$/.exec(p);
-      if (mr) { if (!customers.getById(mr[1])) return send(res, 404, { error: "No existe ese cliente." }), true; accounts.passwordQuitar(mr[1]); return send(res, 200, { ok: true }), true; } }
+      if (mr) { if (exigeReclave(req, res, who)) return true; if (!customers.getById(mr[1])) return send(res, 404, { error: "No existe ese cliente." }), true; accounts.passwordQuitar(mr[1]); return send(res, 200, { ok: true }), true; } }
     if (p === "/api/admin/invitaciones" && get) {
       const nom = (x) => (x.tipo === "alta" ? x.nombre : customers.getById(x.cliente)?.name ?? x.nombre ?? "Cliente " + x.cliente);
       return send(res, 200, { enlaces: accounts.invitacionesLista().map((x) => ({ ...x, nombre: nom(x) })), plantilla: accounts.ajuste("plantilla_enlace") || PLANTILLA_DEFECTO, plantillaDefecto: PLANTILLA_DEFECTO }), true;
@@ -795,6 +832,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
     m = /^\/api\/admin\/(vista-previa|aplicar)\/(productos|clientes|historial|fotos)$/.exec(p);
     if (m && post) {
       if (!actualizador) return send(res, 400, { error: "La actualización de datos no está disponible." }), true;
+      if (m[1] === "aplicar" && m[2] === "productos" && exigeReclave(req, res, who)) return true; // cambiar la tarifa entera: hay que volver a escribir la clave
       const buf = await readBuffer(req, m[2] === "fotos" ? 80_000_000 : 25_000_000); // los ZIP de fotos y los Excel con fotos pesan más que los de texto
       if (!buf || !buf.length) return send(res, 400, { error: `No se recibió el archivo (máximo ${m[2] === "fotos" ? 80 : 25} MB).` }), true;
       try {

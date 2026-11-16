@@ -18,13 +18,18 @@ const MIN_30 = 30 * 60_000;
  * entradas: { cliente (estadoCliente o null), env (la del panel), copias (estadoCopias), eventos24h { total, porTipo }, bloqueadas, accesosNuevos7, pausa, ahora }
  * Devuelve { lista: [{ id, nivel: ok|aviso|mal|info|manual, titulo, detalle, arreglo? }], resumen: { mal, aviso, ok } }.
  */
-export function revisar({ cliente = null, env = {}, copias = null, eventos24h = { total: 0, porTipo: [] }, bloqueadas = 0, accesosNuevos7 = 0, pausa = {}, ahora = Date.now() } = {}) {
+export function revisar({ cliente = null, env = {}, copias = null, eventos24h = { total: 0, porTipo: [] }, bloqueadas = 0, accesosNuevos7 = 0, pausa = {}, panel2fa = null, ahora = Date.now() } = {}) {
   const L = [], add = (id, nivel, titulo, detalle = "", arreglo = "") => L.push({ id, nivel, titulo, detalle, ...(arreglo ? { arreglo } : {}) });
   // ── El panel y las claves ──
   if (claveDebil(env.ADMIN_TOKEN)) add("clave-panel", "mal", "La clave del panel es corta o fácil de adivinar", "Quien la adivine puede ver todos los pedidos y clientes.", "En C:\\vm\\config\\empresa.env cambia ADMIN_TOKEN por una de 20 letras y números y reinicia «VM Empresa».");
   else add("clave-panel", "ok", "La clave del panel es larga");
   if (env.PANEL_PERMITIR_PUBLICO === "1") add("panel-privado", "mal", "El panel está abierto a cualquier dirección de internet", "Debe verse solo desde la oficina o por Tailscale.", "Quita PANEL_PERMITIR_PUBLICO=1 de empresa.env y reinicia «VM Empresa».");
   else add("panel-privado", "ok", "El panel solo se abre desde la oficina o Tailscale");
+  if (panel2fa) {
+    if (panel2fa.ilegible) add("panel-2fa", "mal", "El segundo factor del panel no se puede leer", "Se cambió la clave del panel (ADMIN_TOKEN) y el secreto del móvil ya no se descifra: nadie podría entrar.", "En el ordenador de la oficina ejecuta deploy\\windows\\desactivar-2fa.bat y vuelve a activarlo desde «Cuentas de clientes».");
+    else if (!panel2fa.activo) add("panel-2fa", "aviso", "El panel no tiene segundo factor", "Quien consiga la clave del panel entra sin más. Con el segundo factor también hace falta el móvil.", "Actívalo aquí mismo, en «Segundo factor del panel» (10 minutos).");
+    else add("panel-2fa", "ok", "El panel pide un código del móvil además de la clave");
+  }
   // ── La aplicación de los clientes ──
   const viejo = !cliente || !cliente.at || ahora - Date.parse(cliente.at) > MIN_30;
   if (viejo) add("cliente-estado", "aviso", "La aplicación de los clientes no ha dado señales en los últimos 30 minutos", "Puede estar parada o no haberse reiniciado con la última versión; sin ella no se puede revisar su configuración.", "Mira http://localhost:3000/health y, si no responde, reinicia «VM Cliente».");

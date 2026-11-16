@@ -11,6 +11,7 @@ import { getDb } from "./db.js";
 import { priceOrder, totals } from "./pricing.js";
 import { createAuth, rateLimiter } from "./auth.js";
 import { leerPausa, TEXTO_PAUSA_PEDIDOS } from "./pausa.js";
+import { crearFrenoCopia } from "./freno-copia.js";
 import { estadoCliente } from "./revision-seguridad.js";
 import { resumenGeo } from "./geoip.js";
 import { turnstileActivo } from "./seguridad.js";
@@ -54,6 +55,8 @@ import { enviarCampanas } from "./correo-campanas.js";
 import { crearCorreoCliente, smtpDesdeEntorno, elegirDestino, tapar, emailValido, correoCodigoAcceso } from "./correo-cliente.js";
 import { zip as zipNode } from "./zip.js";
 import { limpiaError, navegadorCorto } from "./errores.js";
+// Freno al copiado del catálogo: si una cuenta pide datos o PDF a ritmo de máquina se le dice «espera», se anota y, a la tercera vez en una hora, se frena una hora
+const frenoCopia = crearFrenoCopia({ datos: Number(process.env.CATALOGO_LIMIT ?? 40), pdf: Number(process.env.PDF_LIMIT ?? 60), evento: (t, d) => eventoSeguridad(t, d) });
 const pedidosDia = rateLimiter(Number(process.env.PEDIDOS_DIA_LIMIT ?? 40), 24 * 3600e3); // pedidos por cliente y día
 const pedidosGlobal = rateLimiter(Number(process.env.PEDIDOS_GLOBAL_LIMIT ?? 300), 600e3); // pedidos entre TODOS los clientes en 10 minutos: freno general (si alguien robara muchas cuentas o hubiera un fallo, la oficina no se inunda)
 /** Topes de pedidos: por cliente y hora, por cliente y día y en total. Devuelve el texto a enseñar si se pasa de alguno, o "" si puede seguir. */
@@ -678,6 +681,7 @@ async function appRoutes(req, res, url) {
   const enviaPdf = (r) => res.writeHead(200, { "Content-Type": "application/pdf", "Content-Disposition": `${url.searchParams.has("descargar") ? "attachment" : "inline"}; filename="${r.nombre}"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": r.buf.length }).end(r.buf);
   if (mPdf && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    { const f = frenoCopia(account.id, "pdf"); if (f) return void sendJson(res, 429, { error: f }); }
     const r = pdfDePedidoApp(account, mPdf[1]); if (!r) return void sendJson(res, 404, { error: "No encontramos ese pedido." });
     return void enviaPdf(r);
   }
@@ -685,6 +689,7 @@ async function appRoutes(req, res, url) {
   const mHist = /^\/api\/historial\/([\w.-]{1,40})\/pdf$/.exec(p);
   if (mHist && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    { const f = frenoCopia(account.id, "pdf"); if (f) return void sendJson(res, 429, { error: f }); }
     const r = pdfDeHistorial(account, mHist[1]); if (!r) return void sendJson(res, 404, { error: "No encontramos ese pedido." });
     return void enviaPdf(r);
   }
@@ -692,6 +697,7 @@ async function appRoutes(req, res, url) {
   const mMes = /^\/api\/documentos\/mes\/(\d{4}-\d{2})$/.exec(p);
   if (mMes && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    { const f = frenoCopia(account.id, "pdf"); if (f) return void sendJson(res, 429, { error: f }); }
     const mes = mMes[1], visibles = webHistory(clienteConPedidos(account.customerId, HISTORIAL_VER_MAS), catalogNow(), HISTORIAL_VER_MAS).filter((o) => String(o.date).slice(0, 7) === mes);
     const archivos = {};
     for (const o of visibles) { const r = /^VM-\d{4}-\d{6}$/.test(o.doc) ? pdfDePedidoApp(account, o.doc) : pdfDeHistorial(account, String(o.doc)); if (r) archivos[`${o.date}-${r.nombre}`] = r.buf; }
@@ -703,6 +709,7 @@ async function appRoutes(req, res, url) {
   // Datos de la pantalla de Inicio del cliente: lo que suele pedir, lo más pedido, categorías y fotos de su último pedido (todo de su catálogo; nada de otros clientes)
   if (p === "/api/inicio" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    { const f = frenoCopia(account.id, "datos"); if (f) return void sendJson(res, 429, { error: f }); }
     await refreshCatalog(); // ve ya las ofertas y los precios que la empresa acaba de cambiar
     const customer = clienteConPedidos(account.customerId);
     const todos = webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa), arbolInicio = webTree(catalogNow());
@@ -730,6 +737,7 @@ async function appRoutes(req, res, url) {
   }
   if (p === "/catalogo/datos" && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    { const f = frenoCopia(account.id, "datos"); if (f) return void sendJson(res, 429, { error: f }); }
     await refreshCatalog(); // el cliente ve ya los precios y las ofertas que la empresa acaba de cambiar
     const customer = clienteConPedidos(account.customerId), arbol = webTree(catalogNow());
     return void sendJsonEtag(req, res, {

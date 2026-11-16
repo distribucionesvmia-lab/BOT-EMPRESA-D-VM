@@ -176,6 +176,8 @@
   @media (max-width: 640px) { .pausa-botones { grid-template-columns:1fr; } }
   @media (prefers-color-scheme: dark) { .pausa-pill { color:#6fd49b; border-color:#6fd49b; background:rgba(111,212,155,.1); } .pausa-pill.on { color:#fff; background:var(--accent); border-color:var(--accent); } }
   #nuevos-lista { max-height:280px; overflow:auto; } .hoy-tareas details { margin-top:4px; } .hoy-tareas summary { cursor:pointer; color:var(--accent); font-size:12px; } .hoy-tareas details p { margin:4px 0 0; font-size:12px; color:var(--muted); word-break:break-word; }
+  dialog.reclave { border:1px solid var(--line); border-radius:14px; padding:20px; max-width:420px; width:calc(100% - 32px); background:var(--card, #fff); color:var(--text); } dialog.reclave::backdrop { background:rgba(0,0,0,.45); } dialog.reclave h3 { margin:0 0 6px; } dialog.reclave p { margin:0 0 12px; color:var(--muted); } dialog.reclave input { width:100%; margin-bottom:12px; } dialog.reclave .acciones { margin:0; }
+  .f2-lista { margin:0 0 10px 18px; padding:0; display:grid; gap:6px; } .f2-rec { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; } .f2-rec span { font:700 15px/1 ui-monospace, Consolas, monospace; padding:8px 10px; background:var(--line-2); border-radius:8px; text-align:center; letter-spacing:.08em; }
   .rev-fila { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line-2); } .rev-fila:last-child { border-bottom:0; }
   .rev-fila small { color:var(--muted); display:block; margin-top:2px; } .rev-fila .rev-fix { color:var(--text); }
   .rev-b { flex:none; min-width:64px; text-align:center; font-size:12px; font-weight:700; padding:3px 8px; border-radius:999px; border:1px solid var(--line); }
@@ -353,7 +355,7 @@
 
   <div class="panel" id="login">
     <h2>Acceso de la empresa</h2>
-    <form class="row" id="f-login"><input id="clave" type="password" placeholder="Clave de la empresa" aria-label="Clave de la empresa" autocomplete="current-password"><button class="main">Entrar</button><span class="err" id="l-err" role="alert"></span></form>
+    <form class="row" id="f-login"><input id="clave" type="password" placeholder="Clave de la empresa" aria-label="Clave de la empresa" autocomplete="current-password"><input id="codigo2fa" type="text" inputmode="numeric" maxlength="11" placeholder="Código de la aplicación del móvil" aria-label="Código de verificación del móvil" autocomplete="one-time-code" hidden><button class="main">Entrar</button><span class="err" id="l-err" role="alert"></span></form>
   </div>
 
   <div id="app" hidden style="display:grid;gap:14px">
@@ -774,6 +776,26 @@
         <div class="scroll"><table><thead><tr><th>Cuándo</th><th>Cliente</th><th>Pantalla</th><th>Qué falló</th><th>Navegador</th></tr></thead><tbody id="err-ult"></tbody></table></div>
       </div>
       </div>
+      <div class="panel" id="f2-panel">
+        <h2>Segundo factor del panel</h2>
+        <p class="muted" id="f2-estado" style="margin:0 0 10px">Cargando…</p>
+        <div id="f2-pasos" hidden>
+          <ol class="f2-lista">
+            <li>En tu móvil instala una aplicación de códigos: <b>Google Authenticator</b>, <b>Microsoft Authenticator</b> o <b>Aegis</b>.</li>
+            <li>En la aplicación elige <b>«Añadir cuenta»</b> y luego <b>«Introducir clave de configuración»</b> (o «Introducir clave manualmente»).</li>
+            <li>Escribe esta clave (da igual cómo pongas los espacios): <span class="acc-cod" id="f2-clave"></span></li>
+            <li>La aplicación te enseñará un código de 6 cifras que cambia cada 30 segundos. Escríbelo aquí para comprobar que funciona:</li>
+          </ol>
+          <div class="acciones"><input id="f2-cod" type="text" inputmode="numeric" maxlength="8" placeholder="Código de 6 cifras" aria-label="Código de la aplicación" autocomplete="off" style="max-width:220px"><button type="button" id="f2-confirmar" class="main">Comprobar y activar</button><button type="button" id="f2-cancelar">Cancelar</button></div>
+        </div>
+        <div id="f2-emergencia" hidden>
+          <p><b>Guarda estos códigos de emergencia en un sitio seguro</b> (papel o gestor de contraseñas). Cada uno sirve <b>una sola vez</b> si pierdes el móvil. No se volverán a enseñar.</p>
+          <div class="f2-rec" id="f2-rec"></div>
+          <button type="button" id="f2-guardados" class="main" style="margin-top:10px">Ya los he guardado</button>
+        </div>
+        <div class="acciones" id="f2-botones"><button type="button" id="f2-btn" class="main">Activar</button></div>
+        <p class="muted" style="margin:10px 0 0;font-size:12.5px">Si pierdes el móvil y los códigos de emergencia, en el ordenador de la oficina ejecuta <code>deploy\windows\desactivar-2fa.bat</code>. Si cambias <code>ADMIN_TOKEN</code>, el segundo factor deja de poder leerse y hay que ejecutarlo también.</p>
+      </div>
       <div class="panel" id="rev-panel">
         <h2>Revisión de seguridad</h2>
         <p class="muted" id="rev-sub" style="margin:0 0 8px">Cargando…</p>
@@ -812,9 +834,14 @@ const el = (tag, text, props = {}) => Object.assign(document.createElement(tag),
 const hora = (iso) => new Date(iso).toLocaleString("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 /** Cabecera con la clave: si lleva caracteres que una cabecera no admite («€», «—», emojis…) se manda en base64 (el servidor lo entiende), así nunca falla en silencio. */
-function cabClave() { const k = String(clave ?? "").trim(); return "Bearer " + (/^[\x20-\x7e]*$/.test(k) ? k : "b64:" + btoa(String.fromCharCode(...new TextEncoder().encode(k)))); }
-async function call(path, body, raw) {
-  const r = await fetch(path, { method: body ? "POST" : "GET", headers: { Authorization: cabClave(), ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+const valorCab = (k) => { k = String(k ?? "").trim(); return /^[\x20-\x7e]*$/.test(k) ? k : "b64:" + btoa(String.fromCharCode(...new TextEncoder().encode(k))); };
+function cabClave() { return "Bearer " + valorCab(clave); }
+let tok2fa = ""; try { tok2fa = sessionStorage.getItem("vm_admin_2fa") || ""; } catch {} // permiso del segundo factor (código del móvil), 12 h
+/** Cabeceras de todas las peticiones del panel: la clave y, si hay segundo factor, su permiso. */
+const cabsAdmin = (extra = {}) => ({ Authorization: cabClave(), ...(tok2fa ? { "X-VM-2FA": tok2fa } : {}), ...extra });
+async function call(path, body, raw, extra = {}) {
+  const r = await fetch(path, { method: body ? "POST" : "GET", headers: cabsAdmin({ ...(body ? { "Content-Type": "application/json" } : {}), ...extra }), body: body ? JSON.stringify(body) : undefined });
+  if (r.status === 401 && !raw) { const j = await r.clone().json().catch(() => ({})); if (j.necesita2fa) { tok2fa = ""; try { sessionStorage.removeItem("vm_admin_2fa"); } catch {} clearInterval(timer); $("app").hidden = true; $("login").hidden = false; $("codigo2fa").hidden = false; $("codigo2fa").focus(); throw new Error("Escribe el código de la aplicación del móvil."); } }
   if (r.status === 429) { clearInterval(timer); $("app").hidden = true; $("login").hidden = false; throw new Error("Demasiados intentos con una clave errónea. Espera unos minutos y vuelve a probar."); }
   if (r.status === 403) { try { sessionStorage.removeItem("vm_admin"); } catch {} clearInterval(timer); $("app").hidden = true; $("login").hidden = false; throw new Error("Clave incorrecta"); }
   if (raw) return r;
@@ -822,6 +849,20 @@ async function call(path, body, raw) {
   if (!r.ok) throw new Error(j.error || "Error");
   return j;
 }
+/** Ventana para volver a escribir la clave del panel antes de una acción peligrosa. Devuelve la clave escrita o null si se cancela. */
+function pedirReclave(texto) {
+  return new Promise((ok) => {
+    const d = el("dialog", "", { className: "reclave" }), f = el("form", "", { method: "dialog" }), inp = el("input", "", { type: "password", autocomplete: "current-password", placeholder: "Clave del panel", "aria-label": "Clave del panel" });
+    const si = el("button", "Continuar", { className: "main" }), no = el("button", "Cancelar", { type: "button" });
+    f.append(el("h3", "Confirma con tu clave"), el("p", texto), inp, el("div", "", { className: "acciones" }));
+    f.lastChild.append(si, no); d.append(f); document.body.append(d);
+    let hecho = false; const fin = (v) => { if (hecho) return; hecho = true; d.close(); d.remove(); ok(v); };
+    f.onsubmit = (e) => { e.preventDefault(); fin(inp.value.trim() || null); }; no.onclick = () => fin(null); d.addEventListener("cancel", (e) => { e.preventDefault(); fin(null); });
+    d.showModal(); inp.focus();
+  });
+}
+/** Hace una acción peligrosa: pide la clave otra vez y la manda en la cabecera X-VM-Reclave. */
+async function conReclave(texto, accion) { const k = await pedirReclave(texto); if (k === null) return null; return accion({ "X-VM-Reclave": valorCab(k) }); }
 function mostrarAviso(texto) { const p = $("pin"); p.hidden = false; p.textContent = texto; setTimeout(() => (p.hidden = true), 8000); }
 function mostrarPin(texto, pin) { const p = $("pin"); p.hidden = false; p.textContent = texto + " "; p.appendChild(el("b", pin)); p.appendChild(el("span", " — anótalo ahora y díselo al cliente: no se volverá a mostrar.")); }
 
@@ -956,7 +997,7 @@ $("borrar-sel").onclick = async () => {
   if (!confirm(aviso)) return;
   const b = $("borrar-sel"); b.disabled = true;
   try {
-    const r = await call("/api/admin/pedidos/borrar", { refs, confirmo: true });
+    const r = await conReclave("Vas a BORRAR pedidos. Escribe otra vez la clave del panel para continuar.", (h) => call("/api/admin/pedidos/borrar", { refs, confirmo: true }, false, h)); if (!r) { b.disabled = false; return; }
     sel.clear(); $("expmsg").textContent = `${r.borrados} pedido${r.borrados === 1 ? "" : "s"} borrado${r.borrados === 1 ? "" : "s"}. Copia de seguridad: ${r.copia}`; refrescar();
   } catch (e) { $("expmsg").textContent = e.message; } finally { actualizarSel(); }
 };
@@ -1223,10 +1264,10 @@ function adPinta(r, p) {
     d.appendChild(ul); cont.appendChild(d);
   }
 }
-async function adLlamar(ruta, p, fichero, extra = "") {
+async function adLlamar(ruta, p, fichero, extra = "", cabExtra = {}) {
   const max = $(p + "-tipo").value === "fotos" ? 80e6 : 25e6;
   if (fichero.size > max) throw new Error(`El archivo pesa ${Math.round(fichero.size / 1e6)} MB y el máximo es ${max / 1e6} MB. Haz un ZIP con las fotos (pesa mucho menos que un Excel con fotos) o súbelo en dos partes.`);
-  const r = await fetch(`/api/admin/${ruta}/${$(p + "-tipo").value}?fichero=${encodeURIComponent(fichero.name)}${extra}`, { method: "POST", headers: { Authorization: cabClave(), "Content-Type": "application/octet-stream" }, body: fichero });
+  const r = await fetch(`/api/admin/${ruta}/${$(p + "-tipo").value}?fichero=${encodeURIComponent(fichero.name)}${extra}`, { method: "POST", headers: { ...cabsAdmin(cabExtra), "Content-Type": "application/octet-stream" }, body: fichero });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || "No se pudo procesar el Excel");
   return j;
@@ -1245,7 +1286,7 @@ $(p + "-aplicar").onclick = async () => {
   if (!confirm(aviso)) return;
   const confirmo = !!ultimo?.confirmar?.length;
   $(p + "-aplicar").disabled = true; $(p + "-msg").textContent = "Aplicando…";
-  try { const j = await adLlamar("aplicar", p, fichero, confirmo ? "&confirmo=1" : ""); const { resumen, ...r } = j; delete r.ok; delete r.tipo; $(p + "-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${k} ${v}`).join(" · "); $(p + "-aplicar").hidden = true; $(p + "-res").textContent = ""; $(p + "-file").value = ""; refrescar(); despues?.(); }
+  try { const reh = $(p + "-tipo").value === "productos" ? await pedirReclave("Vas a cambiar la tarifa de artículos. Escribe otra vez la clave del panel.") : ""; if (reh === null) { $(p + "-msg").textContent = "Cancelado: no se ha cambiado nada."; return; } const j = await adLlamar("aplicar", p, fichero, confirmo ? "&confirmo=1" : "", reh ? { "X-VM-Reclave": valorCab(reh) } : {}); const { resumen, ...r } = j; delete r.ok; delete r.tipo; $(p + "-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${k} ${v}`).join(" · "); $(p + "-aplicar").hidden = true; $(p + "-res").textContent = ""; $(p + "-file").value = ""; refrescar(); despues?.(); }
   catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-aplicar").disabled = false; }
 };
 }
@@ -1299,7 +1340,7 @@ async function articulos() {
         if (f.existe && !confirm(`¿Cambiar la foto de «${a.nombre}»?\n\nLa foto actual no se borra: se guarda en la carpeta «anteriores».`)) return;
         bt.disabled = true; etq.textContent = "Subiendo…";
         try {
-          const r = await fetch(`/api/admin/articulos/${encodeURIComponent(a.id)}/foto`, { method: "POST", headers: { Authorization: cabClave(), "Content-Type": fi.type }, body: fi }), j = await r.json().catch(() => ({}));
+          const r = await fetch(`/api/admin/articulos/${encodeURIComponent(a.id)}/foto`, { method: "POST", headers: { ...cabsAdmin(), "Content-Type": fi.type }, body: fi }), j = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(j.error || "No se ha podido guardar la foto.");
           etq.textContent = `Foto ${j.w}×${j.h} px · ${{ pequena: "pequeña: se ve borrosa", justa: "justa", buena: "buena" }[j.calidad]} · guardada (los clientes la verán en un minuto)`; etq.className = j.calidad === "pequena" ? "foto-mala" : "";
         } catch (e) { etq.textContent = e.message; etq.className = "foto-mala"; } finally { bt.disabled = false; }
@@ -1371,7 +1412,7 @@ const recargarArticulos = () => { clearTimeout(tAr); tAr = setTimeout(() => { pa
   $("fz-revisar").onclick = async () => {
     const fi = f.files[0]; if (!fi) return; $("fz-revisar").disabled = true; $("fz-msg").textContent = "Leyendo el zip y emparejando…";
     try {
-      const r = await fetch("/api/admin/fotos/zip", { method: "POST", headers: { Authorization: cabClave(), "Content-Type": "application/zip" }, body: fi }), j = await r.json().catch(() => ({}));
+      const r = await fetch("/api/admin/fotos/zip", { method: "POST", headers: { ...cabsAdmin(), "Content-Type": "application/zip" }, body: fi }), j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "No se ha podido revisar el zip.");
       rev = j; $("fz-msg").textContent = "";
       $("fz-resumen").textContent = `El zip trae ${j.total} fotos: ${j.filas.length} se emparejan con un artículo, ${j.dudosas.length} son dudosas y ${j.sin.length} no tienen artículo parecido${j.ignoradas.filter((x) => x.motivo !== "no es una foto").length ? `; ${j.ignoradas.filter((x) => x.motivo !== "no es una foto").length} fotos no se pueden usar (pesan más de 6 MB o son demasiado pequeñas)` : ""}. Todavía no se ha cambiado nada.`;
@@ -1388,7 +1429,7 @@ const recargarArticulos = () => { clearTimeout(tAr); tAr = setTimeout(() => { pa
     if (!confirm(`¿Poner ${ids.length} fotos nuevas?\n\nLas fotos que había antes no se borran: se guardan en la carpeta «anteriores».`)) return;
     $("fz-aplicar").disabled = true; $("fz-msg2").textContent = "Poniendo las fotos…";
     try {
-      const r = await fetch("/api/admin/fotos/zip/aplicar", { method: "POST", headers: { Authorization: cabClave(), "Content-Type": "application/json" }, body: JSON.stringify({ token: rev.token, ids, forzar: $("fz-forzar").checked, confirmo: true }) }), j = await r.json().catch(() => ({}));
+      const r = await fetch("/api/admin/fotos/zip/aplicar", { method: "POST", headers: { ...cabsAdmin(), "Content-Type": "application/json" }, body: JSON.stringify({ token: rev.token, ids, forzar: $("fz-forzar").checked, confirmo: true }) }), j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || "No se han podido poner las fotos.");
       $("fz-msg2").textContent = `Hecho: ${j.hechas} fotos puestas${j.saltadas.length ? `, ${j.saltadas.length} no se han podido poner (${j.saltadas.slice(0, 3).map((x) => x.id + ": " + x.motivo).join("; ")}${j.saltadas.length > 3 ? "…" : ""})` : ""}. Los clientes las verán en un minuto.`;
       rev = null; $("fz-lista").textContent = ""; $("fz-aplicar").disabled = true; recargarArticulos();
@@ -1834,7 +1875,7 @@ function irA(t) {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.t === t)));
   for (const k of PAGINAS) $("p-" + k).hidden = k !== t;
   if (t === "avisos") avisosClientes().catch(() => {});
-  if (t === "cuentas") revisionSeguridad().catch(() => {});
+  if (t === "cuentas") { revisionSeguridad().catch(() => {}); segundoFactor().catch(() => {}); }
   pausaPanel().catch(() => {}); // el banner de pausa sale o se quita al momento al cambiar de pestaña
   if (t === "articulos") articulos().catch((e) => ($("ar-msg").textContent = e.message));
   if (t === "estadisticas") estAbrir(); else estCerrar();
@@ -1885,10 +1926,34 @@ async function accesosNuevos() {
     const f = el("div", "", { className: "acc-fila" }), izq = el("div");
     izq.append(verCliente(x.customerId, x.cliente), el("small", `${x.tipo === "restablecida" ? "Contraseña restablecida por la oficina" : "Creó su contraseña"} · ${hace(x.at)}${x.aparato ? " · " + x.aparato : ""}${x.ip ? " · IP " + x.ip : ""}`));
     f.append(izq);
-    if (x.tipo !== "restablecida") { const b = el("button", "Restablecer", { type: "button", className: "peligro" }); b.onclick = async () => { if (!confirm("Se borrará su contraseña y se cerrarán sus sesiones. Tendrá que crearla otra vez. ¿Restablecer?")) return; try { await call(`/api/admin/cliente/${encodeURIComponent(x.customerId)}/password/restablecer`, {}); } catch (e) { alert(e.message); } caja.dataset.huella = ""; await accesosNuevos(); }; f.append(b); }
+    if (x.tipo !== "restablecida") { const b = el("button", "Restablecer", { type: "button", className: "peligro" }); b.onclick = async () => { if (!confirm("Se borrará su contraseña y se cerrarán sus sesiones. Tendrá que crearla otra vez. ¿Restablecer?")) return; try { await conReclave("Vas a restablecer la contraseña de un cliente. Escribe otra vez la clave del panel.", (h) => call(`/api/admin/cliente/${encodeURIComponent(x.customerId)}/password/restablecer`, {}, false, h)); } catch (e) { alert(e.message); } caja.dataset.huella = ""; await accesosNuevos(); }; f.append(b); }
     return f;
   }));
 }
+// ═════════ Segundo factor del panel ═════════
+async function segundoFactor() {
+  const e = await call("/api/admin/2fa/estado");
+  $("f2-estado").textContent = e.ilegible ? "ACTIVADO, pero ya no se puede leer (se cambió la clave del panel). Ejecuta desactivar-2fa.bat en el ordenador de la oficina." : e.activo ? `ACTIVADO. Al entrar hay que escribir el código de tu aplicación del móvil. Códigos de emergencia que quedan: ${e.emergencia}.` : "DESACTIVADO. Con él, aunque alguien consiga la clave del panel no podrá entrar sin tu móvil.";
+  $("f2-btn").textContent = e.activo ? "Desactivar" : "Activar"; $("f2-btn").className = e.activo ? "peligro" : "main";
+  $("f2-pasos").hidden = true; $("f2-botones").hidden = false; if (!e.activo) $("f2-emergencia").hidden = true;
+}
+$("f2-btn").onclick = async () => {
+  try {
+    const e = await call("/api/admin/2fa/estado");
+    if (!e.activo) { const r = await call("/api/admin/2fa/preparar", {}); $("f2-clave").textContent = r.clave; $("f2-cod").value = ""; $("f2-pasos").hidden = false; $("f2-botones").hidden = true; $("f2-cod").focus(); return; }
+    const cod = prompt("Para desactivarlo escribe un código de tu aplicación (o uno de emergencia):"); if (!cod) return;
+    await call("/api/admin/2fa/desactivar", { codigo: cod.trim() }); tok2fa = ""; try { sessionStorage.removeItem("vm_admin_2fa"); } catch {} mostrarAviso("Segundo factor desactivado."); await segundoFactor();
+  } catch (e) { alert(e.message); }
+};
+$("f2-cancelar").onclick = () => { $("f2-pasos").hidden = true; $("f2-botones").hidden = false; };
+$("f2-confirmar").onclick = async () => {
+  try {
+    const r = await call("/api/admin/2fa/activar", { codigo: $("f2-cod").value.trim(), confirmo: true });
+    if (r.token) { tok2fa = r.token; try { sessionStorage.setItem("vm_admin_2fa", tok2fa); } catch {} } // quien lo acaba de activar no tiene que volver a escribir un código
+    $("f2-rec").replaceChildren(...r.emergencia.map((c) => el("span", c))); $("f2-emergencia").hidden = false; $("f2-pasos").hidden = true; await segundoFactor(); $("f2-botones").hidden = true;
+  } catch (e) { alert(e.message); }
+};
+$("f2-guardados").onclick = () => { $("f2-emergencia").hidden = true; $("f2-rec").replaceChildren(); $("f2-botones").hidden = false; };
 // ═════════ Pausa de emergencia y revisión de seguridad ═════════
 async function pausaPanel() {
   const p = await call("/api/admin/pausa"), b = $("pausa-banner");
@@ -2030,7 +2095,7 @@ async function abrirFicha(id) {
   cuerpo.push(seccionDatos(f));
   const cp = f.correoPedidos, correoTxt = !cp.activo ? "El cliente la ha desactivado en «Mi cuenta»." : cp.destino ? `Se envía a ${cp.destino}${cp.delaCuenta ? " (el correo de su cuenta; tiene prioridad sobre los de su ficha)" : ""}.` : "No tiene ningún correo: añade uno en «Editar datos».";
   cuerpo.push(fiSec("Cuenta en la aplicación", f.cuenta ? fiDl([["Estado", f.cuenta.bloqueada ? "Bloqueo temporal" : f.cuenta.estado === "blocked" ? "Bloqueada" : f.cuenta.confirmada ? "Activa" : "Sin confirmar"], ["Último acceso", fechaCorta(f.cuenta.ultimoAcceso)], ["Contraseña", f.password?.tiene ? `Creada el ${fechaCorta(f.password.creada)}` : "Aún no la ha creado"], ["Aparatos recordados", f.aparatos ? `${f.aparatos} (entran solos, sin pedir permiso)` : "Ninguno"], ["Cuenta creada", fechaCorta(f.cuenta.creada)], ["Confirmación de pedido por correo", correoTxt]]) : fiDl([["Confirmación de pedido por correo", correoTxt]])));
-  if (f.password?.tiene) { const bp = el("button", "Restablecer su contraseña", { type: "button", className: "peligro", style: "margin:8px 8px 0 0" }); bp.onclick = async () => { if (!confirm("Se borrará su contraseña, se cerrarán sus sesiones y tendrá que crearla otra vez. ¿Restablecer?")) return; try { await call(`/api/admin/cliente/${encodeURIComponent(id)}/password/restablecer`, {}); abrirFicha(id); } catch (e) { alert(e.message); } }; cuerpo[cuerpo.length - 1].append(bp); }
+  if (f.password?.tiene) { const bp = el("button", "Restablecer su contraseña", { type: "button", className: "peligro", style: "margin:8px 8px 0 0" }); bp.onclick = async () => { if (!confirm("Se borrará su contraseña, se cerrarán sus sesiones y tendrá que crearla otra vez. ¿Restablecer?")) return; try { const hecho = await conReclave("Vas a restablecer la contraseña de un cliente. Escribe otra vez la clave del panel.", (h) => call(`/api/admin/cliente/${encodeURIComponent(id)}/password/restablecer`, {}, false, h)); if (hecho) abrirFicha(id); } catch (e) { alert(e.message); } }; cuerpo[cuerpo.length - 1].append(bp); }
   if (f.aparatos) { const bo = el("button", "Olvidar sus aparatos", { type: "button", className: "peligro", style: "margin-top:8px" }); bo.onclick = async () => { if (!confirm("Este cliente tendrá que volver a pedir permiso a la oficina desde cada aparato. ¿Olvidar sus aparatos?")) return; try { await call(`/api/admin/cliente/${encodeURIComponent(id)}/aparatos/olvidar`, {}); abrirFicha(id); } catch (e) { alert(e.message); } }; cuerpo[cuerpo.length - 1].append(bo); }
   const chips = el("div", "", { className: "fi-chips" });
   if (pa?.pedidos) {
@@ -2080,7 +2145,20 @@ $("bg-res").addEventListener("keydown", (e) => { const bs = [...$("bg-res").quer
 document.addEventListener("click", (e) => { if (!e.target.closest(".busca-g")) bgCerrar(); });
 document.addEventListener("keydown", (e) => { if (e.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) && !$("app").hidden) { e.preventDefault(); $("bg-q").focus(); } });
 async function entrar() { try { await refrescar(); if ($("app").hidden && clave) { await call("/api/admin/resumen"); $("login").hidden = true; $("app").hidden = false; clearInterval(timer); timer = setInterval(refrescar, 15000); } } catch (e) { $("l-err").textContent = e.message; } }
-$("f-login").onsubmit = (e) => { e.preventDefault(); clave = $("clave").value.trim(); try { sessionStorage.setItem("vm_admin", clave); } catch {} $("l-err").textContent = ""; entrar(); };
+$("f-login").onsubmit = async (e) => {
+  e.preventDefault(); clave = $("clave").value.trim(); try { sessionStorage.setItem("vm_admin", clave); } catch {} $("l-err").textContent = "";
+  const cod = $("codigo2fa").value.trim();
+  if (cod) { // segundo factor: se cambia el código por un permiso de 12 horas
+    try {
+      const r = await fetch("/api/admin/2fa/entrar", { method: "POST", headers: { Authorization: cabClave(), "Content-Type": "application/json" }, body: JSON.stringify({ codigo: cod }) }), j = await r.json().catch(() => ({}));
+      if (!r.ok) { $("l-err").textContent = j.error || (r.status === 403 ? "Clave incorrecta" : "No se pudo comprobar el código."); $("codigo2fa").value = ""; return; }
+      if (j.token) { tok2fa = j.token; try { sessionStorage.setItem("vm_admin_2fa", tok2fa); } catch {} }
+      $("codigo2fa").value = ""; $("codigo2fa").hidden = true;
+      if (j.emergencia !== undefined && j.emergencia <= 2) mostrarAviso(`Te quedan ${j.emergencia} códigos de emergencia: genera otros desactivando y activando el segundo factor.`);
+    } catch { $("l-err").textContent = "No hay conexión con el servidor."; return; }
+  }
+  entrar();
+};
 if (clave) entrar();
 </script>
 </body>

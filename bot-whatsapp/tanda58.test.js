@@ -27,7 +27,7 @@ test("clave del panel con caracteres especiales («€», «—», «ñ», emoji
 test("el panel manda la clave siempre con la misma función (sin espacios y a prueba de caracteres raros) en TODOS los sitios", () => {
   const e = leer("./empresa.html");
   assert.equal([...e.matchAll(/"Bearer " \+ clave/g)].length, 0, "ningún sitio manda la clave a pelo");
-  assert.ok([...e.matchAll(/cabClave\(\)/g)].length >= 6, "los 5 envíos y la definición");
+  assert.ok([...e.matchAll(/cabsAdmin\(/g)].length >= 5, "los envíos pasan todos por cabsAdmin (que usa cabClave y añade el permiso del segundo factor)"); assert.match(e, /Authorization: cabClave\(\)/);
   assert.match(e, /function cabClave\(\)/); assert.match(e, /"b64:" \+ btoa\(/); assert.match(e, /clave = \$\("clave"\)\.value\.trim\(\)/);
   assert.match(leer("./mcp/vm-mcp.js"), /Authorization: "Bearer " \+ token/, "la conexión de Claude sigue mandando la clave normal: el servidor la sigue admitiendo");
 });

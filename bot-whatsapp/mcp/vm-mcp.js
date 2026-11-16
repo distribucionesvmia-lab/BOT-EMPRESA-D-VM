@@ -33,7 +33,7 @@ async function api(metodo, ruta, cuerpo) {
   const token = clave();
   if (!token) throw new Error("Falta la clave de la empresa: pon VM_ADMIN_TOKEN o VM_ENV_FILE en la configuración de esta conexión.");
   let r;
-  try { r = await fetch(BASE + ruta, { method: metodo, headers: { Authorization: "Bearer " + token, ...(cuerpo ? { "Content-Type": "application/json" } : {}) }, body: cuerpo ? JSON.stringify(cuerpo) : undefined, signal: AbortSignal.timeout(30_000) }); }
+  try { r = await fetch(BASE + ruta, { method: metodo, headers: { Authorization: "Bearer " + token, ...(process.env.VM_ADMIN_2FA_BYPASS ? { "X-VM-2FA": process.env.VM_ADMIN_2FA_BYPASS } : {}), ...(cuerpo ? { "Content-Type": "application/json" } : {}) }, body: cuerpo ? JSON.stringify(cuerpo) : undefined, signal: AbortSignal.timeout(30_000) }); }
   catch (e) { throw new Error(`No se puede conectar con el panel de la empresa en ${BASE} (${e?.cause?.code || e?.name || "error"}). ¿Está encendido el ordenador de la oficina y conectado Tailscale?`); }
   const j = await r.json().catch(() => ({}));
   if (r.status === 403) throw new Error("El panel no ha aceptado la clave de la empresa.");

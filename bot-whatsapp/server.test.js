@@ -954,17 +954,18 @@ test("PEDIDOS: se filtran por día, horas y cliente, y se borran los elegidos (c
   // borrar: solo la empresa, con confirmación y referencias válidas
   const [a, b] = todos.filter((o) => o.estado === "pendiente").slice(0, 2).map((o) => o.ref);
   assert.equal((await call("POST", "/api/admin/pedidos/borrar", { body: { refs: [a], confirmo: true } })).status, 403);
-  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: [a] } })).status, 400); // sin confirmar
-  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: [], confirmo: true } })).status, 400);
-  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: ["x; DROP"], confirmo: true } })).status, 400);
+  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: [a], confirmo: true } })).status, 401, "borrar pide volver a escribir la clave (X-VM-Reclave)");
+  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, headers: { "X-VM-Reclave": ADMIN }, body: { refs: [a] } })).status, 400); // sin confirmar
+  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, headers: { "X-VM-Reclave": ADMIN }, body: { refs: [], confirmo: true } })).status, 400);
+  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, headers: { "X-VM-Reclave": ADMIN }, body: { refs: ["x; DROP"], confirmo: true } })).status, 400);
   assert.equal((await lista()).filter((o) => o.ref === a || o.ref === b).length, 2); // nada se ha borrado todavía
-  const r = (await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: [a], confirmo: true } })).json;
+  const r = (await call("POST", "/api/admin/pedidos/borrar", { admin: true, headers: { "X-VM-Reclave": ADMIN }, body: { refs: [a], confirmo: true } })).json;
   assert.equal(r.borrados, 1); assert.match(r.copia, /^pedidos-antes-de-borrar-\d{8}-\d{4}\.sqlite$/);
   assert.ok(fs.existsSync(path.join(dir, "respaldos", r.copia)), "se guarda la copia antes de borrar");
   const tras = await lista();
   assert.equal(tras.find((o) => o.ref === a), undefined); // borrado
   assert.ok(tras.find((o) => o.ref === b)); // el no elegido sigue
-  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, body: { refs: [a], confirmo: true } })).json.borrados, 0); // repetirlo no rompe nada
+  assert.equal((await call("POST", "/api/admin/pedidos/borrar", { admin: true, headers: { "X-VM-Reclave": ADMIN }, body: { refs: [a], confirmo: true } })).json.borrados, 0); // repetirlo no rompe nada
 });
 
 test("PEDIDO DE SIEMPRE: el cliente lo puede editar, borrar y recuperar, sin enviar nada y sin tocar a otro cliente", async () => {
