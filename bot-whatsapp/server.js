@@ -45,7 +45,7 @@ import { crearNotificador } from "./notificaciones.js";
 import { scheduleBackups, backupAll } from "./backup.js";
 import { sourceFromEnv } from "./drive.js";
 import nodePath from "node:path";
-import { BUSINESS, AYUDA, ayudaPublica, condicionesPedido, envTexto } from "./config.js";
+import { BUSINESS, AYUDA, ayudaPublica, condicionesPedido, envTexto, EMPRESA_DIRECCION, EMPRESA_EMAIL } from "./config.js";
 import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
 import { categorizar } from "./categorias.js";
 import { empaquetar, estatico } from "./estaticos.js";
@@ -476,7 +476,7 @@ const respaldarAntesDeActualizar = () => { const { errors } = backupAll({ pedido
 const admin = createAdmin({ respaldar: respaldarAntesDeActualizar, imgDir: process.env.IMG_DIR ?? fileURLToPath(new URL("./imagenes/", import.meta.url)), sync, mail: notificador, actualizador, estado: estadoDelSistema, actualizaciones: leerActualizaciones, accounts: getAccountsDb(), customers: customerDirectory, orders: getDb(), catalogDb: dbsAdmin?.catalogDb ?? null, adminToken: adminEnabled ? process.env.ADMIN_TOKEN : undefined }); // la aplicación del cliente ni conoce la clave
 /** Datos fiscales de la empresa para el PDF: los PRIVACY_* de la configuración (lo que esté vacío no se imprime) y el teléfono de ayuda. */
 function datosPdfComunes() {
-  const titular = envTexto("PRIVACY_TITULAR") || "Distribuciones Valentín Martín", cif = envTexto("PRIVACY_CIF"), dir = envTexto("PRIVACY_DIRECCION"), tel = AYUDA.telefono, mail = envTexto("PRIVACY_EMAIL");
+  const titular = envTexto("PRIVACY_TITULAR") || "Distribuciones Valentín Martín", cif = envTexto("PRIVACY_CIF"), dir = EMPRESA_DIRECCION(), tel = AYUDA.telefono, mail = EMPRESA_EMAIL();
   return { empresa: titular, datosEmpresa: [[cif && "CIF " + cif, dir].filter(Boolean).join(" · "), [tel && "Tel. " + tel, mail].filter(Boolean).join(" · ")].filter(Boolean) };
 }
 // PDF de un pedido hecho en la aplicación (con los precios guardados del día). null si no existe, es de otro cliente o está cancelado.
@@ -643,7 +643,7 @@ async function appRoutes(req, res, url) {
   }
   // Aplicación del cliente
   if (!clientEnabled) return void res.writeHead(404).end();
-  if (p === "/cliente" && req.method === "GET") return void ((cuerpo) => enviar(res, 200, htmlCsp(cuerpo), cuerpo))((() => { const dl = { titular: envTexto("PRIVACY_TITULAR") || undefined, cif: envTexto("PRIVACY_CIF"), direccion: envTexto("PRIVACY_DIRECCION") || undefined, email: envTexto("PRIVACY_EMAIL") }; return empaquetar(page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml(dl)).replaceAll("<div data-aviso-legal></div>", avisoLegalHtml(dl)), "cliente"); })());
+  if (p === "/cliente" && req.method === "GET") return void ((cuerpo) => enviar(res, 200, htmlCsp(cuerpo), cuerpo))((() => { const dl = { titular: envTexto("PRIVACY_TITULAR") || undefined, cif: envTexto("PRIVACY_CIF"), direccion: EMPRESA_DIRECCION(), email: EMPRESA_EMAIL() }; return empaquetar(page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml(dl)).replaceAll("<div data-aviso-legal></div>", avisoLegalHtml(dl)), "cliente"); })());
   if (await auth.route(req, res, url)) return;
 
   const account = auth.sessionOf(req);

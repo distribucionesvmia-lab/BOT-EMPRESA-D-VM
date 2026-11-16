@@ -251,7 +251,9 @@ test("PAQUETE «COMPRAR MÁS FÁCIL» A+B: lo que ya compra arriba, «Lo más pe
 
 test("AYUDA: sin datos rellenados no hay botón; con teléfono o WhatsApp se ofrecen solo esos y el horario", async () => {
   const { ayudaPublica, AYUDA } = await import("./config.js");
-  assert.equal(ayudaPublica(), null, "la empresa aún no ha rellenado teléfono ni WhatsApp: el botón no aparece");
+  assert.equal(ayudaPublica().telHref, "tel:+34635098044"); assert.equal(ayudaPublica().horario, "De 7:00 a 15:00"); // datos de la oficina por defecto
+  Object.assign(AYUDA, { telefono: "", whatsapp: "", horario: "" });
+  assert.equal(ayudaPublica(), null, "sin teléfono ni WhatsApp el botón no aparece");
   Object.assign(AYUDA, { telefono: "983 123 456", whatsapp: "600 111 222", horario: "L-V 8:00-14:00" });
   const a = ayudaPublica();
   assert.equal(a.telHref, "tel:+34983123456"); assert.equal(a.whatsappHref, "https://wa.me/34600111222"); assert.equal(a.horario, "L-V 8:00-14:00");

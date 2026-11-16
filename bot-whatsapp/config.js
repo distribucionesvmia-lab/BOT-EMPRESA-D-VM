@@ -11,12 +11,15 @@ export function limpiaTextoEnv(v) {
   return s;
 }
 export const envTexto = (k) => limpiaTextoEnv(globalThis.process?.env?.[k]);
+/** Datos públicos de la empresa (valores por defecto; se pueden cambiar con PRIVACY_DIRECCION y PRIVACY_EMAIL). */
+export const EMPRESA_DIRECCION = () => envTexto("PRIVACY_DIRECCION") || "Cl Labradores, n.º 45, parcela 24B, 47400 Medina del Campo";
+export const EMPRESA_EMAIL = () => envTexto("PRIVACY_EMAIL") || "oficina@distribucionesvm.es";
 export const HORARIO_REPARTO = () => envTexto("HORARIO_REPARTO"); // p. ej. «Lunes a viernes, de 8:00 a 14:00»
 const ayudaEnv = envTexto;
 export const AYUDA = {
-  telefono: ayudaEnv("AYUDA_TEL") || "", // p. ej. "983 000 000"
+  telefono: ayudaEnv("AYUDA_TEL") || "635 09 80 44", // teléfono de la oficina (se puede cambiar con AYUDA_TEL)
   whatsapp: ayudaEnv("AYUDA_WHATSAPP") || "", // p. ej. "600 000 000" (con o sin el 34 delante)
-  horario: ayudaEnv("AYUDA_HORARIO") || "", // p. ej. "Lunes a viernes, de 8:00 a 14:00"
+  horario: ayudaEnv("AYUDA_HORARIO") || "De 7:00 a 15:00", // horario de atención (se puede cambiar con AYUDA_HORARIO)
 };
 // ── CONDICIONES DEL PEDIDO que se enseñan al cliente antes de enviarlo. RELLENAR en C:\vm\config: PEDIDO_MINIMO (euros sin IVA; vacío = sin mínimo) y
 // PORTES_TEXTO (p. ej. "Portes gratis desde 150 €"). Lo que esté vacío no se enseña: nunca se inventa una condición.
