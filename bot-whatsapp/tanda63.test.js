@@ -103,3 +103,12 @@ test("pantalla y panel: campo del código al entrar, ventana de activar/desactiv
   for (const t of ['id="pw-cod"', 'id="pw-cod-fila"', 'id="abrir-2fa"', 'id="m-2fa"', "Introducir clave de configuración", "Guarda estos códigos de emergencia", "/api/2fa/preparar", "/api/2fa/activar", "/api/2fa/desactivar", "necesitaCodigo"]) assert.ok(h.includes(t), t);
   assert.doesNotMatch(h, /\son[a-z]+="/); assert.match(e, /Verificación en dos pasos/); assert.match(a, /accounts\.dobleFactor\(ids\[0\]\)\.activo && aparatoDe\(req\) !== ids\[0\]/);
 });
+
+test("al crear su contraseña por primera vez se ofrece (opcional) la verificación en dos pasos, y se puede dejar para luego", () => {
+  const h = leer("./cliente.html");
+  assert.match(h, /const recienCreada = creando;/);
+  assert.match(h, /dispatchEvent\(new Event\("vm:ofrecer-2fa"\)\)/);
+  assert.match(h, /addEventListener\("vm:ofrecer-2fa", \(\) => abrir\(true\)\)/);
+  assert.match(h, /Ahora no, quizá más tarde/);
+  assert.match(h, /Tu contraseña ya está creada\. ¿Quieres añadir una protección extra\?/);
+});

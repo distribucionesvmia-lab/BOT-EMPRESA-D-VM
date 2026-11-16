@@ -1293,7 +1293,7 @@ $("f-acceso").onsubmit = (e) => {
       }
       if (j.necesitaCrear) { modoCrear(true); $("pw-pass").value = ""; $("pw-pass").focus(); tsPinta("ts-pw"); return; } // crear una contraseña pide «no soy un robot» si está configurado
       if (!r.ok) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error || "No se pudo entrar."); if (!creando) { $("pw-pass").value = ""; $("pw-pass").focus(); } return; }
-      quitaPase(); f.reset(); $("pw-cod-fila").hidden = true; modoCrear(false); entrar(j.cliente.nombre);
+      const recienCreada = creando; quitaPase(); f.reset(); $("pw-cod-fila").hidden = true; modoCrear(false); entrar(j.cliente.nombre); if (recienCreada) setTimeout(() => document.dispatchEvent(new Event("vm:ofrecer-2fa")), 700); // contraseña recién creada: se ofrece (opcional) la verificación en dos pasos
     }, "pw-err")).then(rotulo);
   };
   $("pw-ayuda").onclick = () => $("no-entro").click(); $("pw-registro").onclick = () => $("ir-registro-2").click();
@@ -1306,16 +1306,16 @@ $("f-acceso").onsubmit = (e) => {
   const fases = ["d2-form-pass", "d2-pasos", "d2-rec", "d2-form-off", "d2-activar"], ver = (cual) => { for (const id of fases) $(id).hidden = id !== cual; }, borra = () => { for (const id of ["d2-err1", "d2-err2", "d2-err3"]) $(id).textContent = ""; };
   const error = (id, e, j) => { $(id).textContent = (j && j.error) || e || "No se pudo hacer."; };
   let clave = "";
-  async function abrir() {
-    borra(); $("m-2fa").hidden = false; $("d2-estado").textContent = "Cargando…"; ver("");
+  async function abrir(oferta) {
+    borra(); $("d2-cerrar").textContent = oferta === true ? "Ahora no, quizá más tarde" : "Cerrar"; $("m-2fa").hidden = false; $("d2-estado").textContent = "Cargando…"; ver("");
     try {
       const y = await fetch("/api/yo").then((r) => r.json());
       if (!y.cliente?.tienePassword) { $("d2-estado").textContent = "Primero crea tu contraseña: menú ⋮ → «Cambiar mi contraseña»."; return; }
       if (y.cliente.dobleFactor) { $("d2-estado").textContent = "ACTIVADA. Cuando entres desde un móvil o navegador nuevo te pediremos el código de tu aplicación. En este aparato no hace falta."; ver("d2-form-off"); $("d2-pass2").focus(); }
-      else { $("d2-estado").textContent = "Es opcional y añade una capa más de seguridad: además de tu contraseña, hará falta un código de tu móvil al entrar desde un aparato nuevo."; ver("d2-activar"); }
+      else { $("d2-estado").textContent = (oferta === true ? "Tu contraseña ya está creada. ¿Quieres añadir una protección extra? " : "") + "Es opcional y añade una capa más de seguridad: además de tu contraseña, hará falta un código de tu móvil al entrar desde un aparato nuevo."; ver("d2-activar"); }
     } catch { $("d2-estado").textContent = SIN_RED; }
   }
-  $("abrir-2fa").onclick = abrir; $("d2-cerrar").onclick = () => { $("m-2fa").hidden = true; $("d2-codigos").replaceChildren(); };
+  $("abrir-2fa").onclick = () => abrir(); document.addEventListener("vm:ofrecer-2fa", () => abrir(true)); $("d2-cerrar").onclick = () => { $("m-2fa").hidden = true; $("d2-codigos").replaceChildren(); };
   $("d2-copiar").onclick = async () => { try { await navigator.clipboard.writeText(clave.replace(/\s/g, "")); $("d2-copiar").textContent = "Clave copiada ✓"; } catch { $("d2-copiar").textContent = "No se pudo copiar: escríbela a mano"; } };
   $("d2-activar").onclick = () => { borra(); ver("d2-form-pass"); $("d2-pass").value = ""; $("d2-pass").focus(); };
   $("d2-form-pass").onsubmit = async (e) => {
