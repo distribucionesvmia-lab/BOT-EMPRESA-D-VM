@@ -7,6 +7,7 @@ import { normalizePhone, validEmail, pinValido } from "./cuentas-db.js";
 import { nifCodes, nifClean } from "./nif-codes.js";
 import { codeKey, validCode, claveCodigoOficina } from "./nif-key.js";
 import { navegadorCorto } from "./errores.js";
+import { leerPausa, TEXTO_PAUSA_ENTRADAS } from "./pausa.js";
 import { elegirDestino, tapar } from "./correo-cliente.js";
 import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
 
@@ -184,12 +185,15 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
 
   /** Atiende las rutas del cliente: /api/registro, /api/acceso, /api/salir y /api/yo. Devuelve true si la ruta era suya. */
   async function route(req, res, url) {
+    const pausaEntradas = () => leerPausa(accounts).entradas; // pausa de emergencia (panel de la empresa): nadie nuevo inicia sesión; los que ya están dentro siguen
+    if (req.method === "POST" && /^\/api\/acceso(\/|$)/.test(url.pathname) && pausaEntradas()) return send(res, 503, { error: TEXTO_PAUSA_ENTRADAS, pausa: true }), true;
     const p = url.pathname;
     // ── Enlace de invitación de la oficina: GET enseña una página con un botón (así las vistas previas de WhatsApp no lo gastan); solo el POST lo gasta y abre sesión ──
     if (p.startsWith("/entrar/") && (req.method === "GET" || req.method === "POST")) {
       const ya = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow", "X-Content-Type-Options": "nosniff" };
       const token = decodeURIComponent(p.slice(8)), fin = (code, t, x, b) => (res.writeHead(code, ya).end(paginaEntrar(t, x, b)), true);
       if (!loginLimit(ip(req))) return fin(429, "Demasiados intentos", "Espera unos minutos y vuelve a abrir el enlace.", "");
+      if (req.method === "POST" && pausaEntradas()) return fin(503, "Entrada en pausa", TEXTO_PAUSA_ENTRADAS, "");
       const v = accounts.invitacionVer(token);
       if (!v.ok) return fin(410, "Este enlace ya no sirve", v.motivo === "caducada" ? "Ha caducado." : v.motivo === "usada" ? "Ya se ha usado o la oficina lo ha anulado." : "No lo reconocemos.", '<a class="b" href="/cliente">Entrar de la forma normal</a><a class="s" href="/cliente#enlace-caducado">¿Necesitas otro enlace? Pídeselo a la oficina</a>');
       if (req.method === "GET" && v.tipo === "alta") return fin(200, "Bienvenido", "Pulsa para solicitar tu alta como cliente.", `<form method="POST" action="/entrar/${encodeURIComponent(token)}"><button type="submit">Solicitar mi alta</button></form>`);
@@ -463,7 +467,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (p === "/api/yo" && req.method === "GET") {
       let acc = sessionOf(req), extra = {};
       if (!acc) { // sin sesión (caducó, o se cerró el navegador) pero con un aparato ya aprobado por la oficina: entra solo
-        const rec = aparatoDe(req), r = rec ? abrirConAparato(rec, req) : null;
+        const rec = pausaEntradas() ? null : aparatoDe(req), r = rec ? abrirConAparato(rec, req) : null; // en pausa de emergencia tampoco se reabre sola la sesión
         if (r?.ok) { acc = r.account; extra = { "Set-Cookie": (avisoAcceso(r.token, req), r.cookies) }; }
       }
       if (!acc) return send(res, 200, { cliente: null }), true; // invitado: sin sesión no es un error (la consola del navegador queda limpia)

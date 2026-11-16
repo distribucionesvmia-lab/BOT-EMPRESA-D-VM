@@ -12,6 +12,8 @@ import { send, readJson, makeAdminCheck } from "./auth.js";
 import { ipDe, eventoSeguridad } from "./seguridad.js";
 import { etiquetaAccion } from "./actividad.js";
 import { claveCodigoOficina } from "./nif-key.js";
+import { leerPausa, guardarPausa } from "./pausa.js";
+import { revisar } from "./revision-seguridad.js";
 import { crearAutoBases } from "./auto-bases.js";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2, promoVigente, precioEfectivo, hoyMadrid } from "./pricing.js";
@@ -439,6 +441,22 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
         if (!accounts.accesoSolicitudResolver(id, ma[2] === "aprobar" ? "aprobada" : "rechazada")) return send(res, 409, { error: "Esa solicitud ya no está pendiente." }), true;
         return send(res, 200, { ok: true }), true;
       } }
+    // ---- Revisión de seguridad: lo que está bien y lo que hay que arreglar, con qué hacer ----
+    if (p === "/api/admin/seguridad/revision" && get) {
+      let cliente = null; try { cliente = JSON.parse(accounts.ajuste("estado_cliente") || "null"); } catch { /* sin datos */ }
+      let copias = null; try { copias = estadoCopias(process.env.BACKUP_DIR ?? "respaldos"); } catch { /* sin carpeta */ }
+      return send(res, 200, revisar({ cliente, env: process.env, copias, eventos24h: accounts.seguridadResumen({ horas: 24 }), bloqueadas: accounts.listAccounts().filter((a) => a.locked || a.status === "blocked").length, accesosNuevos7: accounts.accesosNuevos({ dias: 7 }).filter((x) => x.tipo === "primera").length, pausa: leerPausa(accounts, { fresco: true }) })), true;
+    }
+    // ---- Pausa de emergencia: cierra las entradas nuevas y/o los pedidos nuevos hasta que se reactive ----
+    if (p === "/api/admin/pausa" && get) return send(res, 200, leerPausa(accounts, { fresco: true })), true;
+    if (p === "/api/admin/pausa" && post) {
+      const b = (await readJson(req)) ?? {};
+      if (b.confirmo !== true) return send(res, 400, { error: "Hace falta confirmar." }), true;
+      for (const k of ["entradas", "pedidos"]) if (k in b && typeof b[k] !== "boolean") return send(res, 400, { error: "Valor no válido." }), true;
+      const v = guardarPausa(accounts, { entradas: b.entradas, pedidos: b.pedidos, motivo: b.motivo });
+      eventoSeguridad("pausa-de-emergencia", `${v.entradas ? "entradas pausadas" : "entradas abiertas"}, ${v.pedidos ? "pedidos pausados" : "pedidos abiertos"}`);
+      return send(res, 200, v), true;
+    }
     // ---- Contraseñas de los clientes: quién se ha activado (creó su contraseña) y restablecer si hace falta ----
     if (p === "/api/admin/accesos-nuevos" && get) return send(res, 200, { lista: accounts.accesosNuevos({ dias: 30 }).map((x) => ({ ...x, cliente: customers.getById(x.customerId)?.name ?? `Cliente ${x.customerId}`, telefono: customers.getById(x.customerId)?.phone ?? "" })) }), true;
     if (post) { const mr = /^\/api\/admin\/cliente\/([\w-]{1,20})\/password\/restablecer$/.exec(p);

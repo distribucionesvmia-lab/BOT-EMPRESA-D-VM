@@ -168,6 +168,11 @@
   /* Hoy */
   #p-hoy { display:grid; gap:14px; } #p-hoy[hidden] { display:none; }
   .acc-banner { display:flex; gap:12px; align-items:center; justify-content:space-between; background:var(--accent); color:#fff; padding:10px 14px; border-radius:10px; font-weight:700; } .acc-banner[hidden] { display:none; } .acc-banner button { background:#fff; color:var(--accent); border-color:#fff; }
+  .rev-fila { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line-2); } .rev-fila:last-child { border-bottom:0; }
+  .rev-fila small { color:var(--muted); display:block; margin-top:2px; } .rev-fila .rev-fix { color:var(--text); }
+  .rev-b { flex:none; min-width:64px; text-align:center; font-size:12px; font-weight:700; padding:3px 8px; border-radius:999px; border:1px solid var(--line); }
+  .rev-b.ok { color:#1f6f43; border-color:#1f6f43; } .rev-b.aviso { color:#8a5a00; border-color:#b8860b; } .rev-b.mal { color:#fff; background:var(--accent); border-color:var(--accent); } .rev-b.info, .rev-b.manual { color:var(--muted); }
+  @media (prefers-color-scheme: dark) { .rev-b.ok { color:#6fd49b; border-color:#6fd49b; } .rev-b.aviso { color:#f0c36a; border-color:#f0c36a; } }
   .acc-panel { border-left:4px solid var(--accent); } .acc-panel[hidden] { display:none; }
   .acc-fila { display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line-2); } .acc-fila:last-child { border-bottom:0; }
   .acc-fila small { color:var(--muted); display:block; } .acc-ref { font:700 22px/1 ui-monospace, Consolas, monospace; letter-spacing:.15em; padding:6px 10px; border:2px solid var(--accent); border-radius:8px; }
@@ -345,6 +350,7 @@
 
   <div id="app" hidden style="display:grid;gap:14px">
     <div id="acc-banner" class="acc-banner" role="alert" hidden><span></span><button type="button" class="main">Ver</button></div>
+    <div id="pausa-banner" class="acc-banner" role="alert" hidden><span></span><button type="button" class="main">Ir a la pausa</button></div>
     <div class="pin" id="pin" role="status" hidden></div>
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" data-t="hoy" aria-selected="true">Hoy <span class="n" id="n-hoy" hidden></span></button>
@@ -370,6 +376,12 @@
         <h2>Clientes que necesitan ayuda para entrar</h2>
         <p class="muted" style="margin:0 0 8px">Los clientes con correo en su ficha entran solos con el código que les llega; aquí solo salen los que <b>pulsan «Necesito ayuda»</b>, no tienen correo o no se les pudo enviar. Pregúntales por teléfono qué <b>número de comprobación</b> les sale en la pantalla: si coincide con el de aquí, es él. Entonces pulsa «Dejarle entrar», o «Dar un código» y díselo (por teléfono o WhatsApp).</p>
         <div id="acc-lista"></div>
+      </section>
+      <section class="panel" id="pausa-panel">
+        <h2>Pausa de emergencia</h2>
+        <p class="muted" style="margin:0 0 8px">Si ves que pasa algo raro (muchos pedidos falsos, alguien probando contraseñas), puedes cerrar la puerta desde aquí. <b>Los clientes que ya están dentro siguen</b>; los que lleguen verán un aviso. Se reabre con un clic.</p>
+        <div class="acciones"><button type="button" id="pausa-ent" class="peligro">Pausar entradas nuevas</button><button type="button" id="pausa-ped" class="peligro">Pausar pedidos</button></div>
+        <p class="muted" id="pausa-txt" style="margin:8px 0 0"></p>
       </section>
       <section class="panel" id="nuevos-panel" hidden>
         <h2>Accesos nuevos (últimos 30 días)</h2>
@@ -751,6 +763,11 @@
         <h3 style="margin:12px 0 4px">Los últimos</h3>
         <div class="scroll"><table><thead><tr><th>Cuándo</th><th>Cliente</th><th>Pantalla</th><th>Qué falló</th><th>Navegador</th></tr></thead><tbody id="err-ult"></tbody></table></div>
       </div>
+      </div>
+      <div class="panel" id="rev-panel">
+        <h2>Revisión de seguridad</h2>
+        <p class="muted" id="rev-sub" style="margin:0 0 8px">Cargando…</p>
+        <div id="rev-lista"></div>
       </div>
       <div class="panel">
         <h2>Seguridad y actividad del panel</h2>
@@ -1617,7 +1634,7 @@ async function copias(comprobar = false) {
   finally { if (comprobar) { b.disabled = false; b.textContent = "Comprobar copias ahora"; } }
 }
 $("copias-comprobar").onclick = () => copias(true);
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), seguridadPanel(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), correoClientes(), accesos(), accesosNuevos(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), seguridadPanel(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), correoClientes(), accesos(), accesosNuevos(), pausaPanel(), $("p-cuentas").hidden ? Promise.resolve() : revisionSeguridad(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 // ═════════ Estadísticas y patrones ═════════
 const est = { rango: "30d", d0: "", d1: "", datos: null, modo: "uds", mas: false, timerVivo: 0, timerDatos: 0, cliente: null };
@@ -1807,6 +1824,8 @@ function irA(t) {
   document.querySelectorAll(".tab").forEach((x) => x.setAttribute("aria-selected", String(x.dataset.t === t)));
   for (const k of PAGINAS) $("p-" + k).hidden = k !== t;
   if (t === "avisos") avisosClientes().catch(() => {});
+  if (t === "cuentas") revisionSeguridad().catch(() => {});
+  pausaPanel().catch(() => {}); // el banner de pausa sale o se quita al momento al cambiar de pestaña
   if (t === "articulos") articulos().catch((e) => ($("ar-msg").textContent = e.message));
   if (t === "estadisticas") estAbrir(); else estCerrar();
   if (t === "datos") ultimasSubidas();
@@ -1857,6 +1876,37 @@ async function accesosNuevos() {
     return f;
   }));
 }
+// ═════════ Pausa de emergencia y revisión de seguridad ═════════
+async function pausaPanel() {
+  const p = await call("/api/admin/pausa"), b = $("pausa-banner");
+  const ponBoton = (id, activa, textoPausar, textoReabrir) => { const x = $(id); x.textContent = activa ? textoReabrir : textoPausar; x.className = activa ? "main" : "peligro"; };
+  ponBoton("pausa-ent", p.entradas, "Pausar entradas nuevas", "Reabrir las entradas"); ponBoton("pausa-ped", p.pedidos, "Pausar pedidos", "Reabrir los pedidos");
+  const dice = [p.entradas ? "entradas nuevas CERRADAS" : "", p.pedidos ? "pedidos CERRADOS" : ""].filter(Boolean).join(" y ");
+  $("pausa-txt").textContent = dice ? `Ahora mismo: ${dice}${p.desde ? " desde " + fechaCorta(p.desde) : ""}.` : "Ahora mismo todo está abierto.";
+  if (!b.dataset.listo) { b.dataset.listo = "1"; b.querySelector("button").onclick = () => { irA("hoy"); $("pausa-panel").scrollIntoView({ behavior: "smooth" }); }; }
+  b.hidden = !dice || !$("p-hoy").hidden; b.querySelector("span").textContent = `PAUSA ACTIVA: ${dice}`;
+}
+for (const [id, campo, nombre] of [["pausa-ent", "entradas", "las entradas nuevas"], ["pausa-ped", "pedidos", "los pedidos"]]) {
+  $(id).onclick = async () => {
+    const p = await call("/api/admin/pausa"), cierra = !p[campo];
+    if (!confirm(cierra ? `Se cerrarán ${nombre}. Los clientes que ya están dentro siguen, pero nadie nuevo podrá ${campo === "pedidos" ? "enviar pedidos" : "entrar"} hasta que lo reabras. ¿Pausar?` : `Se reabrirán ${nombre}. ¿Reabrir?`)) return;
+    try { await call("/api/admin/pausa", { confirmo: true, [campo]: cierra }); } catch (e) { alert(e.message); }
+    await pausaPanel();
+  };
+}
+const NIVEL_TXT = { ok: "Bien", aviso: "Revisar", mal: "Arreglar", info: "Info", manual: "Tú" };
+async function revisionSeguridad() {
+  const d = await call("/api/admin/seguridad/revision"), caja = $("rev-lista"), r = d.resumen;
+  $("rev-sub").textContent = r.mal ? `${r.mal} cosa${r.mal === 1 ? "" : "s"} por arreglar y ${r.aviso} por revisar.` : r.aviso ? `Nada grave. ${r.aviso} cosa${r.aviso === 1 ? "" : "s"} por revisar.` : "Todo lo que el programa puede comprobar está en orden.";
+  const huella = JSON.stringify(d.lista.map((x) => [x.id, x.nivel, x.detalle]));
+  if (caja.dataset.huella === huella) return; caja.dataset.huella = huella;
+  const orden = { mal: 0, aviso: 1, info: 2, ok: 3, manual: 4 };
+  caja.replaceChildren(...[...d.lista].sort((a, b) => orden[a.nivel] - orden[b.nivel]).map((x) => {
+    const f = el("div", "", { className: "rev-fila" }), t = el("div");
+    t.append(el("b", x.titulo)); if (x.detalle) t.append(el("small", x.detalle)); if (x.arreglo) t.append(el("small", "Qué hacer: " + x.arreglo, { className: "rev-fix" }));
+    f.append(el("span", NIVEL_TXT[x.nivel], { className: "rev-b " + x.nivel }), t); return f;
+  }));
+}
 async function hoy() {
   const d = await call("/api/admin/hoy");
   $("hoy-sub").textContent = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Madrid" }).replace(/^./, (c) => c.toUpperCase()) + " · lo que necesita tu atención ahora mismo.";
@@ -1872,6 +1922,7 @@ async function hoy() {
   );
   // tareas, por orden de urgencia
   const T = [], tarea = (nivel, texto, sub, boton, fn) => T.push({ nivel, texto, sub, boton, fn });
+  try { const rv = (await call("/api/admin/seguridad/revision")).resumen; if (rv.mal) tarea("alta", `${rv.mal} cosa${rv.mal === 1 ? "" : "s"} de seguridad por arreglar`, "Mira la «Revisión de seguridad» en Cuentas de clientes", "Ver", () => irA("cuentas")); } catch { /* sin revisión */ }
   if (d.accesos?.length) tarea("alta", `${d.accesos.length} cliente${d.accesos.length === 1 ? "" : "s"} esperando entrar`, d.accesos.map((x) => x.cliente).slice(0, 3).join(" · "), "Ver arriba", () => $("acc-panel").scrollIntoView({ behavior: "smooth" }));
   if (p.retenidos) tarea("alta", `${p.retenidos} pedido${p.retenidos === 1 ? "" : "s"} retenido${p.retenidos === 1 ? "" : "s"}: hay que revisarlo${p.retenidos === 1 ? "" : "s"} antes de exportar`, p.retenidosLista[0]?.motivo, "Revisar", () => irA("pedidos"));
   if (p.pendientes) tarea("media", `${p.pendientes} pedido${p.pendientes === 1 ? " listo" : "s listos"} para exportar a a3ERP`, p.masAntiguoHoras >= 12 ? `El más antiguo lleva ${p.masAntiguoHoras} horas` : "", "Ir a Pedidos", () => irA("pedidos"));

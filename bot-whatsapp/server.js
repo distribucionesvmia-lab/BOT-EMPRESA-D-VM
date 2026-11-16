@@ -10,6 +10,9 @@ import { makeToken, readToken } from "./links.js";
 import { getDb } from "./db.js";
 import { priceOrder, totals } from "./pricing.js";
 import { createAuth, rateLimiter } from "./auth.js";
+import { leerPausa, TEXTO_PAUSA_PEDIDOS } from "./pausa.js";
+import { estadoCliente } from "./revision-seguridad.js";
+import { turnstileActivo } from "./seguridad.js";
 import { cabecerasSeguridad, CSP, eventoSeguridad, usarRegistro, ipDe, claveDebil, crearEscudo, origenAjeno, panelPermitido, cspEstricta } from "./seguridad.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
@@ -54,6 +57,7 @@ const pedidosDia = rateLimiter(Number(process.env.PEDIDOS_DIA_LIMIT ?? 40), 24 *
 const pedidosGlobal = rateLimiter(Number(process.env.PEDIDOS_GLOBAL_LIMIT ?? 300), 600e3); // pedidos entre TODOS los clientes en 10 minutos: freno general (si alguien robara muchas cuentas o hubiera un fallo, la oficina no se inunda)
 /** Topes de pedidos: por cliente y hora, por cliente y día y en total. Devuelve el texto a enseñar si se pasa de alguno, o "" si puede seguir. */
 const topePedidos = (cuentaId, via = "") => {
+  if (leerPausa(getAccountsDb()).pedidos) return TEXTO_PAUSA_PEDIDOS; // pausa de emergencia puesta desde el panel
   if (!pedidosLimite(String(cuentaId))) { eventoSeguridad("demasiados-pedidos", `cuenta ${cuentaId}${via}`); return "Has enviado muchos pedidos en poco tiempo. Si necesitas más, llámanos y lo hacemos contigo."; }
   if (!pedidosDia(String(cuentaId))) { eventoSeguridad("demasiados-pedidos-dia", `cuenta ${cuentaId}${via}`); return "Hoy has enviado muchos pedidos. Si necesitas más, llámanos y lo hacemos contigo."; }
   if (!pedidosGlobal("todos")) { eventoSeguridad("pedidos-tope-global", `se alcanzó el máximo de pedidos en 10 minutos${via}`); return "Ahora mismo estamos recibiendo muchos pedidos a la vez. Inténtalo de nuevo en unos minutos o llámanos."; }
@@ -1064,6 +1068,10 @@ const servidorHttp = http
   // HOST=127.0.0.1 hace que solo se pueda entrar desde el propio servidor (la aplicación de la empresa); sin HOST escucha en todas las interfaces
   .listen(PORT, process.env.HOST || undefined, () => {
     console.log(`Bot escuchando en http://localhost:${PORT}` + (process.env.HOST ? ` (solo ${process.env.HOST})` : ""));
+    if (clientEnabled) { // la aplicación de los clientes le cuenta al panel cómo está configurada (sin claves) para la «Revisión de seguridad»
+      const contar = () => { try { getAccountsDb().ajusteGuardar("estado_cliente", JSON.stringify(estadoCliente({ ...process.env, PUBLIC_URL }, { turnstile: turnstileActivo(), smtp: !!smtpDesdeEntorno() }))); } catch { /* sin guardar */ } };
+      contar(); setInterval(contar, 10 * 60_000).unref();
+    }
     // Si la oficina actualiza los archivos y el programa se queda con el código antiguo (no se reinició), se reinicia solo: el archivo iniciar-*.bat lo vuelve a arrancar a los 10 s.
     // Se espera 8 minutos desde que se nota la diferencia para no adelantarse a las pruebas de «VM Actualizar» (si fallan, vuelve atrás y no hace falta reiniciar).
     if (process.env.DEMO !== "1" && process.env.AUTO_REINICIO !== "0" && !process.env.VM_TEST) {
