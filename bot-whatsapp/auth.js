@@ -436,7 +436,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       }
       if (accion === "activar") {
         const sello = accounts.totpPendiente(id), s = sello ? abrirSello(sello) : null; if (!s) return send(res, 409, { error: "Empieza de nuevo: pulsa «Activar»." }), true;
-        const c = verificarTotp(s, b.codigo); if (c === null) { accounts.passwordFallo(id); return send(res, 400, { error: "El código no es correcto. Comprueba que has escrito la clave en la aplicación y escribe el código que muestra ahora." }), true; }
+        const c = verificarTotp(s, b.codigo); if (c === null) return send(res, 400, { error: "El código no es correcto. Comprueba que has escrito bien la clave en la aplicación y que la hora de tu móvil es la automática; escribe el código que muestra AHORA (cambia cada 30 segundos)." }), true; // aquí ya hay sesión: no se cuenta como fallo de la cuenta, para no bloquear a quien se equivoca al activarlo
         const emergencia = Array.from({ length: 8 }, () => { const h = crypto.randomBytes(5).toString("hex").toUpperCase(); return `${h.slice(0, 5)}-${h.slice(5)}`; });
         accounts.totpActivar(id, sello, emergencia.map(huellaSecreto), c);
         try { onCodigo?.(acc); } catch {} // aviso al móvil del cliente
