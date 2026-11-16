@@ -26,7 +26,7 @@ test("CONTENIDO: resumen del pedido para el cliente, informativo, SIN códigos d
   const m = correoPedido(pedido(), { nombre: "BAR PRUEBA", telefono: "983 000 000", ahora: "2026-11-16T08:00:00.000Z" });
   assert.match(m.subject, /Hemos recibido tu pedido VM-2026-000123/); assert.match(m.text, /2 cajas \(12 uds\) · AGUA 1,5 L/); assert.match(m.text, /3 uds · CAFÉ 1 KG/);
   assert.match(m.text, /Total con IVA: 36,30 €/); assert.match(m.text, /Calle Uno 1/); assert.match(m.text, /Llamar antes/); assert.match(m.text, /983 000 000/);
-  assert.match(m.text, /solo informativo: no es una factura/); assert.match(m.text, /«Mi cuenta» → «Correo»/); assert.match(m.text, /Puedes modificarlo hasta las 10:00/);
+  assert.match(m.text, /solo informativo: no es una factura/); assert.match(m.text, /«Mi cuenta» → «Correo»/); assert.doesNotMatch(m.text, /modificarlo/);
   for (const prohibido of ["7001", "ART-9988", "ART-1"]) assert.ok(!m.text.includes(prohibido) && !m.subject.includes(prohibido), "no debe salir " + prohibido);
   const mod = correoPedido(pedido(), { modificado: true }); assert.match(mod.subject, /Pedido modificado VM-2026-000123/); assert.match(mod.text, /cambios de tu pedido/);
   assert.match(correoPedido(pedido({ review: true }), {}).text, /Revisaremos tu pedido/);

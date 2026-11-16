@@ -18,14 +18,11 @@ test("2. hora límite en cada ficha de día y en #plazo, calculada por el servid
   assert.match(p, /\$\("plazo"\)\.textContent = pz \? pz\.texto/); assert.match(p, /fetch\("\/catalogo\/plazo\?dia="/);
   assert.match(leer("./server.js"), /plazoModificacion\(o\.date\)/);
 });
-test("plazoModificacion es la misma regla que puedeEditarPedido", () => {
-  const lunes = "2026-11-16T08:00:00Z"; // lunes 16
-  assert.deepEqual(plazoModificacion("2026-11-17", lunes, lunes), { dia: "2026-11-16", texto: "Puedes modificarlo hasta las 10:00 de hoy", corto: "hoy 10:00" });
-  assert.equal(plazoModificacion("2026-11-23", lunes, lunes).texto, "Puedes modificarlo hasta las 10:00 del viernes");
-  assert.equal(plazoModificacion("2026-11-23", lunes, lunes).corto, "vie 10:00");
-  assert.equal(plazoModificacion(null), null);
+test("los pedidos enviados no se modifican: no hay plazo y puedeEditarPedido siempre dice que no", () => {
+  const lunes = "2026-11-16T08:00:00Z";
+  assert.equal(plazoModificacion("2026-11-17", lunes, lunes), null); assert.equal(plazoModificacion(null), null);
   const o = { status: "ok", export_status: "pending", delivery_date: "2026-11-23", created_at: lunes };
-  assert.equal(puedeEditarPedido(o, lunes).texto, plazoModificacion(o.delivery_date, lunes, lunes).texto);
+  assert.deepEqual(puedeEditarPedido(o, lunes), { ok: false, texto: "" });
 });
 
 const c = leer("./cliente.html"), a = leer("./auth.js");
