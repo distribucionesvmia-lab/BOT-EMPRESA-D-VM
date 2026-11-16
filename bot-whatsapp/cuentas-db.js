@@ -132,6 +132,8 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   // Solo se guardan las huellas del secreto del navegador y del código; la «referencia» (4 cifras) la ven el cliente y la oficina para comprobar que es la misma persona.
   db.exec("CREATE TABLE IF NOT EXISTS acceso_solicitudes (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, secret_hash TEXT NOT NULL UNIQUE, ref TEXT NOT NULL, aparato TEXT, ip TEXT, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, estado TEXT NOT NULL DEFAULT 'pendiente', code_hash TEXT, attempts INTEGER NOT NULL DEFAULT 0, resuelta_at TEXT)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_acceso_sol_cliente ON acceso_solicitudes(customer_id)");
+  addCol("acceso_solicitudes", "visible", "INTEGER NOT NULL DEFAULT 1"); // 0 = el cliente va a entrar solo con el código que le llega por correo: la oficina NO lo ve hasta que pida ayuda
+  addCol("acceso_solicitudes", "motivo", "TEXT");
   // Aparatos de confianza: tras UNA aprobación de la oficina, ese navegador queda recordado (cookie con un secreto de 32 bytes; aquí solo su huella) y vuelve a entrar solo, sin pedir nada.
   db.exec("CREATE TABLE IF NOT EXISTS aparatos_confiables (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, aparato TEXT, created_at TEXT NOT NULL, last_used TEXT NOT NULL, expires_at TEXT NOT NULL)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_aparatos_cliente ON aparatos_confiables(customer_id)");
@@ -421,14 +423,14 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     },
     // ── Entrada aprobada por la oficina ──
     /** Nueva solicitud (anula la pendiente anterior del mismo cliente). No deja repetir antes de `esperaS` s. { ok:true, id } o { ok:false, espera }. */
-    accesoSolicitudCrear({ customerId, secretHash, ref, aparato = "", ip = "", now = new Date().toISOString(), minutos = 30, esperaS = 20 }) {
+    accesoSolicitudCrear({ customerId, secretHash, ref, aparato = "", ip = "", now = new Date().toISOString(), minutos = 30, esperaS = 20, visible = true, motivo = "" }) {
       const id = String(customerId), ult = db.prepare("SELECT created_at FROM acceso_solicitudes WHERE customer_id = ? ORDER BY id DESC LIMIT 1").get(id);
       if (ult) { const falta = esperaS - Math.floor((new Date(now) - new Date(ult.created_at)) / 1000); if (falta > 0) return { ok: false, espera: falta }; }
       db.exec("BEGIN IMMEDIATE");
       try {
         db.prepare("UPDATE acceso_solicitudes SET estado = 'reemplazada', resuelta_at = ? WHERE customer_id = ? AND estado IN ('pendiente', 'aprobada')").run(now, id);
         db.prepare("DELETE FROM acceso_solicitudes WHERE created_at < ?").run(plus(now, -3 * 86_400_000));
-        const r = db.prepare("INSERT INTO acceso_solicitudes (customer_id, secret_hash, ref, aparato, ip, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(id, String(secretHash), String(ref), String(aparato).slice(0, 60), String(ip).slice(0, 60), now, plus(now, minutos * 60_000));
+        const r = db.prepare("INSERT INTO acceso_solicitudes (customer_id, secret_hash, ref, aparato, ip, created_at, expires_at, visible, motivo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(id, String(secretHash), String(ref), String(aparato).slice(0, 60), String(ip).slice(0, 60), now, plus(now, minutos * 60_000), visible ? 1 : 0, motivo || null);
         db.exec("COMMIT"); return { ok: true, id: Number(r.lastInsertRowid) };
       } catch (e) { db.exec("ROLLBACK"); throw e; }
     },
@@ -444,6 +446,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       const r = db.prepare("SELECT * FROM acceso_solicitudes WHERE secret_hash = ? AND estado = 'aprobada' AND expires_at > ?").get(String(secretHash), now);
       if (!r || db.prepare("UPDATE acceso_solicitudes SET estado = 'usada', resuelta_at = ? WHERE id = ? AND estado = 'aprobada'").run(now, r.id).changes !== 1) return { ok: false };
       return { ok: true, customerId: r.customer_id };
+    },
+    /** La solicitud pasa a verse en el panel de la oficina (el cliente pidió ayuda, no tiene correo o el correo falló). */
+    accesoSolicitudVisible(idOSecretHash, motivo = "", now = new Date().toISOString()) {
+      return db.prepare("UPDATE acceso_solicitudes SET visible = 1, motivo = COALESCE(?, motivo) WHERE (id = ? OR secret_hash = ?) AND estado = 'pendiente' AND expires_at > ?").run(motivo || null, typeof idOSecretHash === "number" ? idOSecretHash : -1, typeof idOSecretHash === "string" ? idOSecretHash : "", now).changes === 1;
     },
     /** La oficina aprueba o rechaza una pendiente. */
     accesoSolicitudResolver(id, estado, now = new Date().toISOString()) {
@@ -491,10 +497,10 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     aparatosBorrar: (customerId) => db.prepare("DELETE FROM aparatos_confiables WHERE customer_id = ?").run(String(customerId)).changes,
     /** Para el panel: las pendientes (con su referencia) y las últimas resueltas. Nunca incluye secretos ni códigos. */
     accesoSolicitudes({ now = new Date().toISOString() } = {}) {
-      const fila = (r) => ({ id: r.id, customerId: r.customer_id, ref: r.ref, aparato: r.aparato || "", creada: r.created_at, caduca: r.expires_at, estado: r.estado, conCodigo: !!r.code_hash, resuelta: r.resuelta_at });
+      const fila = (r) => ({ id: r.id, customerId: r.customer_id, ref: r.ref, aparato: r.aparato || "", creada: r.created_at, caduca: r.expires_at, estado: r.estado, conCodigo: !!r.code_hash, resuelta: r.resuelta_at, motivo: r.motivo || "" });
       return {
-        pendientes: db.prepare("SELECT * FROM acceso_solicitudes WHERE estado = 'pendiente' AND expires_at > ? ORDER BY id DESC LIMIT 50").all(now).map(fila),
-        recientes: db.prepare("SELECT * FROM acceso_solicitudes WHERE estado != 'pendiente' OR expires_at <= ? ORDER BY id DESC LIMIT 15").all(now).map((r) => fila({ ...r, estado: r.estado === "pendiente" ? "caducada" : r.estado })),
+        pendientes: db.prepare("SELECT * FROM acceso_solicitudes WHERE estado = 'pendiente' AND visible = 1 AND expires_at > ? ORDER BY id DESC LIMIT 50").all(now).map(fila),
+        recientes: db.prepare("SELECT * FROM acceso_solicitudes WHERE visible = 1 AND (estado != 'pendiente' OR expires_at <= ?) ORDER BY id DESC LIMIT 15").all(now).map((r) => fila({ ...r, estado: r.estado === "pendiente" ? "caducada" : r.estado })),
       };
     },
     /** Guarda la huella del código personal de la cuenta. { ok:true } o { error } si otro cliente ya usa ese código. */

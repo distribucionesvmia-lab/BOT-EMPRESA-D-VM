@@ -7,6 +7,7 @@ import { normalizePhone, validEmail, pinValido } from "./cuentas-db.js";
 import { nifCodes, nifClean } from "./nif-codes.js";
 import { codeKey, validCode, claveCodigoOficina } from "./nif-key.js";
 import { navegadorCorto } from "./errores.js";
+import { elegirDestino, tapar } from "./correo-cliente.js";
 import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
 
 const COOKIE = "vm_session";
@@ -91,7 +92,7 @@ export { send, readJson };
  * secure: cookie solo por HTTPS · trustProxy: usar X-Forwarded-For para la IP
  */
 const paginaEntrar = (titulo, texto, boton) => `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${titulo} · Distribuciones Valentín Martín</title><style>:root{--bg:#F5F5F7;--card:#fff;--t:#1D1D1F;--t2:#5F5F65;--a:#C8102E;--on:#fff}@media(prefers-color-scheme:dark){:root{--bg:#000;--card:#1C1C1E;--t:#F5F5F7;--t2:#A8A8B0;--a:#FF6B7D;--on:#1D1D1F}}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--t);font:16px/1.45 system-ui,sans-serif}header{background:#C8102E;color:#fff;padding:20px 16px;text-align:center;font-weight:700;font-size:20px}main{flex:1;display:flex;align-items:center;justify-content:center;padding:24px 16px}.c{background:var(--card);border-radius:20px;padding:28px 22px;max-width:420px;width:100%;text-align:center}h1{margin:0 0 8px;font-size:24px}p{margin:0 0 14px;color:var(--t2)}a.b,button{display:flex;align-items:center;justify-content:center;width:100%;min-height:52px;border:0;border-radius:26px;background:var(--a);color:var(--on);font:inherit;font-weight:700;font-size:17px;cursor:pointer;text-decoration:none}a.s{display:block;margin-top:8px;padding:12px 0;color:var(--a);font-weight:600;min-height:44px;line-height:1.35}</style><body><header>Distribuciones Valentín Martín</header><main><div class="c"><h1>${titulo}</h1><p>${texto}</p>${boton}</div></main></body></html>`;
-export function createAuth({ accounts, customers, misDatos = null, secure = false, trustProxy = false, onAcceso = null, onCodigo = null }) {
+export function createAuth({ accounts, customers, misDatos = null, secure = false, trustProxy = false, onAcceso = null, onCodigo = null, enviarCodigo = null }) {
   // Límites por IP (configurables para las pruebas): accesos cada 10 minutos y solicitudes de alta cada hora
   const loginLimit = rateLimiter(Number(process.env.LOGIN_LIMIT ?? 20), 10 * 60_000);
   // Acceso solo con NIF (sin nombre): no hay una cuenta a la que contar los fallos, así que se limita más por IP y en conjunto
@@ -101,6 +102,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const registerLimit = rateLimiter(Number(process.env.REGISTER_LIMIT ?? 20), 60 * 60_000);
   const intentosAcceso = contadorIntentos(Number(process.env.CAPTCHA_DESPUES_DE ?? 5), 10 * 60_000); // pasados N intentos en 10 min desde una dirección, se pide «no soy un robot»
   // Entrada aprobada por la oficina: topes por dirección, por cliente y en total (que nadie pueda llenar el panel de la empresa de solicitudes)
+  const codigoPorCorreo = () => !!enviarCodigo && process.env.CODIGO_CORREO !== "0"; // con correo configurado, el cliente entra SOLO con el código que le llega al correo que ya tenemos (sin que la oficina apruebe nada)
   const oficinaActiva = () => process.env.ACCESO_OFICINA !== "0";
   const soloOficina = () => oficinaActiva() && process.env.ACCESO_SOLO_OFICINA !== "0"; // por defecto SOLO se entra así (ACCESO_SOLO_OFICINA=0 reabre las otras formas, solo para emergencias)
   const altaAutomatica = () => process.env.ALTA_AUTOMATICA === "1"; // por defecto TODA alta la acepta la empresa; esto la dejaría entrar sola si coincide con un cliente (no recomendado)
@@ -109,7 +111,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const solicitudGlobal = rateLimiter(Number(process.env.OFICINA_GLOBAL_LIMIT ?? 200), 60 * 60_000);
   const estadoIp = rateLimiter(Number(process.env.OFICINA_ESTADO_LIMIT ?? 600), 10 * 60_000); // el navegador pregunta cada pocos segundos
   const codigoVerificar = rateLimiter(Number(process.env.OFICINA_CODIGO_LIMIT ?? 15), 10 * 60_000);
-  const MSG_SOLICITUD = "Hemos avisado a la oficina. En cuanto lo apruebe, entrarás solo. Si te dan un código, escríbelo aquí.";
+  const MSG_SOLICITUD = "Si los datos coinciden con un cliente, te hemos enviado un código de 6 cifras al correo que tenemos de ti (mira también el spam). Escríbelo aquí. Si no tienes correo o no te llega, pulsa «Necesito ayuda» y la oficina te dará paso.";
   const huellaSecreto = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
   /** Clientes con ese NIF (o 6 primeros dígitos) cuyo nombre se parece al escrito. */
   function clientesPorNombreYNif(nif, empresa) {
@@ -180,7 +182,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     }
     if (!p.startsWith("/api/")) return false;
 
-    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null, accesoOficina: oficinaActiva(), soloOficina: soloOficina() }), true; // solo la clave PÚBLICA, si está activada
+    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null, accesoOficina: oficinaActiva(), soloOficina: soloOficina(), codigoCorreo: codigoPorCorreo() }), true; // solo la clave PÚBLICA, si está activada
 
     if (p === "/api/registro" && req.method === "POST") {
       if (!registerLimit(ip(req))) return eventoSeguridad("muchas-solicitudes-de-alta", ip(req)), demasiados(res, registerLimit, ip(req)), true;
@@ -248,9 +250,20 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       const ids = clientesPorNombreYNif(b.nif, b.empresa);
       if (ids.length === 1 && !solicitudCliente(ids[0])) { eventoSeguridad("acceso-oficina-muchas-por-cliente", `cliente ${ids[0]}`); }
       else if (ids.length === 1 && solicitudGlobal("todas")) {
-        const r = accounts.accesoSolicitudCrear({ customerId: ids[0], secretHash: huellaSecreto(secreto), ref, aparato: navegadorCorto(req.headers["user-agent"]), ip: ip(req), esperaS: Number(process.env.OFICINA_ESPERA_S ?? 20) });
-        if (r.ok) console.log(`[VM acceso] Solicitud de entrada del cliente ${ids[0]} (referencia ${ref}): esperando a la oficina`);
-        else console.warn(`[VM acceso] Solicitud NO creada para el cliente ${ids[0]}: ya pidió otra hace menos de ${r.espera} s`);
+        const id = ids[0], destino = codigoPorCorreo() ? elegirDestino({ account: { email: accounts.emailDe(id) }, customer: customers.getById(id) }) : null;
+        const r = accounts.accesoSolicitudCrear({ customerId: id, secretHash: huellaSecreto(secreto), ref, aparato: navegadorCorto(req.headers["user-agent"]), ip: ip(req), esperaS: Number(process.env.OFICINA_ESPERA_S ?? 20),
+          visible: !destino, motivo: destino ? "" : codigoPorCorreo() ? "No tiene correo en su ficha" : "Correo no configurado", minutos: destino ? 15 : 30 }); // con correo: el cliente entra solo y la oficina no ve nada; sin correo: lo ve la oficina
+        if (!r.ok) console.warn(`[VM acceso] Solicitud NO creada para el cliente ${id}: ya pidió otra hace menos de ${r.espera} s`);
+        else if (!destino) console.log(`[VM acceso] Solicitud de entrada del cliente ${id} (referencia ${ref}): ${codigoPorCorreo() ? "sin correo en su ficha" : "correo no configurado"}, esperando a la oficina`);
+        else {
+          const codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+          accounts.accesoSolicitudCodigo(r.id, claveCodigoOficina(id, codigo)); // solo se guarda su huella
+          console.log(`[VM acceso] Código por correo para el cliente ${id} (${tapar(destino)})`);
+          void Promise.resolve(enviarCodigo({ to: destino, nombre: customers.getById(id)?.name ?? "", codigo, minutos: 15 })).catch((e) => {
+            console.error("[VM acceso] El servidor de correo NO ha enviado el código:", e?.message); eventoSeguridad("codigo-correo-error", String(e?.message ?? "error").slice(0, 120));
+            accounts.accesoSolicitudVisible(r.id, "No se pudo enviar el correo"); // la oficina lo ve y puede dejarle entrar
+          });
+        }
       } else if (ids.length === 1) eventoSeguridad("acceso-oficina-tope-global", "se alcanzó el máximo de solicitudes por hora");
       else console.warn(`[VM acceso] Solicitud NO creada: ${motivoSinSolicitud(b.nif, b.empresa)}`);
       return send(res, 200, { ok: true, solicitud: secreto, ref, mensaje: MSG_SOLICITUD }), true;
@@ -280,6 +293,16 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       const e = accounts.accesoSolicitudEstado(h);
       if (e.estado === "aprobada") { const c = accounts.accesoSolicitudConsumir(h); return c.ok ? abrir(c.customerId) : send(res, 200, { estado: "caducada" }), true; }
       return send(res, 200, { estado: ["pendiente", "rechazada", "caducada", "usada", "reemplazada"].includes(e.estado) ? e.estado : "pendiente", ...(e.estado === "pendiente" ? { ref: e.ref } : {}) }), true; // «desconocida» (NIF que no coincide) se enseña como pendiente: no se puede averiguar
+    }
+
+    // «Necesito ayuda»: el código por correo no llega (o no hay correo): la solicitud pasa a verse en el panel de la oficina, que le puede dejar entrar o darle un código
+    if (p === "/api/acceso/oficina/ayuda" && req.method === "POST") {
+      if (!oficinaActiva()) return send(res, 503, { error: "Esta forma de entrar no está disponible ahora. Llámanos." }), true;
+      if (!estadoIp(ip(req))) return demasiados(res, estadoIp, ip(req)), true;
+      const b = await readJson(req), secreto = typeof b?.solicitud === "string" ? b.solicitud : "";
+      if (secreto.length < 20 || secreto.length > 100) return send(res, 400, { error: "Solicitud no válida." }), true;
+      accounts.accesoSolicitudVisible(huellaSecreto(secreto), "Pidió ayuda"); // si no existe o ya caducó, no pasa nada (misma respuesta)
+      return send(res, 200, { ok: true, mensaje: "Hemos avisado a la oficina. En cuanto lo apruebe, entrarás solo. También puedes llamarnos y decirnos tu número de comprobación." }), true;
     }
 
     if (p === "/api/acceso" && req.method === "POST") {

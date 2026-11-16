@@ -11,21 +11,21 @@ import { libre } from "./puerto-libre.js";
 const leer = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
 /** Servidor con la lógica REAL de acceso, una base en memoria y clientes ficticios. */
-async function montar({ tope = {} } = {}) {
-  const accounts = openAccountsDb(":memory:");
-  const fichas = { C1: { id: "C1", name: "BAR LA PLAZA S.L.", emails: [] }, C2: { id: "C2", name: "LOCAL UNO", emails: [] }, C3: { id: "C3", name: "LOCAL DOS", emails: [] } };
+async function montar({ tope = {}, conCorreo = false, falloCorreo = false } = {}) {
+  const accounts = openAccountsDb(":memory:"), correos = [];
+  const fichas = { C1: { id: "C1", name: "BAR LA PLAZA S.L.", emails: ["Cliente@Ejemplo.es"] }, C2: { id: "C2", name: "LOCAL UNO", emails: [] }, C3: { id: "C3", name: "LOCAL DOS", emails: [] } };
   const porNif = { 123456: ["C1"], 654321: ["C2", "C3"] };
   const quita = (t) => String(t ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
   const customers = { findByNif: (t) => [...new Set(nifCodes(t).flatMap((c) => porNif[c] ?? []))], getById: (id) => fichas[id] ?? null, candidates: () => [], getByPhone: () => null,
     nameMatches: (c, typed) => !!c && quita(typed).length >= 2 && quita(c.name).includes(quita(typed)),
     matchRegistration: () => ({ customer: null, reason: "nombre" }) };
   Object.assign(process.env, { OFICINA_IP_LIMIT: String(tope.ip ?? 50), OFICINA_GLOBAL_LIMIT: String(tope.global ?? 200), OFICINA_CODIGO_LIMIT: String(tope.codigo ?? 50) });
-  const auth = createAuth({ accounts, customers });
+  const auth = createAuth({ accounts, customers, enviarCodigo: conCorreo ? async (c) => { if (falloCorreo) throw new Error("SMTP caído"); correos.push(c); } : null });
   const srv = http.createServer(async (req, res) => { if (!(await auth.route(req, res, new URL(req.url, "http://x")))) res.writeHead(404).end(); });
   const port = await libre(); await new Promise((ok) => srv.listen(port, "127.0.0.1", ok));
   const post = async (ruta, cuerpo, cab = {}) => { const r = await fetch(`http://127.0.0.1:${port}${ruta}`, { method: "POST", headers: { "Content-Type": "application/json", ...cab }, body: JSON.stringify(cuerpo) }); return { status: r.status, json: await r.json().catch(() => ({})), cab: r.headers }; };
   const get = async (ruta, cab = {}) => { const r = await fetch(`http://127.0.0.1:${port}${ruta}`, { headers: cab }); return { status: r.status, json: await r.json().catch(() => ({})) }; };
-  return { accounts, port, post, get, cerrar: () => srv.close() };
+  return { accounts, correos, port, post, get, cerrar: () => srv.close() };
 }
 const pedir = (m, nif = "12345678Z", empresa = "Bar La Plaza", extra = {}, cab = {}) => m.post("/api/acceso/oficina/pedir", { nif, empresa, t: 5000, ...extra }, cab);
 const estado = (m, solicitud, codigo) => m.post("/api/acceso/oficina/estado", { solicitud, ...(codigo ? { codigo } : {}) });
@@ -172,6 +172,45 @@ test("contra bots: el campo trampa y enviar demasiado rápido (o sin decir cuán
   } finally { m2.cerrar(); delete process.env.OFICINA_CLIENTE_LIMIT; delete process.env.OFICINA_ESPERA_S; }
 });
 
+test("CÓDIGO POR CORREO (sin la oficina): nombre + NIF → el código llega al correo de la ficha → entra solo y el aparato queda recordado", async () => {
+  const m = await montar({ conCorreo: true });
+  try {
+    const r = await pedir(m); assert.equal(r.status, 200); assert.match(r.json.mensaje, /código de 6 cifras al correo que tenemos/);
+    await new Promise((ok) => setTimeout(ok, 30)); assert.equal(m.correos.length, 1); const c = m.correos[0];
+    assert.equal(c.to, "Cliente@Ejemplo.es", "va al correo que YA consta en la ficha (nadie escribe un correo)"); assert.match(c.codigo, /^\d{6}$/); assert.equal(c.minutos, 15);
+    assert.equal(m.accounts.accesoSolicitudes().pendientes.length, 0, "la oficina NO ve ni tiene que aceptar nada");
+    assert.equal(JSON.stringify(m.accounts.accesoSolicitudes()).includes(c.codigo), false);
+    assert.equal((await estado(m, r.json.solicitud, c.codigo === "000000" ? "111111" : "000000")).status, 401);
+    const e = await estado(m, r.json.solicitud, c.codigo); assert.equal(e.status, 200); assert.equal(e.json.cliente.nombre, "BAR LA PLAZA S.L."); assert.equal(e.cab.getSetCookie().length, 2, "sesión + aparato recordado");
+    assert.notEqual((await estado(m, r.json.solicitud, c.codigo)).status, 200, "el código vale una vez");
+    assert.equal((await m.get("/api/seguridad")).json.codigoCorreo, true);
+  } finally { m.cerrar(); }
+});
+
+test("CÓDIGO POR CORREO: la respuesta es la misma si no coincide (no se averigua nada) y no se manda correo; sin correo en la ficha, o si el correo falla, lo ve la oficina", async () => {
+  const m = await montar({ conCorreo: true });
+  try {
+    const bien = await pedir(m);
+    for (const [nif, emp] of [["99999999R", "Bar La Plaza"], ["12345678Z", "Otro Negocio Distinto"]]) { const r = await pedir(m, nif, emp); assert.deepEqual(Object.keys(r.json).sort(), Object.keys(bien.json).sort()); assert.equal(r.json.mensaje, bien.json.mensaje); }
+    await new Promise((ok) => setTimeout(ok, 30)); assert.equal(m.correos.length, 1, "solo al cliente real");
+    // «Necesito ayuda»: pasa a la oficina
+    assert.equal(m.accounts.accesoSolicitudes().pendientes.length, 0);
+    assert.equal((await m.post("/api/acceso/oficina/ayuda", { solicitud: bien.json.solicitud })).status, 200);
+    const p = m.accounts.accesoSolicitudes().pendientes; assert.equal(p.length, 1); assert.equal(p[0].motivo, "Pidió ayuda");
+    assert.equal((await m.post("/api/acceso/oficina/ayuda", { solicitud: "corto" })).status, 400);
+    assert.equal((await m.post("/api/acceso/oficina/ayuda", { solicitud: "x".repeat(43) })).status, 200, "un secreto inventado no dice nada");
+  } finally { m.cerrar(); }
+  // cliente SIN correo en su ficha → lo ve la oficina directamente
+  const sin = await montar({ conCorreo: true });
+  try {
+    const r = await pedir(sin, "65432199A", "Local Uno"); assert.equal(r.status, 200); // C2 y C3 comparten NIF; el nombre decide
+    await new Promise((ok) => setTimeout(ok, 30)); assert.equal(sin.correos.length, 0); const p = sin.accounts.accesoSolicitudes().pendientes; assert.equal(p.length, 1); assert.equal(p[0].motivo, "No tiene correo en su ficha");
+  } finally { sin.cerrar(); }
+  // el correo falla → la oficina lo ve
+  const roto = await montar({ conCorreo: true, falloCorreo: true });
+  try { await pedir(roto); await new Promise((ok) => setTimeout(ok, 50)); const p = roto.accounts.accesoSolicitudes().pendientes; assert.equal(p.length, 1); assert.equal(p[0].motivo, "No se pudo enviar el correo"); } finally { roto.cerrar(); }
+});
+
 test("ALTAS: toda alta queda pendiente hasta que la empresa la acepte; el correo es OPCIONAL y no hay código de entrada", async () => {
   const m = await montar();
   try {
@@ -184,13 +223,13 @@ test("ALTAS: toda alta queda pendiente hasta que la empresa la acepte; el correo
   const src = leer("./auth.js"); assert.match(src, /process\.env\.ALTA_AUTOMATICA === "1"/); assert.match(src, /m\.customer && altaAutomatica\(\) && !sinCodigoEntrada/);
 });
 
-test("pantalla del cliente: nombre + NIF, sin correo, sin manejadores en línea; panel de la empresa con aprobar / código / rechazar", () => {
+test("pantalla del cliente: nombre + NIF (no se escribe ningún correo), sin manejadores en línea; panel de la empresa con aprobar / código / rechazar", () => {
   const h = leer("./cliente.html"), e = leer("./empresa.html"), a = leer("./admin.js"), db = leer("./cuentas-db.js");
   const tarjeta = h.slice(h.indexOf('id="f-correo"'), h.indexOf('id="f-acceso"'));
-  for (const t of ['id="co-emp"', 'id="co-nif"', 'id="co-cod"', 'id="co-ref"', "Avisar a la oficina", 'autocomplete="one-time-code"']) assert.ok(tarjeta.includes(t), t);
+  for (const t of ['id="co-emp"', 'id="co-nif"', 'id="co-cod"', 'id="co-ref"', "Enviarme el código", 'id="co-pedir-ayuda"', 'id="co-reenviar"', 'autocomplete="one-time-code"']) assert.ok(tarjeta.includes(t), t);
   assert.ok(!tarjeta.includes('id="co-mail"') && !/correo electrónico/i.test(tarjeta), "ya no se pide correo para entrar");
   assert.doesNotMatch(tarjeta, /\son[a-z]+=/i);
-  for (const t of ["/api/acceso/oficina/pedir", "/api/acceso/oficina/estado"]) assert.ok(h.includes(t), t);
+  for (const t of ["/api/acceso/oficina/pedir", "/api/acceso/oficina/estado", "/api/acceso/oficina/ayuda"]) assert.ok(h.includes(t), t);
   assert.ok(!h.includes("/api/acceso/correo/"), "el acceso por correo se quitó");
   for (const t of ['id="acc-panel"', 'id="acc-banner"', "Dejarle entrar", "Dar un código", "Rechazar", "Número de comprobación", "/api/admin/accesos"]) assert.ok(e.includes(t), t);
   assert.doesNotMatch(e, /onclick="/, "la política de scripts no deja manejadores en línea");

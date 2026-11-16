@@ -367,8 +367,8 @@
     <div id="p-hoy">
       <div class="pag-cab"><h1>Hoy</h1><p id="hoy-sub">Lo que necesita tu atención ahora mismo.</p></div>
       <section class="panel acc-panel" id="acc-panel" aria-live="polite" hidden>
-        <h2>Clientes esperando entrar</h2>
-        <p class="muted" style="margin:0 0 8px">Pregúntales por teléfono qué <b>número de comprobación</b> les sale en la pantalla: si coincide con el de aquí, es él. Entonces pulsa «Dejarle entrar», o «Dar un código» y díselo (por teléfono o WhatsApp).</p>
+        <h2>Clientes que necesitan ayuda para entrar</h2>
+        <p class="muted" style="margin:0 0 8px">Los clientes con correo en su ficha entran solos con el código que les llega; aquí solo salen los que <b>pulsan «Necesito ayuda»</b>, no tienen correo o no se les pudo enviar. Pregúntales por teléfono qué <b>número de comprobación</b> les sale en la pantalla: si coincide con el de aquí, es él. Entonces pulsa «Dejarle entrar», o «Dar un código» y díselo (por teléfono o WhatsApp).</p>
         <div id="acc-lista"></div>
       </section>
       <section class="hoy-kpis" id="hoy-kpis" aria-label="Resumen de hoy"></section>
@@ -1823,7 +1823,7 @@ async function accesos() {
     caja.dataset.huella = JSON.stringify([d.pendientes.map((x) => x.id), cod]);
     caja.replaceChildren(...d.pendientes.map((x) => {
       const f = el("div", "", { className: "acc-fila" }), izq = el("div");
-      izq.append(verCliente(x.customerId, x.cliente), el("small", `${x.telefono ? "Tel. " + x.telefono + " · " : ""}${hace(x.creada)}${x.aparato ? " · " + x.aparato : ""}`));
+      izq.append(verCliente(x.customerId, x.cliente), el("small", `${x.telefono ? "Tel. " + x.telefono + " · " : ""}${hace(x.creada)}${x.aparato ? " · " + x.aparato : ""}${x.motivo ? " · " + x.motivo : ""}`));
       const ref = el("div"); ref.append(el("small", "Número de comprobación"), el("span", x.ref, { className: "acc-ref" }));
       const bs = el("div", "", { style: "display:flex; gap:8px; flex-wrap:wrap; align-items:center" });
       const accion = (txt, ruta, clase) => { const b = el("button", txt, { type: "button", className: clase }); b.onclick = async () => { b.disabled = true; try { const r = await call(`/api/admin/accesos/${x.id}/${ruta}`, {}); if (ruta === "codigo") cod[x.id] = r.codigo; } catch (e) { alert(e.message); } await accesos(); b.disabled = false; }; return b; };

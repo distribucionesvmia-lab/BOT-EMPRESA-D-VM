@@ -725,7 +725,7 @@
       <form class="vm-card" id="f-correo" novalidate hidden>
         <span class="tag">Cliente habitual</span>
         <h2>Inicia sesión</h2>
-        <p id="co-intro">Escribe el <b>nombre de tu empresa</b> y tu <b>NIF</b>. Avisaremos a la oficina y, en cuanto te dé paso, <b>entras solo</b>. No hace falta correo.</p>
+        <p id="co-intro">Escribe el <b>nombre de tu empresa</b> y tu <b>NIF</b>. Te enviaremos un <b>código de 6 cifras</b> al correo que ya tenemos de ti y <b>entras solo</b>. En este móvil o navegador no te lo volveremos a pedir.</p>
         <div id="co-paso1">
           <label>Nombre de tu empresa o negocio<input id="co-emp" type="text" maxlength="80" autocomplete="organization" placeholder="Tal como lo conocemos" aria-describedby="co-err"></label>
           <label>NIF (DNI, NIE o CIF)<input id="co-nif" type="text" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="Ej.: 12345678Z" aria-describedby="co-err"></label>
@@ -734,12 +734,12 @@
         </div>
         <div id="co-paso2" hidden>
           <div class="okmsg" id="co-ok" role="status"></div>
-          <p class="co-ref-p">Tu número de comprobación: <b class="co-ref" id="co-ref">····</b><small>Si la oficina te lo pide por teléfono, díselo.</small></p>
-          <label>¿Te han dado un código de 6 cifras? Escríbelo aquí<input id="co-cod" type="text" inputmode="numeric" maxlength="7" autocomplete="one-time-code" placeholder="······" aria-describedby="co-err"></label>
-          <p class="acc-ayuda"><button class="vm-link" type="button" id="co-cambiar">Cambiar los datos</button></p>
+          <label>Código de 6 cifras<input id="co-cod" type="text" inputmode="numeric" maxlength="7" autocomplete="one-time-code" placeholder="······" aria-describedby="co-err"></label>
+          <p class="acc-ayuda"><button class="vm-link" type="button" id="co-reenviar" disabled>Reenviar el código</button><button class="vm-link" type="button" id="co-pedir-ayuda">Necesito ayuda</button><button class="vm-link" type="button" id="co-cambiar">Cambiar los datos</button></p>
+          <p class="co-ref-p" id="co-ref-p" hidden>Tu número de comprobación: <b class="co-ref" id="co-ref">····</b><small>Díselo a la oficina si te lo pide por teléfono.</small></p>
         </div>
         <div class="err" id="co-err" role="alert"></div>
-        <button class="vm-btn primary" id="co-boton">Avisar a la oficina</button>
+        <button class="vm-btn primary" id="co-boton">Enviarme el código</button>
         <p class="acc-ayuda"><button class="vm-link" type="button" id="co-ayuda">¿No puedes entrar? Llámanos o escríbenos</button><button class="vm-link" type="button" id="co-registro">¿Cliente nuevo? Solicitar acceso</button><button class="vm-link" type="button" id="co-otra" hidden>Entrar de otra forma</button></p>
       </form>
 
@@ -1115,7 +1115,7 @@ $("f-acceso").onsubmit = (e) => {
   const f = $("f-correo"), fa = $("f-acceso"); if (!f || !fa) return;
   let paso = 1, secreto = "", reloj = 0, soloOficina = false;
   const err = (m, id) => { $("co-err").textContent = m || ""; for (const x of ["co-emp", "co-nif", "co-cod"]) $(x).removeAttribute("aria-invalid"); if (id) { $(id).setAttribute("aria-invalid", "true"); $(id).focus(); } };
-  const rotulo = () => { $("co-boton").textContent = paso === 1 ? "Avisar a la oficina" : "Entrar con el código"; $("co-boton").hidden = false; };
+  const rotulo = () => { $("co-boton").textContent = paso === 1 ? "Enviarme el código" : "Entrar"; $("co-boton").hidden = false; };
   const verPaso = (n) => { paso = n; $("co-paso1").hidden = n !== 1; $("co-paso2").hidden = n !== 2; $("co-intro").hidden = n !== 1; rotulo(); err(""); if (n === 2) { $("co-cod").value = ""; } else { clearInterval(reloj); secreto = ""; } };
   const datos = () => ({ empresa: $("co-emp").value.trim(), nif: $("co-nif").value.trim() });
   const valida = () => {
@@ -1135,6 +1135,8 @@ $("f-acceso").onsubmit = (e) => {
       if (j.estado === "caducada" || j.estado === "reemplazada") { clearInterval(reloj); $("co-ok").textContent = "La solicitud ha caducado. Cambia los datos y vuelve a avisar a la oficina."; return; }
     } catch { /* sin red: se vuelve a intentar */ }
   }
+  let cuenta = 0, relojCuenta = 0;
+  const cuentaAtras = (s) => { clearInterval(relojCuenta); cuenta = s; const b = $("co-reenviar"), pinta = () => { b.disabled = cuenta > 0; b.textContent = cuenta > 0 ? `Reenviar el código (${cuenta} s)` : "Reenviar el código"; }; pinta(); relojCuenta = setInterval(() => { cuenta--; pinta(); if (cuenta <= 0) clearInterval(relojCuenta); }, 1000); };
   async function pedir() {
     const body = { ...datos(), sitio_web: $("co-web").value, t: Math.round(performance.now()) }; if (tsToken["ts-correo"]) body.cf = tsToken["ts-correo"]; // «sitio_web» es un campo trampa y «t» lo que tardó una persona en llegar hasta aquí (un bot no lo rellena bien)
     const r = await post("/api/acceso/oficina/pedir", body); if (body.cf) { tsToken["ts-correo"] = null; tsPinta("ts-correo"); }
@@ -1142,8 +1144,8 @@ $("f-acceso").onsubmit = (e) => {
     if (j.necesitaVerificacion) { err(j.error); tsPinta("ts-correo"); return false; }
     if (!r.ok) { err(j.error || "No se pudo avisar a la oficina."); return false; }
     if (j.entra) { entrarYa(j); return true; } // este aparato ya lo aprobó la oficina otra vez: entra directamente
-    secreto = j.solicitud; $("co-ref").textContent = j.ref || "····"; $("co-ok").textContent = j.mensaje || "Hemos avisado a la oficina.";
-    verPaso(2); secreto = j.solicitud; clearInterval(reloj); reloj = setInterval(preguntar, 3000); return true;
+    secreto = j.solicitud; $("co-ref").textContent = j.ref || "····"; $("co-ok").textContent = j.mensaje || "Te hemos enviado un código.";
+    verPaso(2); secreto = j.solicitud; $("co-ref-p").hidden = true; clearInterval(reloj); reloj = setInterval(preguntar, 3000); cuentaAtras(60); return true;
   }
   f.onsubmit = (e) => {
     e.preventDefault(); err("");
@@ -1156,7 +1158,9 @@ $("f-acceso").onsubmit = (e) => {
       entrarYa(j);
     }, "co-err")).then(rotulo);
   };
-  $("co-cambiar").onclick = () => { verPaso(1); $("co-emp").focus(); };
+  $("co-cambiar").onclick = () => { clearInterval(relojCuenta); verPaso(1); $("co-emp").focus(); };
+  $("co-reenviar").onclick = async () => { if (cuenta > 0 || f.dataset.enviando) return; err(""); f.dataset.enviando = "1"; $("co-reenviar").disabled = true; try { await pedir(); } catch { err(SIN_RED); } finally { delete f.dataset.enviando; } };
+  $("co-pedir-ayuda").onclick = async () => { err(""); try { const r = await post("/api/acceso/oficina/ayuda", { solicitud: secreto }), j = await r.json().catch(() => ({})); $("co-ref-p").hidden = false; $("co-ok").textContent = r.ok ? (j.mensaje || "Hemos avisado a la oficina.") : (j.error || "No se pudo avisar."); } catch { err(SIN_RED); } };
   $("co-ayuda").onclick = () => $("no-entro").click(); $("co-registro").onclick = () => $("ir-registro-2").click();
   const aOtra = (otra) => { f.hidden = otra; fa.hidden = !otra; $("ac-volver-p").hidden = !otra || soloOficina; };
   $("co-otra").onclick = () => aOtra(true); $("ac-volver").onclick = () => aOtra(false);
