@@ -30,7 +30,7 @@ test("2. /api/inicio y el catálogo ya no tardan por recalcular la fecha y las c
   assert.match(p, /const FORMATO_MADRID = new Intl\.DateTimeFormat/); assert.doesNotMatch(p, /export const hoyMadrid = \(\) => new Date\(\)\.toLocaleDateString/);
   assert.match(c, /const normCache = new Map\(\)/);
   assert.match(hoyMadrid(), /^\d{4}-\d{2}-\d{2}$/);
-  const s = leer("./server.js"); assert.match(s, /const sendJsonEtag = /); assert.match(s, /arbolInicio = webTree\(catalogNow\(\)\)/); assert.equal((s.match(/webTree\(catalogNow\(\)\)/g) ?? []).length, 3); // una vez por petición (antes, dos en cada una)
+  const s = leer("./server.js"); assert.match(s, /const sendJsonEtag = /); assert.match(s, /arbolInicio = webTree\(catalogNow\(\)\)/); assert.equal((s.match(/webTree\(catalogNow\(\)\)/g) ?? []).length, 4); // una vez por petición (antes, dos en cada una) + una en el calentamiento antes de abrir el puerto
 });
 test("3. página «Sin conexión» en el service worker: marca, Reintentar y «tu pedido sigue guardado»", () => {
   const sw = leer("./pwa/sw.js");

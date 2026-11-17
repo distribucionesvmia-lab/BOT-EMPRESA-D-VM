@@ -584,6 +584,8 @@ function imgs() {
 const imgUrl = (id) => (imgs().has(id) ? `/img/${encodeURIComponent(id)}?v=${imgVer.get(id) ?? 0}` : null); // ?v= cambia al cambiar la foto: el móvil no se queda con la antigua guardada
 const imgEsIa = (id) => (imgs(), imgIa.has(String(id)));
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow", "Content-Security-Policy": CSP };
+/** La página de entrada y chat ya preparada (privacidad y aviso legal puestos, CSS/JS aparte, minimizada y con huella). */
+function cuerpoCliente() { const dl = { titular: envTexto("PRIVACY_TITULAR") || undefined, cif: envTexto("PRIVACY_CIF"), direccion: EMPRESA_DIRECCION(), email: EMPRESA_EMAIL() }; return empaquetar(page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml(dl)).replaceAll("<div data-aviso-legal></div>", avisoLegalHtml(dl)), "cliente"); }
 const htmlCsp = (cuerpo) => ({ ...HTML, "Content-Security-Policy": cspEstricta(cuerpo) }); // la política estricta lleva las huellas de los scripts de ESA página
 const sendJson = (res, code, data) => enviar(res, code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }, JSON.stringify(data));
 
@@ -656,7 +658,7 @@ async function appRoutes(req, res, url) {
   }
   // Aplicación del cliente
   if (!clientEnabled) return void res.writeHead(404).end();
-  if (p === "/cliente" && req.method === "GET") return void ((cuerpo) => enviar(res, 200, htmlCsp(cuerpo), cuerpo))((() => { const dl = { titular: envTexto("PRIVACY_TITULAR") || undefined, cif: envTexto("PRIVACY_CIF"), direccion: EMPRESA_DIRECCION(), email: EMPRESA_EMAIL() }; return empaquetar(page("cliente.html").toString().replaceAll("<div data-privacidad></div>", privacidadHtml(dl)).replaceAll("<div data-aviso-legal></div>", avisoLegalHtml(dl)), "cliente"); })());
+  if (p === "/cliente" && req.method === "GET") return void ((cuerpo) => enviar(res, 200, htmlCsp(cuerpo), cuerpo))(cuerpoCliente());
   if (await auth.route(req, res, url)) return;
 
   const account = auth.sessionOf(req);
@@ -1052,6 +1054,8 @@ async function appRoutes(req, res, url) {
 // Escudo general: en la app pública frena inundaciones y escáneres por dirección (ESCUDO=0 lo apaga; ESCUDO_POR_MINUTO cambia el tope). No actúa en la app de la empresa (red local) ni en pruebas.
 const escudo = clientEnabled && !adminEnabled && process.env.ESCUDO !== "0" && process.env.DEMO !== "1" && (!process.env.VM_TEST || process.env.ESCUDO === "1")
   ? crearEscudo({ porMinuto: Number(process.env.ESCUDO_POR_MINUTO ?? 300), estaticoPorMinuto: Number(process.env.ESCUDO_ESTATICO_POR_MINUTO ?? 1500) }) : null;
+// Calentamiento ANTES de abrir el puerto: tras cada actualización el programa se reinicia; así el primer cliente no espera a preparar las páginas (minimizar CSS/JS, huellas), el índice de fotos ni el árbol de categorías. Si algo falla aquí, no pasa nada: se hará en la primera visita, como antes.
+if (clientEnabled) { try { const t0 = Date.now(); cuerpoCliente(); empaquetar(page("pedido.html").toString(), "pedido"); imgs(); webTree(catalogNow()); console.log(`Calentamiento listo en ${Date.now() - t0} ms`); } catch (e) { console.error("Calentamiento (no es grave):", e.message); } }
 const panelExtra = String(process.env.PANEL_IPS_EXTRA ?? "").split(/[,;\s]+/).filter(Boolean);
 const origenesPropios = [process.env.PUBLIC_URL, process.env.CLIENTE_URL].filter(Boolean); // otros dominios propios que pueden mandar formularios
 const servidorHttp = http

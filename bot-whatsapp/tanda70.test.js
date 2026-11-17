@@ -26,3 +26,9 @@ test("MEMO en el servidor: los precios del catálogo y el resumen del mes pasan 
   assert.match(sv, /const memoProductos = crearMemo\(/); assert.match(sv, /function productosDe\(customer\)/); assert.equal((sv.match(/productosDe\(customer\)/g) || []).length >= 3, true);
   assert.match(sv, /memoResumen\.get\(/); assert.match(sv, /firmaCliente\(/);
 });
+
+test("CALENTAMIENTO: antes de abrir el puerto se preparan las páginas, las fotos y el árbol; si falla no impide arrancar", () => {
+  const sv = src("./server.js"), i = sv.indexOf("// Calentamiento ANTES de abrir el puerto"), f = sv.slice(i, i + 900), l = sv.indexOf(".listen(PORT");
+  assert.ok(i > 0 && i < l); assert.match(f, /cuerpoCliente\(\)/); assert.match(f, /empaquetar\(page\("pedido\.html"\)/); assert.match(f, /imgs\(\)/); assert.match(f, /webTree\(catalogNow\(\)\)/); assert.match(f, /catch \(e\)/);
+  assert.match(sv, /function cuerpoCliente\(\)/); assert.match(sv, /enviar\(res, 200, htmlCsp\(cuerpo\), cuerpo\)\)\(cuerpoCliente\(\)\)/); // la ruta usa la misma función
+});
