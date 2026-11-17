@@ -237,7 +237,7 @@ test("PAQUETE «COMPRAR MÁS FÁCIL» A+B: lo que ya compra arriba, «Lo más pe
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   // F-21
-  assert.match(ped, /"Lo compras"/); assert.match(ped, /else if \(arbol\) \{ const ord = items\.slice\(\)\.sort\(porFamilia\); items = \[\.\.\.ord\.filter\(p => p\.count > 0\), \.\.\.ord\.filter\(p => !\(p\.count > 0\)\)\]; \}/); // lo que ya compra arriba, cada grupo en orden a3ERP
+  assert.match(ped, /"Lo compras"/); assert.match(ped, /ORDEN FIJO dentro de cada sección/); assert.match(ped, /rs\(x\) - rs\(y\) \|\| porFamilia\(x, y\) \|\| cmpNombre\(x, y\)/); assert.doesNotMatch(ped, /ord\.filter\(p => p\.count > 0\)/); // orden fijo: subcategoría, familia a3ERP, código y nombre; lo que ya compra NO sube arriba
   assert.match(ped, /Lo más pedido/); assert.match(ped, /data\.top/);
   // F-22
   assert.doesNotMatch(ped, /atajos/); assert.match(ped, /inp\.inputMode = "numeric"/); // sin botones «+1 caja / +6 cajas»

@@ -12,10 +12,21 @@ test("«Hacer pedido» abre el catálogo en «Lo habitual» si el cliente tiene 
 
 test("el catálogo ordena los artículos de cada categoría por familia, subfamilia y artículo (como el histórico)", () => {
   const ped = src("./pedido.html");
-  assert.match(ped, /const ord = items\.slice\(\)\.sort\(porFamilia\)/);
+  assert.match(ped, /rs\(x\) - rs\(y\) \|\| porFamilia\(x, y\) \|\| cmpNombre\(x, y\)/); // subcategoría, familia a3ERP, artículo y, sin familia, nombre
 });
 
 test("el carrito (catálogo y chat) sigue el orden de a3ERP", () => {
   assert.match(src("./pedido.html"), /const lines = \(\) => .*\.sort\(porFamilia\)/);
   assert.match(src("./bot.js"), /items = ordenarLineas\(\[\.\.\.items\], \(i\) => i\.id\)/);
+});
+
+test("categorías y subcategorías del catálogo siguen el orden de a3ERP (menor código de familia primero; sin código, al final)", () => {
+  const ped = src("./pedido.html");
+  assert.match(ped, /function ordenarArbol\(d\)/); assert.match(ped, /ordenarArbol\(data\); data\.products\.forEach/); assert.match(ped, /data = nuevo; ordenarArbol\(data\)/);
+  // la lógica, ejecutada de verdad con familias de prueba
+  const cod = ped.slice(ped.indexOf("const limpiaFam"), ped.indexOf("// ORDEN-FAMILIA-FIN")), fn = ped.slice(ped.indexOf("function ordenarArbol"), ped.indexOf("const productoPorId"));
+  const d = { tree: [{ id: "a", subs: [{ id: "x" }, { id: "y" }] }, { id: "b", subs: [] }, { id: "c", subs: [] }], products: [{ cat: "a", sub: "x", fam: "10.2" }, { cat: "a", sub: "y", fam: "2.1" }, { cat: "b", sub: "z", fam: "1.1" }, { cat: "c", sub: "w" }] };
+  new Function("d", cod + fn + "ordenarArbol(d);")(d);
+  assert.deepEqual(d.tree.map(c => c.id), ["b", "a", "c"]); // 1.1 < 2.1 < 10.2; «c» sin familia, al final
+  assert.deepEqual(d.tree[1].subs.map(s => s.id), ["y", "x"]); // 2.1 antes que 10.2
 });

@@ -2282,18 +2282,24 @@ function renderList() {
   if (tab === "hab" && !q) items = items.slice().sort((a, b) => compararFamilias(a.fam, b.fam) || (b.count || 0) - (a.count || 0) || compararCodigos(a.id, b.id)); // por familia, subfamilia y artículo (como en a3ERP); dentro de cada subfamilia, lo que más pide primero
   else if (arbol && ordenCat === "nombre") items = items.slice().sort(cmpNombre);
   else if (arbol && (ordenCat === "pa" || ordenCat === "pd")) items = items.slice().sort((a, b) => (ordenCat === "pa" ? 1 : -1) * (precioUd(a) - precioUd(b)) || cmpNombre(a, b));
-  else if (arbol) { const ord = items.slice().sort(porFamilia); items = [...ord.filter(p => p.count > 0), ...ord.filter(p => !(p.count > 0))]; } // en cada categoría, lo que ya compra va arriba; dentro de cada grupo, por familia, subfamilia y artículo (como en a3ERP y en su histórico)
+  else if (arbol) { // ORDEN FIJO dentro de cada sección: subcategoría (como en el árbol), código de familia/subfamilia de a3ERP, código de artículo y, si no hay código de familia, el nombre. Lo que ya compra NO sube arriba (eso está en «Lo habitual» y en la etiqueta «Lo compras»)
+    const catArbol = data.tree.find(x => x.id === nav.cat), rangoSub = new Map(((catArbol && catArbol.subs) || []).map((s, i) => [s.id, i]));
+    const rs = p => rangoSub.has(p.sub) ? rangoSub.get(p.sub) : 9999;
+    items = items.slice().sort((x, y) => rs(x) - rs(y) || porFamilia(x, y) || cmpNombre(x, y));
+  }
   if (filtra) { // «Ver solo lo que he marcado»: una tabla con lo marcado (foto, cantidad, importe), no tarjetas
     tablaLineas.sinObs = true; list.appendChild(tablaLineas(items.map(p => ({ ...p, qty: qty.get(p.id) })))); tablaLineas.sinObs = false;
     return;
   }
   if (tab === "hab" && !q && items.length) { const nota = document.createElement("div"); nota.className = "cuenta-lista"; nota.textContent = "Lo que has pedido al menos una vez en los últimos 6 meses"; list.appendChild(nota); }
   if (items.length > limite) { const info = document.createElement("div"); info.className = "cuenta-lista"; info.setAttribute("role", "status"); info.textContent = `Mostrando ${limite} de ${items.length}`; list.appendChild(info); }
-  const conGrupos = arbol && ordenCat === "hab" && items.some(p => p.count > 0) && items.some(p => !(p.count > 0)); // en una sección: primero lo que ya compra, con su título
+  const conGrupos = false; // ya no se separa «lo que sueles pedir» arriba: el orden de la sección es fijo
+  const subsVarias = arbol && ordenCat === "hab" && nav.sub === "*" && new Set(items.map(p => p.sub)).size > 1; let subPrev = null; // título por subcategoría cuando se ve toda la categoría
   let grupo = null, famPrev = null;
   items.slice(0, limite).forEach(p => {
     if (tab === "hab" && !q && items.some(x => grupoFam(x)) && grupoFam(p) !== famPrev) { famPrev = grupoFam(p); const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = nombreFam(p); list.appendChild(t); }
     if (conGrupos && (p.count > 0 ? "hab" : "resto") !== grupo) { grupo = p.count > 0 ? "hab" : "resto"; const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = grupo === "hab" ? "Lo que sueles pedir" : "Todo lo demás"; list.appendChild(t); }
+    if (subsVarias && p.sub !== subPrev) { subPrev = p.sub; const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = marcaDe(p) || ""; if (t.textContent) list.appendChild(t); }
     list.appendChild(row(p));
   });
   entrada(list, ".pf");
@@ -2426,6 +2432,15 @@ const tAbierto = Date.now(); let pedidoEnviado = false, abandonoAnotado = false;
 function uso(evento, seg) { try { fetch("/api/uso", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify(seg == null ? { evento } : { evento, seg }) }).catch(() => {}); } catch {} }
 addEventListener("pagehide", () => { if (!pedidoEnviado && !abandonoAnotado && typeof count === "function" && data.products && count() > 0) { abandonoAnotado = true; uso("abandono"); } });
 document.addEventListener("visibilitychange", () => { if (document.hidden && !pedidoEnviado && !abandonoAnotado && data.products && count() > 0) { abandonoAnotado = true; uso("abandono"); } else if (!document.hidden) abandonoAnotado = false; });
+// Categorías y subcategorías en el orden de a3ERP: primero la que tiene el código de familia más bajo (la leche de Pascual, etc.); sin código de familia, al final y como estaban
+function ordenarArbol(d) {
+  if (!d || !(d.tree || []).length) return;
+  const minimo = new Map(); // «cat» y «cat/sub» → menor código de familia de sus artículos
+  for (const p of d.products) { const f = limpiaFam(p.fam); if (!f) continue; for (const k of [p.cat, p.cat + "/" + p.sub]) { const m = minimo.get(k); if (m === undefined || compararFamilias(f, m) < 0) minimo.set(k, f); } }
+  const cmp = (ka, kb) => { const a = minimo.get(ka), b = minimo.get(kb); if (a === undefined && b === undefined) return 0; if (a === undefined) return 1; if (b === undefined) return -1; return compararFamilias(a, b); };
+  d.tree = d.tree.map((c, i) => ({ c, i })).sort((x, y) => cmp(x.c.id, y.c.id) || x.i - y.i).map(x => x.c);
+  for (const c of d.tree) c.subs = (c.subs || []).map((s, i) => ({ s, i })).sort((x, y) => cmp(c.id + "/" + x.s.id, c.id + "/" + y.s.id) || x.i - y.i).map(x => x.s);
+}
 const productoPorId = new Map();
 function refresh() {
   guardar();
@@ -3125,7 +3140,7 @@ function pintarCopia() { pintarSoloVer(); for (const id of ["copiaPrecios", "cop
 // Mete en pantalla unos datos nuevos del servidor sin perder el pedido: lo que ya no existe se quita (y se dice)
 function aplicarDatos(nuevo) {
   const antes = qty.size ? calc().total : null;
-  data = nuevo; productoPorId.clear(); data.products.forEach(p => productoPorId.set(p.id, p)); indiceBusq = null; _dupCorto = null; plazoCache.clear();
+  data = nuevo; ordenarArbol(data); productoPorId.clear(); data.products.forEach(p => productoPorId.set(p.id, p)); indiceBusq = null; _dupCorto = null; plazoCache.clear();
   let quitados = 0; for (const id of [...qty.keys()]) if (!productoPorId.has(id)) { qty.delete(id); unitOf.delete(id); notes.delete(id); quitados++; }
   favs.clear(); (data.favs || []).forEach(id => favs.add(id));
   pintarCopia(); pintarAviso(); pintarAbierto(); try { pintarDias(); } catch {}
@@ -3160,7 +3175,7 @@ function pendienteSinRed(eb) {
   if (!r) { $("ttl").textContent = ""; $("list").innerHTML = ""; $("list").appendChild(estadoVacio({ icono: "nube", titulo: "Sin conexión", texto: "No podemos cargar el catálogo ahora mismo. Comprueba tu conexión e inténtalo de nuevo.", boton: "Reintentar", onclick: () => location.reload() })); return; }
   if (!r.ok) { if (r.status === 401) copiaCat.borrar().catch(() => {}); $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 primeros dígitos de tu DNI</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
   data = await r.json(); if (copia) { data.__copia = copia.guardado; huboCorte = true; } else { data.__cargado = Date.now(); setTimeout(guardarCopia, 1500); }
-  data.products.forEach(p => productoPorId.set(p.id, p));
+  ordenarArbol(data); data.products.forEach(p => productoPorId.set(p.id, p));
   pintarAviso(); pintarAbierto(); pintarCopia();
   window.vmLetra.control($("letraBox"), "boton");
   if (data.ayuda) { $("ayudaBtn").hidden = false; $("ayudaBtn").onclick = () => abrirAyuda(data.ayuda, data.customer.name); }

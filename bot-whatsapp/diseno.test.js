@@ -230,7 +230,8 @@ test("tanda 3 (catálogo): barra de categoría con fondo, subcategorías como ch
   assert.match(pedido, /\.cab-cat \{ position:sticky; top:0; z-index:4; background:var\(--bg\);/); // 6
   assert.match(pedido, /nav = \{ cat, sub: cat && sub === null \? "\*" : sub \}/); assert.match(pedido, /className = "subchips"/); // 12
   assert.match(pedido, /Mostrando \$\{limite\} de \$\{items\.length\}/); assert.match(pedido, /new IntersectionObserver\(es => \{ if \(es\[0\]\.isIntersecting\) mas\(\); \}/); // 3
-  assert.match(pedido, /"Lo que sueles pedir" : "Todo lo demás"/); assert.match(pedido, /lc\.className = "pf-compras"/); assert.doesNotMatch(pedido, /\[p\.marca, tab === "all" && p\.count > 0 \? "Lo compras"/); // 4
+  assert.match(pedido, /const conGrupos = false;/); // el orden de cada sección es fijo (ya no se separa «lo que sueles pedir» arriba)
+  assert.match(pedido, /lc\.className = "pf-compras"/); assert.doesNotMatch(pedido, /\[p\.marca, tab === "all" && p\.count > 0 \? "Lo compras"/); // 4
   assert.match(pedido, /\.falta \.falta-fila \{ display:grid; grid-template-columns:56px minmax\(0, 1fr\);/); assert.match(pedido, /\.falta \.falta-n b \{ display:-webkit-box; -webkit-line-clamp:2;/); // 5
   assert.match(pedido, /\.pf-seg \{ height:44px; padding:2px; \}/); assert.match(pedido, /\.pf-sec \{ min-height:1\.25em; \}/); assert.match(pedido, /\.pf-ctl \{ margin-top:auto;/); // 7
   assert.match(pedido, /return r \|\| "•"/); assert.match(pedido, /sin nombre no hay tarjeta/); // 8

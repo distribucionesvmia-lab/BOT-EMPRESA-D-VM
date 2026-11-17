@@ -21,7 +21,7 @@ test("2. cada tarjeta dice la unidad de venta y las medidas aunque el nombre sal
 test("3. el número de productos de una categoría no se parte en dos líneas (860 → «86» y «0»)", () => { assert.match(p, /\.cat small, \.sub small \{ white-space:nowrap/); });
 test("4. categorías grandes: ordenar (lo que más pido, nombre, precio) y filtrar por marca", () => {
   assert.match(p, /if \(c\.count > 30\)/); for (const t of ['["pa", "Precio: de menor a mayor"]', '["nombre", "Nombre (A–Z)"]', "marcaCat = v", "if (marcaCat) items = items.filter"]) assert.ok(p.includes(t), t);
-  assert.match(p, /const conGrupos = arbol && ordenCat === "hab"/);
+  assert.match(p, /const conGrupos = false;/); // orden fijo de la sección (ya no sube lo que más pido)
 });
 test("5. red lenta: se dice que se está cargando y dos toques seguidos en «+» avisan «ahora llevas N»", () => {
   assert.match(p, /Cargando el catálogo… con poca cobertura/); assert.match(p, /ahora llevas \$\{/); assert.match(p, /Date\.now\(\); if \(t - \(setQty\.ult \|\| 0\) < 900\)/);
