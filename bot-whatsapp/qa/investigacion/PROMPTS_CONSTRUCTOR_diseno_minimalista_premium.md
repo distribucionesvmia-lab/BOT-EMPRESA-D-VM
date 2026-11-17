@@ -7,7 +7,7 @@
 
 **Qué significa «estilo Apple» aquí:** principios de diseño (simplicidad, jerarquía clara, mucho aire, un solo color de acento, fotografía protagonista, movimiento suave y con propósito), **no** copiar logos, iconos ni imágenes de Apple. Todo el contenido es de Valentín.
 
-**Qué NO cambia en ningún prompt:** datos de tarifa y clientes, precios, descuentos, IVA, reglas de entrega (hoy solo Medina del Campo antes de las 10:00), el aviso de «entrega hoy», el pedido fijo, los recordatorios, el panel de la empresa, la letra A−/A+ (hasta +30 %) y lo ya arreglado (botón y contador estables, zonas táctiles ≥ 44 px, apaisado usable).
+**Qué NO cambia en ningún prompt:** datos de tarifa y clientes, precios, descuentos, IVA, reglas de entrega (hoy solo Medina del Campo antes de las 10:00), el aviso de «entrega hoy», el pedido fijo, los recordatorios, el acceso con contraseña y verificación en dos pasos, el panel de la empresa, la letra A−/A+ (hasta +30 %) y lo ya arreglado (botón y contador estables, zonas táctiles ≥ 44 px, apaisado usable). **Los pedidos enviados NO se pueden modificar** (decisión de la empresa, 16-nov): no añadas «Modificar pedido» ni textos que digan que se podrá modificar.
 
 ---
 
@@ -65,7 +65,7 @@ OBJETIVO: crear el sistema de diseño minimalista y aplicarlo a las pantallas de
    - Elimina el aspecto de botón 3D (sombras duras, degradados marcados) y los marcos de color alrededor de las fotos.
 
 4. ACCESO Y CHAT (solo aspecto)
-   - Acceso: fondo claro, logo grande centrado, título «Bienvenido», campos y un botón rojo en píldora; sin fondo rojo a pantalla completa.
+   - Acceso: fondo claro, logo grande centrado, título «Bienvenido», campos y un botón rojo en píldora; sin fondo rojo a pantalla completa. Conserva TODOS los pasos y campos actuales del acceso (nombre + NIF + contraseña, crear contraseña, verificación en dos pasos opcional con su ventana, aprobación de la oficina, mensajes de error y bloqueos): solo cambia el aspecto, no el funcionamiento ni la seguridad.
    - Chat: burbujas recibidas #F2F2F7 con texto oscuro; enviadas con el acento y texto blanco; radio 20 con la esquina cercana a 6; cabecera ligera como en el punto 2; atajos como chips blancos.
 
 5. COMPRUEBA: contraste AA en textos y botones; a 130 % de letra nada se corta; reduced-motion y reduced-transparency; capturas antes y después en los 7 tamaños; el catálogo (iframe) usa los mismos tokens.
@@ -111,7 +111,7 @@ OBJETIVO: sustituir el «Paso 1 de 3», las pestañas Histórico/Catálogo de la
    - Inicio: la pantalla nueva del Prompt 4 (hasta entonces, una pantalla provisional con el saludo y «Tu pedido de siempre» si ya existe).
    - Catálogo: categorías y listas de productos.
    - Pedido: el carrito actual (paso 2) y el día de entrega.
-   - Mis pedidos: último pedido, histórico, «Modificar pedido», pedido fijo («Mi pedido fijo») y favoritos.
+   - Mis pedidos: último pedido, histórico, pedido fijo («Mi pedido fijo») y favoritos (los pedidos enviados no se modifican).
    - Ayuda: el botón de ayuda actual (llamar / WhatsApp / horario) y, debajo, «Ajustes de pantalla» con el control de letra A−/A+/Automático.
    El botón «Aa» de la cabecera sigue abriendo el control de letra directamente.
 
@@ -147,7 +147,7 @@ OBJETIVO: crear la pantalla «Inicio» y unir carrito + entrega + confirmación 
    - Sección «Entrega»: dirección en gris y fila horizontal de chips de día (alto 64): Hoy (solo si procede, con la regla de las 10:00; si ya no procede, no aparece), Mañana, y los siguientes días de servicio, más «Otro día» (calendario existente). Seleccionado: fondo oscuro. Si el cliente estaba en «Hoy» y pasan las 10:00, se avisa con claridad y se deselecciona.
    - Barra de «Portes gratis / pedido mínimo»: SOLO si existe esa regla en el artefacto; si no existe, no la pongas ni la inventes.
    - Resumen: base, IVA y total, con el mismo cálculo y las mismas reglas que ahora (no cambies ningún importe ni cuándo se calcula el IVA; si hoy el IVA se muestra al elegir el día, mantén ese comportamiento).
-   - Botón fijo inferior (material translúcido): «Confirmar pedido · 169,91 €» y debajo, en gris, «Puedes modificarlo hasta las 10:00 del martes» con la hora límite de edición ya implementada.
+   - Botón fijo inferior (material translúcido): «Confirmar pedido · 169,91 €». No pongas ningún texto sobre poder modificar el pedido después (los enviados no se modifican).
    - Pantalla de confirmación: marca de verificación grande que se dibuja en 400 ms (estática con reduced-motion), «Pedido recibido», la referencia (VM-…), el resumen, la fecha de entrega y los botones «Ver pedido» y «Volver al inicio».
 
 3. COMPRUEBA: recorrido completo repetir pedido → revisar → elegir día → confirmar; que el pedido llega al panel de la empresa igual que antes (mismos importes y referencia); casos de hora (9:30, 9:59→10:00, 11:00, sábado) para el aviso y la opción «Hoy»; cliente sin historial; 130 % de letra; 7 tamaños de pantalla.
@@ -164,7 +164,7 @@ OBJETIVO: que las fotos se vean nítidas y cuidadas aunque algunas sean pequeña
    - Todas las baldosas de producto: cuadradas 1:1, fondo #F2F2F7, foto con object-fit: contain y un margen interior para que el producto ocupe el 80–85 % del marco. Sin marcos de color ni anillos.
    - NO estires las fotos pequeñas: si una foto mide menos de 160 px de lado, muéstrala a su tamaño natural (o como mucho ×1,5) centrada en la baldosa en lugar de ampliarla a 72–88 px; así no se ve borrosa.
    - Fotos marcadas como generadas con IA (lista __VM_FOTOS_IA__): micro-etiqueta «Imagen orientativa» en la esquina inferior de la baldosa.
-   - Carga bajo demanda: saca las fotos incrustadas de la página (hoy 14 MB de base64) y cárgalas por categoría solo cuando se abre esa categoría, en paquetes por categoría (un artefacto admite como máximo 511 archivos, así que un archivo por categoría, no por foto). Mientras llegan, baldosa neutra y fundido de 200 ms al aparecer (sin animaciones de destello).
+   - Carga bajo demanda. En el programa real las fotos ya se sirven por /img/ con ETag (commit 779e513): no toques eso. Lo siguiente es para la demo/artefacto: saca las fotos incrustadas de la página (hoy 14 MB de base64) y cárgalas por categoría solo cuando se abre esa categoría, en paquetes por categoría (un artefacto admite como máximo 511 archivos, así que un archivo por categoría, no por foto). Mientras llegan, baldosa neutra y fundido de 200 ms al aparecer (sin animaciones de destello).
    - Meta: la página inicial (sin fotos) debe abrir en menos de 3 s con buena cobertura. Dime el peso antes y después.
    - ENTRÉGAME un listado (CSV) de los artículos cuya foto mide 200 px o menos de lado: código, nombre, categoría y tamaño actual, para que yo busque fotos mejores. No sustituyas ninguna foto tú.
 
