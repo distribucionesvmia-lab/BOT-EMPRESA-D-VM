@@ -207,7 +207,7 @@ export function categorizar(p) {
     const s = sub ?? (explicitSub ? [slug(explicitSub), explicitSub] : c.subs[c.subs.length - 1]);
     return { cat: c.id, sub: s[0], catNombre: c.nombre, subNombre: s[1], icono: c.icono };
   }
-  return { cat: "f-" + slug(explicit), sub: explicitSub ? slug(explicitSub) : "general", catNombre: explicit, subNombre: explicitSub || "General", icono: "📦" };
+  return { cat: "f-" + slug(explicit), sub: explicitSub ? slug(explicitSub) : "general", catNombre: explicit, subNombre: explicitSub || "General", icono: p?.icono || "📦" };
 }
 
 /**

@@ -39,8 +39,10 @@ import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { crearAvisos } from "./avisos.js";
 import { compararFamilias } from "./ordenfamilia.js";
+import { conArbolA3erp } from "./arbol-a3erp.js";
 import { endpointValido, clavesValidas } from "./webpush.js";
 const FAM_NOMBRES = JSON.parse(fs.readFileSync(new URL("./familias-nombres.json", import.meta.url), "utf8")); // nombres de las familias y subfamilias de a3ERP (listado de familias)
+const FAM_CATEGORIAS = (() => { try { return JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8")); } catch { return {}; } })();
 // Orden de a3ERP para categorías y subcategorías aunque los artículos aún no traigan su código de familia: menor código de familia del mapa familias-categorias.json por nombre («Pascual» → 1.1, «Pascual/Leche» → 1.1)
 const FAM_ORDEN = (() => { const o = {}; try { const m = JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8")); const menor = (k, c) => { if (o[k] === undefined || compararFamilias(c, o[k]) < 0) o[k] = c; }; for (const [cod, v] of Object.entries(m)) { if (v?.category) menor(v.category, cod); if (v?.category && v?.subcategory) menor(v.category + "/" + v.subcategory, cod); } } catch { /* sin mapa: se queda el orden de siempre */ } return o; })();
 import { mailConfigFromEnv, sendMail } from "./mailer.js";
@@ -86,14 +88,16 @@ if (process.env.DEMO === "1") {
   process.env.EXPORT_DIR ??= "exportaciones-demo";
 }
 
-setCatalog((await getCatalog())?.filter((p) => !sinCoste(p)) ?? null); // catálogo (base de productos); si no hay, se usa el de config.js. Sin los artículos de precio 0 o con descuento del 100 %
+setCatalog(catalogoParaClientes(await getCatalog())); // catálogo (base de productos); si no hay, se usa el de config.js. Sin los artículos de precio 0 o con descuento del 100 %
+// Catálogo para los clientes: sin artículos sin coste y, si ya traen su código de familia, con el árbol de a3ERP (ARBOL_A3ERP=0 lo apaga)
+function catalogoParaClientes(cat) { const l = cat?.filter((p) => !sinCoste(p)) ?? null; return l && process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(l, FAM_NOMBRES, FAM_CATEGORIAS) : l; }
 let catalogSeen = catalogVersion();
 // Si se actualizan los productos o precios, el bot los usa sin reiniciar
 async function refreshCatalog() {
   const v = catalogVersion();
   if (v !== catalogSeen) {
     catalogSeen = v;
-    setCatalog((await getCatalog())?.filter((p) => !sinCoste(p)) ?? null);
+    setCatalog(catalogoParaClientes(await getCatalog()));
   }
 }
 
