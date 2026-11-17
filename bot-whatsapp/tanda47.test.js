@@ -30,3 +30,13 @@ test("categorías y subcategorías del catálogo siguen el orden de a3ERP (menor
   assert.deepEqual(d.tree.map(c => c.id), ["b", "a", "c"]); // 1.1 < 2.1 < 10.2; «c» sin familia, al final
   assert.deepEqual(d.tree[1].subs.map(s => s.id), ["y", "x"]); // 2.1 antes que 10.2
 });
+
+test("sin código de familia en los artículos, categorías y subcategorías siguen el orden de a3ERP con el mapa del servidor (data.famOrden)", () => {
+  const ped = src("./pedido.html"), sv = src("./server.js");
+  assert.match(sv, /const FAM_ORDEN = /); assert.equal((sv.match(/famOrden: FAM_ORDEN/g) || []).length, 2); // catálogo normal y por enlace
+  const cod = ped.slice(ped.indexOf("const limpiaFam"), ped.indexOf("// ORDEN-FAMILIA-FIN")), fn = ped.slice(ped.indexOf("function ordenarArbol"), ped.indexOf("const productoPorId"));
+  const d = { famOrden: { Cafe: "33.5", Pascual: "1.1", Aguas: "10.0", "Pascual/Yogures": "1.9", "Pascual/Leche": "1.1" },
+    tree: [{ id: "c", nombre: "Cafe", subs: [] }, { id: "p", nombre: "Pascual", subs: [{ id: "y", nombre: "Yogures" }, { id: "l", nombre: "Leche" }] }, { id: "a", nombre: "Aguas", subs: [] }], products: [{ cat: "c", sub: "x" }] };
+  new Function("d", cod + fn + "ordenarArbol(d);")(d);
+  assert.deepEqual(d.tree.map(c => c.id), ["p", "a", "c"]); assert.deepEqual(d.tree[0].subs.map(s => s.id), ["l", "y"]);
+});

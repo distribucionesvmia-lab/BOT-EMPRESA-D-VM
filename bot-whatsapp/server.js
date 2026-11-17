@@ -38,8 +38,11 @@ const avisoEntrega = (customer) => ({ entregaHoy: entregaHoyDisponible(customer)
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { crearAvisos } from "./avisos.js";
+import { compararFamilias } from "./ordenfamilia.js";
 import { endpointValido, clavesValidas } from "./webpush.js";
 const FAM_NOMBRES = JSON.parse(fs.readFileSync(new URL("./familias-nombres.json", import.meta.url), "utf8")); // nombres de las familias y subfamilias de a3ERP (listado de familias)
+// Orden de a3ERP para categorías y subcategorías aunque los artículos aún no traigan su código de familia: menor código de familia del mapa familias-categorias.json por nombre («Pascual» → 1.1, «Pascual/Leche» → 1.1)
+const FAM_ORDEN = (() => { const o = {}; try { const m = JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8")); const menor = (k, c) => { if (o[k] === undefined || compararFamilias(c, o[k]) < 0) o[k] = c; }; for (const [cod, v] of Object.entries(m)) { if (v?.category) menor(v.category, cod); if (v?.category && v?.subcategory) menor(v.category + "/" + v.subcategory, cod); } } catch { /* sin mapa: se queda el orden de siempre */ } return o; })();
 import { mailConfigFromEnv, sendMail } from "./mailer.js";
 import { crearNotificador } from "./notificaciones.js";
 import { scheduleBackups, backupAll } from "./backup.js";
@@ -343,7 +346,7 @@ function webOrderRoutes(req, res, url) {
         used: getDb().hasOrderKey(linkKey(link)),
         products,
         history: webHistory(view, catalogNow()),
-        tree: arbolEnlace, accesos: accesosDe(arbolEnlace), famNombres: FAM_NOMBRES,
+        tree: arbolEnlace, accesos: accesosDe(arbolEnlace), famNombres: FAM_NOMBRES, famOrden: FAM_ORDEN,
         top: topIds(),
       ayuda: ayudaPublica(),
         ayuda: ayudaPublica(),
@@ -751,7 +754,7 @@ async function appRoutes(req, res, url) {
       favs: getAccountsDb().favorites(account.customerId),
       products: webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa),
       history: webHistory(customer, catalogNow()),
-      tree: arbol, accesos: accesosDe(arbol), famNombres: FAM_NOMBRES,
+      tree: arbol, accesos: accesosDe(arbol), famNombres: FAM_NOMBRES, famOrden: FAM_ORDEN,
       top: topIds(),
       retirados: retiradosDe(customer),
       abiertos: abiertosDe(account),

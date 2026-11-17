@@ -2437,6 +2437,8 @@ function ordenarArbol(d) {
   if (!d || !(d.tree || []).length) return;
   const minimo = new Map(); // «cat» y «cat/sub» → menor código de familia de sus artículos
   for (const p of d.products) { const f = limpiaFam(p.fam); if (!f) continue; for (const k of [p.cat, p.cat + "/" + p.sub]) { const m = minimo.get(k); if (m === undefined || compararFamilias(f, m) < 0) minimo.set(k, f); } }
+  // sin código de familia en los artículos (aún no se ha subido el Excel de a3ERP), se usa el del mapa de categorías del servidor (data.famOrden, por nombre)
+  for (const c of d.tree) { const fc = (d.famOrden || {})[c.nombre]; if (fc && !minimo.has(c.id)) minimo.set(c.id, fc); for (const s of c.subs || []) { const fs = (d.famOrden || {})[c.nombre + "/" + s.nombre]; if (fs && !minimo.has(c.id + "/" + s.id)) minimo.set(c.id + "/" + s.id, fs); } }
   const cmp = (ka, kb) => { const a = minimo.get(ka), b = minimo.get(kb); if (a === undefined && b === undefined) return 0; if (a === undefined) return 1; if (b === undefined) return -1; return compararFamilias(a, b); };
   d.tree = d.tree.map((c, i) => ({ c, i })).sort((x, y) => cmp(x.c.id, y.c.id) || x.i - y.i).map(x => x.c);
   for (const c of d.tree) c.subs = (c.subs || []).map((s, i) => ({ s, i })).sort((x, y) => cmp(c.id + "/" + x.s.id, c.id + "/" + y.s.id) || x.i - y.i).map(x => x.s);
