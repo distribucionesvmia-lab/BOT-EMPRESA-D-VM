@@ -393,6 +393,16 @@
   .cu-cab { display:flex; align-items:center; justify-content:space-between; gap:var(--s3); padding:var(--s4) var(--s5); border-bottom:.5px solid var(--line); flex:none; }
   .cu-cab h2 { font-size:calc(var(--t-lg) / var(--k,1)); }
   .cu-cuerpo { overflow:auto; padding:var(--s4) var(--s5) var(--s6); display:flex; flex-direction:column; gap:var(--s4); -webkit-overflow-scrolling:touch; }
+  .cu-resumen { background:var(--surface); border-radius:var(--r-card); padding:var(--s3); margin:0 0 var(--s3); }
+  .cu-resumen .rs-cab { display:flex; align-items:center; gap:var(--s2); }
+  .cu-resumen .rs-cab h3 { flex:1; margin:0; font-size:calc(17px / var(--k,1)); text-transform:capitalize; }
+  .cu-resumen .rs-nav { width:44px; height:44px; border:0; border-radius:50%; background:transparent; color:var(--accent); font-size:calc(24px / var(--k,1)); }
+  .cu-resumen .rs-nav[disabled] { opacity:.3; }
+  .cu-resumen .rs-cifras { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:var(--s2); margin:var(--s2) 0; }
+  .cu-resumen .rs-cifra b { display:block; font-size:calc(22px / var(--k,1)); font-weight:700; }
+  .cu-resumen .rs-cifra span, .cu-resumen .rs-nota { font-size:calc(13px / var(--k,1)); color:var(--text-2); }
+  .cu-resumen .rs-ahorro b { color:var(--ok); }
+  .cu-resumen ol { margin:var(--s1) 0 0; padding-left:var(--s4); }
   .cu-tit { margin:var(--s2) 0 0; font-size:calc(var(--t-micro) / var(--k,1)); font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--text-2); }
   .cu-datos { background:var(--fill); border-radius:var(--r-card); padding:var(--s3) var(--s4); display:grid; grid-template-columns:auto 1fr; gap:var(--s2) var(--s4); margin:0; font-size:calc(var(--t-sec) / var(--k,1)); }
   .cu-datos dt { color:var(--text-2); } .cu-datos dd { margin:0; font-weight:600; overflow-wrap:anywhere; }
@@ -1541,10 +1551,31 @@ function abrirProblema(o) {
   $("m-problema").hidden = false;
 }
 $("p-x").onclick = $("p-cerrar").onclick = () => ($("m-problema").hidden = true);
+/** «Tu resumen del mes» al principio de Mi cuenta: compras, lo que más pide y lo que se ha ahorrado frente a la tarifa. Sin pedidos no sale. */
+async function pintarResumen(caja, mes) {
+  const j = await fetch("/api/mi-resumen" + (mes ? "?mes=" + encodeURIComponent(mes) : "")).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  caja.textContent = ""; if (!j?.hay) { caja.className = ""; return; }
+  caja.className = "cu-resumen"; caja.setAttribute("role", "region"); caja.setAttribute("aria-label", "Tu resumen del mes");
+  const i = j.meses.findIndex((m) => m.mes === j.mes), cab = nodo("div", null, "rs-cab"), h = nodo("h3", "Tu resumen de " + j.titulo);
+  const ant = nodo("button", "‹", "rs-nav"), sig = nodo("button", "›", "rs-nav"); ant.type = sig.type = "button";
+  ant.setAttribute("aria-label", "Mes anterior"); sig.setAttribute("aria-label", "Mes siguiente");
+  ant.disabled = i >= j.meses.length - 1; sig.disabled = i <= 0;
+  ant.onclick = () => pintarResumen(caja, j.meses[i + 1].mes); sig.onclick = () => pintarResumen(caja, j.meses[i - 1].mes);
+  cab.append(ant, h, sig); caja.appendChild(cab);
+  const cifras = nodo("div", null, "rs-cifras"), cifra = (valor, texto, cls) => { const c = nodo("div", null, "rs-cifra" + (cls ? " " + cls : "")); c.append(nodo("b", valor), nodo("span", texto)); cifras.appendChild(c); };
+  cifra(String(j.pedidos), j.pedidos === 1 ? "pedido" : "pedidos");
+  cifra((j.aprox ? "≈ " : "") + eur(j.total), "con IVA");
+  if (j.ahorro > 0) cifra((j.aprox ? "≈ " : "") + eur(j.ahorro), "ahorrado frente a tarifa", "rs-ahorro");
+  caja.appendChild(cifras);
+  if (j.variacion !== null && j.variacion !== 0) caja.appendChild(nodo("p", "Has comprado un " + Math.abs(j.variacion) + " % " + (j.variacion > 0 ? "más" : "menos") + " que en " + j.anterior.titulo + ".", "rs-nota"));
+  if (j.masPedidos.length) { caja.appendChild(nodo("p", "Lo que más has pedido", "cu-tit")); const ol = nodo("ol"); for (const a of j.masPedidos) ol.appendChild(nodo("li", a.unidades + " uds · " + a.nombre)); caja.appendChild(ol); }
+  if (j.aprox) caja.appendChild(nodo("p", "Los pedidos anteriores a la app se calculan con los precios de hoy (aproximado).", "rs-nota"));
+}
 async function abrirCuenta(irAPedidos, mas) {
   menu(false); const B = $("cu-cuerpo"); B.innerHTML = '<div class="cu-esq" aria-hidden="true"><div class="sk" style="height:96px"></div><div class="sk" style="height:20px;width:40%"></div><div class="sk" style="height:76px"></div><div class="sk" style="height:76px"></div></div><span class="solo-lector" role="status">Un momento…</span>'; $("m-cuenta").hidden = false;
   const j = await fetch("/api/mi-cuenta" + (mas ? "?mas=1" : "")).then((r) => (r.ok ? r.json() : null)).catch(() => null); B.innerHTML = "";
   if (!j) { B.replaceChildren(estadoVacio({ icono: "nube", titulo: "No se ha podido cargar", texto: "No hemos podido cargar tu cuenta. Comprueba tu conexión e inténtalo de nuevo.", boton: "Reintentar", onclick: () => abrirCuenta(irAPedidos, mas) })); return; }
+  const resumenCaja = nodo("div"); B.appendChild(resumenCaja); pintarResumen(resumenCaja, null); // al principio: lo que ha comprado este mes
   // Mis datos
   B.appendChild(nodo("h3", "Mis datos", "cu-tit"));
   const dl = nodo("dl", null, "cu-datos"), fila = (k, v) => { if (!v) return; dl.append(nodo("dt", k), nodo("dd", v)); };

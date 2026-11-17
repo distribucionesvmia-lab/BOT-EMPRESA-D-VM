@@ -41,6 +41,7 @@ import { crearAvisos } from "./avisos.js";
 import { compararFamilias } from "./ordenfamilia.js";
 import { conArbolA3erp } from "./arbol-a3erp.js";
 import { previaPedidoRapido } from "./pedido-rapido.js";
+import { resumenMensual } from "./resumen-mensual.js";
 import { endpointValido, clavesValidas } from "./webpush.js";
 const FAM_NOMBRES = JSON.parse(fs.readFileSync(new URL("./familias-nombres.json", import.meta.url), "utf8")); // nombres de las familias y subfamilias de a3ERP (listado de familias)
 const FAM_CATEGORIAS = (() => { try { return JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8")); } catch { return {}; } })();
@@ -866,6 +867,22 @@ async function appRoutes(req, res, url) {
       return { ref: o.ref, fecha: o.created_at, entrega: o.delivery_date ?? null, total: o.total, lineas: o.items.length, resumen: o.items.slice(0, 3).map((i) => `${i.qty} ${i.name}`).join(" · "), modificado: o.modified_at ?? null, editable: pe.ok, hasta: pe.ok ? pe.texto : "" };
     });
     return void sendJson(res, 200, { pedidos: lista, ayuda: ayudaPublica() });
+  }
+  // ── «Tu resumen del mes»: SUS compras, lo que más pide y lo que se ahorra frente a la tarifa. Solo lee; los pedidos de a3ERP (sin precios guardados) se valoran con los precios de hoy y se marcan «aprox.» ──
+  if (p === "/api/mi-resumen" && req.method === "GET") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    const cust = clienteConPedidos(account.customerId, HISTORIAL_ANALISIS), cat = catalogNow(), re = !!cust?.recargoEquivalencia;
+    const cent = (n) => Math.round((Number(n) || 0) * 100);
+    const pedidos = webHistory(cust, cat, HISTORIAL_ANALISIS).map((o) => {
+      const propio = /^VM-\d{4}-\d{6}$/.test(o.doc) ? getDb().getOrderByRef(o.doc) : null;
+      const esMio = propio && propio.customer_id === String(account.customerId);
+      let items, aprox = false;
+      if (esMio && propio.items?.length) items = propio.items.map((i) => ({ nombre: i.name ?? "", units: Number(i.units ?? i.qty) || 0, price: i.price, amount: i.amount, vat: i.vat_rate ?? i.vat })); // precios guardados del día del pedido
+      else { aprox = true; const pr = priceOrder({ items: o.lines.map((l) => ({ id: l.id, qty: l.qty, unit: "ud" })) }, cust, cat); items = pr.items.map((i) => ({ nombre: i.name ?? o.lines.find((l) => String(l.id) === String(i.id))?.name ?? "", units: i.units, price: i.price, amount: i.amount, vat: i.vat })); }
+      const total = totals(items.map((i) => ({ amount: i.amount, vat: i.vat })), esMio ? !!propio.re : re).total;
+      return { fecha: String(o.date).slice(0, 10), aprox, total, lineas: items.map((i) => ({ nombre: i.nombre, unidades: i.units, ahorro: Math.max(0, cent(i.units * i.price) - cent(i.amount)) / 100 })) };
+    });
+    return void sendJson(res, 200, resumenMensual({ pedidos, mes: /^\d{4}-\d{2}$/.test(url.searchParams.get("mes") ?? "") ? url.searchParams.get("mes") : null, hoy: madridDay() }));
   }
   if (p === "/api/mi-cuenta" && req.method === "GET") { // «Mi cuenta»: SUS datos y SUS últimos pedidos (los de a3ERP y los hechos aquí), con las líneas para repetirlos o añadirlos al carrito
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });

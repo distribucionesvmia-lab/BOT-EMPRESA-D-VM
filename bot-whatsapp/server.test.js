@@ -1218,6 +1218,26 @@ test("BENCH 11: «Descargar todo el mes» da un ZIP con los PDF de SUS pedidos d
   assert.equal((await call("GET", "/api/documentos/mes/2026-1x", { cookie: A })).status, 404);
 });
 
+test("PEDIR EN 10 SEGUNDOS y RESUMEN DEL MES: vista previa sin crear nada, envío por /catalogo con la propuesta, y el resumen cuenta SUS pedidos", async () => {
+  const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar dos"));
+  assert.equal((await call("GET", "/api/pedido-rapido")).status, 401); assert.equal((await call("GET", "/api/mi-resumen")).status, 401);
+  const base = await call("POST", "/catalogo", { cookie: A, body: { key: "rapido-base-1", lines: [{ id: "1010", qty: 2, unit: "ud" }] } });
+  assert.equal(base.status, 200, JSON.stringify(base.json));
+  const antes = (await call("GET", "/api/admin/pedidos", { admin: true })).json;
+  const v = (await call("GET", "/api/pedido-rapido", { cookie: A })).json;
+  assert.equal(v.posible, true, JSON.stringify(v)); assert.ok(v.total > 0 && v.articulos >= 1 && v.lineas.length >= 1 && v.opciones.length >= 1);
+  assert.ok(v.opciones.some((o) => o.date === v.porDefecto)); assert.ok(v.direccion);
+  const despues = (await call("GET", "/api/admin/pedidos", { admin: true })).json; assert.equal(JSON.stringify(despues).length, JSON.stringify(antes).length); // la vista previa NO crea ningún pedido
+  const env = await call("POST", "/catalogo", { cookie: A, body: { key: "rapido-test-0001", lines: v.lineas.map((l) => ({ id: l.id, qty: l.qty, unit: l.unit })), delivery: v.porDefecto } });
+  assert.equal(env.status, 200, JSON.stringify(env.json)); assert.match(env.json.ref, /^VM-\d{4}-\d{6}$/);
+  const otra = await call("POST", "/catalogo", { cookie: A, body: { key: "rapido-test-0001", lines: v.lineas.map((l) => ({ id: l.id, qty: l.qty, unit: l.unit })), delivery: v.porDefecto } });
+  assert.equal(otra.status, 409); // el mismo toque repetido no duplica
+  const r = (await call("GET", "/api/mi-resumen", { cookie: A })).json;
+  assert.equal(r.hay, true); assert.ok(r.pedidos >= 2, JSON.stringify(r)); assert.ok(r.total > 0 && Array.isArray(r.masPedidos) && r.masPedidos.length >= 1); assert.match(r.mes, /^\d{4}-\d{2}$/);
+  const rb = (await call("GET", "/api/mi-resumen", { cookie: B })).json; assert.ok(!rb.hay || rb.pedidos < r.pedidos); // B no ve los pedidos de A
+  assert.equal((await call("GET", "/api/mi-resumen?mes=basura", { cookie: A })).status, 200); // un mes mal escrito se ignora
+});
+
 test("BENCH 12: registro de errores: se limpia lo que llega (sin datos personales), tiene límites y la oficina lo ve por tipo y por cliente", async () => {
   const A = cookieOf(await entrarNif("111111")), B = cookieOf(await entrarNif("122222", "bar dos"));
   const mando = (cookie, body, extra = {}) => fetch(`${BASE}/api/log-error`, { method: "POST", headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}), "User-Agent": "Mozilla/5.0 (Linux; Android 14; SM-A556B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36", ...extra }, body: typeof body === "string" ? body : JSON.stringify(body) });
