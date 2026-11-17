@@ -85,6 +85,10 @@ export function openDb(path = process.env.DB_PATH ?? "pedidos.sqlite") {
   addColumn("orders", "delivery_date", "TEXT"); // día de entrega que pidió el cliente (AAAA-MM-DD)
   addColumn("orders", "modified_at", "TEXT"); // cuándo lo modificó el cliente (null = nunca)
   addColumn("orders", "city", "TEXT"); // población del cliente (sale bajo el nombre en el Excel de pedidos)
+  // Índices de las consultas que se hacen en CADA visita de un cliente (sus pedidos) y al exportar / ver una exportación; sin ellos SQLite recorre todos los pedidos de todos los clientes
+  db.exec("CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id, id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_orders_export_id ON orders(export_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)");
   for (const [c, ddl] of [["unit", "TEXT NOT NULL DEFAULT 'ud'"], ["boxes", "INTEGER"], ["units", "INTEGER"], ["discount", "REAL NOT NULL DEFAULT 0"], ["vat_rate", "REAL"], ["amount", "REAL"], ["note", "TEXT"]]) {
     addColumn("order_lines", c, ddl);
   }

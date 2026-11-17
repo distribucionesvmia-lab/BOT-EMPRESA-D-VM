@@ -97,6 +97,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
   db.exec("CREATE TABLE IF NOT EXISTS aparatos_vistos (account_id INTEGER NOT NULL, huella TEXT NOT NULL, first_at TEXT NOT NULL, PRIMARY KEY (account_id, huella))");
   db.exec("CREATE TABLE IF NOT EXISTS errores_app (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, customer_id TEXT, tipo TEXT NOT NULL, pantalla TEXT NOT NULL, api TEXT, estado INTEGER NOT NULL DEFAULT 0, mensaje TEXT, navegador TEXT)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_errores_at ON errores_app(at)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_seguridad_at ON seguridad_eventos(at)"); db.exec("CREATE INDEX IF NOT EXISTS idx_actividad_at ON actividad_panel(at)"); // las listas de «últimos 7 días» del panel
   db.exec("CREATE TABLE IF NOT EXISTS invitaciones (id INTEGER PRIMARY KEY AUTOINCREMENT, token_hash TEXT NOT NULL UNIQUE, customer_id TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL, used_at TEXT, motivo TEXT)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_invitaciones_cliente ON invitaciones(customer_id)");
   // Opciones del enlace (días y hora ya van en expires_at): cuántos usos, mensaje de bienvenida, solo ver o también pedir, y si se le pide poner su código

@@ -42,6 +42,7 @@ import { compararFamilias } from "./ordenfamilia.js";
 import { conArbolA3erp } from "./arbol-a3erp.js";
 import { previaPedidoRapido } from "./pedido-rapido.js";
 import { resumenMensual } from "./resumen-mensual.js";
+import { crearMemo, firmaCliente } from "./memo.js";
 import { endpointValido, clavesValidas } from "./webpush.js";
 const FAM_NOMBRES = JSON.parse(fs.readFileSync(new URL("./familias-nombres.json", import.meta.url), "utf8")); // nombres de las familias y subfamilias de a3ERP (listado de familias)
 const FAM_CATEGORIAS = (() => { try { return JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8")); } catch { return {}; } })();
@@ -94,6 +95,9 @@ setCatalog(catalogoParaClientes(await getCatalog())); // catálogo (base de prod
 // Catálogo para los clientes: sin artículos sin coste y, si ya traen su código de familia, con el árbol de a3ERP (ARBOL_A3ERP=0 lo apaga)
 function catalogoParaClientes(cat) { const l = cat?.filter((p) => !sinCoste(p)) ?? null; return l && process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(l, FAM_NOMBRES, FAM_CATEGORIAS) : l; }
 let catalogSeen = catalogVersion();
+// Memoria con caducidad corta (por cliente): los precios de TODO su catálogo se piden al abrir el chat y otra vez al abrir el catálogo, y el resumen del mes valora hasta 400 pedidos. Cambia la clave si el cliente hace un pedido o cambian sus precios/descuentos o el catálogo.
+const memoProductos = crearMemo({ max: 30, ttlMs: 20_000 }), memoResumen = crearMemo({ max: 60, ttlMs: 120_000 });
+function productosDe(customer) { return memoProductos.get(`${firmaCliente(customer)}|${catalogSeen}`, () => webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa)); }
 // Si se actualizan los productos o precios, el bot los usa sin reiniciar
 async function refreshCatalog() {
   const v = catalogVersion();
@@ -721,7 +725,7 @@ async function appRoutes(req, res, url) {
     { const f = frenoCopia(account.id, "datos"); if (f) return void sendJson(res, 429, { error: f }); }
     await refreshCatalog(); // ve ya las ofertas y los precios que la empresa acaba de cambiar
     const customer = clienteConPedidos(account.customerId);
-    const todos = webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa), arbolInicio = webTree(catalogNow());
+    const todos = productosDe(customer), arbolInicio = webTree(catalogNow());
     const corto = (x) => ({ id: x.id, name: x.name, price: x.price, ...(x.img ? { img: x.img } : {}), ...(x.unitsPerBox ? { unitsPerBox: x.unitsPerBox } : {}), ...(x.soloCaja ? { soloCaja: true } : {}) });
     const ids = String(url.searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8);
     const porId = new Map(todos.map((x) => [x.id, x]));
@@ -758,7 +762,7 @@ async function appRoutes(req, res, url) {
       customer: { name: customer.name, address: customer.address, codigo: String(customer.id ?? ""), re: !!customer.recargoEquivalencia },
       used: false,
       favs: getAccountsDb().favorites(account.customerId),
-      products: webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa),
+      products: productosDe(customer),
       history: webHistory(customer, catalogNow()),
       tree: arbol, accesos: accesosDe(arbol), famNombres: FAM_NOMBRES, famOrden: FAM_ORDEN,
       top: topIds(),
@@ -873,6 +877,8 @@ async function appRoutes(req, res, url) {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     const cust = clienteConPedidos(account.customerId, HISTORIAL_ANALISIS), cat = catalogNow(), re = !!cust?.recargoEquivalencia;
     const cent = (n) => Math.round((Number(n) || 0) * 100);
+    const mesPedido = /^\d{4}-\d{2}$/.test(url.searchParams.get("mes") ?? "") ? url.searchParams.get("mes") : null;
+    return void sendJson(res, 200, memoResumen.get(`${firmaCliente(cust)}|${catalogSeen}|${mesPedido}|${madridDay()}`, () => {
     const pedidos = webHistory(cust, cat, HISTORIAL_ANALISIS).map((o) => {
       const propio = /^VM-\d{4}-\d{6}$/.test(o.doc) ? getDb().getOrderByRef(o.doc) : null;
       const esMio = propio && propio.customer_id === String(account.customerId);
@@ -882,7 +888,8 @@ async function appRoutes(req, res, url) {
       const total = totals(items.map((i) => ({ amount: i.amount, vat: i.vat })), esMio ? !!propio.re : re).total;
       return { fecha: String(o.date).slice(0, 10), aprox, total, lineas: items.map((i) => ({ nombre: i.nombre, unidades: i.units, ahorro: Math.max(0, cent(i.units * i.price) - cent(i.amount)) / 100 })) };
     });
-    return void sendJson(res, 200, resumenMensual({ pedidos, mes: /^\d{4}-\d{2}$/.test(url.searchParams.get("mes") ?? "") ? url.searchParams.get("mes") : null, hoy: madridDay() }));
+    return resumenMensual({ pedidos, mes: mesPedido, hoy: madridDay() });
+    }));
   }
   if (p === "/api/mi-cuenta" && req.method === "GET") { // «Mi cuenta»: SUS datos y SUS últimos pedidos (los de a3ERP y los hechos aquí), con las líneas para repetirlos o añadirlos al carrito
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
