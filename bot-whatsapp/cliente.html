@@ -434,6 +434,10 @@
   .vm-inicio .in-card p { margin:0; color:var(--text-2); font-size:calc(var(--t-sec) / var(--k,1)); line-height:1.35; }
   .vm-inicio .in-peq { color:var(--text-2); font-size:calc(var(--t-cap) / var(--k,1)); }
   .vm-inicio .in-sie-acc { display:flex; gap:var(--s2); margin-top:var(--s2); }
+  #m-rapido .r-dias { display:flex; flex-wrap:wrap; gap:var(--s2); margin:var(--s2) 0; }
+  #m-rapido .r-dia { min-height:44px; padding:0 var(--s3); border:1px solid rgba(128,128,128,.45); border-radius:var(--r-field); background:var(--surface,#fff); color:var(--text,#1d1d1f); font:inherit; font-size:calc(15px / var(--k,1)); }
+  #m-rapido .r-dia[aria-checked="true"] { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); font-weight:600; }
+  #m-rapido .vm-btn { margin-top:var(--s2); width:100%; }
   .vm-inicio .in-card .in-sie-acc .vm-btn { width:auto; flex:1; min-height:44px; }
   #s-cuerpo .s-lin { display:grid; grid-template-columns:1fr auto; gap:var(--s2) var(--s3); align-items:center; padding:var(--s3) 0; border-bottom:1px solid var(--fill); }
   #s-cuerpo .s-nom { font-size:calc(var(--t-sec) / var(--k,1)); line-height:1.3; overflow-wrap:anywhere; }
@@ -887,6 +891,13 @@
       <div id="f-cuerpo"></div>
       <p style="font-size:calc(13px / var(--k,1))">No se envía nada solo: los días que elijas te lo recordamos al abrir la aplicación, para que lo revises y lo envíes tú.</p>
       <button class="vm-link" type="button" id="f-cerrar">Cerrar</button>
+    </div>
+  </div>
+  <div class="vm-modal" id="m-rapido" hidden>
+    <div class="vm-card" role="dialog" aria-modal="true" aria-labelledby="t-rapido" style="max-height:92vh;overflow:auto">
+      <div class="cu-cab cab-modal"><h2 id="t-rapido">Enviar tu pedido de siempre</h2><button class="vm-x" type="button" id="r-x" aria-label="Cerrar">×</button></div>
+      <div id="r-cuerpo"></div>
+      <div class="err" id="r-err" role="alert"></div>
     </div>
   </div>
   <div class="vm-modal" id="m-siempre" hidden>
@@ -1638,6 +1649,43 @@ async function pintarFijo() {
   btn("Borrar mi pedido fijo", "ghost", async () => { if (!confirm("¿Borrar tu pedido fijo?")) return; await post("/api/pedido-fijo/borrar", {}); pintarFijo(); });
 }
 // «Tu pedido de siempre»: editar cantidades, quitar artículos, borrarlo (solo cambia la portada; nunca envía nada)
+/** «Pedir en 10 segundos»: ventana que enseña lo que se va a enviar (artículos, total con IVA de hoy, dirección y día) y solo envía cuando se pulsa «Enviar pedido». Envía por el mismo camino que el catálogo (POST /catalogo). */
+async function abrirRapido(ui) {
+  const B = $("r-cuerpo"), E = $("r-err"); E.textContent = ""; B.textContent = "Un momento…"; $("m-rapido").hidden = false;
+  const j = await fetch("/api/pedido-rapido").then((r) => (r.ok ? r.json() : null)).catch(() => null); // precios y días de ahora mismo
+  const cerrar = () => { $("m-rapido").hidden = true; };
+  if (!j?.posible) { B.textContent = ""; E.textContent = j?.motivo || "No se ha podido preparar el pedido. Comprueba tu conexión e inténtalo otra vez."; return; }
+  B.textContent = "";
+  let dia = j.porDefecto, enviando = false;
+  const key = "rapido-" + (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)); // el mismo toque repetido no duplica el pedido
+  B.appendChild(el("p", null, "Te lo llevamos a: " + j.direccion));
+  const dias = el("div", "r-dias"); dias.setAttribute("role", "radiogroup"); dias.setAttribute("aria-label", "Día de entrega");
+  for (const o of j.opciones) {
+    const b = el("button", "r-dia", o.label + (o.detail ? " · " + o.detail : "")); b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(o.date === dia));
+    b.onclick = () => { dia = o.date; for (const x of dias.children) x.setAttribute("aria-checked", String(x === b)); }; dias.appendChild(b);
+  }
+  B.appendChild(dias);
+  const ul = el("ul", "lineas");
+  for (const l of j.lineas.slice(0, 6)) ul.appendChild(el("li", null, l.qty + (l.unit === "caja" ? (l.qty === 1 ? " caja" : " cajas") : " ud") + " · " + l.nombre));
+  B.appendChild(ul); if (j.lineas.length > 6) B.appendChild(el("p", "in-peq", "… y " + (j.lineas.length - 6) + " más"));
+  if (j.quitados > 0) B.appendChild(el("p", "in-peq", j.quitados === 1 ? "Un artículo ya no está en el catálogo y no se incluye." : j.quitados + " artículos ya no están en el catálogo y no se incluyen."));
+  B.appendChild(el("p", "in-total", `${j.articulos} artículo${j.articulos === 1 ? "" : "s"} · ${eur(j.total)} con IVA`));
+  const bt = (txt, cls, fn) => { const b = el("button", "vm-btn " + cls, txt); b.type = "button"; b.onclick = fn; B.appendChild(b); return b; };
+  const env = bt("Enviar pedido · " + eur(j.total), "primary", async () => {
+    if (enviando) return; enviando = true; env.disabled = true; env.textContent = "Enviando…"; E.textContent = "";
+    let r = null, d = null;
+    try { r = await fetch("/catalogo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, lines: j.lineas.map((l) => ({ id: l.id, qty: l.qty, unit: l.unit })), delivery: dia }) }); d = await r.json().catch(() => null); } catch {}
+    if (r?.ok && d?.ok) {
+      B.textContent = ""; B.append(el("h3", null, "¡Pedido enviado!"), el("p", null, d.ref ? "Tu referencia es " + d.ref + "." : "Lo hemos recibido."));
+      bt("Ver pedido", "primary", () => { cerrar(); abrirCuenta(true); }); bt("Cerrar", "ghost", cerrar); return;
+    }
+    enviando = false; env.disabled = false; env.textContent = "Enviar pedido · " + eur(j.total);
+    E.textContent = d?.error || (r ? "No se ha podido enviar. Inténtalo otra vez o revísalo antes." : "Sin conexión. Tu pedido no se ha enviado: inténtalo cuando vuelva la cobertura.");
+  });
+  bt("Revisar antes de enviar", "ghost", () => { location.href = ui.url + "#" + ui.last.repetir; });
+  bt("Cancelar", "ghost", cerrar);
+}
+$("r-x").onclick = () => ($("m-rapido").hidden = true);
 async function abrirSiempre(modo) {
   const B = $("s-cuerpo"), E = $("s-err"); E.textContent = ""; B.textContent = "Un momento…"; $("m-siempre").hidden = false;
   const j = await fetch("/api/pedido-de-siempre").then((r) => (r.ok ? r.json() : null)).catch(() => null);
@@ -1851,7 +1899,10 @@ function inicio(ui) {
     const rep = el("button", "vm-btn primary", "Repetir y revisar"); rep.type = "button"; rep.onclick = () => { location.href = ui.url + "#" + ui.last.repetir; }; // carga con los precios de hoy y abre «Pedido»; nunca se envía solo
     const dia = diaSemanaDe(ui.last.fecha);
     const sem = el("button", "vm-btn ghost in-rec"); sem.append(el("span", "in-rec-t", dia ? "Repetir cada " + dia : "Repetir cada semana"), el("small", "in-rec-s", "Pedido recurrente: se guarda y tú lo revisas antes de enviar")); sem.type = "button"; sem.onclick = () => { location.href = ui.url + "#" + ui.last.repetir + "&f=1"; };
-    principal.append(rep, sem);
+    const rap = el("button", "vm-btn primary in-rapido", "Enviar ya"); rap.type = "button"; rap.hidden = true; // «Pedir en 10 segundos»: aparece con el total de hoy cuando llega la vista previa; pide confirmar día y dirección antes de enviar
+    rep.className = "vm-btn ghost"; // «Repetir y revisar» pasa a secundario: el botón principal es enviar con un toque
+    principal.append(rap, rep, sem);
+    fetch("/api/pedido-rapido").then((r) => (r.ok ? r.json() : null)).catch(() => null).then((j) => { if (!j?.posible) return; rap.textContent = "Enviar ya · " + eur(j.total); rap.hidden = false; rap.onclick = () => abrirRapido(ui); }); // si no carga, simplemente no sale el botón extra (siguen «Repetir y revisar» y «Hacer pedido»)
     const acc = el("div", "in-sie-acc"), be = el("button", "vm-btn ghost", "Editar"), bb = el("button", "vm-btn ghost", "Borrar"); be.type = bb.type = "button";
     be.setAttribute("aria-label", "Editar tu pedido de siempre"); bb.setAttribute("aria-label", "Borrar tu pedido de siempre");
     be.onclick = () => abrirSiempre("editar"); bb.onclick = () => abrirSiempre("borrar"); acc.append(be, bb); principal.appendChild(acc);

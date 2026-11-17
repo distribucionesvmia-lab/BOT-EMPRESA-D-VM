@@ -40,6 +40,7 @@ import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { crearAvisos } from "./avisos.js";
 import { compararFamilias } from "./ordenfamilia.js";
 import { conArbolA3erp } from "./arbol-a3erp.js";
+import { previaPedidoRapido } from "./pedido-rapido.js";
 import { endpointValido, clavesValidas } from "./webpush.js";
 const FAM_NOMBRES = JSON.parse(fs.readFileSync(new URL("./familias-nombres.json", import.meta.url), "utf8")); // nombres de las familias y subfamilias de a3ERP (listado de familias)
 const FAM_CATEGORIAS = (() => { try { return JSON.parse(fs.readFileSync(new URL("./familias-categorias.json", import.meta.url), "utf8")); } catch { return {}; } })();
@@ -811,6 +812,15 @@ async function appRoutes(req, res, url) {
   if (p === "/api/pedido-de-siempre/borrar" && req.method === "POST") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
     return void sendJson(res, 200, { ok: getAccountsDb().hideUsual(account.customerId) });
+  }
+  // ── «Pedir en 10 segundos»: vista previa del pedido de siempre con el total con IVA de hoy y los días de reparto. NO envía nada: el envío va por POST /catalogo. ──
+  if (p === "/api/pedido-rapido" && req.method === "GET") {
+    if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
+    if (account.soloVer) return void sendJson(res, 200, { posible: false, motivo: SOLO_VER_TEXTO });
+    await refreshCatalog();
+    const customer = clienteConPedidos(account.customerId), u = getAccountsDb().getUsual(account.customerId);
+    const fuente = u ? (u.hidden ? [] : u.lines) : lineasUltimoPedido(customer).lineas;
+    return void sendJson(res, 200, previaPedidoRapido({ fuente, catalogo: catalogNow(), customer, opciones: avisoEntrega(customer).delivery, phone: account.phone }));
   }
   if (p === "/api/pedido-de-siempre/restaurar" && req.method === "POST") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });

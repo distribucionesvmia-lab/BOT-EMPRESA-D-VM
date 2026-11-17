@@ -317,7 +317,7 @@ test("TU PEDIDO DE SIEMPRE en el móvil: el texto a todo el ancho y los botones 
   const fs = await import("node:fs");
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(cli, /\.vm-inicio \.in-card \.vm-btn \{ width:100%; \}/); // botones a todo el ancho, debajo
-  assert.match(cli, /principal\.append\(rep, sem\);/); assert.match(cli, /"Repetir cada " \+ dia/); assert.match(cli, /"Repetir y revisar"/);
+  assert.match(cli, /principal\.append\(rap, rep, sem\);/); assert.match(cli, /"Repetir cada " \+ dia/); assert.match(cli, /"Repetir y revisar"/);
 });
 
 test("MI CUENTA (app del cliente): botón arriba, datos del cliente y pedidos por meses con «Repetir» y «Añadir al carrito»", () => {
