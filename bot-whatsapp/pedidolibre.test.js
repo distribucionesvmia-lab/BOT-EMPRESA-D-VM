@@ -135,3 +135,15 @@ test("lo que ya funcionaba sigue igual: «lo de siempre», «azucar», «servill
   assert.equal(esPedidoMultiple("hola buenas"), false);
   assert.equal(esPedidoMultiple("¿qué me sirve para un bar de tapas?"), false);
 });
+
+test("POR VOZ: «dos cajas de coca cola zero y una de agua» (números en letra, sin comas) anota las dos cosas y las dos en cajas", () => {
+  const UN_AGUA = CAT.filter((p) => p.id !== "A2"), nuevo = () => newSession(cliente, "/catalogo", {}); // con una sola agua en el catálogo no hay duda de cuál
+  const r = di("dos cajas de coca cola zero y una de agua", nuevo(), UN_AGUA);
+  assert.equal(carro(r), "2c×R2,1c×A1"); assert.match(r.reply, /Anotado/); assert.doesNotMatch(r.reply, /¿lo quieres en/); // lo mismo que con cifras
+  assert.equal(carro(di("dos cajas de coca cola zero y 1 de agua", nuevo(), UN_AGUA)), "2c×R2,1c×A1");
+  assert.equal(carro(di("Dos cajas de Coca-Cola Zero y una caja de agua bezoya.")), "2c×R2,1c×A1"); // con mayúsculas y punto final, como lo escribe el dictado del móvil
+  // «una de agua» SOLA sigue preguntando cajas o unidades (no hay de dónde heredar)
+  assert.match(di("una de agua", nuevo(), UN_AGUA).reply, /¿lo quieres en/);
+  // con dos aguas distintas pregunta cuál (no elige una por su cuenta)
+  assert.match(di("dos cajas de coca cola zero y una de agua").reply, /hay 2 opciones parecidas/);
+});

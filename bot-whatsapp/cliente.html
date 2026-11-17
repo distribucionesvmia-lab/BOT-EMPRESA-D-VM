@@ -356,6 +356,11 @@
   form.send { display:flex; align-items:center; gap:var(--s2); padding:var(--s2) max(var(--gutter), calc((100% - var(--ancho)) / 2)) max(var(--s3), env(safe-area-inset-bottom)); border-top:.5px solid var(--mat-line); background:var(--mat-bg); -webkit-backdrop-filter:blur(22px) saturate(180%); backdrop-filter:blur(22px) saturate(180%); }
   @media (prefers-reduced-transparency: reduce) { form.send { background:var(--surface); -webkit-backdrop-filter:none; backdrop-filter:none; } }
   form.send input { flex:1; min-width:0; min-height:48px; border-radius:var(--r-pill); }
+  .voz-estado { margin:0; padding:var(--s1) max(var(--gutter), calc((100% - var(--ancho)) / 2)) 0; font-size:calc(13px / var(--k,1)); color:var(--text-2); background:var(--surface); }
+  form.send .voz { background:var(--field); color:var(--accent); }
+  form.send .voz.escucha { background:var(--accent); color:var(--on-accent); animation:vozlate 1.2s ease-in-out infinite; }
+  @keyframes vozlate { 50% { transform:scale(1.08); } }
+  @media (prefers-reduced-motion: reduce) { form.send .voz.escucha { animation:none; } }
   form.send button { width:48px; height:48px; flex:none; border:0; border-radius:50%; background:var(--accent); color:var(--on-accent); font-size:calc(var(--t-body) / var(--k,1)); cursor:pointer; }
   .sheet { position:absolute; left:0; right:0; bottom:0; max-height:70%; overflow-y:auto; background:var(--surface); border-radius:var(--r-card) var(--r-card) 0 0; border-top:.5px solid var(--line); }
   .sheet .h { padding:var(--s3) var(--s4); font-weight:600; display:flex; justify-content:space-between; border-bottom:.5px solid var(--line); } .sheet .h span { cursor:pointer; }
@@ -890,7 +895,8 @@
       <button type="button" data-q="último pedido"><span class="q-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg></span><span class="q-tx"><b>Último pedido</b><small>Verlo y repetirlo</small></span></button>
       <button type="button" data-q="histórico"><span class="q-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.600-5.900M4 4v4h4M12 8v4l2.500 1.500"/></svg></span><span class="q-tx"><b>Histórico de pedidos</b><small>Tus 10 últimos</small></span></button>
     </nav>
-    <form class="send" id="f"><input id="t" autocomplete="off" placeholder="Escribe un mensaje" aria-label="Mensaje"><button aria-label="Enviar">➤</button></form>
+    <p id="voz-estado" class="voz-estado" role="status" aria-live="polite" hidden></p>
+    <form class="send" id="f"><input id="t" autocomplete="off" placeholder="Escribe un mensaje" aria-label="Mensaje"><button type="button" id="voz" class="voz" hidden aria-label="Pedir hablando"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button><button aria-label="Enviar">➤</button></form>
   </section>
 </main>
 
@@ -2129,6 +2135,30 @@ mbtn.onclick = (e) => { e.stopPropagation(); menu(mpop.hidden); };
 document.addEventListener("click", () => menu(false)); document.addEventListener("keydown", (e) => { if (e.key === "Escape") menu(false); });
 document.querySelectorAll("#quick button").forEach((b) => (b.onclick = () => enviar(b.dataset.q, b.querySelector("b")?.textContent ?? b.textContent)));
 $("f").onsubmit = (e) => { e.preventDefault(); const v = $("t").value.trim(); if (v) { $("t").value = ""; enviar(v); } };
+// ── Pedir hablando: el micrófono del chat dicta lo que dices en la caja de mensaje y, al terminar, lo manda como si lo hubieras escrito («dos cajas de coca cola zero y una de agua»). El reconocimiento lo hace el navegador del móvil (envía el audio a su servicio de voz: Google/Apple); sin soporte, el botón no sale. No confirma ningún pedido: el asistente anota y pregunta como siempre. ──
+(() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition, btn = $("voz"), caja = $("t"), est = $("voz-estado");
+  if (!SR) return; btn.hidden = false;
+  let rec = null, escuchando = false, enviar1 = true;
+  const di = (txt) => { est.textContent = txt; est.hidden = !txt; };
+  const MSG = { "not-allowed": "Permite el micrófono en los ajustes del móvil para pedir hablando.", "service-not-allowed": "Permite el micrófono en los ajustes del móvil para pedir hablando.", "no-speech": "No te he oído. Pulsa el micrófono y habla otra vez.", "audio-capture": "No encuentro el micrófono.", network: "Sin conexión: no puedo oírte ahora. Escríbelo." };
+  btn.onclick = () => {
+    if (escuchando) { try { rec.stop(); } catch {} return; }
+    try {
+      rec = new SR(); rec.lang = "es-ES"; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1; enviar1 = true;
+      rec.onstart = () => { escuchando = true; btn.classList.add("escucha"); btn.setAttribute("aria-pressed", "true"); btn.setAttribute("aria-label", "Dejar de escuchar"); di("Escuchando… di lo que necesitas, por ejemplo «dos cajas de coca cola zero y una de agua»."); };
+      rec.onresult = (e) => { let txt = ""; for (const r of e.results) txt += r[0].transcript; caja.value = txt.trim(); };
+      rec.onerror = (e) => { enviar1 = false; di(MSG[e.error] ?? "No he podido oírte. Prueba otra vez o escríbelo."); };
+      rec.onend = () => {
+        escuchando = false; btn.classList.remove("escucha"); btn.removeAttribute("aria-pressed"); btn.setAttribute("aria-label", "Pedir hablando");
+        const v = caja.value.trim();
+        if (enviar1 && v) { di(""); caja.value = ""; enviar(v); } // llega al chat como un mensaje más (con sus mismas protecciones)
+        else if (!v && enviar1) di("No te he oído. Pulsa el micrófono y habla otra vez.");
+      };
+      rec.start();
+    } catch { escuchando = false; di("No se ha podido usar el micrófono. Escríbelo."); }
+  };
+})();
 // «Mi cuenta» con texto si cabe; si con la letra grande o una pantalla estrecha no cabe, solo el icono
 function ajustaCuenta() {
   const b = $("micuenta"), bar = b && b.closest(".bar"); if (!bar || !bar.offsetWidth) return;

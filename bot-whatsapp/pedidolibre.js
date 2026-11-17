@@ -116,7 +116,7 @@ function interpretarTrozo(z, ctx, previo) {
   const unitUd = resto.some((w) => ["ud", "uds", "unidad", "unidades"].includes(w));
   const formato = resto.find((w) => FORMATO_ESTRICTO.has(w)) ?? null;
   // «2 cajas de X y 3 de Y»: el «3 de Y» también es en cajas
-  const hereda = qty != null && !unitCaja && !unitUd && !formato && previo?.cajas && /^\s*\d+\s+de\s/.test(crudo);
+  const hereda = qty != null && !unitCaja && !unitUd && !formato && previo?.cajas && /^\d+$/.test(ws[0] ?? "") && ws[1] === "de"; // «2 cajas de X y 3 de Y» y también por voz: «dos cajas de X y una de Y» (ws ya trae los números en cifras)
   const unit = unitCaja || (hereda && !unitUd) ? "caja" : "ud";
   const unitStated = unitCaja || unitUd || hereda || !!formato;
   const query = resto.filter((w) => !STOP.has(w) && !w.startsWith("m_") && !/^\d+$/.test(w));
