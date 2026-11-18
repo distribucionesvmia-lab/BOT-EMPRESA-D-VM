@@ -147,3 +147,14 @@ test("POR VOZ: «dos cajas de coca cola zero y una de agua» (números en letra,
   // con dos aguas distintas pregunta cuál (no elige una por su cuenta)
   assert.match(di("dos cajas de coca cola zero y una de agua").reply, /hay 2 opciones parecidas/);
 });
+
+test("SIN COSTE PARA ESTE CLIENTE: un artículo a 0 € o con el 100 % de descuento SOLO para él no se vende en el chat; para los demás clientes, sí", () => {
+  const raro = { ...cliente, id: "9002", discounts: { R2: 100 }, specialPrices: { A1: 0 } }, normal = cliente;
+  const s = (c) => newSession(c, "/catalogo", {});
+  assert.doesNotMatch(di("2 cajas de coca cola zero", s(raro)).reply + carro(di("2 cajas de coca cola zero", s(raro))), /R2|ZERO LATA/);
+  assert.equal(carro(di("1 caja de coca cola zero", s(normal))), "1c×R2"); // otro cliente: normal
+  assert.doesNotMatch(carro(di("una caja de agua bezoya", s(raro))), /A1/); // precio especial 0 € para él
+  assert.equal(carro(di("2 cajas de coca cola light", s(raro))), "2c×R3"); // lo demás de su catálogo sigue funcionando
+  assert.ok(di("hola", s(raro)).session); // y el catálogo global se restaura al terminar (la siguiente llamada lo ve entero)
+  assert.equal(carro(di("1 caja de coca cola zero", s(normal))), "1c×R2");
+});

@@ -159,10 +159,10 @@ test("TOPES DE PEDIDOS: por cliente y hora, por cliente y día, en total en 10 m
   assert.equal((s.match(/topePedidos\(account\.id/g) ?? []).length, 2, "lo usan el catálogo y el chat");
 });
 
-test("del NIF solo se piden y se mandan los 6 primeros dígitos (las letras no cuentan)", async () => {
+test("el NIF se puede escribir con letras y números; se mandan solo los 6 primeros números", async () => {
   const h = leer("./cliente.html"), tarjeta = h.slice(h.indexOf('id="f-pw"'), h.indexOf('id="f-correo"'));
-  for (const t of ["Los 6 primeros dígitos de tu DNI o CIF", 'inputmode="numeric"', 'id="pw-aviso"']) assert.ok(tarjeta.includes(t), t);
-  assert.ok(!/NIF \(DNI, NIE o CIF\)/.test(tarjeta)); assert.match(h, /const nif6 = \(\) => \$\("pw-nif"\)\.value\.replace\(\/\\D\/g, ""\)\.slice\(0, 6\)/); assert.match(h, /nif: nif6\(\), password/);
+  for (const t of ["Tu DNI, NIE o CIF", 'inputmode="text"', 'autocapitalize="characters"', 'id="pw-aviso"']) assert.ok(tarjeta.includes(t), t); assert.ok(!tarjeta.includes('id="pw-nif" type="text" inputmode="numeric"')); // ya no es un teclado solo de números
+  assert.match(h, /const nif6 = \(\) => \$\("pw-nif"\)\.value\.replace\(\/\\D\/g, ""\)\.slice\(0, 6\)/); assert.match(h, /nif: nif6\(\), password/);
   // el servidor reconoce al cliente solo con esos 6 dígitos, y la contraseña no puede contenerlos
   const m = await montar();
   try {

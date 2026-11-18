@@ -612,11 +612,15 @@ const HUMAN_REPLY =
 export function handleMessage(session, rawText, ctx = {}) {
   PRICES = session?.customer?.specialPrices ?? null;
   CLIENTE = session?.customer ?? null;
+  const catalogoBase = CATALOG;
+  // Lo que a ESTE cliente le sale a 0 € (precio especial 0) o con el 100 % de descuento no se vende en el chat, igual que en el catálogo (el 0 € / 100 % general ya lo quita el programa al cargar el catálogo)
+  if (CLIENTE && (CLIENTE.specialPrices || CLIENTE.discounts)) { const ok = CATALOG.filter((p) => { const id = String(p.id), pr = CLIENTE.specialPrices?.[id] ?? p.price, d = CLIENTE.discounts?.[id] ?? p.discount ?? 0; return Number(pr) > 0 && Number(d) < 100; }); if (ok.length && ok.length !== CATALOG.length) CATALOG = ok; }
   try {
     return handleMessageInner(session, rawText, ctx);
   } finally {
     PRICES = null;
     CLIENTE = null;
+    CATALOG = catalogoBase;
   }
 }
 
