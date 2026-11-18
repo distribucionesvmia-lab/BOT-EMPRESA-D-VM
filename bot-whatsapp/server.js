@@ -780,7 +780,7 @@ async function appRoutes(req, res, url) {
     // Sin bloquear el programa (antes se leía el archivo entero de forma síncrona: con cientos de fotos por pantalla, todos esperaban) y con ETag: si la foto no cambió, 304 sin enviar nada
     try {
       const st = await fs.promises.stat(IMG_DIR + file), etag = `"${Math.floor(st.mtimeMs)}-${st.size}"`;
-      const cab = { "Content-Type": IMG_TYPES[file.split(".").pop().toLowerCase()], "Cache-Control": "private, max-age=86400", "ETag": etag, "X-Content-Type-Options": "nosniff" };
+      const cab = { "Content-Type": IMG_TYPES[file.split(".").pop().toLowerCase()], "Cache-Control": url.searchParams.has("v") ? "private, max-age=31536000, immutable" : "private, max-age=86400", "ETag": etag, "X-Content-Type-Options": "nosniff" };
       if (req.headers["if-none-match"] === etag) return void res.writeHead(304, cab).end();
       res.writeHead(200, { ...cab, "Content-Length": st.size });
       if (req.method === "HEAD") return void res.end();
