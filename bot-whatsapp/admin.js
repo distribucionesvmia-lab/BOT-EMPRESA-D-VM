@@ -388,18 +388,36 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
     }
     // ---- Enlace de invitación: la oficina lo crea para un cliente y lo manda ELLA por WhatsApp; el sistema no envía nada ----
     // Opciones por enlace (invitaciones.js): días o fecha (y hora) de caducidad, usos con tope, mensaje de bienvenida, solo ver o también pedir, y si se le pide poner su código.
+    // Dirección pública que llevan los enlaces. Orden: CLIENTE_URL (config) → la que la oficina fijó en el panel → la última por la que entró un cliente (puede ser una interna) → PUBLIC_URL.
+    const limpiaBase = (t) => String(t ?? "").trim().replace(/^(https?:\/\/[^/]+).*$/i, "$1").replace(/\/+$/, "");
+    const baseEnlaces = () => {
+      for (const [origen, v] of [["config", process.env.CLIENTE_URL], ["panel", accounts.ajuste("enlace_url")], ["detectada", accounts.ajuste("contacto")], ["config", process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : ""]]) { const b = limpiaBase(v); if (/^https?:\/\//.test(b)) return { base: b, origen }; }
+      return { base: "", origen: "" };
+    };
+    const baseInterna = (b) => { try { const h = new URL(b).hostname; return h === "localhost" || /^(127\.|10\.|192\.168\.|169\.254\.)|^172\.(1[6-9]|2\d|3[01])\./.test(h) || !/\./.test(h) || /\.(local|lan|internal|home)$/i.test(h); } catch { return true; } };
+    if (p === "/api/admin/invitaciones/direccion") {
+      if (get) { const x = baseEnlaces(); return send(res, 200, { ...x, interna: x.base ? baseInterna(x.base) : false, fijada: limpiaBase(accounts.ajuste("enlace_url")), bloqueada: !!limpiaBase(process.env.CLIENTE_URL) }), true; }
+      if (post) {
+        const b = (await readJson(req)) ?? {}, v = String(b.direccion ?? "").trim();
+        if (!v) { accounts.ajusteGuardar("enlace_url", ""); return send(res, 200, { ok: true, ...baseEnlaces() }), true; }
+        const l = limpiaBase(v);
+        if (!/^https?:\/\/[^/\s]+\.[a-z]{2,}$/i.test(l)) return send(res, 400, { error: "Escribe la dirección completa por la que entran tus clientes, por ejemplo https://pedidos.tuempresa.es" }), true;
+        if (baseInterna(l)) return send(res, 400, { error: "Esa dirección es interna (solo funciona en la oficina). Pon la pública, la que abren los clientes desde su móvil." }), true;
+        accounts.ajusteGuardar("enlace_url", l); return send(res, 200, { ok: true, ...baseEnlaces() }), true;
+      }
+    }
     { const mi = /^\/api\/admin\/clientes\/([^/]+)\/invitacion$/.exec(p);
       if (mi && post) {
         const cli = customers.getById(decodeURIComponent(mi[1]));
         if (!cli) return send(res, 404, { error: "No encontramos ese cliente." }), true;
-        const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1");
+        const base = baseEnlaces().base;
         if (!/^https?:\/\//.test(base)) return send(res, 409, { error: "Falta la dirección pública de la aplicación del cliente: ponla en CLIENTE_URL (en C:\\vm\\config) o abre una vez la aplicación del cliente desde su dirección pública." }), true;
         const op = opcionesInvitacion((await readJson(req)) ?? {});
         if (op.error) return send(res, 400, { error: op.error }), true;
         const { token, caduca } = accounts.invitacionCrear(cli.id, op);
         const url = `${base}/entrar/${token}`, tel = String(cli.phone ?? cli.phones?.[0] ?? "").replace(/\D/g, "").replace(/^(0034|34)/, "");
         const texto = textoWhatsapp(accounts.ajuste("plantilla_enlace"), { nombre: cli.name, url, usos: op.usos, expiresAt: caduca });
-        return send(res, 200, { ok: true, cliente: cli.name, url, caduca, usos: op.usos, soloVer: op.soloVer, pedirCodigo: op.pedirCodigo, texto, whatsapp: `https://wa.me/${/^\d{9}$/.test(tel) ? "34" + tel : ""}?text=${encodeURIComponent(texto)}`, tieneTelefono: /^\d{9}$/.test(tel) }), true;
+        return send(res, 200, { ok: true, base, interna: baseInterna(base), cliente: cli.name, url, caduca, usos: op.usos, soloVer: op.soloVer, pedirCodigo: op.pedirCodigo, texto, whatsapp: `https://wa.me/${/^\d{9}$/.test(tel) ? "34" + tel : ""}?text=${encodeURIComponent(texto)}`, tieneTelefono: /^\d{9}$/.test(tel) }), true;
       } }
     // Enlace para una PERSONA NUEVA (aún sin alta). Tres tipos: «alta» (abre su solicitud con el nombre puesto; no crea nada),
     // «ver» (entra a ver la app sin poder pedir; se crea un cliente provisional solo con el nombre) y «pedir» (como un cliente normal:
@@ -409,7 +427,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       if (!tipo) return send(res, 400, { error: "Elige qué quieres que pueda hacer: darse de alta, ver la app o pedir." }), true;
       const nombre = String(b.nombre ?? "").replace(/\s+/g, " ").trim();
       if (nombre.length < 2 || nombre.length > 80) return send(res, 400, { error: "Escribe el nombre de la persona o del negocio (de 2 a 80 letras)." }), true;
-      const base = String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1");
+      const base = baseEnlaces().base;
       if (!/^https?:\/\//.test(base)) return send(res, 409, { error: "Falta la dirección pública de la aplicación del cliente: ponla en CLIENTE_URL (en C:\\vm\\config) o abre una vez la aplicación del cliente desde su dirección pública." }), true;
       const op = opcionesInvitacion({ ...b, modo: tipo === "pedir" ? "pedir" : "ver", pedirCodigo: tipo === "pedir" ? b.pedirCodigo : false });
       if (op.error) return send(res, 400, { error: op.error }), true;
@@ -433,7 +451,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       const url = `${base}/entrar/${token}`, tel = telefono.replace(/\D/g, "").replace(/^(0034|34)/, "");
       const plantilla = accounts.ajuste("plantilla_enlace") || (tipo === "alta" ? PLANTILLA_ALTA : tipo === "ver" ? PLANTILLA_VER : PLANTILLA_DEFECTO);
       const texto = textoWhatsapp(plantilla, { nombre, url, usos: op.usos, expiresAt: caduca });
-      return send(res, 200, { ok: true, cliente: nombre, codigoCliente: customerId || null, tipo, url, caduca, usos: op.usos, soloVer: tipo !== "pedir", pedirCodigo: op.pedirCodigo, texto, whatsapp: `https://wa.me/${/^\d{9}$/.test(tel) ? "34" + tel : ""}?text=${encodeURIComponent(texto)}`, tieneTelefono: /^\d{9}$/.test(tel) }), true;
+      return send(res, 200, { ok: true, base, interna: baseInterna(base), cliente: nombre, codigoCliente: customerId || null, tipo, url, caduca, usos: op.usos, soloVer: tipo !== "pedir", pedirCodigo: op.pedirCodigo, texto, whatsapp: `https://wa.me/${/^\d{9}$/.test(tel) ? "34" + tel : ""}?text=${encodeURIComponent(texto)}`, tieneTelefono: /^\d{9}$/.test(tel) }), true;
     }
     // Lista de enlaces (sin el enlace en sí: no se guarda) y «Anular»
     // ---- Entrada de clientes aprobada por la oficina: quién la ha pedido (con la referencia que ve él en su pantalla), aprobar, rechazar o dar un código ----
@@ -783,7 +801,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       if (mc && post) return accounts.avisoProgCancelar(mc[1]) ? send(res, 200, { ok: true }) : send(res, 409, { error: "Ese aviso ya salió, se canceló o no existe." }), true; }
     // ---- Correos a clientes (promociones, descuentos, avisos de servicio): ahora o programados; las promociones solo a quien ha aceptado ofertas ----
     {
-      const smtpCfg = () => smtpDesdeEntorno(), baseCliente = () => String(process.env.CLIENTE_URL || accounts.ajuste("contacto") || (process.env.APP_MODE !== "empresa" ? process.env.PUBLIC_URL : "") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1");
+      const smtpCfg = () => smtpDesdeEntorno(), baseCliente = () => baseEnlaces().base;
       const parte = (x) => ({ ...x, para: x.destino === "todos" ? (x.tipo === "promo" ? "Todos los que aceptan ofertas" : "Todos los clientes con correo") : (customers.getById(x.clienteId)?.name ?? "Cliente " + x.clienteId), tipoTexto: TIPOS_CORREO[x.tipo] });
       const lanzar = () => enviarCampanas({ accounts, contactos: () => customers.contactos(), smtp: smtpCfg()?.smtp, from: smtpCfg()?.from, base: baseCliente, negocio: "Distribuciones Valentín Martín", telefono: process.env.AYUDA_TEL ?? "" }).catch((e) => console.error("Correos a clientes:", e.message));
       if (p === "/api/admin/correos" && get) {

@@ -1715,3 +1715,18 @@ test("IMPRIMIR DIRECTO: la hoja para imprimir sale ya, sin exportar ni marcar na
   assert.equal((await call("POST", "/api/admin/imprimir", { admin: true, body: { refs: ["VM-2000-000001"] } })).json.vacio, true); // sin pedidos listos: avisa
   assert.match(fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8").replace(/\r\n/g, "\n"), /id="imprimir-ya"/);
 });
+
+test("DIRECCIÓN DE LOS ENLACES: se puede fijar desde el panel, se rechaza una interna y el enlace creado dice qué dirección usó", async () => {
+  const id = (await call("GET", "/api/admin/clientes?q=ejemplo", { admin: true })).json[0].id;
+  const dir = async (body) => await call(body ? "POST" : "GET", "/api/admin/invitaciones/direccion", { admin: true, ...(body ? { body } : {}) });
+  assert.equal((await dir({ direccion: "http://192.168.1.20:3000" })).status, 400); // interna: un móvil de fuera no la abre
+  assert.equal((await dir({ direccion: "http://localhost:3000" })).status, 400);
+  assert.equal((await dir({ direccion: "pedidos" })).status, 400);
+  const ok = await dir({ direccion: "https://pedidos.ejemplo-vm.es/cliente?x=1" });
+  assert.equal(ok.status, 200); assert.equal(ok.json.base, "https://pedidos.ejemplo-vm.es"); // recorta ruta y consulta
+  const r = (await call("POST", `/api/admin/clientes/${id}/invitacion`, { admin: true, body: {} })).json;
+  assert.match(r.url, /^https:\/\/pedidos\.ejemplo-vm\.es\/entrar\//); assert.equal(r.base, "https://pedidos.ejemplo-vm.es"); assert.equal(r.interna, false);
+  assert.equal((await dir()).json.fijada, "https://pedidos.ejemplo-vm.es");
+  assert.equal((await dir({ direccion: "" })).status, 200); // vaciar vuelve a la detectada
+  assert.match(fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8").replace(/\r\n/g, "\n"), /id="inv-base-g"/);
+});

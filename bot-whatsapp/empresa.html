@@ -749,7 +749,8 @@
           <p class="inv-resumen" id="inv-resumen" role="status" aria-live="polite"></p>
           <div class="acciones"><button class="main" id="inv-crear" type="button">Crear enlace de acceso</button></div>
         </div>
-        <div id="inv-res" class="inv-res" hidden><label class="campo"><span>Enlace creado</span><input id="inv-url" readonly aria-label="Enlace creado"></label><div class="muted" id="inv-info"></div><div class="acciones"><button class="main" id="inv-copiar" type="button">Copiar enlace</button><button id="inv-wa" type="button">Abrir en WhatsApp</button></div><div class="muted" id="inv-msg" role="status"></div></div>
+        <div id="inv-res" class="inv-res" hidden><label class="campo"><span>Enlace creado</span><input id="inv-url" readonly aria-label="Enlace creado"></label><div class="muted" id="inv-info"></div><div class="muted" id="inv-dir"></div><div class="acciones"><button class="main" id="inv-copiar" type="button">Copiar enlace</button><button id="inv-wa" type="button">Abrir en WhatsApp</button></div><div class="muted" id="inv-msg" role="status"></div></div>
+        <div class="inv-res" id="inv-base" style="margin-bottom:10px"><label class="campo"><span>Dirección pública de la aplicación (la que llevan los enlaces)</span><input id="inv-base-v" type="text" placeholder="https://pedidos.tuempresa.es" aria-label="Dirección pública"></label><div class="muted" id="inv-base-i"></div><div class="acciones"><button id="inv-base-g" type="button">Guardar dirección</button></div></div>
         <details style="margin-top:10px"><summary>Texto del WhatsApp (editable)</summary>
           <p class="muted" style="margin:6px 0">Escribe el mensaje que mandarás. Pon <b>{enlace}</b> donde va el enlace (obligatorio). También valen <b>{nombre}</b>, <b>{usos}</b> y <b>{caduca}</b>.</p>
           <textarea id="inv-plantilla" rows="4" maxlength="500" style="width:100%" aria-label="Texto del WhatsApp"></textarea>
@@ -1614,6 +1615,15 @@ function invResumen() {
 }
 for (const id of ["inv-para", "inv-n-tipo", "inv-n-nombre", "inv-sel", "inv-modo", "inv-dias", "inv-fecha", "inv-hora", "inv-usos"]) { $(id).addEventListener("input", invResumen); $(id).addEventListener("change", invResumen); }
 new MutationObserver(() => { $("inv-sel-l").hidden = !$("inv-sel").options.length; invResumen(); }).observe($("inv-sel"), { childList: true });
+
+async function direccionEnlaces() {
+  const r = await call("/api/admin/invitaciones/direccion").catch(() => null); if (!r) return;
+  $("inv-base-v").value = r.fijada || ""; $("inv-base-v").disabled = !!r.bloqueada;
+  $("inv-base-i").textContent = !r.base ? "Ahora no hay ninguna dirección: escríbela aquí o los enlaces no se podrán crear." : `Los enlaces nuevos llevarán: ${r.base} (${r.origen === "config" ? "viene de la configuración del programa" : r.origen === "panel" ? "la que fijaste aquí" : "detectada sola: la última por la que entró un cliente"}).${r.interna ? " ATENCIÓN: parece una dirección interna; un cliente desde su móvil no podría abrirla. Escribe la pública." : ""}${!r.fijada && r.origen === "detectada" ? " Para que no cambie sola, fíjala aquí." : ""}`;
+  $("inv-base-g").disabled = !!r.bloqueada;
+}
+$("inv-base-g").onclick = async () => { const r = await call("/api/admin/invitaciones/direccion", { direccion: $("inv-base-v").value }).catch((e) => ({ error: e.message })); if (r?.error) $("inv-base-i").textContent = r.error; else direccionEnlaces(); };
+direccionEnlaces();
 async function invitaciones() {
   const r = await call("/api/admin/invitaciones").catch(() => null); if (!r) return;
   if (document.activeElement !== $("inv-plantilla")) $("inv-plantilla").value = r.plantilla;
@@ -1634,7 +1644,7 @@ $("inv-crear").onclick = async () => {
   if (nuevo) Object.assign(cuerpo, { tipo: $("inv-n-tipo").value, nombre: $("inv-n-nombre").value, telefono: $("inv-n-tel").value, nif: $("inv-n-nif").value, direccion: $("inv-n-dir").value, poblacion: $("inv-n-pob").value, municipio: $("inv-n-mun").value, correo: $("inv-n-mail").value, razonSocial: $("inv-n-razon").value, recargo: $("inv-n-re").checked });
   const r = await call(nuevo ? "/api/admin/invitaciones/persona-nueva" : "/api/admin/clientes/" + encodeURIComponent(id) + "/invitacion", cuerpo).catch((e) => ({ error: e.message }));
   if (!r || r.error) { $("inv-res").hidden = false; $("inv-url").value = ""; $("inv-info").textContent = ""; m.textContent = (r && r.error) || "No se ha podido crear el enlace."; return; }
-  invActual = r; $("inv-res").hidden = false; $("inv-url").value = r.url; $("inv-info").textContent = `Para ${r.cliente}. ${r.usos === 1 ? "Un solo uso" : "Hasta " + r.usos + " usos"}; caduca el ${fechaEs(r.caduca)}. ${r.tipo === "alta" ? "Solo puede darse de alta (se le abre el formulario con su nombre). " : r.soloVer ? "Solo puede ver el catálogo. " : ""}${r.codigoCliente ? `Se ha creado como cliente provisional ${r.codigoCliente}. ` : ""}${r.tipo === "alta" ? "" : "Si creas otro para este cliente, este deja de valer."}`;
+  invActual = r; $("inv-res").hidden = false; $("inv-url").value = r.url; $("inv-dir").textContent = r.interna ? "ATENCIÓN: este enlace lleva una dirección interna (" + r.base + ") y el cliente no podrá abrirlo desde su móvil. Fija la dirección pública más abajo y créalo de nuevo." : "Dirección usada: " + r.base + ". Comprueba que es la que abren tus clientes."; $("inv-info").textContent = `Para ${r.cliente}. ${r.usos === 1 ? "Un solo uso" : "Hasta " + r.usos + " usos"}; caduca el ${fechaEs(r.caduca)}. ${r.tipo === "alta" ? "Solo puede darse de alta (se le abre el formulario con su nombre). " : r.soloVer ? "Solo puede ver el catálogo. " : ""}${r.codigoCliente ? `Se ha creado como cliente provisional ${r.codigoCliente}. ` : ""}${r.tipo === "alta" ? "" : "Si creas otro para este cliente, este deja de valer."}`;
   $("inv-wa").disabled = !r.tieneTelefono; $("inv-wa").title = r.tieneTelefono ? "" : "Este cliente no tiene teléfono guardado: copia el enlace y mándalo tú";
   invitaciones();
 };

@@ -1165,7 +1165,7 @@ const servidorHttp = http
     }
     // Correos a clientes programados desde el panel (promociones, avisos de servicio): cada minuto manda los que ya tocan. Solo en la app de la empresa y con SMTP; CORREOS_PROGRAMADOS=0 lo apaga.
     if (process.env.DEMO !== "1" && !process.env.VM_TEST && adminEnabled && process.env.CORREOS_PROGRAMADOS !== "0" && smtpDesdeEntorno()) {
-      setInterval(() => { const c = smtpDesdeEntorno(); if (!c) return; enviarCampanas({ accounts: getAccountsDb(), contactos: () => customerDirectory.contactos(), smtp: c.smtp, from: c.from, base: () => String(process.env.CLIENTE_URL || getAccountsDb().ajuste("contacto") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1"), negocio: BUSINESS.name, telefono: AYUDA.telefono }).catch((e) => console.error("Correos programados:", e.message)); }, 60e3).unref();
+      setInterval(() => { const c = smtpDesdeEntorno(); if (!c) return; enviarCampanas({ accounts: getAccountsDb(), contactos: () => customerDirectory.contactos(), smtp: c.smtp, from: c.from, base: () => String(process.env.CLIENTE_URL || getAccountsDb().ajuste("enlace_url") || getAccountsDb().ajuste("contacto") || "").replace(/^(https?:\/\/[^/]+).*$/i, "$1"), negocio: BUSINESS.name, telefono: AYUDA.telefono }).catch((e) => console.error("Correos programados:", e.message)); }, 60e3).unref();
     }
     // Actualización automática desde BASE-ARTICULOS / BASE-CLIENTES / BASE-HISTORICO (ACTUALIZACION_AUTO=0 la desactiva): cada minuto mira si hay un archivo nuevo y estable
     if (process.env.DEMO !== "1" && !process.env.VM_TEST && adminEnabled && process.env.ACTUALIZACION_AUTO !== "0") {
