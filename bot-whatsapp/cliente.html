@@ -1784,7 +1784,7 @@ $("d-confirmar").onclick = async () => {
   if (!r.ok) { $("d-err2").textContent = j.error || "No se pudo eliminar la cuenta."; return; }
   $("m-datos").hidden = true; $("d-eliminar").value = ""; chat.innerHTML = ""; modoAcceso(false); ver("acceso"); $("a-ok").textContent = "Tu cuenta se ha eliminado. Gracias por haber sido cliente.";
 };
-async function cerrarSesion() { try { indexedDB.deleteDatabase("vm-catalogo"); } catch {} await post("/api/salir", {}); chat.innerHTML = ""; modoAcceso(false); ver("acceso"); }
+async function cerrarSesion() { try { indexedDB.deleteDatabase("vm-catalogo"); localStorage.removeItem("vm:quien"); } catch {} await post("/api/salir", {}); chat.innerHTML = ""; modoAcceso(false); ver("acceso"); }
 $("salir").onclick = cerrarSesion;
 
 const hora = () => new Date().toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
@@ -2171,7 +2171,7 @@ async function revisarFijoDesdeAviso() {
   const j = await fetch("/api/pedido-fijo").then((r) => (r.ok ? r.json() : null)).catch(() => null);
   if (j?.fijo?.lineas?.length) location.href = (window.__catUrl || "/catalogo") + "#c=" + j.fijo.lineas.map((l) => encodeURIComponent(l.id) + "." + l.uds).join(",") + "&r=1";
 }
-function entrar(nombre) { yoCache = null; $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (location.hash === "#revisar-fijo") { revisarFijoDesdeAviso(); } if (location.hash === "#enlace") { try { history.replaceState(null, "", location.pathname); } catch {} } if (location.hash === "#invitacion") { try { history.replaceState(null, "", location.pathname); } catch {} setTimeout(() => { $("c-nota").hidden = false; $("cambiar").click(); }, 700); } if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
+function entrar(nombre) { yoCache = null; cargaYo().then((y) => { try { if (y && y.carrito) localStorage.setItem("vm:quien", y.carrito); } catch {} }); /* quién ha entrado en este móvil: el catálogo solo abre con su copia local si es de ESE cliente */ $("cli").textContent = nombre; chat.innerHTML = ""; ver("chatbox"); enviar("hola", null, true); if (location.hash === "#revisar-fijo") { revisarFijoDesdeAviso(); } if (location.hash === "#enlace") { try { history.replaceState(null, "", location.pathname); } catch {} } if (location.hash === "#invitacion") { try { history.replaceState(null, "", location.pathname); } catch {} setTimeout(() => { $("c-nota").hidden = false; $("cambiar").click(); }, 700); } if (/^#cuenta\b/.test(location.hash)) { setTimeout(() => abrirCuenta(true), 400); try { history.replaceState(null, "", location.pathname); } catch {} } setTimeout(preguntarAvisos, 2000); } // «#cuenta»: viene de «Ver pedido» al enviar uno
 
 (async () => {
   const r = await fetch("/api/yo").catch(() => null);

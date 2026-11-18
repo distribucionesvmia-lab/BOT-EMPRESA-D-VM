@@ -3174,11 +3174,14 @@ function pendienteSinRed(eb) {
 }
 (async () => {
   const lenta = setTimeout(() => { if (!data) { const m = document.createElement("p"); m.id = "cargaLenta"; m.className = "carga-lenta"; m.setAttribute("role", "status"); m.textContent = "Cargando el catálogo… con poca cobertura puede tardar un poco."; $("list").prepend(m); } }, 800); // red lenta: se dice que se está cargando
-  let r = await fetch(location.pathname + "/datos").catch(() => null), copia = null; clearTimeout(lenta); document.getElementById("cargaLenta")?.remove();
+  // Abrir al instante: se pide el catálogo a la vez que se lee la copia del móvil. Si hay una copia reciente (menos de 12 h) y es de ESE cliente (el que entró en este móvil: marca «vm:quien» que pone el chat al entrar; NUNCA se enseña la copia de otro), se pinta ya y los datos de verdad la sustituyen al llegar.
+  const pedido = fetch(location.pathname + "/datos").catch(() => null);
+  const suave = await (async () => { try { if (location.pathname !== "/catalogo") return null; const c = await copiaCat.leer().catch(() => null), quien = localStorage.getItem("vm:quien"); return c && c.data && c.data.products && c.data.customer && !c.data.used && quien && quien === "vm_carrito_c_" + c.data.customer.codigo && Date.now() - (c.guardado || 0) < 12 * 3600e3 ? c : null; } catch { return null; } })();
+  let r = suave ? { ok: true, status: 200, json: async () => suave.data } : await pedido, copia = null; clearTimeout(lenta); document.getElementById("cargaLenta")?.remove();
   if (!r || r.status >= 500) { copia = await copiaCat.leer().catch(() => null); if (copia?.data?.products) r = { ok: true, status: 200, json: async () => copia.data }; } // sin cobertura: la última copia guardada
   if (!r) { $("ttl").textContent = ""; $("list").innerHTML = ""; $("list").appendChild(estadoVacio({ icono: "nube", titulo: "Sin conexión", texto: "No podemos cargar el catálogo ahora mismo. Comprueba tu conexión e inténtalo de nuevo.", boton: "Reintentar", onclick: () => location.reload() })); return; }
   if (!r.ok) { if (r.status === 401) copiaCat.borrar().catch(() => {}); $("ttl").textContent = "Sesión caducada"; $("sub").innerHTML = "Vuelve a <a href=\"/cliente\">entrar con los 6 primeros dígitos de tu DNI</a>."; $("list").innerHTML = ""; $("verCarrito").hidden = true; return; }
-  data = await r.json(); if (copia) { data.__copia = copia.guardado; huboCorte = true; } else { data.__cargado = Date.now(); setTimeout(guardarCopia, 1500); }
+  data = await r.json(); if (copia) { data.__copia = copia.guardado; huboCorte = true; } else if (!suave) { data.__cargado = Date.now(); setTimeout(guardarCopia, 1500); } // con la copia local (suave) no se vuelve a guardar hasta que lleguen los datos de verdad
   ordenarArbol(data); data.products.forEach(p => productoPorId.set(p.id, p));
   pintarAviso(); pintarAbierto(); pintarCopia();
   window.vmLetra.control($("letraBox"), "boton");
@@ -3197,8 +3200,16 @@ function pendienteSinRed(eb) {
   const pre = precargar(); // si hay que preguntar (ya hay un pedido empezado), la pantalla se pinta mientras tanto
   refresh();
   await pre; refresh();
-  if (!copia && pendienteGuardado()) pintarPendiente(pendienteGuardado(), null); // lo dejó guardado sin cobertura: se avisa al abrir con red
+  if (!copia && !suave && pendienteGuardado()) pintarPendiente(pendienteGuardado(), null); // lo dejó guardado sin cobertura: se avisa al abrir con red
   if (estadoInicial && !/[#&](?:c|m|cat|tab)=/.test(String(window.vmPrecarga ?? location.hash))) setTimeout(() => { restaurando = true; try { tab = estadoInicial.vmTab === "hab" ? "hab" : "all"; restauraDe(estadoInicial); } finally { restaurando = false; } }, 0); // recargar o volver con «Adelante»: la búsqueda y el punto de la lista
+  if (suave) { // los datos de verdad llegan detrás: sustituyen a la copia, sin perder lo que el cliente ya lleva en el pedido
+    const rr = await pedido;
+    if (rr && rr.ok) {
+      const nuevo = await rr.json().catch(() => null);
+      if (nuevo && nuevo.products) { nuevo.__cargado = Date.now(); const res = aplicarDatos(nuevo); huboCorte = false; guardarCopia(); cargarDirs(); const pend = pendienteGuardado(); if (pend) pintarPendiente(pend, res); else if (cambioPrecios(res)) aviso(`Precios actualizados: tu pedido pasa de ${eur(res.antes)} a ${eur(res.despues)}.`); }
+    } else if (rr && rr.status === 401) { copiaCat.borrar().catch(() => null); location.reload(); } // sesión caducada: sin copia, la pantalla de siempre lo explica
+    else { data.__copia = suave.guardado; huboCorte = true; pintarCopia(); } // sin cobertura o fallo del servidor: se sigue con la copia, avisando de la fecha de los precios
+  }
 })();
 </script>
 <script>
