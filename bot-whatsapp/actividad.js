@@ -7,6 +7,7 @@ const ETIQUETAS = [
   [/^\/api\/admin\/articulos\/[^/]+\/oferta$/, () => "Puso o quitó una oferta"],
   [/^\/api\/admin\/articulos\/[^/]+\/avisar$/, () => "Avisó a los clientes de un artículo"],
   [/^\/api\/admin\/articulos\/[^/]+\/foto$/, () => "Cambió la foto de un artículo"],
+  [/^\/api\/admin\/articulos\/[\w.-]+\/foto-mini$/, null], // las miniaturas se preparan de una en una (cientos): no se apuntan una a una
   [/^\/api\/admin\/fotos\/zip\/aplicar$/, () => "Puso fotos desde un ZIP"],
   [/^\/api\/admin\/pedidos\/borrar$/, () => "Borró pedidos"],
   [/^\/api\/admin\/pedidos\/[\w-]+\/aprobar$/, () => "Aprobó un pedido retenido"],

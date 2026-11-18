@@ -97,7 +97,7 @@ function catalogoParaClientes(cat) { const l = cat?.filter((p) => !sinCoste(p)) 
 let catalogSeen = catalogVersion();
 // Memoria con caducidad corta (por cliente): los precios de TODO su catálogo se piden al abrir el chat y otra vez al abrir el catálogo, y el resumen del mes valora hasta 400 pedidos. Cambia la clave si el cliente hace un pedido o cambian sus precios/descuentos o el catálogo.
 const memoProductos = crearMemo({ max: 30, ttlMs: 20_000 }), memoResumen = crearMemo({ max: 60, ttlMs: 120_000 });
-function productosDe(customer) { return memoProductos.get(`${firmaCliente(customer)}|${catalogSeen}`, () => webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa)); }
+function productosDe(customer) { return memoProductos.get(`${firmaCliente(customer)}|${catalogSeen}|${imgMini.size}`, () => webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa).map((x) => { const m = x.img ? miniUrl(x.id) : null; return m ? { ...x, mini: m } : x; })); }
 // Si se actualizan los productos o precios, el bot los usa sin reiniciar
 async function refreshCatalog() {
   const v = catalogVersion();
@@ -572,15 +572,18 @@ function avisoPedido(account, guardado, modificado = false, email = null) {
 // Fotos de producto: ficheros «<código>.png|jpg|webp» en la carpeta IMG_DIR (por defecto «imagenes»). Se listan al arrancar y cada 5 minutos.
 const IMG_DIR = process.env.IMG_DIR ?? fileURLToPath(new URL("./imagenes/", import.meta.url));
 const IMG_TYPES = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
+let imgMini = new Map(); // código → versión de su miniatura (mini/<código>.jpg), solo si es igual o más nueva que la foto
 let imgIndex = new Map(), imgVer = new Map(), imgAt = 0, imgIa = new Set(); // imgIa: códigos cuya foto está generada con IA (fotos-ia.json en la carpeta de fotos)
 function imgs() {
-  if (Date.now() - imgAt > 60_000) {
+  if (Date.now() - imgAt > (Number(process.env.IMG_REFRESCO_MS) || 60_000)) { // cada minuto mira la carpeta de fotos (IMG_REFRESCO_MS solo para pruebas)
     imgAt = Date.now();
     try { imgIndex = new Map(fs.readdirSync(IMG_DIR).map((f) => /^([\w.-]{1,40})\.(png|jpe?g|webp)$/i.exec(f)).filter(Boolean).map((m) => [m[1], m[0]])); imgVer = new Map([...imgIndex].map(([id, f]) => { try { return [id, Math.floor(fs.statSync(IMG_DIR + f).mtimeMs / 1000)]; } catch { return [id, 0]; } })); } catch { imgIndex = new Map(); imgVer = new Map(); }
+    try { imgMini = new Map(); for (const f of fs.readdirSync(IMG_DIR + "mini")) { const m = /^([\w.-]{1,40})\.jpg$/.exec(f); if (!m || !imgIndex.has(m[1])) continue; const sm = fs.statSync(IMG_DIR + "mini/" + f).mtimeMs, so = fs.statSync(IMG_DIR + imgIndex.get(m[1])).mtimeMs; if (sm >= so - 1) imgMini.set(m[1], Math.floor(sm / 1000)); } } catch { imgMini = new Map(); } // miniaturas preparadas desde el panel
     try { imgIa = new Set(JSON.parse(fs.readFileSync(IMG_DIR + "fotos-ia.json", "utf8")).map(String)); } catch { imgIa = new Set(); }
   }
   return imgIndex;
 }
+const miniUrl = (id) => (imgs().has(id) && imgMini.has(id) ? `/img/${encodeURIComponent(id)}?v=${imgMini.get(id)}&t=m` : null); // la miniatura de las listas (si no hay, las listas usan la foto grande)
 const imgUrl = (id) => (imgs().has(id) ? `/img/${encodeURIComponent(id)}?v=${imgVer.get(id) ?? 0}` : null); // ?v= cambia al cambiar la foto: el móvil no se queda con la antigua guardada
 const imgEsIa = (id) => (imgs(), imgIa.has(String(id)));
 const HTML = { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "X-Robots-Tag": "noindex, nofollow", "Content-Security-Policy": CSP };
@@ -728,7 +731,7 @@ async function appRoutes(req, res, url) {
     await refreshCatalog(); // ve ya las ofertas y los precios que la empresa acaba de cambiar
     const customer = clienteConPedidos(account.customerId);
     const todos = productosDe(customer), arbolInicio = webTree(catalogNow());
-    const corto = (x) => ({ id: x.id, name: x.name, price: x.price, ...(x.img ? { img: x.img } : {}), ...(x.unitsPerBox ? { unitsPerBox: x.unitsPerBox } : {}), ...(x.soloCaja ? { soloCaja: true } : {}) });
+    const corto = (x) => ({ id: x.id, name: x.name, price: x.price, ...(x.img ? { img: x.mini ?? x.img } : {}), ...(x.unitsPerBox ? { unitsPerBox: x.unitsPerBox } : {}), ...(x.soloCaja ? { soloCaja: true } : {}) });
     const ids = String(url.searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8);
     const porId = new Map(todos.map((x) => [x.id, x]));
     const habituales = todos.filter((x) => x.count > 0).slice(0, 10).map((x) => ({ ...corto(x), ...(x.lastQty > 0 ? { ultima: x.lastQty } : {}) })); // «La última vez»: unidades
@@ -736,7 +739,7 @@ async function appRoutes(req, res, url) {
     const lo_mas = habituales.length ? [] : topIds().map((id) => porId.get(String(id))).filter(Boolean).slice(0, 8).map(corto);
     return void sendJson(res, 200, {
       habituales, ofertas, loMasPedido: lo_mas, tieneHistorial: todos.some((x) => x.count > 0),
-      fotos: Object.fromEntries(ids.map((id) => [id, porId.get(id)?.img ?? null])),
+      fotos: Object.fromEntries(ids.map((id) => [id, porId.get(id)?.mini ?? porId.get(id)?.img ?? null])),
       categorias: arbolInicio.map((c) => ({ id: c.id, nombre: c.nombre })), accesos: accesosDe(arbolInicio),
       ayuda: ayudaPublica(),
     });
@@ -775,8 +778,8 @@ async function appRoutes(req, res, url) {
   }
   if (p.startsWith("/img/") && req.method === "GET") {
     if (!account) return void sendJson(res, 401, { error: "Sesión caducada" });
-    const file = imgs().get(decodeURIComponent(p.slice(5)));
-    if (!file) return void sendJson(res, 404, { error: "Sin foto" });
+    const idFoto = decodeURIComponent(p.slice(5)), file0 = imgs().get(idFoto), mini = url.searchParams.get("t") === "m" && imgMini.has(idFoto), file = mini ? "mini/" + idFoto + ".jpg" : file0;
+    if (!file0) return void sendJson(res, 404, { error: "Sin foto" });
     // Sin bloquear el programa (antes se leía el archivo entero de forma síncrona: con cientos de fotos por pantalla, todos esperaban) y con ETag: si la foto no cambió, 304 sin enviar nada
     try {
       const st = await fs.promises.stat(IMG_DIR + file), etag = `"${Math.floor(st.mtimeMs)}-${st.size}"`;

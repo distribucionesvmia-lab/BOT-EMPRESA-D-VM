@@ -25,7 +25,7 @@ before(async () => {
     cwd: path.dirname(fileURLToPath(import.meta.url)),
     env: {
       ...process.env, VM_HOY: "2026-11-15", DEMO: "1", OFICINA_ESPERA_S: "0", ACCESO_SOLO_OFICINA: "0" /* estas pruebas usan las otras formas de entrar; por defecto (producción) SOLO se entra con la aprobación de la oficina: tanda56 */, ALTA_AUTOMATICA: "1" /* estas pruebas usan el alta automática como preparación; por defecto (producción) TODA alta la acepta la empresa: tanda57.test.js */, PORT: String(PORT), PUBLIC_URL: BASE, LOGIN_LIMIT: "1000", NIF_LIMIT: "1000", NIF_GLOBAL_FAILS: "1000", REGISTER_LIMIT: "1000", LINK_SECRET: "x", ADMIN_TOKEN: ADMIN,
-      DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: syncDir, BACKUP_DIR: path.join(dir, "respaldos"), ENTRADA_DIR: path.join(dir, "entrada"), PUSH_ALLOW_HTTP: "1",
+      IMG_DIR: path.join(dir, "img") + path.sep, IMG_REFRESCO_MS: "150", DB_PATH: path.join(dir, "pedidos.sqlite"), CATALOG_DB: path.join(dir, "cat.sqlite"), CUSTOMERS_DB: path.join(dir, "cli.sqlite"), ACCOUNTS_DB: path.join(dir, "cuentas.sqlite"), SYNC_DIR: syncDir, BACKUP_DIR: path.join(dir, "respaldos"), ENTRADA_DIR: path.join(dir, "entrada"), PUSH_ALLOW_HTTP: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -1585,6 +1585,40 @@ test("FOTOS DE ARTÍCULOS (panel): solo con la clave, comprueba que es una foto 
   assert.equal((await sube("1001", Buffer.from("no es una foto"), "image/png")).status, 400);
   const lista = (await call("GET", "/api/admin/articulos?q=1001", { admin: true })).json; assert.ok(lista.filas.length && "foto" in lista.filas[0] && "existe" in lista.filas[0].foto);
   assert.equal((await call("GET", "/api/admin/articulos?filtro=sinfoto", { admin: true })).status, 200); assert.equal((await call("GET", "/api/admin/articulos?filtro=fotopequena", { admin: true })).status, 200);
+});
+
+test("FOTOS PEQUEÑAS: el panel sube la miniatura, la app del cliente la usa en las listas y la grande sigue para la ficha", async () => {
+  const zlib = await import("node:zlib");
+  const crc = (b) => { let x = 0xffffffff; for (const v of b) { x ^= v; for (let k = 0; k < 8; k++) x = x & 1 ? 0xedb88320 ^ (x >>> 1) : x >>> 1; } return (x ^ 0xffffffff) >>> 0; };
+  const ch = (ty, d) => { const l = Buffer.alloc(4); l.writeUInt32BE(d.length); const td = Buffer.concat([Buffer.from(ty), d]), c = Buffer.alloc(4); c.writeUInt32BE(crc(td)); return Buffer.concat([l, td, c]); };
+  const png = (w, h) => { const ih = Buffer.alloc(13); ih.writeUInt32BE(w, 0); ih.writeUInt32BE(h, 4); ih[8] = 8; ih[9] = 2; const fila = Buffer.concat([Buffer.from([0]), Buffer.alloc(w * 3, 200)]); return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), ch("IHDR", ih), ch("IDAT", zlib.deflateSync(Buffer.concat(Array(h).fill(fila)))), ch("IEND", Buffer.alloc(0))]); };
+  const JPG = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/wAARCAAQABgDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFgEBAQEAAAAAAAAAAAAAAAAAAAUH/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8Am4Ca2cAB/9k=", "base64");
+  const ADM = { Authorization: `Bearer ${ADMIN}` }, A = cookieOf(await entrarNif("111111"));
+  const lista = (await call("GET", "/api/admin/articulos?q=1010", { admin: true })).json, id = lista.filas[0].id;
+  const sube = (ruta, body, tipo, adm = true) => fetch(BASE + ruta, { method: "POST", headers: { ...(adm ? ADM : {}), "Content-Type": tipo }, body });
+  // sin clave no hay nada; sin foto grande no hay miniatura; el contenido tiene que ser un JPG de verdad y de tamaño pequeño
+  assert.ok([401, 403].includes((await sube(`/api/admin/articulos/${id}/foto-mini`, JPG, "image/jpeg", false)).status));
+  assert.equal((await sube(`/api/admin/articulos/${id}/foto-mini`, JPG, "image/jpeg")).status, 400); // aún no tiene foto
+  assert.equal((await sube(`/api/admin/articulos/${id}/foto`, png(120, 90), "image/png")).status, 200);
+  assert.equal((await sube(`/api/admin/articulos/${id}/foto-mini`, Buffer.from("no soy un jpg"), "image/jpeg")).status, 400);
+  assert.equal((await sube(`/api/admin/articulos/${id}/foto-mini`, png(30, 30), "image/jpeg")).status, 400); // un PNG no vale como miniatura
+  const antes = (await call("GET", "/api/admin/fotos/minis", { admin: true })).json; assert.ok(antes.pendientes.includes(id));
+  const grande = await fetch(BASE + `/api/admin/foto/${id}`, { headers: ADM }); assert.equal(grande.status, 200); assert.equal(grande.headers.get("content-type"), "image/png"); // el navegador del panel lee la grande
+  assert.equal((await fetch(BASE + `/api/admin/foto/${id}`)).status >= 400, true);
+  const ok = await sube(`/api/admin/articulos/${id}/foto-mini`, JPG, "image/jpeg"); assert.equal(ok.status, 200, await ok.text());
+  const despues = (await call("GET", "/api/admin/fotos/minis", { admin: true })).json; assert.ok(!despues.pendientes.includes(id)); assert.equal(despues.conMini, antes.conMini + 1);
+  // la app del cliente (el índice de fotos se refresca cada minuto: se espera a que aparezca)
+  await new Promise((r) => setTimeout(r, 350)); await fetch(BASE + `/img/${id}`, { headers: { Cookie: A } }); // la carpeta de fotos se vuelve a mirar (aquí cada 150 ms; en producción, cada minuto)
+  const dj = await call("GET", "/catalogo/datos", { cookie: A }); assert.equal(dj.status, 200, JSON.stringify(dj.json)); const d = dj.json.products.find((x) => x.id === id);
+  assert.ok(d?.mini, "la app del cliente no ha enseñado la miniatura");
+  assert.match(d.mini, /^\/img\/[\w.-]+\?v=\d+&t=m$/); assert.match(d.img, /^\/img\/[\w.-]+\?v=\d+$/); // la grande sigue para la ficha
+  const m = await fetch(BASE + d.mini, { headers: { Cookie: A } }); assert.equal(m.status, 200); assert.equal(m.headers.get("content-type"), "image/jpeg"); assert.match(m.headers.get("cache-control"), /immutable/);
+  assert.equal(Buffer.from(await m.arrayBuffer()).length, JPG.length); // es la pequeña
+  const g = await fetch(BASE + d.img, { headers: { Cookie: A } }); assert.equal(g.headers.get("content-type"), "image/png"); // y la grande, la grande
+  assert.equal((await fetch(BASE + d.mini)).status, 401); // sin sesión, nada
+  // cambiar la foto grande vuelve a dejar pendiente su miniatura
+  assert.equal((await sube(`/api/admin/articulos/${id}/foto`, png(150, 100), "image/png")).status, 200);
+  assert.ok((await call("GET", "/api/admin/fotos/minis", { admin: true })).json.pendientes.includes(id));
 });
 
 test("SEGURIDAD: campo trampa, cabeceras, y la clave de «no soy un robot» solo si está configurada", async () => {

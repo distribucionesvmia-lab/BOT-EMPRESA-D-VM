@@ -25,7 +25,7 @@ import { estadoCopias, comprobarCopias } from "./copias.js";
 import { sendMail } from "./mailer.js";
 import { validarProgramado, MAX_PENDIENTES } from "./avisos-programados.js";
 import { validarEdicion } from "./cliente-edicion.js";
-import { crearFotos, MAX_BYTES as FOTO_MAX } from "./fotos-articulos.js";
+import { crearFotos, MAX_BYTES as FOTO_MAX, MAX_MINI } from "./fotos-articulos.js";
 import { crearImportadorZip, MAX_ZIP } from "./fotos-zip.js";
 import { elegirDestino, smtpDesdeEntorno } from "./correo-cliente.js";
 import { validarCampana, audiencia, mensajeCampana, enviarCampanas, limiteDia, MAX_PENDIENTES as MAX_CAMPANAS, TIPOS as TIPOS_CORREO } from "./correo-campanas.js";
@@ -702,6 +702,14 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
         const r = fotos.guardar(mf[1], buf, req.headers["content-type"]); if (r.error) return send(res, 400, { error: r.error }), true;
         return send(res, 200, r), true;
       } }
+    // ---- Miniaturas de las fotos (las prepara el navegador del panel: Node no trae nada para reducir imágenes; son copias, la foto grande no se toca) ----
+    if (p === "/api/admin/fotos/minis" && !post) return send(res, 200, (() => { const e = fotos.estadoMinis(); return { total: e.total, conMini: e.conMini, pendientes: e.pendientes.slice(0, 5000) }; })()), true;
+    { const mo = /^\/api\/admin\/foto\/([\w.-]{1,40})$/.exec(p); // la foto grande, para que el navegador del panel prepare la pequeña
+      if (mo && !post) { const f = fotos.rutaOriginal(mo[1]); if (!f) return send(res, 404, { error: "Ese artículo no tiene foto." }), true; const ext = path.extname(f).slice(1).toLowerCase();
+        res.writeHead(200, { "Content-Type": ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }).end(fs.readFileSync(f)); return true; } }
+    { const mm = /^\/api\/admin\/articulos\/([\w.-]{1,40})\/foto-mini$/.exec(p);
+      if (mm && post) { const buf = await readBuffer(req, MAX_MINI + 1000).catch(() => null); if (!buf) return send(res, 413, { error: "La miniatura pesa demasiado." }), true;
+        const r = fotos.guardarMini(mm[1], buf); return send(res, r.error ? 400 : 200, r), true; } }
     // ---- Poner fotos desde un ZIP: primero se revisa (no cambia nada) y luego se aplican solo las que se confirman ----
     if (p === "/api/admin/fotos/zip" && post) {
       if (!fotosZip || !imgDir) return send(res, 400, { error: "Este programa no tiene catálogo o carpeta de fotos configurados." }), true;
