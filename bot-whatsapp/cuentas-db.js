@@ -399,7 +399,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
      * (así nadie puede llenar un buzón). Devuelve { ok:true } o { ok:false, espera: segundos que faltan }.
      */
     codigoCorreoCrear(customerId, hash, { now = new Date().toISOString(), minutos = 10, esperaS = 60 } = {}) {
-      const id = String(customerId), ult = db.prepare("SELECT created_at FROM login_codes WHERE customer_id = ? ORDER BY id DESC LIMIT 1").get(id);
+      const id = String(customerId), ult = db.prepare("SELECT created_at FROM login_codes WHERE customer_id = ? AND used_at IS NULL ORDER BY id DESC LIMIT 1").get(id); // la espera solo cuenta si el último código sigue sin usar
       if (ult) { const falta = esperaS - Math.floor((new Date(now) - new Date(ult.created_at)) / 1000); if (falta > 0) return { ok: false, espera: falta }; }
       db.exec("BEGIN IMMEDIATE");
       try {

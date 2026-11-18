@@ -768,6 +768,11 @@
           <div class="okmsg" role="status"><b>Verificación en dos pasos.</b> Abre la aplicación de códigos de tu móvil y escribe el número que te muestra (o uno de tus códigos de emergencia).</div>
           <label>Código de la aplicación<input id="pw-cod" type="text" inputmode="numeric" maxlength="11" autocomplete="one-time-code" placeholder="123456" aria-describedby="pw-err"></label>
         </div>
+        <div id="pw-cc-fila" hidden>
+          <div class="okmsg" role="status" id="pw-cc-msg"></div>
+          <label>Código de 6 dígitos<input id="pw-cc" type="text" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456" aria-describedby="pw-err"></label>
+          <button class="vm-link" type="button" id="pw-cc-otro">Enviarme otro código</button>
+        </div>
         <div class="ts-hueco" id="ts-pw" hidden></div>
         <div class="trampa" aria-hidden="true"><label>No rellenar este campo<input id="pw-web" name="sitio_web" tabindex="-1" autocomplete="off"></label></div>
         <div class="err" id="pw-err" role="alert"></div>
@@ -1298,15 +1303,18 @@ $("f-acceso").onsubmit = (e) => {
     }
     return true;
   };
-  for (const id of ["pw-emp", "pw-nif"]) $(id).addEventListener("input", () => { if (creando) modoCrear(false); $("pw-cod-fila").hidden = true; }); // si cambia los datos, vuelve a «entrar»
+  let otroCodigo = false; // «Enviarme otro código»: se manda la solicitud sin código para que el servidor envíe uno nuevo
+  for (const id of ["pw-emp", "pw-nif"]) $(id).addEventListener("input", () => { if (creando) modoCrear(false); $("pw-cod-fila").hidden = true; $("pw-cc-fila").hidden = true; $("pw-cc").value = ""; }); // si cambia los datos, vuelve a «entrar»
   f.onsubmit = (e) => {
     e.preventDefault(); err("");
     if (!valida()) return;
+    if (!$("pw-cc-fila").hidden && !otroCodigo && $("pw-cc").value.replace(/\D/g, "").length !== 6) { err("Escribe el código de 6 dígitos que te hemos enviado a tu correo.", "pw-cc"); return; }
     return Promise.resolve(enviando(f, $("pw-boton"), async () => {
       const body = { empresa: $("pw-emp").value.trim(), nif: nif6(), password: $("pw-pass").value, sitio_web: $("pw-web").value, t: Math.round(performance.now()) }; // «sitio_web» es un campo trampa y «t» lo que tardó una persona en llegar hasta aquí
       if (creando) body.password2 = $("pw-pass2").value;
       if (pase) body.pase = pase;
       if (!$("pw-cod-fila").hidden) body.codigo = $("pw-cod").value.trim();
+      if (!$("pw-cc-fila").hidden && !otroCodigo) body.codigoCorreo = $("pw-cc").value.replace(/\D/g, ""); otroCodigo = false;
       if (tsToken["ts-pw"]) body.cf = tsToken["ts-pw"];
       const r = await post(creando ? "/api/acceso/pw/crear" : "/api/acceso/pw/entrar", body); if (body.cf) { tsToken["ts-pw"] = null; tsPinta("ts-pw"); }
       const j = await r.json().catch(() => ({}));
@@ -1318,11 +1326,17 @@ $("f-acceso").onsubmit = (e) => {
       if (j.necesitaCodigo) { // el cliente tiene la verificación en dos pasos: se pide el código de su aplicación
         $("pw-cod-fila").hidden = false; $("pw-cod").focus(); if (r.status === 401) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error); $("pw-cod").value = ""; } return;
       }
+      if (j.necesitaCodigoCorreo) { // contraseña bien: falta el código de 6 dígitos que se manda al correo de su ficha
+        $("pw-cc-fila").hidden = false; $("pw-cc-msg").textContent = j.mensaje || `Hemos enviado un código de 6 dígitos a ${j.correo}. Escríbelo aquí para entrar.`; $("pw-cc").focus();
+        if (r.status === 401) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error); $("pw-cc").value = ""; } else if (!j.enviado && j.error) err(j.error);
+        return;
+      }
       if (j.necesitaCrear) { modoCrear(true); $("pw-pass").value = ""; $("pw-pass").focus(); tsPinta("ts-pw"); return; } // crear una contraseña pide «no soy un robot» si está configurado
       if (!r.ok) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error || "No se pudo entrar."); if (!creando) { $("pw-pass").value = ""; $("pw-pass").focus(); } return; }
-      const recienCreada = creando; quitaPase(); f.reset(); $("pw-cod-fila").hidden = true; modoCrear(false); entrar(j.cliente.nombre); if (recienCreada) setTimeout(() => document.dispatchEvent(new Event("vm:ofrecer-2fa")), 700); // contraseña recién creada: se ofrece (opcional) la verificación en dos pasos
+      const recienCreada = creando; quitaPase(); f.reset(); $("pw-cod-fila").hidden = true; $("pw-cc-fila").hidden = true; modoCrear(false); entrar(j.cliente.nombre); if (recienCreada) setTimeout(() => document.dispatchEvent(new Event("vm:ofrecer-2fa")), 700); // contraseña recién creada: se ofrece (opcional) la verificación en dos pasos
     }, "pw-err")).then(rotulo);
   };
+  $("pw-cc-otro").onclick = () => { otroCodigo = true; $("pw-cc").value = ""; f.requestSubmit(); };
   $("pw-ayuda").onclick = () => $("no-entro").click(); $("pw-registro").onclick = () => $("ir-registro-2").click();
   fetch("/api/seguridad").then((r) => r.json()).then((j) => {
     if (!j.accesoPassword) return; f.hidden = false; document.documentElement.classList.add("acceso-pw"); $("cambiar-pw").hidden = false; $("abrir-2fa").hidden = false;

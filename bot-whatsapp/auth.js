@@ -5,7 +5,7 @@
 import crypto from "node:crypto";
 import { normalizePhone, validEmail, pinValido } from "./cuentas-db.js";
 import { nifCodes, nifClean } from "./nif-codes.js";
-import { codeKey, validCode, claveCodigoOficina, sellar, abrirSello } from "./nif-key.js";
+import { codeKey, validCode, claveCodigoOficina, claveCodigoCorreo, sellar, abrirSello } from "./nif-key.js";
 import { nuevoSecreto, verificarTotp, urlOtp, agrupar } from "./totp.js";
 import { navegadorCorto } from "./errores.js";
 import { leerPausa, TEXTO_PAUSA_ENTRADAS } from "./pausa.js";
@@ -110,6 +110,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const pwIp = rateLimiter(Number(process.env.PW_IP_LIMIT ?? 12), 10 * 60_000); // intentos de entrar por dirección
   const pwCrearIp = rateLimiter(Number(process.env.PW_CREAR_IP_LIMIT ?? 5), 60 * 60_000); // contraseñas nuevas por dirección y hora
   const pwCrearGlobal = rateLimiter(Number(process.env.PW_CREAR_GLOBAL_LIMIT ?? 100), 60 * 60_000);
+  const pwCorreoIp = rateLimiter(Number(process.env.PW_CORREO_IP_LIMIT ?? 8), 10 * 60_000), pwCorreoGlobal = rateLimiter(Number(process.env.PW_CORREO_GLOBAL_LIMIT ?? 150), 60 * 60_000), pwCorreoVerIp = rateLimiter(Number(process.env.PW_CORREO_VER_LIMIT ?? 15), 10 * 60_000); // código por correo: envíos y comprobaciones
   const pwFallosGlobal = rateLimiter(Number(process.env.PW_FALLOS_GLOBAL ?? 120), 60 * 60_000); // intentos con datos que no coinciden con ningún cliente
   const pwFuera = rateLimiter(Number(process.env.GEO_FUERA_LIMIT ?? 4), 10 * 60_000); // intentos de entrar desde fuera de España por dirección: muy pocos
   const MSG_PASE = "Estás conectando desde fuera de España. Por seguridad, la oficina tiene que dar paso a este aparato (solo la primera vez). Ya la hemos avisado: espera su respuesta aquí o llámanos y dile tu número de comprobación.";
@@ -391,10 +392,35 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
           }
         }
       }
+      // ── Código de 6 dígitos al correo que consta en su ficha (aparato nuevo, sin verificación en dos pasos propia). Solo con correo configurado (SMTP); CODIGO_CORREO_PW=0 lo apaga. ──
+      const pideCorreo = (id) => codigoPorCorreo() && process.env.CODIGO_CORREO_PW !== "0" && aparatoDe(req) !== id && !accounts.dobleFactor(id).activo;
+      /** true si ya ha respondido (hay que parar: falta el código, es incorrecto o no hay correo); false si el código es bueno y se puede seguir. */
+      const exigirCorreo = async (id) => {
+        const dest = elegirDestino({ account: { email: accounts.emailDe(id) }, customer: customers.getById(id) });
+        if (!dest) { console.warn(`[VM acceso] El cliente ${id} no tiene correo en su ficha: no se le puede mandar el código`); eventoSeguridad("acceso-sin-correo", `cliente ${id}`); return send(res, 409, { sinCorreo: true, error: "No tenemos ningún correo tuyo en tu ficha, así que no podemos enviarte el código de seguridad. Llámanos y lo añadimos." }), true; }
+        const escrito = String(b.codigoCorreo ?? "").replace(/\D/g, "");
+        if (escrito) {
+          if (!pwCorreoVerIp(ip(req))) return demasiados(res, pwCorreoVerIp, ip(req)), true;
+          const v = accounts.codigoCorreoComprobar([id], (cid) => claveCodigoCorreo(cid, escrito));
+          if (v.ok) return false;
+          eventoSeguridad("pw-codigo-correo-incorrecto", `cliente ${id}`);
+          return send(res, 401, { necesitaCodigoCorreo: true, correo: tapar(dest), error: v.reason === "expired" ? "El código ha caducado. Pide uno nuevo." : v.reason === "agotado" ? "Has fallado demasiadas veces con ese código. Pide uno nuevo." : "El código no es correcto. Revisa tu correo y escríbelo de nuevo." }), true;
+        }
+        if (!pwCorreoIp(ip(req))) return demasiados(res, pwCorreoIp, ip(req)), true;
+        if (!pwCorreoGlobal("todas")) return eventoSeguridad("pw-correo-tope-global", "se alcanzó el máximo de códigos por correo por hora"), send(res, 429, { error: "Ahora mismo no podemos enviar más códigos. Inténtalo en unos minutos o llámanos." }), true;
+        const codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+        const cr = accounts.codigoCorreoCrear(id, claveCodigoCorreo(id, codigo));
+        if (!cr.ok) return send(res, 409, { necesitaCodigoCorreo: true, correo: tapar(dest), error: `Ya te hemos enviado un código hace un momento a ${tapar(dest)}. Revisa tu correo (mira también el spam). Si no llega, espera ${cr.espera} segundos y pide otro.` }), true;
+        try { await enviarCodigo({ to: dest, nombre: customers.getById(id)?.name ?? "", codigo, minutos: 10 }); }
+        catch (e) { console.error("[VM acceso] El servidor de correo NO ha enviado el código:", e?.message); eventoSeguridad("codigo-correo-error", String(e?.message ?? "error").slice(0, 120)); return send(res, 503, { error: "No hemos podido enviar el correo con el código. Inténtalo en unos minutos o llámanos." }), true; }
+        console.log(`[VM acceso] Código por correo para el cliente ${id} (${tapar(dest)})`);
+        return send(res, 409, { necesitaCodigoCorreo: true, correo: tapar(dest), enviado: true, mensaje: `Te hemos enviado un código de 6 dígitos a ${tapar(dest)}. Escríbelo aquí para entrar. Vale 10 minutos.` }), true;
+      };
       if (crear) {
         const motivo = motivoPassword(password, b.nif, b.empresa); // se mira SIEMPRE (coincida o no el cliente): así no se averigua nada
         if (motivo) return send(res, 400, { error: motivo }), true;
         if (typeof b.password2 === "string" && b.password2 !== password) return send(res, 400, { error: "Las dos contraseñas no coinciden." }), true;
+        if (ids.length === 1 && pideCorreo(ids[0]) && await exigirCorreo(ids[0])) return true; // antes de crear nada: quien no tenga acceso al correo de la ficha no puede crear la contraseña
         if (!pwCrearIp(ip(req))) return eventoSeguridad("pw-muchas-altas", ip(req)), demasiados(res, pwCrearIp, ip(req), "Demasiadas contraseñas nuevas desde esta conexión. Llámanos si necesitas ayuda."), true;
         if (!pwCrearGlobal("todas")) return eventoSeguridad("pw-tope-global", "se alcanzó el máximo de contraseñas nuevas por hora"), send(res, 429, { error: "Ahora mismo no podemos crear más accesos. Llámanos." }), true;
         if (ids.length !== 1) { accounts.passwordFalso(); return send(res, 409, { error: "No hemos podido crear tu acceso con esos datos. Si ya tienes contraseña, entra con ella; si no la recuerdas, llámanos." }), true; }
@@ -417,7 +443,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
         if (!codigo) return send(res, 409, { necesitaCodigo: true, error: "Escribe el código de la aplicación de tu móvil (o uno de tus códigos de emergencia)." }), true;
         if (!comprobarSegundoFactor(ids[0], codigo)) { accounts.passwordFallo(ids[0]); eventoSeguridad("cliente-2fa-incorrecto", "código de segundo factor incorrecto"); return send(res, 401, { necesitaCodigo: true, error: "El código no es correcto o ya se usó. Espera al siguiente de la aplicación o usa uno de emergencia." }), true; }
         accounts.passwordReiniciarFallos(ids[0]); // contraseña y código bien: ahora sí se borran los fallos
-      }
+      } else if (pideCorreo(ids[0]) && await exigirCorreo(ids[0])) return true; // aparato nuevo: contraseña bien + código de 6 dígitos del correo de su ficha
       return abrir(ids[0]);
     }
     // ── Verificación en dos pasos del cliente (opcional; se activa en «Mi cuenta» con una aplicación tipo Google Authenticator) ──
