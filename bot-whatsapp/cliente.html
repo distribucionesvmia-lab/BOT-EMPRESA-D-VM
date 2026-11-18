@@ -738,6 +738,11 @@
   html.solo-correo #cambiar, html.solo-correo .in-codigo, html.solo-correo .bv-codigo { display:none !important; }
   #co-cod { font-size:calc(24px / var(--k,1)); letter-spacing:.35em; text-align:center; font-variant-numeric:tabular-nums; }
   .co-ref-p { margin:10px 0; } .co-ref-p small { display:block; color:var(--text-2); } .co-ref { font:700 28px/1 ui-monospace, Consolas, monospace; letter-spacing:.2em; color:var(--accent); }
+  /* «Tu pedido de siempre» más limpio: una acción principal (Enviar ya), una secundaria (Repetir y revisar) y lo demás, más ligero */
+  .vm-inicio .in-card .in-rec { background:transparent; border:1px solid var(--line); }
+  .vm-inicio .in-card .in-sie-acc { gap:0; margin-top:var(--s3); padding-top:var(--s1,4px); border-top:1px solid var(--line); }
+  .vm-inicio .in-card .in-sie-acc .vm-btn.ghost { background:transparent; color:var(--text-2); }
+  .vm-inicio .in-card .in-sie-acc .vm-btn.ghost + .vm-btn.ghost { border-left:1px solid var(--line); border-radius:0; }
 </style>
 </head>
 <body>
