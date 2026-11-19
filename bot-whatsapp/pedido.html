@@ -1791,7 +1791,7 @@ function control(p) {
       sel.appendChild(b);
     }
     box.appendChild(sel);
-  } else { const sp = document.createElement("div"); sp.className = "pf-fijo"; sp.textContent = "Por unidades"; box.appendChild(sp); } // solo se vende suelto: no hace falta selector (el hueco mantiene la fila igual)
+  } else { const sp = document.createElement("div"); sp.className = "pf-fijo"; sp.textContent = esKilo(p.name) ? "Por kilos" : "Por unidades"; box.appendChild(sp); } // solo se vende suelto: no hace falta selector (el hueco mantiene la fila igual)
   const hueco = document.createElement("div"); hueco.className = "pf-slot"; box.appendChild(hueco);
   if (!q) {
     const b = document.createElement("button");
@@ -1838,6 +1838,8 @@ function verFoto(p) {
 // Medidas que lleva el nombre (30x40 cm, 25 cm, 1,5 L…): se enseñan aparte porque el nombre se recorta en la tarjeta
 const medidasDeNombre = n => { const m = String(n).match(/\b\d+(?:[.,]\d+)?\s*[x×]\s*\d+(?:[.,]\d+)?(?:\s*[x×]\s*\d+(?:[.,]\d+)?)?\s*(?:cm|mm|m)?\b|\b\d+(?:[.,]\d+)?\s*(?:cm|mm|ml|cl|l|kg|g|gr|litros?)\b/gi); return m ? [...new Set(m.map(x => x.replace(/\s+/g, " ").trim()))].slice(0, 2) : []; };
 // Precio de una unidad YA con su descuento (el que se factura); el anterior, tachado, solo si hay descuento
+// Artículo al peso: «KG» suelto en el nombre (sin número al lado; «1 KG» es un formato). El responsable apunta el peso al prepararlo. Misma regla que esPorKilo en export-format.js.
+const esKilo = n => { const t = String(n ?? ""); for (const m of t.matchAll(/(?<![\p{L}\d])kg(?![\p{L}\d])/giu)) { if (/\d[\d.,]*\s*$/.test(t.slice(0, m.index)) || /^\s*[.:]?\s*\d/.test(t.slice(m.index + m[0].length))) continue; return true; } return false; };
 const precioUd = p => Number(p.price) * (1 - (Number(p.discount) || 0) / 100);
 function formatoTexto(p) {
   const pk = /(\d+)\s*[xX×]\s*(\d+)/.exec(p.name), esPack = /\bpack\b/i.test(p.name) || (pk && Number(pk[1]) * Number(pk[2]) > 1);
@@ -1860,7 +1862,7 @@ function abrirFicha(p) {
   const med = medidasDeNombre(p.name); if (med.length) fila("Medidas", med.join(" · "));
   if (p.unitsPerBox) fila("Unidades por caja", String(p.unitsPerBox));
   const hayDto = Number(p.discount) > 0;
-  fila("Precio por unidad", hayDto ? `<s>${eurp(p.price)}</s> <b>${eurp(precioUd(p))}</b> <span class="pf-dto">−${String(p.discount).replace(".", ",")} %</span>` : eurp(p.price), true);
+  fila(esKilo(p.name) ? "Precio por kg" : "Precio por unidad", hayDto ? `<s>${eurp(p.price)}</s> <b>${eurp(precioUd(p))}</b> <span class="pf-dto">−${String(p.discount).replace(".", ",")} %</span>` : eurp(p.price), true);
   if (p.unitsPerBox) fila("Precio por caja", eur(precioCaja(p)));
   fila("IVA", `${String(p.vat ?? 21).replace(".", ",")} % (los precios van sin IVA)`);
   if (p.oferta) fila("Oferta", "Vale" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().join("/") : " ahora"));
@@ -1889,12 +1891,12 @@ function row(p) {
   if (p.nombreCorto && p.nombreCorto !== p.name) n.title = p.name;
   const c = document.createElement("div"); c.className = "pf-sec"; // el código de producto no se muestra
   const pk = /(\d+)\s*[xX×]\s*(\d+)/.exec(p.name), esPack = /\bpack\b/i.test(p.name) || (pk && Number(pk[1]) * Number(pk[2]) > 1);
-  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " · " + eur(precioCaja(p)); else if (esPack) c.textContent = pk && Number(pk[1]) * Number(pk[2]) > 1 ? "Pack de " + Number(pk[1]) * Number(pk[2]) : "Pack"; else c.textContent = "Por unidades"; // se dice siempre el formato y la unidad de venta
+  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " · " + eur(precioCaja(p)); else if (esPack) c.textContent = pk && Number(pk[1]) * Number(pk[2]) > 1 ? "Pack de " + Number(pk[1]) * Number(pk[2]) : "Pack"; else c.textContent = esKilo(p.name) ? "Se vende por kilos" : "Por unidades"; // se dice siempre el formato y la unidad de venta
   { const med = medidasDeNombre(p.name); if (med.length) c.textContent += " · " + med.join(" · "); } // las medidas, aunque el nombre salga recortado
   const pr = document.createElement("div"); pr.className = "pf-pr";
   const price = document.createElement("b"); const ud = document.createElement("span"); ud.className = "pf-ud";
   const enCaja = !!p.unitsPerBox && unit(p.id) === "caja", fmtP = enCaja ? eur : eurp; // el precio es de lo que se pide: la caja (con sus unidades) o la unidad
-  ud.textContent = enCaja ? ` /caja (${p.unitsPerBox} ud)` : (esPack ? " /pack" : " /ud");
+  ud.textContent = enCaja ? ` /caja (${p.unitsPerBox} ud)` : (esKilo(p.name) ? " /kg" : esPack ? " /pack" : " /ud");
   if (Number(p.discount) > 0) { const viejo = document.createElement("s"); viejo.className = "pf-viejo"; viejo.textContent = fmtP(enCaja ? Number(p.price) * p.unitsPerBox : Number(p.price)); price.textContent = fmtP(enCaja ? precioCaja(p) : precioUd(p)); pr.append(viejo, price, ud); } // precio original tachado y el neto (el que se factura) al lado
   else { price.textContent = fmtP(enCaja ? precioCaja(p) : Number(p.price)); pr.append(price, ud); }
   if (p.discount) { const dto = document.createElement("span"); dto.className = "pf-dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} %`; pr.appendChild(dto); }
@@ -2362,7 +2364,7 @@ function tablaLineas(ls) {
     // Importe + unidades + quitar
     const m = tr.insertCell(); m.className = "tl-imp";
     const ib = document.createElement("b"); ib.textContent = eur(importe(l));
-    const is = document.createElement("small"); is.textContent = (cj ? `${l.qty} ${l.qty === 1 ? "caja" : "cajas"} = ${uds(l)} uds` : `${uds(l)} ${uds(l) === 1 ? "unidad" : "unidades"}`) + ` × ${precioUdExacto(l)} €`; // el precio exacto que se multiplica (redondeado al céntimo solo al final)
+    const is = document.createElement("small"); is.textContent = (cj ? `${l.qty} ${l.qty === 1 ? "caja" : "cajas"} = ${uds(l)} uds` : `${uds(l)} ${uds(l) === 1 ? "unidad" : "unidades"}`) + ` × ${precioUdExacto(l)} €` + (esKilo(l.name) ? "/kg (se pesa al preparar)" : ""); // el precio exacto que se multiplica (redondeado al céntimo solo al final)
     const x = document.createElement("button"); x.type = "button"; x.className = "cx"; x.textContent = "Quitar"; x.setAttribute("aria-label", "Quitar " + l.name); x.onclick = () => setQty(l.id, 0);
     m.append(ib, is, x);
     // Deslizar la línea hacia la izquierda la quita (con «Deshacer» durante 8 s); el botón «Quitar» hace lo mismo
@@ -2712,7 +2714,7 @@ function pintarSugs() {
     if (p.img) { const i = document.createElement("img"); i.src = fotoMini(p); i.alt = ""; i.decoding = "async"; i.loading = "lazy"; i.width = 56; i.height = 56; i.onerror = () => i.remove(); im.appendChild(i); }
     const tx = document.createElement("span"); tx.className = "sug-tx"; const n = document.createElement("b"); n.textContent = nombreVisible(p); n.title = p.name; const pr = document.createElement("small"); // nombre en hasta 2 líneas (no cortado en una) y, debajo, el formato (caja/pack/medidas) y el precio: así se distinguen las variantes
     const pkS = /(\d+)\s*[xX×]\s*(\d+)/.exec(p.name), fmtS = p.unitsPerBox ? (p.soloCaja ? `Solo cajas de ${p.unitsPerBox}` : `Caja de ${p.unitsPerBox}`) : (/\bpack\b/i.test(p.name) || (pkS && Number(pkS[1]) * Number(pkS[2]) > 1) ? "Pack" : "Por unidades"), medS = medidasDeNombre(p.name);
-    pr.textContent = [fmtS, ...medS].join(" · ") + " · " + (p.soloCaja && p.unitsPerBox ? `${eur(precioCaja(p))} la caja` : eurp(p.price) + " /ud");
+    pr.textContent = [fmtS, ...medS].join(" · ") + " · " + (p.soloCaja && p.unitsPerBox ? `${eur(precioCaja(p))} la caja` : eurp(p.price) + (esKilo(p.name) ? " /kg" : " /ud"));
     tx.append(n, pr);
     const mas = document.createElement("button"); mas.type = "button"; mas.className = "sug-mas"; mas.setAttribute("aria-label", "Añadir " + p.name);
     mas.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round"/></svg>';

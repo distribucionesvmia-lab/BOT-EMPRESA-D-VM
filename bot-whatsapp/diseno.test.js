@@ -235,7 +235,7 @@ test("tanda 3 (catálogo): barra de categoría con fondo, subcategorías como ch
   assert.match(pedido, /\.falta \.falta-fila \{ display:grid; grid-template-columns:56px minmax\(0, 1fr\);/); assert.match(pedido, /\.falta \.falta-n b \{ display:-webkit-box; -webkit-line-clamp:2;/); // 5
   assert.match(pedido, /\.pf-seg \{ height:44px; padding:2px; \}/); assert.match(pedido, /\.pf-sec \{ min-height:1\.25em; \}/); assert.match(pedido, /\.pf-ctl \{ margin-top:auto;/); // 7
   assert.match(pedido, /return r \|\| "•"/); assert.match(pedido, /sin nombre no hay tarjeta/); // 8
-  assert.match(pedido, /esPack \? " \/pack" : " \/ud"/); assert.match(pedido, /"Pack de "/); assert.match(pedido, /sp\.textContent = "Por unidades"/); // 9
+  assert.match(pedido, /esPack \? " \/pack" : " \/ud"/); assert.match(pedido, /"Pack de "/); assert.match(pedido, /"Por unidades"; box\.appendChild\(sp\)/); // 9
   assert.match(pedido, /className = "acceso"/); assert.match(pedido, /\[#&\]sub=/); // 11
 });
 
