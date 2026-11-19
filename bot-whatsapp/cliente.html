@@ -1935,7 +1935,7 @@ function inicio(ui) {
     if (bv?.mostrar && !c.querySelector(".in-bienvenida:not(.in-enlace)")) { // primera vez: tarjeta de 3 pasos (se cierra para siempre con «Entendido», guardado por cliente); si entró con el NIF y aún no tiene código, se le ofrece ahí mismo
       const k = el("section", "in-bienvenida"); k.setAttribute("aria-label", "Bienvenida");
       k.appendChild(el("h3", null, "Así se hace un pedido"));
-      const ol = el("ol"); for (const t of ["Busca un artículo o mira «Lo que sueles pedir».", "Marca las cantidades con el «+».", "Pulsa «Revisar pedido», elige el día de entrega y envíalo."]) ol.appendChild(el("li", null, t)); k.appendChild(ol);
+      const ol = el("ol"); for (const t of ["Busca un artículo o mira «Lo habitual» y el «Histórico».", "Marca las cantidades con el «+».", "Pulsa «Revisar pedido», elige el día de entrega y envíalo."]) ol.appendChild(el("li", null, t)); k.appendChild(ol);
       if (y?.codigoPropio === false) { const o = el("div", "bv-codigo"); o.appendChild(el("p", null, "Pon tu código de entrada para entrar con el teléfono, sin acordarte del DNI.")); const b2 = el("button", "vm-btn ghost", "Poner mi código"); b2.type = "button"; b2.onclick = () => $("cambiar").click(); o.appendChild(b2); k.appendChild(o); }
       const ent = el("button", "vm-btn primary", "Entendido"); ent.type = "button"; ent.onclick = async () => { ent.disabled = true; const r = await post("/api/bienvenida/vista", {}).catch(() => null); if (r?.ok) k.remove(); else { ent.disabled = false; falloCarga(k, "No hemos podido guardarlo.", () => ent.click()); } };
       k.appendChild(ent); c.insertBefore(k, sal.nextSibling); return;
@@ -2004,9 +2004,9 @@ function inicio(ui) {
     }
     const lista = j.tieneHistorial ? j.habituales : j.loMasPedido;
     if (lista?.length) {
-      const sec = el("section", "in-sec"); sec.setAttribute("aria-label", j.tieneHistorial ? "Lo que sueles pedir" : "Lo más pedido");
-      const cab = el("div", "in-sec-cab"); cab.appendChild(el("h3", null, j.tieneHistorial ? "Lo que sueles pedir" : "Lo más pedido"));
-      if (j.tieneHistorial) { const todos = el("a", "in-vertodos", "Ver todos"); todos.href = cat + "#tab=hab"; todos.setAttribute("aria-label", "Ver todo lo que sueles pedir"); cab.appendChild(todos); }
+      const sec = el("section", "in-sec"); sec.setAttribute("aria-label", j.tieneHistorial ? "Lo habitual" : "Lo más pedido");
+      const cab = el("div", "in-sec-cab"); cab.appendChild(el("h3", null, j.tieneHistorial ? "Lo habitual" : "Lo más pedido"));
+      if (j.tieneHistorial) { const todos = el("a", "in-vertodos", "Ver todos"); todos.href = cat + "#tab=hab"; todos.setAttribute("aria-label", "Ver todo el histórico"); cab.appendChild(todos); }
       sec.appendChild(cab);
       const fila = el("div", "in-hscroll");
       for (const p of lista) fila.appendChild(tarjeta(p, ""));
