@@ -132,7 +132,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
   // Subcarpetas BASE-ARTICULOS, BASE-CLIENTES y BASE-HISTORICO (da igual mayúsculas, guiones, tildes o palabras detrás: «BASE-HISTORICO PEDIDOS» vale).
   // Pueden estar dentro de la carpeta de entrada (ENTRADA_DIR) o en BASES_DIR (p. ej. C:\vm); en Windows, si no se ha puesto, se busca junto a la carpeta de datos.
   // Lo que se deja ahí se entiende como de ese tipo; igualmente se mira el contenido, y si no cuadra se avisa y no se carga solo. Cada una tiene su propia subcarpeta «aplicados».
-  const SUBS = [["basearticulos", "productos"], ["baseproductos", "productos"], ["baseclientes", "clientes"], ["basehistorico", "historial"], ["basehistorial", "historial"]];
+  const SUBS = [["basearticulos", "productos"], ["baseproductos", "productos"], ["baseclientes", "clientes"], ["basehistorico", "historial"], ["basehistorial", "historial"], ["baseconsumo", "consumo"]];
   const normSub = (n) => String(n ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
   const tipoDeSub = (n) => { const s = normSub(n); return SUBS.find(([pre]) => s.startsWith(pre))?.[1] ?? null; };
   const basesDir = () => {
@@ -855,7 +855,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       } catch (e) { return send(res, 409, { error: "No se pudo mover el archivo. Si lo tienes abierto en Excel, ciérralo y vuelve a intentarlo." }), true; }
     }
     // ---- Actualizar datos desde un Excel: vista previa de los cambios y aplicar solo las diferencias ----
-    m = /^\/api\/admin\/(vista-previa|aplicar)\/(productos|clientes|historial|fotos)$/.exec(p);
+    m = /^\/api\/admin\/(vista-previa|aplicar)\/(productos|clientes|historial|consumo|fotos)$/.exec(p);
     if (m && post) {
       if (!actualizador) return send(res, 400, { error: "La actualización de datos no está disponible." }), true;
       if (m[1] === "aplicar" && m[2] === "productos" && exigeReclave(req, res, who)) return true; // cambiar la tarifa entera: hay que volver a escribir la clave

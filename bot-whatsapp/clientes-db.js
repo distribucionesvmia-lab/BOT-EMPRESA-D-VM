@@ -224,6 +224,28 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       }
     },
 
+    /**
+     * Precios y descuentos PROPIOS de cada cliente (Excel de consumo): Map(cliente → { precios: { artículo: precio }, descuentos: { artículo: % } }).
+     * Solo escribe lo que viene (añade o cambia); NO borra lo que el cliente ya tenía y no aparece. Todo o nada.
+     */
+    setPreciosPropios(porCliente) {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const out = { clientes: 0, precios: 0, descuentos: 0, desconocidos: 0 };
+        for (const [cid, d] of porCliente) {
+          const id = String(cid).trim();
+          if (!byId.get(id)) { out.desconocidos++; continue; }
+          for (const [pid, price] of Object.entries(d.precios ?? {})) { db.prepare("INSERT OR REPLACE INTO customer_prices VALUES (?, ?, ?)").run(id, String(pid), Number(price)); out.precios++; }
+          for (const [pid, pct] of Object.entries(d.descuentos ?? {})) { db.prepare("INSERT OR REPLACE INTO customer_discounts VALUES (?, ?, ?)").run(id, String(pid), Number(pct)); out.descuentos++; }
+          out.clientes++;
+        }
+        db.exec("COMMIT");
+        return out;
+      } catch (err) {
+        db.exec("ROLLBACK");
+        throw err;
+      }
+    },
     getById: (id) => (byId.get(String(id)) ? full(byId.get(String(id))) : null),
     /** Cliente cuyo teléfono coincide (9 últimos dígitos). Si lo comparten varios, null: se identificará por nombre. */
     getByPhone(phone) {

@@ -1240,7 +1240,7 @@ $("sync-ahora").onclick = async () => {
   try { const r = await call("/api/admin/sincronizacion/ahora", {}); $("sync-msg").textContent = r.ok ? "Hecho." : "Terminó con errores (mira el detalle)."; await refrescar(); }
   catch (e) { $("sync-msg").textContent = e.message; } finally { $("sync-ahora").disabled = false; }
 };
-const adEt = { anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", familias: "Códigos de familia de a3ERP (ordenan pedidos y histórico)", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", fotosBajaCalidad: "Fotos de baja resolución (se verán borrosas)", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", ignoradas: "Archivos ignorados", fotosIA: "Fotos creadas con IA (se avisa en el catálogo)", rechazados: "Productos con datos raros (NO se importan)", desconocidos: "Códigos de cliente que no existen (ignorados)", clientes: "Clientes con historial distinto", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
+const adEt = { descuentosNuevos: "Descuentos propios nuevos", descuentosCambian: "Descuentos que cambian", preciosPropiosNuevos: "Precios propios nuevos (distintos de la tarifa)", preciosPropiosCambian: "Precios propios que cambian", anadidos: "Productos añadidos", quitados: "Productos que pasan a inactivos", modificados: "Modificados", reactivados: "Reactivados", sinPrecio: "Sin precio (no se pueden vender)", iguales: "Sin cambios", familias: "Códigos de familia de a3ERP (ordenan pedidos y histórico)", fotosNuevas: "Fotos nuevas", fotosCambiadas: "Fotos cambiadas", fotosBajaCalidad: "Fotos de baja resolución (se verán borrosas)", nuevos: "Clientes nuevos", ausentes: "No vienen en el Excel (se dejan igual)", sinNif: "Sin NIF", sinTelefono: "Sin teléfono", clientesConCambios: "Clientes con histórico distinto", pedidosNuevos: "Pedidos nuevos", ignoradas: "Archivos ignorados", fotosIA: "Fotos creadas con IA (se avisa en el catálogo)", rechazados: "Productos con datos raros (NO se importan)", desconocidos: "Códigos de cliente que no existen (ignorados)", clientes: "Clientes con historial distinto", lineas: "Líneas leídas", sinFecha: "Líneas sin fecha" };
 function adPinta(r, p) {
   const cont = $(p + "-res"); cont.textContent = "";
   if (r.lectura?.columnas) { const q = document.createElement("p"); q.className = "muted"; const c = r.lectura.columnas; q.textContent = "Cómo se ha leído el Excel · " + Object.entries({ code: "código", name: "nombre", price: "PRECIO", unitsPerBox: "uds/caja", vat: "IVA", discount: "descuento" }).filter(([k]) => c[k]).map(([k, et]) => `${et} = «${c[k]}»`).join(" · "); cont.appendChild(q); }
@@ -1251,7 +1251,7 @@ function adPinta(r, p) {
   cont.appendChild(t);
   for (const a of r.aviso ?? []) { const p = document.createElement("p"); p.className = "muted"; p.textContent = "Aviso: " + a; cont.appendChild(p); }
   const fmt = (v) => (v === null || v === undefined || v === "" ? "—" : typeof v === "boolean" ? (v ? "sí" : "no") : String(v));
-  const ETQ_GRUPO = { sinNif: "Clientes SIN NIF en el Excel", sinTelefono: "Clientes SIN teléfono", sinCorreo: "Clientes sin correo", modificados: "Modificados (campo a campo)", nuevos: "Clientes nuevos", ausentes: "No vienen en este Excel" };
+  const ETQ_GRUPO = { conCambios: "Clientes con cambios (pulsa cada uno para ver qué cambia)", sinNif: "Clientes SIN NIF en el Excel", sinTelefono: "Clientes SIN teléfono", sinCorreo: "Clientes sin correo", modificados: "Modificados (campo a campo)", nuevos: "Clientes nuevos", ausentes: "No vienen en este Excel" };
   for (const [grupo, filas] of Object.entries(r.detalle ?? {})) {
     if (!filas.length) continue;
     const total = r.detalleTotal?.[grupo] ?? filas.length;
@@ -1300,6 +1300,7 @@ const TIPOS_DX = [
   { p: "px", tipo: "productos", icono: "", titulo: "Productos y precios", acepta: ".xlsx", desc: "Añade los productos nuevos, actualiza precios, IVA, unidades por caja y categorías, y retira los que ya no vienen (pasan a inactivos, no se borran).", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Modo de venta (2 = solo caja, 3 = caja o unidad) · Bloqueado · Obsoleto · Cód. familia" },
   { p: "cl", tipo: "clientes", icono: "", titulo: "Clientes", acepta: ".xlsx", desc: "Crea los clientes nuevos (con su cuenta) y actualiza nombre, dirección, teléfonos y correos. Los que no vienen en el Excel no se dan de baja solos.", cols: "Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto" },
   { p: "hi", tipo: "historial", icono: "", titulo: "Historial de compras", acepta: ".xlsx", desc: "Relaciona cada compra con su cliente por el código. Cada cliente conserva sus 10 últimos pedidos. Sube antes el Excel de clientes.", cols: "Cliente · Fecha · Nº Documento · Artículo · Unidades" },
+  { p: "co", tipo: "consumo", icono: "", titulo: "Consumo de clientes (precios y descuentos)", acepta: ".xlsx", desc: "El Excel «Consumo clientes… último servicio» de a3ERP: por cada cliente y artículo, lo último que se le sirvió. Pone el descuento propio de cada cliente, su precio si no es el de la tarifa, y añade a su historial los documentos que aún no tenía (no borra nada). Si subes otro más adelante, solo cambia lo que sea distinto. El coste que trae el Excel no se lee ni se guarda. Sube antes clientes y artículos.", cols: "Cliente · Artículo · Unidades · Precio · Desc.1 · Fecha · Nº Documento (Base, Coste y almacén se ignoran)" },
   { p: "fo", tipo: "fotos", icono: "", titulo: "Fotos de productos (ZIP o Excel)", acepta: ".zip,.xlsx", desc: "Un ZIP con una foto por producto (con el código como nombre, 11098.jpg, o con el nombre del artículo; en cualquier carpeta) o un EXCEL con una foto en cada fila junto al código o nombre del artículo. Si trae un Excel de control con la columna «tipo» (IA), avisa en el catálogo de las fotos creadas con IA.", cols: "Archivos .jpg, .png o .webp (mejor de 800 px o más)" },
 ];
 for (const t of TIPOS_DX) {
@@ -1310,7 +1311,7 @@ for (const t of TIPOS_DX) {
   $(t.p + "-file").addEventListener("change", () => { if (enRevision?.p === t.p) enRevision = null; }); // si elige otro archivo a mano, ya no es el de la bandeja
   $(t.p + "-ver").addEventListener("click", () => { c.style.gridColumn = "1 / -1"; }); // la tarjeta que se está revisando ocupa todo el ancho
 }
-const nombreTipo = { productos: "px", clientes: "cl", historial: "hi", fotos: "fo" };
+const nombreTipo = { productos: "px", clientes: "cl", historial: "hi", consumo: "co", fotos: "fo" };
 async function ultimasSubidas() {
   try {
     const lista = await call("/api/admin/actualizaciones");
@@ -1665,7 +1666,7 @@ $("f-avisos").onsubmit = async (e) => {
 };
 // ---- Bandeja de entrada: los Excel que se dejan en la carpeta del ordenador. Nada se aplica solo ----
 let enRevision = null; // { p, nombre }: el archivo de la bandeja que se está revisando en una de las tarjetas
-const TIPO_TXT = { productos: "Artículos y precios", clientes: "Clientes", historial: "Historial de compras", fotos: "Fotos (ZIP)" };
+const TIPO_TXT = { productos: "Artículos y precios", clientes: "Clientes", historial: "Historial de compras", consumo: "Consumo de clientes", fotos: "Fotos (ZIP)" };
 async function entrada() {
   const r = await call("/api/admin/entrada");
   $("entrada-panel").hidden = !r.configurada;
