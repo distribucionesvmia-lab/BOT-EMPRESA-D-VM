@@ -862,8 +862,9 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       const buf = await readBuffer(req, m[2] === "fotos" ? 80_000_000 : 25_000_000); // los ZIP de fotos y los Excel con fotos pesan más que los de texto
       if (!buf || !buf.length) return send(res, 400, { error: `No se recibió el archivo (máximo ${m[2] === "fotos" ? 80 : 25} MB).` }), true;
       try {
-        if (m[1] === "vista-previa") return send(res, 200, { ok: true, tipo: m[2], ...actualizador.vistaPrevia(m[2], buf) }), true;
-        return send(res, 200, { ok: true, tipo: m[2], ...actualizador.aplicar(m[2], buf, { fichero: String(url.searchParams.get("fichero") ?? "").slice(0, 120), confirmo: url.searchParams.get("confirmo") === "1" }) }), true;
+        const opc = { sinPrecios: url.searchParams.get("sinPrecios") === "1" };
+        if (m[1] === "vista-previa") return send(res, 200, { ok: true, tipo: m[2], ...actualizador.vistaPrevia(m[2], buf, opc) }), true;
+        return send(res, 200, { ok: true, tipo: m[2], ...actualizador.aplicar(m[2], buf, { fichero: String(url.searchParams.get("fichero") ?? "").slice(0, 120), confirmo: url.searchParams.get("confirmo") === "1", ...opc }) }), true;
       } catch (e) {
         return send(res, e.confirmar ? 409 : 400, { error: e.message || "No se pudo leer el Excel.", ...(e.confirmar ? { confirmar: e.confirmar } : {}) }), true;
       }

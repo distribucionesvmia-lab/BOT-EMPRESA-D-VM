@@ -1284,7 +1284,7 @@ $(p + "-ver").onclick = async () => {
   fichero = $(p + "-file").files[0]; $(p + "-aplicar").hidden = true; $(p + "-res").textContent = "";
   if (!fichero) { $(p + "-msg").textContent = "Elige primero el archivo Excel."; return; }
   $(p + "-ver").disabled = true; $(p + "-msg").textContent = "Comparando con lo que hay…";
-  try { const j = await adLlamar("vista-previa", p, fichero); ultimo = j; adPinta(j, p); $(p + "-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : !(j.aviso && j.aviso.length) ? "Este Excel es igual que lo que ya tienes: no hay ningún cambio que aplicar." : "No se puede aplicar este Excel: lee los avisos de arriba."; $(p + "-aplicar").hidden = !j.aplicable; }
+  try { const j = await adLlamar("vista-previa", p, fichero, $(p + "-sp")?.checked ? "&sinPrecios=1" : ""); ultimo = j; adPinta(j, p); $(p + "-msg").textContent = j.aplicable ? "Revisa los cambios y pulsa «Aplicar cambios» si son correctos." : !(j.aviso && j.aviso.length) ? "Este Excel es igual que lo que ya tienes: no hay ningún cambio que aplicar." : "No se puede aplicar este Excel: lee los avisos de arriba."; $(p + "-aplicar").hidden = !j.aplicable; }
   catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-ver").disabled = false; }
 };
 $(p + "-aplicar").onclick = async () => {
@@ -1292,7 +1292,7 @@ $(p + "-aplicar").onclick = async () => {
   if (!confirm(aviso)) return;
   const confirmo = !!ultimo?.confirmar?.length;
   $(p + "-aplicar").disabled = true; $(p + "-msg").textContent = "Aplicando…";
-  try { const reh = $(p + "-tipo").value === "productos" ? await pedirReclave("Vas a cambiar la tarifa de artículos. Escribe otra vez la clave del panel.") : ""; if (reh === null) { $(p + "-msg").textContent = "Cancelado: no se ha cambiado nada."; return; } const j = await adLlamar("aplicar", p, fichero, confirmo ? "&confirmo=1" : "", reh ? { "X-VM-Reclave": valorCab(reh) } : {}); const { resumen, ...r } = j; delete r.ok; delete r.tipo; $(p + "-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${k} ${v}`).join(" · "); $(p + "-aplicar").hidden = true; $(p + "-res").textContent = ""; $(p + "-file").value = ""; refrescar(); despues?.(); }
+  try { const reh = $(p + "-tipo").value === "productos" ? await pedirReclave("Vas a cambiar la tarifa de artículos. Escribe otra vez la clave del panel.") : ""; if (reh === null) { $(p + "-msg").textContent = "Cancelado: no se ha cambiado nada."; return; } const j = await adLlamar("aplicar", p, fichero, (confirmo ? "&confirmo=1" : "") + ($(p + "-sp")?.checked ? "&sinPrecios=1" : ""), reh ? { "X-VM-Reclave": valorCab(reh) } : {}); const { resumen, ...r } = j; delete r.ok; delete r.tipo; $(p + "-msg").textContent = "Hecho: " + Object.entries(r).map(([k, v]) => `${k} ${v}`).join(" · "); $(p + "-aplicar").hidden = true; $(p + "-res").textContent = ""; $(p + "-file").value = ""; refrescar(); despues?.(); }
   catch (e) { $(p + "-msg").textContent = e.message; } finally { $(p + "-aplicar").disabled = false; }
 };
 }
@@ -1305,7 +1305,7 @@ const TIPOS_DX = [
 ];
 for (const t of TIPOS_DX) {
   const c = document.createElement("div"); c.className = "panel dx-card"; c.dataset.tipo = t.tipo;
-  c.innerHTML = `<h2>${t.titulo}</h2><p class="muted" style="margin:0 0 8px">${t.desc}</p><p class="muted" style="margin:0 0 10px;font-size:13px"><b>Columnas:</b> ${t.cols}</p><p class="ult muted" id="${t.p}-ult" style="margin:0 0 10px;font-size:13px"></p><input type="hidden" id="${t.p}-tipo" value="${t.tipo}"><div class="row"><input type="file" id="${t.p}-file" accept="${t.acepta}" aria-label="Archivo de ${t.titulo}"><button class="main" id="${t.p}-ver" type="button">Ver cambios</button><button id="${t.p}-aplicar" type="button" hidden>Aplicar cambios</button></div><p class="muted" id="${t.p}-msg" role="status"></p><div id="${t.p}-res"></div>`;
+  c.innerHTML = `<h2>${t.titulo}</h2><p class="muted" style="margin:0 0 8px">${t.desc}</p><p class="muted" style="margin:0 0 10px;font-size:13px"><b>Columnas:</b> ${t.cols}</p><p class="ult muted" id="${t.p}-ult" style="margin:0 0 10px;font-size:13px"></p><input type="hidden" id="${t.p}-tipo" value="${t.tipo}"><div class="row"><input type="file" id="${t.p}-file" accept="${t.acepta}" aria-label="Archivo de ${t.titulo}"><button class="main" id="${t.p}-ver" type="button">Ver cambios</button><button id="${t.p}-aplicar" type="button" hidden>Aplicar cambios</button></div>${t.tipo === "consumo" ? `<label style="display:flex;gap:8px;align-items:flex-start;margin:8px 0;font-size:13px"><input type="checkbox" id="${t.p}-sp" style="margin-top:3px"><span><b>Aplicar solo descuentos e historial</b>, sin los precios propios (los precios distintos de la tarifa se revisan aparte; marca la casilla ANTES de pulsar «Ver cambios»).</span></label>` : ""}<p class="muted" id="${t.p}-msg" role="status"></p><div id="${t.p}-res"></div>`;
   $("dx-tarjetas").appendChild(c);
   montarExcel(t.p, () => { ultimasSubidas(); entradaTrasAplicar(t.p); });
   $(t.p + "-file").addEventListener("change", () => { if (enRevision?.p === t.p) enRevision = null; }); // si elige otro archivo a mano, ya no es el de la bandeja

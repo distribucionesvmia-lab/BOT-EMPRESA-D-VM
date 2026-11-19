@@ -213,7 +213,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
   }
 
   // ---------- consumo de clientes (precio y descuento propios de cada cliente + artículos que compra) ----------
-  function consumo(buf) {
+  function consumo(buf, { sinPrecios = false } = {}) {
     const { items, nombres, stats } = parseConsumoXlsx(buf);
     if (!items.size) throw new Error("El Excel de consumo no tiene líneas válidas.");
     const sinCeros = (x) => String(x).trim().replace(/^0+(?=\d)/, ""); // «0365» y «365» son el mismo código si no hay otro igual
@@ -247,7 +247,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
           const efectivo = a.discounts[pid] ?? prod.discount ?? 0;
           if (Math.abs(it.pct - efectivo) >= 0.005) { (pid in a.discounts ? r.desCambian++ : r.desNuevos++); descuentos[pid] = it.pct; cambios.push({ campo: `Descuento · ${prod.name}`, antes: pc(efectivo), despues: pc(it.pct) }); }
         }
-        if (it.price !== null) { // precio de tarifa que se le aplicó; solo es «propio» si no es el de la tarifa de hoy
+        if (it.price !== null && !sinPrecios) { // (con «solo descuentos e historial» los precios propios ni se miran) precio de tarifa que se le aplicó; solo es «propio» si no es el de la tarifa de hoy
           const efectivo = a.specialPrices[pid] ?? prod.price ?? 0;
           if (Math.abs(it.price - efectivo) > 0.0005) { (pid in a.specialPrices ? r.preCambian++ : r.preNuevos++); precios[pid] = it.price; cambios.push({ campo: `Precio · ${prod.name}`, antes: eur(efectivo), despues: eur(it.price) }); }
         }
@@ -419,20 +419,20 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
   }
 
   const por = { productos, clientes, historial, consumo, fotos };
-  const preparar = (tipo, buf) => {
+  const preparar = (tipo, buf, opc = {}) => {
     if (!por[tipo]) throw new Error("Tipo de datos desconocido.");
     const real = detectarTipo(buf);
     if (real && real !== tipo) throw new Error(`Este archivo parece un Excel ${ETIQUETA_TIPO[real]}, no ${ETIQUETA_TIPO[tipo]}. Súbelo en la tarjeta «${TARJETA_TIPO[real]}».`);
-    return por[tipo](buf);
+    return por[tipo](buf, opc);
   };
   return {
     anadirProducto, anadirCliente,
-    vistaPrevia(tipo, buf) {
-      const { aplicar: _a, ...r } = preparar(tipo, buf);
+    vistaPrevia(tipo, buf, opc = {}) {
+      const { aplicar: _a, ...r } = preparar(tipo, buf, opc);
       return r;
     },
-    aplicar(tipo, buf, { fichero = "", confirmo = false } = {}) {
-      const p = preparar(tipo, buf);
+    aplicar(tipo, buf, { fichero = "", confirmo = false, ...opc } = {}) {
+      const p = preparar(tipo, buf, opc);
       if (!p.aplicable) throw new Error(p.aviso.find((a) => /No se puede aplicar|no se pueden añadir/.test(a)) ?? "No hay nada que aplicar.");
       if (p.confirmar?.length && !confirmo) { // hay precios que cambian mucho, productos que se quitan o datos raros: se aplica solo si lo has confirmado
         const e = new Error("Hay cosas que confirmar antes de aplicar: " + p.confirmar.join(" "));

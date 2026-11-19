@@ -107,3 +107,18 @@ test("CONSUMO: si el nombre del Excel no se parece al del cliente de ese código
   assert.equal(JSON.stringify(customersDb.getById("365")), antes);             // intacto: ni descuento ni historial
   assert.deepEqual(customersDb.getById("400").discounts, { 1: 25 });           // el que sí coincide (por su razón social) se aplica
 });
+
+test("CONSUMO: «solo descuentos e historial» aplica eso sin pedir confirmar y NO guarda ningún precio propio", () => {
+  const { a, customersDb } = montar();
+  const f = consumo(fila(1, 12, "0.5", "10", 46335, "D1", "0365"), fila(2, 3, "2.5", "0", 46335, "D1", "0365")); // el artículo 2 traería un precio distinto de la tarifa
+  assert.ok(a.vistaPrevia("consumo", f).confirmar?.length);                       // normal: pide confirmar
+  const p = a.vistaPrevia("consumo", f, { sinPrecios: true });
+  assert.equal(p.confirmar, undefined); assert.equal(p.resumen.preciosPropiosNuevos, 0); assert.equal(p.resumen.descuentosNuevos, 1);
+  a.aplicar("consumo", f, { sinPrecios: true });                                   // sin confirmo: no hace falta
+  const c = customersDb.getById("365");
+  assert.deepEqual(c.discounts, { 1: 10 }); assert.deepEqual(c.specialPrices, {});  // el descuento sí, el precio no
+  assert.deepEqual(c.orders.map((o) => o.doc).sort(), ["D1", "VIEJO"]);              // y el historial también
+  // más tarde, ya revisados los precios, se pueden aplicar con el modo normal
+  a.aplicar("consumo", f, { confirmo: true });
+  assert.deepEqual(customersDb.getById("365").specialPrices, { 2: 2.5 });
+});
