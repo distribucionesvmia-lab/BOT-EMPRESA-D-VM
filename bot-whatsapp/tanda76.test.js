@@ -7,19 +7,24 @@ import { openCatalogDb } from "./catalogo-db.js";
 import { openCustomersDb } from "./clientes-db.js";
 import { openAccountsDb } from "./cuentas-db.js";
 import { crearActualizador, detectarTipo } from "./actualizar-datos.js";
+import { precioEfectivo } from "./pricing.js";
 import { parseConsumo } from "./consumo-import.js";
 
 const libro = (rows) => Buffer.from(buildWorkbook([{ name: "H", widths: [], rows }]));
 const CAB = ["Artículo", "Descripción ", "Unidades", "", "Precio", "Fecha", "Desc.1", "Nº Documento", "Base", "Nombre", "Cód Almacén", "Cliente", "Desc. Almacén", "Coste", "Obt. precio coste"];
-const fila = (art, uds, precio, desc, fecha, doc, cli) => [`          ${art}`, "ARTICULO", String(uds), "", String(precio), String(fecha), String(desc), doc, "0", "NOMBRE", "1", `    ${cli}`, "Almacén central", "9.9999", "PMED"];
+const fila = (art, uds, precio, desc, fecha, doc, cli, nombre = "BAR UNO") => [`          ${art}`, "ARTICULO", String(uds), "", String(precio), String(fecha), String(desc), doc, "0", nombre, "1", `    ${cli}`, "Almacén central", "9.9999", "PMED"];
 const consumo = (...f) => libro([CAB, ...f]);
 const CAB_P = ["Cód. artículo", "Artículo", "Precio venta", "Tipo IVA ventas", "Unidades paquete venta", "Obsoleto", "Bloqueado"];
 const montar = () => {
   const catalogDb = openCatalogDb(":memory:"), customersDb = openCustomersDb(":memory:"), accountsDb = openAccountsDb(":memory:");
   const a = crearActualizador({ catalogDb, customersDb, accountsDb, imgDir: null, registro: () => {} });
   a.aplicar("productos", libro([CAB_P, ["1", "AGUA", "0,50", "RED10", "6", "No", "No"], ["2", "LECHE", "2,00", "RED10", "6", "No", "No"]]));
-  customersDb.upsertCustomers([{ id: "365", name: "BAR UNO", active: true, orders: [{ doc: "VIEJO", date: "2026-01-05", lines: [{ productId: "1", qty: 1 }] }] }]);
-  return { a, customersDb };
+  customersDb.upsertCustomers([
+    { id: "365", name: "BAR UNO", active: true, orders: [{ doc: "VIEJO", date: "2026-01-05", lines: [{ productId: "1", qty: 1 }] }] },
+    { id: "400", name: "Dos", legalName: "RESTAURANTE EL ROBLE SL", active: true, orders: [{ doc: "VIEJO2", date: "2026-02-05", lines: [{ productId: "2", qty: 4 }] }] },
+    { id: "500", name: "TERCERO", active: true, orders: [] },
+  ]);
+  return { a, customersDb, catalogDb };
 };
 
 test("CONSUMO: se leen las columnas con códigos rellenos de espacios y decimales con punto; el COSTE no se guarda", () => {
@@ -64,4 +69,41 @@ test("CONSUMO: vista previa sin escribir; aplicar añade descuento y precio prop
   assert.ok(!p3.confirmar); // sin precios nuevos distintos de la tarifa no hace falta confirmar
   a.aplicar("consumo", f2);
   assert.deepEqual(customersDb.getById("365").discounts, { 1: 15 }); assert.deepEqual(customersDb.getById("365").specialPrices, { 2: 2.5 });
+});
+
+test("CONSUMO: cada cliente recibe SOLO lo suyo (precios, descuentos e historial) y los demás ni lo ven ni se tocan", () => {
+  const { a, customersDb, catalogDb } = montar();
+  const antes500 = JSON.stringify(customersDb.getById("500"));
+  const f = consumo(
+    fila(1, 12, "0.5", "10", 46335, "D1", "0365", "BAR UNO"), fila(2, 3, "2", "5", 46335, "D1", "0365", "BAR UNO"),
+    fila(1, 6, "0.5", "25", 46340, "D2", "0400", "ROBLE, EL"), fila(2, 2, "3", "0", 46340, "D2", "0400", "ROBLE, EL"),
+  );
+  const p = a.vistaPrevia("consumo", f);
+  assert.equal(p.resumen.nombreNoCoincide, 0); assert.equal(p.resumen.clientesConCambios, 2);
+  a.aplicar("consumo", f, { confirmo: true });
+  const A = customersDb.getById("365"), B = customersDb.getById("400"), C = customersDb.getById("500");
+  assert.deepEqual([A.discounts, A.specialPrices], [{ 1: 10, 2: 5 }, {}]);   // lo de A
+  assert.deepEqual([B.discounts, B.specialPrices], [{ 1: 25 }, { 2: 3 }]);    // lo de B: otro descuento y un precio propio que A no tiene
+  assert.equal(JSON.stringify(C), antes500);                                   // el tercero, intacto
+  assert.deepEqual(A.orders.map((o) => o.doc).sort(), ["D1", "VIEJO"]);        // el historial de A: el suyo
+  assert.deepEqual(B.orders.map((o) => o.doc).sort(), ["D2", "VIEJO2"]);       // el de B: el suyo, sin nada de A
+  assert.deepEqual(B.orders.find((o) => o.doc === "D2").lines.map((l) => [l.productId, l.qty]).sort(), [["1", 6], ["2", 2]]);
+  // lo que paga cada uno por el MISMO artículo: distinto, y cada cliente solo ve su propio precio
+  const leche = catalogDb.list({ activeOnly: false }).find((x) => String(x.id) === "2"), agua = catalogDb.list({ activeOnly: false }).find((x) => String(x.id) === "1");
+  assert.deepEqual(precioEfectivo(leche, A, "2"), { price: 2, discount: 5 });
+  assert.deepEqual(precioEfectivo(leche, B, "2"), { price: 3, discount: 0 });
+  assert.deepEqual(precioEfectivo(leche, C, "2"), { price: 2, discount: 0 });  // sin datos propios: la tarifa
+  assert.deepEqual([precioEfectivo(agua, A, "1").discount, precioEfectivo(agua, B, "1").discount, precioEfectivo(agua, C, "1").discount], [10, 25, 0]);
+});
+
+test("CONSUMO: si el nombre del Excel no se parece al del cliente de ese código, NO se toca a ese cliente (el código podría ser de otro)", () => {
+  const { a, customersDb } = montar();
+  const antes = JSON.stringify(customersDb.getById("365"));
+  const f = consumo(fila(1, 12, "0.5", "40", 46335, "D1", "0365", "PANADERIA OTRA"), fila(1, 6, "0.5", "25", 46340, "D2", "0400", "RESTAURANTE EL ROBLE"));
+  const p = a.vistaPrevia("consumo", f);
+  assert.equal(p.resumen.nombreNoCoincide, 1); assert.equal(p.resumen.clientesConCambios, 1);
+  assert.match(p.aviso.join(" "), /NO se tocan/); assert.equal(p.detalle.nombreNoCoincide[0].id, "365");
+  a.aplicar("consumo", f);
+  assert.equal(JSON.stringify(customersDb.getById("365")), antes);             // intacto: ni descuento ni historial
+  assert.deepEqual(customersDb.getById("400").discounts, { 1: 25 });           // el que sí coincide (por su razón social) se aplica
 });

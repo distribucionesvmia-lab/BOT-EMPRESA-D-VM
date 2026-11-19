@@ -214,7 +214,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
 
   // ---------- consumo de clientes (precio y descuento propios de cada cliente + artículos que compra) ----------
   function consumo(buf) {
-    const { items, stats } = parseConsumoXlsx(buf);
+    const { items, nombres, stats } = parseConsumoXlsx(buf);
     if (!items.size) throw new Error("El Excel de consumo no tiene líneas válidas.");
     const sinCeros = (x) => String(x).trim().replace(/^0+(?=\d)/, ""); // «0365» y «365» son el mismo código si no hay otro igual
     const indice = (ids) => { const m = new Map(); for (const id of ids) { const k = sinCeros(id); m.set(k, m.has(k) ? null : id); } return m; };
@@ -222,14 +222,21 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const cliIdx = indice(customersDb.list().map((c) => String(c.id)));
     const producto = (pid) => { const id = prods.has(pid) ? pid : prodIdx.get(sinCeros(pid)); return id ? [id, prods.get(id)] : [null, null]; };
     const clienteId = (cid) => (customersDb.getById(cid) ? String(cid) : cliIdx.get(sinCeros(cid)) ?? null);
+    // El código no basta: el nombre que trae el Excel tiene que parecerse al del cliente de la base (nombre comercial o razón social). Si no, NO se toca a ese cliente.
+    const STOP = new Set(["restaurante", "cafeteria", "hotel", "sociedad", "limitada", "anonima", "hermanos", "comunidad", "bienes", "servicios", "hosteleria", "cafe", "bar"]);
+    const palabras = (t) => nrm(t).split(" ").filter((w) => w.length >= 3 && !STOP.has(w));
+    const mismoNombre = (excel, ...base) => { const A = palabras(excel), B = base.flatMap(palabras); if (!A.length || !B.length) return null; /* no se puede comprobar */ return A.some((w) => B.some((v) => v === w || (w.length >= 5 && v.length >= 5 && (w.startsWith(v) || v.startsWith(w))))); };
     const eur = (n) => `${Number(n).toFixed(4).replace(/\.?0+$/, "")} €`, pc = (n) => `${Number(n)} %`;
-    const r = { desNuevos: 0, desCambian: 0, preNuevos: 0, preCambian: 0, pedNuevos: 0, iguales: 0, desconocidos: 0, artDesconocidos: 0, conCoincidenciaSinCeros: 0 };
-    const paraPrecios = new Map(), paraPedidos = new Map(), filas = [], noExisten = [], artSin = new Set();
+    const r = { desNuevos: 0, desCambian: 0, preNuevos: 0, preCambian: 0, pedNuevos: 0, iguales: 0, desconocidos: 0, otroNombre: 0, sinComprobar: 0, artDesconocidos: 0, conCoincidenciaSinCeros: 0 };
+    const paraPrecios = new Map(), paraPedidos = new Map(), filas = [], noExisten = [], artSin = new Set(), otroNombre = [];
     for (const [cidRaw, pares] of items) {
       const cid = clienteId(cidRaw);
       if (!cid) { r.desconocidos++; noExisten.push({ id: cidRaw, nombre: "no existe en la base de clientes" }); continue; }
+      const a = customersDb.getById(cid);
+      const mismo = mismoNombre(nombres.get(cidRaw), a.name, a.legalName); if (mismo === null) r.sinComprobar++;
+      if (mismo === false) { r.otroNombre++; otroNombre.push({ id: cid, nombre: `${a.name} · en el Excel: ${nombres.get(cidRaw)}`, motivo: "el nombre no coincide: no se toca" }); continue; }
       if (cid !== String(cidRaw).trim()) r.conCoincidenciaSinCeros++;
-      const a = customersDb.getById(cid), cambios = [], precios = {}, descuentos = {}, docs = new Map();
+      const cambios = [], precios = {}, descuentos = {}, docs = new Map();
       for (const [pidRaw, it] of pares) {
         const [pid, prod] = producto(pidRaw);
         if (!pid) { r.artDesconocidos++; artSin.add(pidRaw); continue; }
@@ -256,14 +263,16 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const aviso = [];
     if (r.desconocidos) aviso.push(`${r.desconocidos} clientes del Excel no existen en la base: se ignoran (¿falta subir antes el Excel de clientes?).`);
     if (r.artDesconocidos) aviso.push(`${r.artDesconocidos} líneas son de artículos que no están en el catálogo (${artSin.size} artículos distintos): se ignoran (¿falta subir antes el Excel de artículos?).`);
+    if (r.otroNombre) aviso.push(`${r.otroNombre} clientes NO se tocan porque el nombre del Excel no se parece al de la base (mira «El nombre no coincide»): el código puede ser de otro cliente.`);
+    if (r.sinComprobar) aviso.push(`${r.sinComprobar} clientes no se han podido comprobar por nombre (el Excel o la ficha no traen un nombre con palabras que comparar): se aplican por su código.`);
     if (r.conCoincidenciaSinCeros) aviso.push(`${r.conCoincidenciaSinCeros} clientes se han reconocido quitando ceros del código («0365» = «365»). Si no es correcto, no apliques.`);
     if (stats.sinPrecio) aviso.push(`${stats.sinPrecio} líneas sin precio (o a 0 €): cuentan como compra, pero no cambian su precio ni su descuento.`);
     if (cambiar.size === 0 && r.iguales === 0) aviso.push("Ningún cliente del Excel existe en la base: sube antes el Excel de clientes. No se puede aplicar.");
     const confirmar = [];
     if (r.preNuevos + r.preCambian) confirmar.push(`${r.preNuevos + r.preCambian} precios propios de clientes serían DISTINTOS de la tarifa de hoy (mira «Precio · …» en el detalle). Confírmalo solo si son precios especiales de esos clientes y no una tarifa antigua: después, esos clientes pagarían ese precio aunque la tarifa cambie.`);
-    const resumen = { clientesConCambios: cambiar.size, descuentosNuevos: r.desNuevos, descuentosCambian: r.desCambian, preciosPropiosNuevos: r.preNuevos, preciosPropiosCambian: r.preCambian, pedidosNuevos: r.pedNuevos, iguales: r.iguales, desconocidos: r.desconocidos, lineas: stats.filas, sinFecha: stats.sinFecha };
+    const resumen = { clientesConCambios: cambiar.size, descuentosNuevos: r.desNuevos, descuentosCambian: r.desCambian, preciosPropiosNuevos: r.preNuevos, preciosPropiosCambian: r.preCambian, pedidosNuevos: r.pedNuevos, iguales: r.iguales, desconocidos: r.desconocidos, nombreNoCoincide: r.otroNombre, lineas: stats.filas, sinFecha: stats.sinFecha };
     return {
-      resumen, detalle: { conCambios: filas.slice(0, LIMITE_CLIENTES), desconocidos: noExisten.slice(0, MUESTRA) }, detalleTotal: { conCambios: filas.length, desconocidos: noExisten.length },
+      resumen, detalle: { conCambios: filas.slice(0, LIMITE_CLIENTES), nombreNoCoincide: otroNombre.slice(0, LIMITE_CLIENTES), desconocidos: noExisten.slice(0, MUESTRA) }, detalleTotal: { conCambios: filas.length, nombreNoCoincide: otroNombre.length, desconocidos: noExisten.length },
       aviso, ...(confirmar.length ? { confirmar } : {}), aplicable: cambiar.size > 0,
       aplicar() { const p = customersDb.setPreciosPropios(paraPrecios), h = customersDb.setPurchases(paraPedidos); return { clientes: cambiar.size, descuentos: p.descuentos, precios: p.precios, pedidos: r.pedNuevos, lineas: h.lineas }; },
     };
