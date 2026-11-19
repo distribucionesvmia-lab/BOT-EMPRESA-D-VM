@@ -14,7 +14,7 @@ import { leerPausa, TEXTO_PAUSA_PEDIDOS } from "./pausa.js";
 import { crearFrenoCopia } from "./freno-copia.js";
 import { estadoCliente } from "./revision-seguridad.js";
 import { resumenGeo } from "./geoip.js";
-import { turnstileActivo } from "./seguridad.js";
+import { turnstileActivo, retoPropioActivo } from "./seguridad.js";
 import { cabecerasSeguridad, CSP, eventoSeguridad, usarRegistro, ipDe, claveDebil, crearEscudo, origenAjeno, panelPermitido, cspEstricta } from "./seguridad.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
@@ -1136,7 +1136,7 @@ const servidorHttp = http
   .listen(PORT, process.env.HOST || undefined, () => {
     console.log(`Bot escuchando en http://localhost:${PORT}` + (process.env.HOST ? ` (solo ${process.env.HOST})` : ""));
     if (clientEnabled) { // la aplicación de los clientes le cuenta al panel cómo está configurada (sin claves) para la «Revisión de seguridad»
-      const contar = () => { try { getAccountsDb().ajusteGuardar("estado_cliente", JSON.stringify(estadoCliente({ ...process.env, PUBLIC_URL }, { turnstile: turnstileActivo(), smtp: !!smtpDesdeEntorno(), geo: resumenGeo() }))); } catch { /* sin guardar */ } };
+      const contar = () => { try { getAccountsDb().ajusteGuardar("estado_cliente", JSON.stringify(estadoCliente({ ...process.env, PUBLIC_URL }, { turnstile: turnstileActivo(), retoPropio: retoPropioActivo(), smtp: !!smtpDesdeEntorno(), geo: resumenGeo() }))); } catch { /* sin guardar */ } };
       contar(); setInterval(contar, 10 * 60_000).unref();
     }
     // Si la oficina actualiza los archivos y el programa se queda con el código antiguo (no se reinició), se reinicia solo: el archivo iniciar-*.bat lo vuelve a arrancar a los 10 s.

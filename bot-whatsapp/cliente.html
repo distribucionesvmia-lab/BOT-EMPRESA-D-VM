@@ -1191,16 +1191,28 @@ function validaAcceso() {
   return true;
 }
 // «No soy un robot» (Cloudflare Turnstile): solo si la empresa ha puesto sus claves; el alta lo pide siempre y el acceso solo tras muchos intentos
-let tsClave = null, tsListo = null; const tsToken = {}, tsId = {};
+let tsClave = null, tsListo = null, tsLocal = false; const tsToken = {}, tsId = {};
+// «No soy un robot» PROPIO (sin servicios externos): el navegador resuelve un reto de trabajo en segundo plano (~1 s) y manda el resultado como `cf`
+async function retoResolver() {
+  const j = await (await fetch("/api/reto", { cache: "no-store" })).json(), enc = new TextEncoder(), bits = j.bits, lote = 512;
+  const ceros = (u) => { let n = 0; for (const b of u) { if (b === 0) { n += 8; continue; } n += Math.clz32(b) - 24; break; } return n; };
+  for (let ini = 0; ini < 4_000_000; ini += lote) {
+    const hs = await Promise.all(Array.from({ length: lote }, (_, k) => crypto.subtle.digest("SHA-256", enc.encode(j.reto + ":" + (ini + k)))));
+    for (let k = 0; k < lote; k++) if (ceros(new Uint8Array(hs[k])) >= bits) return j.reto + "|" + (ini + k);
+  }
+  return null;
+}
 function tsCargar() {
   if (tsListo) return tsListo;
   return (tsListo = fetch("/api/seguridad").then((r) => r.json()).then((j) => {
-    tsClave = j.turnstile || null; if (!tsClave) return null;
+    tsClave = j.turnstile || null; tsLocal = !tsClave && !!j.retoPropio && !!(window.crypto && crypto.subtle); if (tsLocal) return "local"; if (!tsClave) return null;
     return new Promise((ok) => { const s = document.createElement("script"); s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true; s.onload = () => ok(window.turnstile); s.onerror = () => ok(null); document.head.appendChild(s); });
   }).catch(() => null));
 }
 async function tsPinta(hueco) {
-  const ts = await tsCargar(); const el = $(hueco); if (!ts || !tsClave || !el) return;
+  const ts = await tsCargar();
+  if (ts === "local") { tsToken[hueco] = null; try { const t = await retoResolver(); if (t) tsToken[hueco] = t; } catch { /* sin conexión: el servidor lo pedirá de nuevo */ } return; }
+  const el = $(hueco); if (!ts || !tsClave || !el) return;
   el.hidden = false; if (tsId[hueco] != null) { try { ts.reset(tsId[hueco]); } catch {} tsToken[hueco] = null; return; }
   tsId[hueco] = ts.render(el, { sitekey: tsClave, callback: (tk) => { tsToken[hueco] = tk; }, "expired-callback": () => { tsToken[hueco] = null; }, "error-callback": () => { tsToken[hueco] = null; } });
 }

@@ -11,7 +11,7 @@ import { navegadorCorto } from "./errores.js";
 import { leerPausa, TEXTO_PAUSA_ENTRADAS } from "./pausa.js";
 import { modoGeo, claseDe } from "./geoip.js";
 import { elegirDestino, tapar } from "./correo-cliente.js";
-import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
+import { turnstileSite, turnstileActivo, robotActivo, retoPropioActivo, nuevoReto, verificarRobot, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
 
 const COOKIE = "vm_session";
 const COOKIE_APARATO = "vm_aparato"; // aparato de confianza: tras una aprobación de la oficina, este navegador vuelve a entrar solo
@@ -103,6 +103,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const nifGlobalFails = rateLimiter(Number(process.env.NIF_GLOBAL_FAILS ?? 15), 60 * 60_000); // fallos de NIF por hora, entre todos los clientes
   const usoLimit = rateLimiter(300, 10 * 60_000); // contadores: muchos permitidos, pero no infinitos por IP
   const registerLimit = rateLimiter(Number(process.env.REGISTER_LIMIT ?? 20), 60 * 60_000);
+  const retosPedidos = contadorIntentos(Number(process.env.RETO_LIMIT ?? 60), 10 * 60_000); // retos del «no soy un robot» propio por dirección
   const intentosAcceso = contadorIntentos(Number(process.env.CAPTCHA_DESPUES_DE ?? 5), 10 * 60_000); // pasados N intentos en 10 min desde una dirección, se pide «no soy un robot»
   // Entrada aprobada por la oficina: topes por dirección, por cliente y en total (que nadie pueda llenar el panel de la empresa de solicitudes)
   // Entrada con NOMBRE + NIF + CONTRASEÑA (por defecto). La primera vez, el cliente crea su contraseña; después solo la escribe (y el aparato queda recordado un año). ACCESO_MODO=oficina vuelve a «la oficina da paso / código por correo».
@@ -253,14 +254,19 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     }
     if (!p.startsWith("/api/")) return false;
 
-    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null, accesoOficina: oficinaActiva(), soloOficina: soloOficina(), codigoCorreo: codigoPorCorreo(), accesoPassword: pwActiva() }), true; // solo la clave PÚBLICA, si está activada
+    if (p === "/api/reto" && req.method === "GET") { // reto del «no soy un robot» propio (sin servicios externos); límite por dirección para que no sirva de martillo
+      if (!retoPropioActivo()) return send(res, 404, { error: "No disponible." }), true;
+      if (retosPedidos.pasado(retosPedidos.suma(ip(req)))) return send(res, 429, { error: "Demasiadas comprobaciones seguidas. Espera un minuto." }), true;
+      return send(res, 200, nuevoReto()), true;
+    }
+    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null, retoPropio: retoPropioActivo(), accesoOficina: oficinaActiva(), soloOficina: soloOficina(), codigoCorreo: codigoPorCorreo(), accesoPassword: pwActiva() }), true; // solo la clave PÚBLICA, si está activada
 
     if (p === "/api/registro" && req.method === "POST") {
       if (!registerLimit(ip(req))) return eventoSeguridad("muchas-solicitudes-de-alta", ip(req)), demasiados(res, registerLimit, ip(req)), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       if (String(b.sitio_web ?? "").trim()) return eventoSeguridad("alta-con-campo-trampa", ip(req)), send(res, 200, { ok: true, estado: "pendiente" }), true; // campo oculto relleno = un bot: se finge que ha ido bien y no se guarda nada
-      if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("alta-sin-comprobacion-robot", ip(req)), send(res, 400, { error: "No hemos podido comprobar que no eres un robot. Recarga la página e inténtalo de nuevo.", verificacion: true }), true;
+      if (!(await verificarRobot(b.cf, ip(req))).ok) return eventoSeguridad("alta-sin-comprobacion-robot", ip(req)), send(res, 400, { error: "No hemos podido comprobar que no eres un robot. Recarga la página e inténtalo de nuevo.", verificacion: true }), true;
       const empresa = String(b.empresa ?? "").trim().replace(/\s+/g, " ");
       const correo = String(b.correo ?? "").trim();
       const pin = String(b.pin ?? "");
@@ -301,9 +307,9 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       if (!solicitudIp(ip(req))) return eventoSeguridad("acceso-oficina-muchas-peticiones", ip(req)), demasiados(res, solicitudIp, ip(req)), true;
-      if (turnstileActivo() && !aparatoDe(req)) { // un aparato nuevo (el único caso que molesta a la oficina) tiene que pasar «no soy un robot» si está configurado
+      if (robotActivo() && !aparatoDe(req)) { // un aparato nuevo (el único caso que molesta a la oficina) tiene que pasar «no soy un robot» si está configurado
         intentosAcceso.suma(ip(req));
-        if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
+        if (!(await verificarRobot(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
       }
       if (pedirNombre(res, b)) return true;
       if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe tu NIF: los 6 primeros dígitos de tu DNI o CIF, o el NIF completo." }), true;
@@ -380,8 +386,8 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       // Contra bots: campo trampa o enviado más rápido de lo que escribe una persona (o sin decirlo) → se responde como un fallo normal y no se prueba nada
       if (String(b.sitio_web ?? "").trim()) return eventoSeguridad("acceso-con-campo-trampa", ip(req)), send(res, 401, MAL), true;
       if (!(Number(b.t) >= 1500)) return eventoSeguridad("acceso-demasiado-rapido", ip(req)), send(res, 401, MAL), true;
-      if (turnstileActivo() && (crear || intentosAcceso.pasado(intentosAcceso.suma(ip(req))))) { // «no soy un robot»: siempre para crear una contraseña, y al entrar cuando hay muchos intentos
-        if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
+      if (robotActivo() && (crear || intentosAcceso.pasado(intentosAcceso.suma(ip(req))))) { // «no soy un robot»: siempre para crear una contraseña, y al entrar cuando hay muchos intentos
+        if (!(await verificarRobot(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
       }
       if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe tu NIF: los 6 primeros dígitos de tu DNI o CIF, o el NIF completo." }), true;
       const password = typeof b.password === "string" ? b.password : "";
@@ -525,8 +531,8 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (soloOficina()) return send(res, 403, { error: "Para entrar, escribe el nombre de tu empresa y tu NIF: la oficina te dará paso." }), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
-      if (turnstileActivo() && intentosAcceso.pasado(intentosAcceso.suma(ip(req)))) { // muchos intentos seguidos: a partir de aquí, «no soy un robot»
-        if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
+      if (robotActivo() && intentosAcceso.pasado(intentosAcceso.suma(ip(req)))) { // muchos intentos seguidos: a partir de aquí, «no soy un robot»
+        if (!(await verificarRobot(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
       }
       const empresa = String(b.empresa ?? "").slice(0, 80);
       // Cliente habitual: solo los 6 primeros dígitos del DNI/CIF (el nombre es opcional: si se envía, estrecha la búsqueda)
