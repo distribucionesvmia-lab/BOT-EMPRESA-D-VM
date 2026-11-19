@@ -761,7 +761,7 @@
         <div class="okmsg" id="pw-aviso" role="status"></div>
         <label>Contraseña<input id="pw-pass" type="password" maxlength="64" autocomplete="current-password" aria-describedby="pw-err"></label>
         <div id="pw-crear" hidden>
-          <div class="okmsg" role="status"><b>Es tu primera vez.</b> Elige una contraseña (mínimo 8 caracteres, que no sea tu NIF ni el nombre de tu empresa). La próxima vez te la pediremos igual.</div>
+          <div class="okmsg" role="status"><b>Es tu primera vez.</b> Repite abajo la contraseña que acabas de escribir (mínimo 8 caracteres, que no sea tu NIF ni el nombre de tu empresa). Después te enviaremos un código de 6 dígitos al correo que tenemos en tu ficha. La próxima vez te pediremos la contraseña igual.</div>
           <label>Repite la contraseña<input id="pw-pass2" type="password" maxlength="64" autocomplete="new-password" aria-describedby="pw-err"></label>
         </div>
         <div id="pw-cod-fila" hidden>
@@ -1331,7 +1331,7 @@ $("f-acceso").onsubmit = (e) => {
         if (r.status === 401) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error); $("pw-cc").value = ""; } else if (!j.enviado && j.error) err(j.error);
         return;
       }
-      if (j.necesitaCrear) { modoCrear(true); $("pw-pass").value = ""; $("pw-pass").focus(); tsPinta("ts-pw"); return; } // crear una contraseña pide «no soy un robot» si está configurado
+      if (j.necesitaCrear) { modoCrear(true); $("pw-pass2").focus(); tsPinta("ts-pw"); return; } // la contraseña que acaba de escribir se conserva: solo tiene que repetirla // crear una contraseña pide «no soy un robot» si está configurado
       if (!r.ok) { f.classList.remove("sacude"); void f.offsetWidth; f.classList.add("sacude"); err(j.error || "No se pudo entrar."); if (!creando) { $("pw-pass").value = ""; $("pw-pass").focus(); } return; }
       const recienCreada = creando; quitaPase(); f.reset(); $("pw-cod-fila").hidden = true; $("pw-cc-fila").hidden = true; modoCrear(false); entrar(j.cliente.nombre); if (recienCreada) setTimeout(() => document.dispatchEvent(new Event("vm:ofrecer-2fa")), 700); // contraseña recién creada: se ofrece (opcional) la verificación en dos pasos
     }, "pw-err")).then(rotulo);
