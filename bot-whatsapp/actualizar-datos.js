@@ -227,7 +227,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const palabras = (t) => nrm(t).split(" ").filter((w) => w.length >= 3 && !STOP.has(w));
     const mismoNombre = (excel, ...base) => { const A = palabras(excel), B = base.flatMap(palabras); if (!A.length || !B.length) return null; /* no se puede comprobar */ return A.some((w) => B.some((v) => v === w || (w.length >= 5 && v.length >= 5 && (w.startsWith(v) || v.startsWith(w))))); };
     const eur = (n) => `${Number(n).toFixed(4).replace(/\.?0+$/, "")} €`, pc = (n) => `${Number(n)} %`;
-    const r = { desNuevos: 0, desCambian: 0, preNuevos: 0, preCambian: 0, pedNuevos: 0, iguales: 0, desconocidos: 0, otroNombre: 0, sinComprobar: 0, sinDescTarifa: 0, desCien: 0, artDesconocidos: 0, conCoincidenciaSinCeros: 0 };
+    const r = { desNuevos: 0, desCambian: 0, preNuevos: 0, preCambian: 0, pedNuevos: 0, iguales: 0, desconocidos: 0, otroNombre: 0, sinComprobar: 0, desCien: 0, artDesconocidos: 0, conCoincidenciaSinCeros: 0 };
     const paraPrecios = new Map(), paraPedidos = new Map(), filas = [], noExisten = [], artSin = new Set(), otroNombre = [];
     for (const [cidRaw, pares] of items) {
       const cid = clienteId(cidRaw);
@@ -243,10 +243,10 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
         const k = `${it.date}|${it.doc}`;
         if (!docs.has(k)) docs.set(k, { doc: it.doc, date: it.date, lines: [] });
         docs.get(k).lines.push({ productId: pid, qty: it.qty });
-        { // DESCUENTO especial: solo si el cliente lo tiene (> 0 %) y es distinto del que ya le sale. Es independiente del precio: un artículo a precio de tarifa puede llevar descuento propio y uno a precio especial puede llevar el suyo aparte.
+        { // DESCUENTO especial: lo que se le cobró (también 0 %: si la tarifa tiene descuento y a él no se le hizo, se guarda 0 %) si es distinto del que ya le sale; el 100 % (regalo) no cuenta. Es independiente del precio: un artículo a precio de tarifa puede llevar descuento propio y uno a precio especial puede llevar el suyo aparte.
           const efectivo = a.discounts[pid] ?? prod.discount ?? 0;
           if (it.pct >= 100) r.desCien++; // 100 %: es un regalo, nunca se guarda como descuento del cliente
-          if (!(it.pct > 0) || it.pct >= 100) { if ((prod.discount ?? 0) > 0 && !(pid in a.discounts)) r.sinDescTarifa++; } // sin descuento propio: no se guarda nada (si la tarifa tiene uno, se queda ese: se avisa)
+          if (it.pct >= 100) { /* regalo: no se toca el descuento */ }
           else if (Math.abs(it.pct - efectivo) >= 0.005) { (pid in a.discounts ? r.desCambian++ : r.desNuevos++); descuentos[pid] = it.pct; cambios.push({ campo: `Descuento · ${prod.name}`, antes: pc(efectivo), despues: pc(it.pct) }); }
         }
         if (it.price !== null && !sinPrecios) { // (con «solo descuentos e historial» los precios propios ni se miran) precio de tarifa que se le aplicó; solo es «propio» si no es el de la tarifa de hoy
@@ -268,7 +268,6 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     if (r.otroNombre) aviso.push(`${r.otroNombre} clientes NO se tocan porque el nombre del Excel no se parece al de la base (mira «El nombre no coincide»): el código puede ser de otro cliente.`);
     if (r.sinComprobar) aviso.push(`${r.sinComprobar} clientes no se han podido comprobar por nombre (el Excel o la ficha no traen un nombre con palabras que comparar): se aplican por su código.`);
     if (r.desCien) aviso.push(`${r.desCien} líneas con descuento del 100 % (regalos): no se guarda ese descuento.`);
-    if (r.sinDescTarifa) aviso.push(`${r.sinDescTarifa} líneas: la tarifa del artículo tiene descuento pero a ese cliente se le cobró SIN descuento. No se le guarda ningún descuento propio, así que seguirá con el de la tarifa. Si no debe tenerlo, hay que quitárselo a mano.`);
     if (r.conCoincidenciaSinCeros) aviso.push(`${r.conCoincidenciaSinCeros} clientes se han reconocido quitando ceros del código («0365» = «365»). Si no es correcto, no apliques.`);
     if (stats.sinPrecio) aviso.push(`${stats.sinPrecio} líneas a 0 € o sin precio (regalos, tazas, carteles, muestras…): se ignoran; no cuentan como compra ni cambian precios ni descuentos.`);
     if (cambiar.size === 0 && r.iguales === 0) aviso.push("Ningún cliente del Excel existe en la base: sube antes el Excel de clientes. No se puede aplicar.");
