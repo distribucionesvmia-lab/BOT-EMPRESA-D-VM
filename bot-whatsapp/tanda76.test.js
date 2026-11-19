@@ -31,7 +31,7 @@ test("CONSUMO: se leen las columnas con códigos rellenos de espacios y decimale
   const { items, stats } = parseConsumo([CAB, fila(1, 12, "4.995", "13.5", 46335, "D1", "0365"), fila(1, 2, "5", "10", 46340, "D2", "0365"), fila(3, 1, 0, 0, 46335, "D3", "0365")]);
   const m = items.get("0365");
   assert.deepEqual(m.get("1"), { price: 5, pct: 10, qty: 2, date: "2026-11-14", doc: "D2" }); // el mismo artículo dos veces: vale el más reciente
-  assert.equal(m.get("3").price, null); // precio 0: cuenta como compra pero no toca precio ni descuento
+  assert.equal(m.has("3"), false); // precio 0: es un regalo, no una compra: se ignora del todo (ni habitual, ni precio, ni descuento)
   assert.equal(stats.sinPrecio, 1);
   assert.ok(!JSON.stringify([...items]).includes("9.9999")); // nada del coste
   assert.throws(() => parseConsumo([["a", "b"]]), /cabecera/);

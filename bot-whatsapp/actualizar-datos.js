@@ -266,7 +266,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     if (r.otroNombre) aviso.push(`${r.otroNombre} clientes NO se tocan porque el nombre del Excel no se parece al de la base (mira «El nombre no coincide»): el código puede ser de otro cliente.`);
     if (r.sinComprobar) aviso.push(`${r.sinComprobar} clientes no se han podido comprobar por nombre (el Excel o la ficha no traen un nombre con palabras que comparar): se aplican por su código.`);
     if (r.conCoincidenciaSinCeros) aviso.push(`${r.conCoincidenciaSinCeros} clientes se han reconocido quitando ceros del código («0365» = «365»). Si no es correcto, no apliques.`);
-    if (stats.sinPrecio) aviso.push(`${stats.sinPrecio} líneas sin precio (o a 0 €): cuentan como compra, pero no cambian su precio ni su descuento.`);
+    if (stats.sinPrecio) aviso.push(`${stats.sinPrecio} líneas a 0 € o sin precio (regalos, tazas, carteles, muestras…): se ignoran; no cuentan como compra ni cambian precios ni descuentos.`);
     if (cambiar.size === 0 && r.iguales === 0) aviso.push("Ningún cliente del Excel existe en la base: sube antes el Excel de clientes. No se puede aplicar.");
     const confirmar = [];
     if (r.preNuevos + r.preCambian) confirmar.push(`${r.preNuevos + r.preCambian} precios propios de clientes serían DISTINTOS de la tarifa de hoy (mira «Precio · …» en el detalle). Confírmalo solo si son precios especiales de esos clientes y no una tarifa antigua: después, esos clientes pagarían ese precio aunque la tarifa cambie.`);

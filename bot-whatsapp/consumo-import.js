@@ -25,7 +25,7 @@ export const esCabeceraConsumo = (fila) => {
 
 /**
  * Filas → { items: Map(cliente → Map(artículo → { price, pct, qty, date, doc })), nombres: Map(cliente → nombre que trae el Excel), stats }.
- * Si un cliente repite un artículo, vale la fila de fecha más reciente. Las filas sin fecha o sin unidades no cuentan como compra.
+ * Si un cliente repite un artículo, vale la fila de fecha más reciente. Las filas sin fecha, sin unidades o a 0 € (regalos) no cuentan como compra.
  */
 export function parseConsumo(rows) {
   let hi = -1, col = {};
@@ -46,13 +46,12 @@ export function parseConsumo(rows) {
     if (!date) { stats.sinFecha++; continue; }
     if (qty === null || qty <= 0) { stats.sinUnidades++; continue; }
     const price = parseNumber(r[col.price]), pct = col.pct >= 0 ? parseNumber(r[col.pct]) ?? 0 : 0;
-    const ok = price !== null && price > 0; // precio 0: regalo o dato incompleto → no se toca ni el precio ni el descuento, solo cuenta como compra
-    if (!ok) stats.sinPrecio++;
+    if (price === null || price <= 0) { stats.sinPrecio++; continue; } // precio 0: es un regalo o material (tazas, carteles, muestras…), no una compra: ni cuenta como «habitual» ni toca precio ni descuento
     const doc = col.doc >= 0 ? String(r[col.doc] ?? "").trim() || date : date;
     if (!items.has(cid)) items.set(cid, new Map());
     const nom = col.nombre >= 0 ? String(r[col.nombre] ?? "").trim() : ""; if (nom && !nombres.has(cid)) nombres.set(cid, nom);
     const m = items.get(cid), antes = m.get(pid);
-    if (!antes || date >= antes.date) m.set(pid, { price: ok ? Math.round(price * 10000) / 10000 : null, pct: ok ? Math.min(100, Math.max(0, Math.round(pct * 100) / 100)) : null, qty: Math.max(1, Math.round(qty)), date, doc });
+    if (!antes || date >= antes.date) m.set(pid, { price: Math.round(price * 10000) / 10000, pct: Math.min(100, Math.max(0, Math.round(pct * 100) / 100)), qty: Math.max(1, Math.round(qty)), date, doc });
   }
   return { items, nombres, stats: { ...stats, clientes: items.size } };
 }
