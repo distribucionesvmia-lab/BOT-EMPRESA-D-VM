@@ -195,6 +195,29 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   };
   const sessionOf = (req) => accounts.sessionAccount(parseCookies(req.headers.cookie)[COOKIE]);
 
+  /** Código de 6 dígitos al correo de la ficha. true si ya ha respondido (falta el código, es incorrecto o no hay correo); false si el código es bueno. */
+  async function exigirCorreoDe(req, res, b, id) {
+        const dest = elegirDestino({ account: { email: accounts.emailDe(id) }, customer: customers.getById(id) });
+        if (!dest) { console.warn(`[VM acceso] El cliente ${id} no tiene correo en su ficha: no se le puede mandar el código`); eventoSeguridad("acceso-sin-correo", `cliente ${id}`); return send(res, 409, { sinCorreo: true, error: "No tenemos ningún correo tuyo en tu ficha, así que no podemos enviarte el código de seguridad. Llámanos y lo añadimos." }), true; }
+        const escrito = String(b.codigoCorreo ?? "").replace(/\D/g, "");
+        if (escrito) {
+          if (!pwCorreoVerIp(ip(req))) return demasiados(res, pwCorreoVerIp, ip(req)), true;
+          const v = accounts.codigoCorreoComprobar([id], (cid) => claveCodigoCorreo(cid, escrito));
+          if (v.ok) return false;
+          eventoSeguridad("pw-codigo-correo-incorrecto", `cliente ${id}`);
+          return send(res, 401, { necesitaCodigoCorreo: true, correo: tapar(dest), error: v.reason === "expired" ? "El código ha caducado. Pide uno nuevo." : v.reason === "agotado" ? "Has fallado demasiadas veces con ese código. Pide uno nuevo." : "El código no es correcto. Revisa tu correo y escríbelo de nuevo." }), true;
+        }
+        if (!pwCorreoIp(ip(req))) return demasiados(res, pwCorreoIp, ip(req)), true;
+        if (!pwCorreoGlobal("todas")) return eventoSeguridad("pw-correo-tope-global", "se alcanzó el máximo de códigos por correo por hora"), send(res, 429, { error: "Ahora mismo no podemos enviar más códigos. Inténtalo en unos minutos o llámanos." }), true;
+        const codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+        const cr = accounts.codigoCorreoCrear(id, claveCodigoCorreo(id, codigo));
+        if (!cr.ok) return send(res, 409, { necesitaCodigoCorreo: true, correo: tapar(dest), error: `Ya te hemos enviado un código hace un momento a ${tapar(dest)}. Revisa tu correo (mira también el spam). Si no llega, espera ${cr.espera} segundos y pide otro.` }), true;
+        try { await enviarCodigo({ to: dest, nombre: customers.getById(id)?.name ?? "", codigo, minutos: 10 }); }
+        catch (e) { console.error("[VM acceso] El servidor de correo NO ha enviado el código:", e?.message); eventoSeguridad("codigo-correo-error", String(e?.message ?? "error").slice(0, 120)); return send(res, 503, { error: "No hemos podido enviar el correo con el código. Inténtalo en unos minutos o llámanos." }), true; }
+        console.log(`[VM acceso] Código por correo para el cliente ${id} (${tapar(dest)})`);
+        return send(res, 409, { necesitaCodigoCorreo: true, correo: tapar(dest), enviado: true, mensaje: `Te hemos enviado un código de 6 dígitos a ${tapar(dest)}. Escríbelo aquí para entrar. Vale 10 minutos.` }), true;
+  }
+
   /** Atiende las rutas del cliente: /api/registro, /api/acceso, /api/salir y /api/yo. Devuelve true si la ruta era suya. */
   async function route(req, res, url) {
     const pausaEntradas = () => leerPausa(accounts).entradas; // pausa de emergencia (panel de la empresa): nadie nuevo inicia sesión; los que ya están dentro siguen
@@ -395,27 +418,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       // ── Código de 6 dígitos al correo que consta en su ficha (aparato nuevo, sin verificación en dos pasos propia). Solo con correo configurado (SMTP); CODIGO_CORREO_PW=0 lo apaga. ──
       const pideCorreo = (id) => codigoPorCorreo() && process.env.CODIGO_CORREO_PW !== "0" && aparatoDe(req) !== id && !accounts.dobleFactor(id).activo;
       /** true si ya ha respondido (hay que parar: falta el código, es incorrecto o no hay correo); false si el código es bueno y se puede seguir. */
-      const exigirCorreo = async (id) => {
-        const dest = elegirDestino({ account: { email: accounts.emailDe(id) }, customer: customers.getById(id) });
-        if (!dest) { console.warn(`[VM acceso] El cliente ${id} no tiene correo en su ficha: no se le puede mandar el código`); eventoSeguridad("acceso-sin-correo", `cliente ${id}`); return send(res, 409, { sinCorreo: true, error: "No tenemos ningún correo tuyo en tu ficha, así que no podemos enviarte el código de seguridad. Llámanos y lo añadimos." }), true; }
-        const escrito = String(b.codigoCorreo ?? "").replace(/\D/g, "");
-        if (escrito) {
-          if (!pwCorreoVerIp(ip(req))) return demasiados(res, pwCorreoVerIp, ip(req)), true;
-          const v = accounts.codigoCorreoComprobar([id], (cid) => claveCodigoCorreo(cid, escrito));
-          if (v.ok) return false;
-          eventoSeguridad("pw-codigo-correo-incorrecto", `cliente ${id}`);
-          return send(res, 401, { necesitaCodigoCorreo: true, correo: tapar(dest), error: v.reason === "expired" ? "El código ha caducado. Pide uno nuevo." : v.reason === "agotado" ? "Has fallado demasiadas veces con ese código. Pide uno nuevo." : "El código no es correcto. Revisa tu correo y escríbelo de nuevo." }), true;
-        }
-        if (!pwCorreoIp(ip(req))) return demasiados(res, pwCorreoIp, ip(req)), true;
-        if (!pwCorreoGlobal("todas")) return eventoSeguridad("pw-correo-tope-global", "se alcanzó el máximo de códigos por correo por hora"), send(res, 429, { error: "Ahora mismo no podemos enviar más códigos. Inténtalo en unos minutos o llámanos." }), true;
-        const codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
-        const cr = accounts.codigoCorreoCrear(id, claveCodigoCorreo(id, codigo));
-        if (!cr.ok) return send(res, 409, { necesitaCodigoCorreo: true, correo: tapar(dest), error: `Ya te hemos enviado un código hace un momento a ${tapar(dest)}. Revisa tu correo (mira también el spam). Si no llega, espera ${cr.espera} segundos y pide otro.` }), true;
-        try { await enviarCodigo({ to: dest, nombre: customers.getById(id)?.name ?? "", codigo, minutos: 10 }); }
-        catch (e) { console.error("[VM acceso] El servidor de correo NO ha enviado el código:", e?.message); eventoSeguridad("codigo-correo-error", String(e?.message ?? "error").slice(0, 120)); return send(res, 503, { error: "No hemos podido enviar el correo con el código. Inténtalo en unos minutos o llámanos." }), true; }
-        console.log(`[VM acceso] Código por correo para el cliente ${id} (${tapar(dest)})`);
-        return send(res, 409, { necesitaCodigoCorreo: true, correo: tapar(dest), enviado: true, mensaje: `Te hemos enviado un código de 6 dígitos a ${tapar(dest)}. Escríbelo aquí para entrar. Vale 10 minutos.` }), true;
-      };
+      const exigirCorreo = (id) => exigirCorreoDe(req, res, b, id);
       if (crear) {
         const motivo = motivoPassword(password, b.nif, b.empresa); // se mira SIEMPRE (coincida o no el cliente): así no se averigua nada
         if (motivo) return send(res, 400, { error: motivo }), true;
@@ -494,6 +497,14 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       }
       const motivo = motivoPassword(b.nueva, "", ""); if (motivo) return send(res, 400, { error: motivo }), true;
       if (typeof b.nueva2 === "string" && b.nueva2 !== b.nueva) return send(res, 400, { error: "Las dos contraseñas no coinciden." }), true;
+      // Cambiar la contraseña también exige el código de 6 dígitos al correo de su ficha (o el de su aplicación si tiene verificación en dos pasos): así una sesión abierta o un móvil prestado no bastan.
+      if (codigoPorCorreo() && process.env.CODIGO_CORREO_PW !== "0") {
+        if (accounts.dobleFactor(acc.customerId).activo) {
+          const cod = typeof b.codigo === "string" ? b.codigo.trim() : "";
+          if (!cod) return send(res, 409, { necesitaCodigo: true, error: "Escribe el código de la aplicación de tu móvil (o uno de tus códigos de emergencia)." }), true;
+          if (!comprobarSegundoFactor(acc.customerId, cod)) { eventoSeguridad("cliente-2fa-incorrecto", "código de segundo factor incorrecto al cambiar la contraseña"); return send(res, 401, { necesitaCodigo: true, error: "El código no es correcto o ya se usó. Espera al siguiente de la aplicación o usa uno de emergencia." }), true; }
+        } else if (await exigirCorreoDe(req, res, b, acc.customerId)) return true;
+      }
       accounts.passwordCambiar(acc.id, b.nueva, parseCookies(req.headers.cookie)[COOKIE]);
       try { onCodigo?.(acc); } catch {}
       return send(res, 200, { ok: true }), true;

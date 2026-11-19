@@ -1025,6 +1025,7 @@
       <label id="p-actual-l">Contraseña actual<input id="p-actual" type="password" maxlength="64" autocomplete="current-password"></label>
       <label>Nueva contraseña<input id="p-nueva" type="password" maxlength="64" autocomplete="new-password"></label>
       <label>Repite la nueva contraseña<input id="p-nueva2" type="password" maxlength="64" autocomplete="new-password"></label>
+      <div id="p-cc-fila" hidden><p id="p-cc-msg" role="status"></p><label>Código de 6 dígitos de tu correo<input id="p-cc" type="text" inputmode="numeric" maxlength="8" autocomplete="one-time-code"></label><button class="vm-link" type="button" id="p-cc-otro">Enviarme otro código</button></div>
       <div class="err" id="p-err" role="alert"></div><div class="okmsg" id="p-ok" role="status"></div>
       <button class="vm-btn primary">Guardar contraseña</button>
       <button class="vm-link" type="button" id="p-cerrar">Cerrar</button>
@@ -1374,21 +1375,30 @@ $("f-acceso").onsubmit = (e) => {
 })();
 // ── Cambiar mi contraseña (dentro de la aplicación) ──
 $("cambiar-pw").onclick = async () => {
-  $("p-err").textContent = ""; $("p-ok").textContent = ""; $("f-pass").reset(); $("m-pass").hidden = false;
+  $("p-err").textContent = ""; $("p-ok").textContent = ""; $("f-pass").reset(); $("p-cc-fila").hidden = true; $("m-pass").hidden = false;
   try { const y = await fetch("/api/yo").then((r) => r.json()); $("p-actual-l").hidden = !y.cliente?.tienePassword; } catch {}
   ($("p-actual-l").hidden ? $("p-nueva") : $("p-actual")).focus();
 };
 $("p-cerrar").onclick = () => { $("m-pass").hidden = true; };
+let pOtro = false;
+$("p-cc-otro").onclick = () => { pOtro = true; $("p-cc").value = ""; $("f-pass").requestSubmit(); };
 $("f-pass").onsubmit = async (e) => {
   e.preventDefault(); $("p-err").textContent = ""; $("p-ok").textContent = "";
   const n1 = $("p-nueva").value, n2 = $("p-nueva2").value;
   if (!$("p-actual-l").hidden && !$("p-actual").value) { $("p-err").textContent = "Escribe tu contraseña actual."; return $("p-actual").focus(); }
   if (n1.length < 8) { $("p-err").textContent = "La contraseña nueva tiene que tener al menos 8 caracteres."; return $("p-nueva").focus(); }
   if (n1 !== n2) { $("p-err").textContent = "Las dos contraseñas nuevas no coinciden."; return $("p-nueva2").focus(); }
+  const otro = pOtro; pOtro = false, cc = $("p-cc").value.replace(/\D/g, "");
+  if (!$("p-cc-fila").hidden && !otro && cc.length !== 6) { $("p-err").textContent = "Escribe el código de 6 dígitos que te hemos enviado a tu correo."; return $("p-cc").focus(); }
+  const body = { actual: $("p-actual").value, nueva: n1, nueva2: n2 };
+  if (!$("p-cc-fila").hidden && !otro) { body.codigoCorreo = cc; body.codigo = $("p-cc").value.trim(); }
   try {
-    const r = await post("/api/password", { actual: $("p-actual").value, nueva: n1, nueva2: n2 }), j = await r.json().catch(() => ({}));
+    const r = await post("/api/password", body), j = await r.json().catch(() => ({}));
+    if (j.necesitaCodigoCorreo || j.necesitaCodigo) { // falta el código (o está mal): se enseña el campo con el aviso del servidor
+      $("p-cc-fila").hidden = false; $("p-cc-msg").textContent = j.mensaje || (j.correo ? `Te hemos enviado un código de 6 dígitos a ${j.correo}. Escríbelo para confirmar el cambio.` : "Escribe el código de la aplicación de tu móvil."); if (!j.enviado) $("p-err").textContent = j.error || ""; $("p-cc").focus(); return;
+    }
     if (!r.ok) { $("p-err").textContent = j.error || "No se pudo cambiar la contraseña."; return; }
-    $("p-ok").textContent = "Listo: desde ahora entras con tu nueva contraseña."; $("f-pass").reset(); setTimeout(() => ($("m-pass").hidden = true), 1800);
+    $("p-ok").textContent = "Listo: desde ahora entras con tu nueva contraseña."; $("f-pass").reset(); $("p-cc-fila").hidden = true; setTimeout(() => ($("m-pass").hidden = true), 1800);
   } catch { $("p-err").textContent = SIN_RED; }
 };
 $("cambiar").onclick = () => { $("c-err").textContent = ""; $("c-ok").textContent = ""; $("f-codigo").reset(); $("m-codigo").hidden = false; $("c-nuevo").focus(); };
