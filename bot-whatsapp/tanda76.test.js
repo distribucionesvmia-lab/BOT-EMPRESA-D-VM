@@ -130,9 +130,10 @@ test("CONSUMO: precio y descuento son cosas distintas: a tarifa con descuento pr
     fila(1, 12, "0.5", "10", 46335, "D1", "0365"),  // a precio de tarifa pero con descuento propio → solo descuento
     fila(2, 3, "2.5", "0", 46335, "D1", "0365"),    // precio distinto y sin descuento; la tarifa tiene 8 % → no se guarda descuento, se avisa
     fila(2, 3, "2.5", "15", 46335, "D2", "0400", "ROBLE, EL"), // precio especial CON su descuento aparte
+    fila(1, 1, "0.5", "100", 46340, "D3", "0400", "ROBLE, EL"), // 100 %: nunca se guarda como descuento
   );
   const p = a.vistaPrevia("consumo", f);
-  assert.match(p.aviso.join(" "), /SIN descuento/);
+  assert.match(p.aviso.join(" "), /SIN descuento/); assert.match(p.aviso.join(" "), /100 %/);
   a.aplicar("consumo", f, { confirmo: true });
   const A = customersDb.getById("365"), B = customersDb.getById("400");
   assert.deepEqual([A.discounts, A.specialPrices], [{ 1: 10 }, { 2: 2.5 }]);
