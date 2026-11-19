@@ -75,6 +75,10 @@ test("CONSUMO DE PUNTA A PUNTA: cada cliente ve SU precio en SUS artículos y na
   const texto = (d) => JSON.stringify(d);
   assert.ok(!texto(dB).includes(`"price":${espA}`) && !texto(dA).includes(`"price":${espB}`));
   assert.ok(!(await call("POST", "/api/chat", { cookie: B, body: { text: "último pedido", id: "t78b" } }).then((r) => JSON.stringify(r.json))).includes(String(espA)));
+  // la relación con su fecha aparece en SU historial (Mi cuenta) y no en el del otro
+  const cuenta = async (c) => JSON.stringify((await call("GET", "/api/mi-cuenta", { cookie: c })).json);
+  const cA = await cuenta(A), cB = await cuenta(B);
+  assert.ok(cA.includes('"doc":"D1","pdf":true,"fecha":"2026-11-02"') && !cA.includes('"D7"')); assert.ok(cB.includes('"doc":"D7","pdf":true,"fecha":"2026-10-20"') && !cB.includes('"D1"'));
   // el mismo Excel otra vez: nada que cambiar
   assert.equal((await subir("vista-previa")).json.aplicable, false);
 });

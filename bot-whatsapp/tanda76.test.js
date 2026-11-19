@@ -122,3 +122,20 @@ test("CONSUMO: «solo descuentos e historial» aplica eso sin pedir confirmar y 
   a.aplicar("consumo", f, { confirmo: true });
   assert.deepEqual(customersDb.getById("365").specialPrices, { 2: 2.5 });
 });
+
+test("CONSUMO: precio y descuento son cosas distintas: a tarifa con descuento propio, precio propio con su descuento aparte, y sin descuento propio no se guarda ninguno", () => {
+  const { a, customersDb } = montar();
+  a.aplicar("productos", libro([[...CAB_P, "Descuento"], ["1", "AGUA", "0,50", "RED10", "6", "No", "No", "0"], ["2", "LECHE", "2,00", "RED10", "6", "No", "No", "8"]]));
+  const f = consumo(
+    fila(1, 12, "0.5", "10", 46335, "D1", "0365"),  // a precio de tarifa pero con descuento propio → solo descuento
+    fila(2, 3, "2.5", "0", 46335, "D1", "0365"),    // precio distinto y sin descuento; la tarifa tiene 8 % → no se guarda descuento, se avisa
+    fila(2, 3, "2.5", "15", 46335, "D2", "0400", "ROBLE, EL"), // precio especial CON su descuento aparte
+  );
+  const p = a.vistaPrevia("consumo", f);
+  assert.match(p.aviso.join(" "), /SIN descuento/);
+  a.aplicar("consumo", f, { confirmo: true });
+  const A = customersDb.getById("365"), B = customersDb.getById("400");
+  assert.deepEqual([A.discounts, A.specialPrices], [{ 1: 10 }, { 2: 2.5 }]);
+  assert.deepEqual([B.discounts, B.specialPrices], [{ 2: 15 }, { 2: 2.5 }]);
+  assert.ok(A.orders.some((o) => o.doc === "D1" && o.date === "2026-11-09"), JSON.stringify(A.orders.map((o) => [o.doc, o.date]))); // la compra con su fecha queda en su historial
+});
