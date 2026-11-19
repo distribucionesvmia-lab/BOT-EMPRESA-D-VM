@@ -38,7 +38,7 @@ const avisoEntrega = (customer) => ({ entregaHoy: entregaHoyDisponible(customer)
 import { scheduleDailyExport, runExport } from "./exporter.js";
 import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { crearAvisos } from "./avisos.js";
-import { compararFamilias } from "./ordenfamilia.js";
+import { compararFamilias, ordenarLineas } from "./ordenfamilia.js";
 import { conArbolA3erp } from "./arbol-a3erp.js";
 import { previaPedidoRapido } from "./pedido-rapido.js";
 import { resumenMensual } from "./resumen-mensual.js";
@@ -734,7 +734,7 @@ async function appRoutes(req, res, url) {
     const corto = (x) => ({ id: x.id, name: x.name, price: x.price, ...(x.img ? { img: x.mini ?? x.img } : {}), ...(x.unitsPerBox ? { unitsPerBox: x.unitsPerBox } : {}), ...(x.soloCaja ? { soloCaja: true } : {}) });
     const ids = String(url.searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8);
     const porId = new Map(todos.map((x) => [x.id, x]));
-    const habituales = todos.filter((x) => x.count > 0).slice(0, 10).map((x) => ({ ...corto(x), ...(x.lastQty > 0 ? { ultima: x.lastQty } : {}) })); // «La última vez»: unidades
+    const habituales = ordenarLineas(todos.filter((x) => x.count > 0)).slice(0, 10).map((x) => ({ ...corto(x), ...(x.lastQty > 0 ? { ultima: x.lastQty } : {}) })); // «La última vez»: unidades
     const ofertas = todos.filter((x) => x.oferta).slice(0, 10).map((x) => ({ ...corto(x), oferta: { tipo: x.oferta.tipo, valor: x.oferta.valor, ...(x.oferta.hasta ? { hasta: x.oferta.hasta } : {}) } })); // solo las que de verdad le cambian el precio a ESTE cliente
     const lo_mas = habituales.length ? [] : topIds().map((id) => porId.get(String(id))).filter(Boolean).slice(0, 8).map(corto);
     return void sendJson(res, 200, {

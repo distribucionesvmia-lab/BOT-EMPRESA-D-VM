@@ -40,3 +40,8 @@ test("sin código de familia en los artículos, categorías y subcategorías sig
   new Function("d", cod + fn + "ordenarArbol(d);")(d);
   assert.deepEqual(d.tree.map(c => c.id), ["p", "a", "c"]); assert.deepEqual(d.tree[0].subs.map(s => s.id), ["l", "y"]);
 });
+
+test("INICIO: «Lo que sueles pedir» sale en el orden de a3ERP (familia → artículo), no por frecuencia", async () => {
+  const src = (await import("node:fs")).readFileSync(new URL("./server.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.match(src, /const habituales = ordenarLineas\(todos\.filter\(\(x\) => x\.count > 0\)\)\.slice\(0, 10\)/);
+});
