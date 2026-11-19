@@ -34,10 +34,10 @@ test("MCP: se presenta bien (initialize, lista de herramientas) y no suelta la c
     assert.equal(i.result.protocolVersion, "2025-03-26"); assert.equal(i.result.serverInfo.name, "vm-pedidos"); assert.ok(i.result.capabilities.tools);
     assert.equal((await c.pedir("initialize", { protocolVersion: "1999-01-01" })).result.protocolVersion, "2025-06-18"); // una versión que no conoce: propone la suya
     const l = await c.pedir("tools/list"); const nombres = l.result.tools.map((t) => t.name);
-    assert.deepEqual(nombres, ["estado_avisos", "buscar_articulos", "enviar_aviso", "poner_oferta", "quitar_oferta", "cambiar_precio", "avisar_oferta_articulo"]);
+    assert.deepEqual(nombres, ["estado_avisos", "buscar_articulos", "enviar_aviso", "poner_oferta", "quitar_oferta", "cambiar_precio", "avisar_oferta_articulo", "buscar_clientes", "ficha_cliente", "estadisticas", "ver_excel", "aplicar_excel", "poner_ofertas", "ver_temporada", "cambiar_temporada"]);
     for (const t of l.result.tools) { assert.equal(t.inputSchema.type, "object"); assert.ok(t.description.length > 30); }
     // las que cambian algo exigen la confirmación del usuario en su esquema
-    for (const n of nombres.filter((x) => !["estado_avisos", "buscar_articulos"].includes(x))) assert.ok(l.result.tools.find((t) => t.name === n).inputSchema.required.includes("confirmado_por_el_usuario"), n);
+    for (const n of nombres.filter((x) => !["estado_avisos", "buscar_articulos", "buscar_clientes", "ficha_cliente", "estadisticas", "ver_excel", "ver_temporada"].includes(x))) assert.ok(l.result.tools.find((t) => t.name === n).inputSchema.required.includes("confirmado_por_el_usuario"), n);
     assert.equal(JSON.stringify(l).includes(TOKEN), false);
     assert.deepEqual((await c.pedir("ping")).result, {});
     assert.equal((await c.pedir("cosa/rara")).error.code, -32601);

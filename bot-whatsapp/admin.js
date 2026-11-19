@@ -13,6 +13,7 @@ import { ipDe, eventoSeguridad } from "./seguridad.js";
 import { etiquetaAccion } from "./actividad.js";
 import { claveCodigoOficina } from "./nif-key.js";
 import { leerPausa, guardarPausa } from "./pausa.js";
+import { TEMPORADAS, validarTemporada, temporadaActiva } from "./temporada.js";
 import { revisar } from "./revision-seguridad.js";
 import { crear2fa } from "./panel-2fa.js";
 import { crearAutoBases } from "./auto-bases.js";
@@ -504,6 +505,12 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       dosFactores.desactivar(); eventoSeguridad("panel-2fa-desactivado", "segundo factor desactivado"); return send(res, 200, { ok: true }), true;
     }
     // ---- Pausa de emergencia: cierra las entradas nuevas y/o los pedidos nuevos hasta que se reactive ----
+    if (p === "/api/admin/temporada" && get) return send(res, 200, { activa: temporadaActiva(accounts.ajuste("temporada"), madridDay()), opciones: Object.entries(TEMPORADAS).map(([id, t]) => ({ id, titulo: t.titulo, texto: t.texto })) }), true;
+    if (p === "/api/admin/temporada" && post) { // cambia el aspecto de fiestas de la web de los clientes (solo un banner; no toca código, logo ni cabecera). Pide confirmación.
+      const b = await readJson(req); if (b?.confirmo !== true) return send(res, 400, { error: "Falta la confirmación." }), true;
+      let v; try { v = validarTemporada(b, madridDay()); } catch (e) { return send(res, 400, { error: e.message }), true; }
+      accounts.ajusteGuardar("temporada", JSON.stringify(v)); return send(res, 200, { ok: true, activa: temporadaActiva(JSON.stringify(v), madridDay()) }), true;
+    }
     if (p === "/api/admin/pausa" && get) return send(res, 200, leerPausa(accounts, { fresco: true })), true;
     if (p === "/api/admin/pausa" && post) {
       const b = (await readJson(req)) ?? {};

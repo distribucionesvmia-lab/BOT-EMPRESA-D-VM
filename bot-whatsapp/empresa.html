@@ -642,6 +642,16 @@
           <div class="acciones campo-ancho"><button class="main" id="av-enviar">Enviar aviso</button><span class="muted" id="av-msg" role="status"></span></div>
         </form>
       </div>
+      <div class="panel" id="tp-card">
+        <h2>Temporada de la web (Navidad y otras fiestas)</h2>
+        <p class="muted" style="margin:0 0 4px">Pone una <b>franja de color con un mensaje de fiestas</b> bajo la cabecera de la aplicación de los clientes. No cambia nada más (ni el logo, ni los precios, ni el código) y se quita sola en la fecha de fin.</p>
+        <div class="form-grid">
+          <label class="campo"><span>Temporada</span><select id="tp-id"></select></label>
+          <label class="campo"><span>Hasta el día <small>(opcional)</small></span><input id="tp-hasta" type="date"></label>
+          <label class="campo campo-ancho"><span>Mensaje <small>(opcional, máximo 90 letras; en blanco sale el de la temporada)</small></span><input id="tp-mensaje" maxlength="90" placeholder="Por ejemplo: Cerramos el 24 y el 31. ¡Felices fiestas!"></label>
+          <div class="acciones campo-ancho"><button class="main" id="tp-guardar" type="button">Guardar temporada</button><span class="muted" id="tp-msg" role="status"></span></div>
+        </div>
+      </div>
       <div class="panel" id="pr-card">
         <h2>Programar un aviso</h2>
         <p class="muted" style="margin:0 0 4px">Deja preparada una promoción o un descuento para que salga <b>solo</b> el día y la hora que elijas. Lo confirmas ahora y puedes cancelarlo mientras esté pendiente.</p>
@@ -1726,6 +1736,22 @@ async function entradaArchivar(nombre, carpeta, msg) {
   entrada().catch(() => {});
 }
 function entradaTrasAplicar(p) { if (enRevision && enRevision.p === p) { const n = enRevision.nombre, c = enRevision.carpeta; enRevision = null; entradaArchivar(n, c, `Aplicado: «${n}» ha pasado a la subcarpeta «aplicados».`); } }
+// ---- Temporada de la web (franja de fiestas) ----
+let tpListo = false;
+async function temporadaCargar(forzar = false) {
+  if (tpListo && !forzar) return; // el panel se refresca solo: no pisa lo que se esté escribiendo
+  try {
+    const j = await call("/api/admin/temporada"); const sel = $("tp-id");
+    if (!sel.options.length) for (const o of j.opciones) { const op = document.createElement("option"); op.value = o.id; op.textContent = o.titulo + (o.texto ? " · " + o.texto : ""); sel.appendChild(op); }
+    tpListo = true; sel.value = j.activa.id; $("tp-hasta").value = j.activa.hasta || ""; $("tp-mensaje").value = j.activa.id === "normal" ? "" : j.activa.texto;
+    $("tp-msg").textContent = j.activa.id === "normal" ? "Ahora mismo: sin adornos." : "Ahora mismo: " + j.activa.titulo + (j.activa.hasta ? " hasta el " + j.activa.hasta.split("-").reverse().join("/") : "") + ".";
+  } catch (e) { $("tp-msg").textContent = e.message; }
+}
+$("tp-guardar").onclick = async () => {
+  const id = $("tp-id").value, txt = id === "normal" ? "Quitar los adornos de la web" : `Poner «${$("tp-id").selectedOptions[0].textContent.split(" · ")[0]}» en la web de los clientes${$("tp-hasta").value ? " hasta el " + $("tp-hasta").value.split("-").reverse().join("/") : ""}`;
+  if (!confirm(txt + ". Los clientes lo verán enseguida. ¿Seguro?")) return;
+  try { await call("/api/admin/temporada", { id, hasta: $("tp-hasta").value || null, mensaje: $("tp-mensaje").value, confirmo: true }); await temporadaCargar(true); $("tp-msg").textContent = "Guardado. " + $("tp-msg").textContent; } catch (e) { $("tp-msg").textContent = e.message; }
+};
 async function avisos() {
   const r = await call("/api/admin/resumen");
   const n = (id, v) => { $(id).hidden = !v; $(id).textContent = v; };
@@ -1753,7 +1779,7 @@ async function copias(comprobar = false) {
   finally { if (comprobar) { b.disabled = false; b.textContent = "Comprobar copias ahora"; } }
 }
 $("copias-comprobar").onclick = () => copias(true);
-async function refrescar() { try { await Promise.all([pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), seguridadPanel(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), correoClientes(), accesos(), accesosNuevos(), pausaPanel(), $("p-cuentas").hidden ? Promise.resolve() : revisionSeguridad(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
+async function refrescar() { try { await Promise.all([temporadaCargar(), pedidos(), solicitudes(), cuentas(), usoApp(), erroresApp(), seguridadPanel(), invitaciones(), derechos(), avisos(), sincronizacion(), correo(), actualizacion(), recordatorios(), entrada(), copias(), correoClientes(), accesos(), accesosNuevos(), pausaPanel(), $("p-cuentas").hidden ? Promise.resolve() : revisionSeguridad(), $("p-hoy").hidden ? Promise.resolve() : hoy()]); } catch (e) { if (e.message !== "Clave incorrecta" && !/^Demasiados intentos/.test(e.message)) $("act").textContent = "Sin conexión con el servidor"; else if (/^Demasiados intentos/.test(e.message)) $("l-err").textContent = e.message; } }
 
 // ═════════ Estadísticas y patrones ═════════
 const est = { rango: "30d", d0: "", d1: "", datos: null, modo: "uds", mas: false, timerVivo: 0, timerDatos: 0, cliente: null };

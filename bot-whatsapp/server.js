@@ -15,6 +15,7 @@ import { crearFrenoCopia } from "./freno-copia.js";
 import { estadoCliente } from "./revision-seguridad.js";
 import { resumenGeo } from "./geoip.js";
 import { turnstileActivo, retoPropioActivo } from "./seguridad.js";
+import { temporadaActiva } from "./temporada.js";
 import { cabecerasSeguridad, CSP, eventoSeguridad, usarRegistro, ipDe, claveDebil, crearEscudo, origenAjeno, panelPermitido, cspEstricta } from "./seguridad.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
@@ -723,6 +724,7 @@ async function appRoutes(req, res, url) {
     const z = zipNode(archivos);
     return void res.writeHead(200, { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="pedidos-${mes}.zip"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": z.length }).end(z);
   }
+  if (p === "/api/temporada" && req.method === "GET") { const t = temporadaActiva(getAccountsDb().ajuste("temporada"), madridDay()); return void sendJson(res, 200, { id: t.id, texto: t.texto, fondo: t.fondo, color: t.color }); } // franja de fiestas (Navidad…): solo texto y colores
   if (p === "/api/ayuda" && req.method === "GET") return void sendJson(res, 200, { ayuda: ayudaPublica() }); // datos públicos de contacto de la empresa
   // Datos de la pantalla de Inicio del cliente: lo que suele pedir, lo más pedido, categorías y fotos de su último pedido (todo de su catálogo; nada de otros clientes)
   if (p === "/api/inicio" && req.method === "GET") {

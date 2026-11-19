@@ -2241,5 +2241,6 @@ addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); instalacion
 addEventListener("appinstalled", () => { instalacion = null; const m = document.getElementById("instalar-menu"); if (m) m.hidden = true; });
 { const m = document.getElementById("instalar-menu"); if (m) { m.hidden = yaInstalada(); m.onclick = () => { menu(false); abrirInstalar(); }; } }
 </script>
+<script>fetch("/api/temporada",{cache:"no-store"}).then((r)=>r.ok?r.json():null).then((t)=>{if(!t||t.id==="normal"||!t.texto)return;const d=document.createElement("div");d.className="vm-temporada";d.setAttribute("role","status");d.textContent=t.texto;d.style.cssText="background:"+t.fondo+";color:"+t.color+";text-align:center;padding:8px 14px;font-weight:600;font-size:calc(14px / var(--k,1));line-height:1.35";const m = document.querySelector("main"); if (m) m.insertBefore(d, m.firstChild); else document.body.insertBefore(d, document.body.firstChild);}).catch(()=>null);</script>
 </body>
 </html>
