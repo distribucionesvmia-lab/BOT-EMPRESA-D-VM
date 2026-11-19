@@ -48,3 +48,11 @@ test("server.js aplica la puerta del panel y la defensa CSRF", () => {
   const s = fs.readFileSync(new URL("./server.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.match(s, /panelPermitido\(req, panelExtra\)/); assert.match(s, /origenAjeno\(req, origenesPropios\)/);
 });
+
+test("CSRF: si el navegador dice «same-origin» se acepta aunque el Host que ve el programa sea otro (túnel); sin esa cabecera se sigue comparando el origen", async () => {
+  const { origenAjeno } = await import("./seguridad.js");
+  const r = (h) => ({ method: "POST", headers: h });
+  assert.equal(origenAjeno(r({ "sec-fetch-site": "same-origin", origin: "https://publica.ts.net", host: "localhost:3000" })), null);
+  assert.ok(origenAjeno(r({ "sec-fetch-site": "cross-site", origin: "https://publica.ts.net", host: "publica.ts.net" })));
+  assert.ok(origenAjeno(r({ origin: "https://mala.com", host: "localhost:3000" })));
+});

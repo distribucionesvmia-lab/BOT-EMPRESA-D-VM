@@ -124,6 +124,7 @@ export function origenAjeno(req, permitidos = []) {
   if (METODOS_SEGUROS.has(String(req.method).toUpperCase())) return null;
   const sfs = String(req.headers["sec-fetch-site"] ?? "").toLowerCase();
   if (sfs && sfs !== "same-origin" && sfs !== "none") return `sec-fetch-site=${sfs}`;
+  if (sfs === "same-origin") return null; // el navegador mismo certifica que la página y la petición son del mismo sitio (con túneles, el Host que ve el programa puede no ser el de la barra)
   const origen = req.headers.origin;
   if (origen !== undefined) {
     const o = String(origen);
