@@ -61,7 +61,7 @@ test("entrar desde un aparato NUEVO: tras la contraseña pide el código; uno ma
     const sin = await entrar(m); assert.equal(sin.status, 409); assert.equal(sin.json.necesitaCodigo, true); assert.equal(sin.cab.getSetCookie().length, 0, "sin código no se abre ninguna sesión");
     assert.equal((await entrar(m, { password: "mala-clave-1" })).status, 401, "con la contraseña mala ni se llega a pedir el código");
     const mal = await entrar(m, { codigo: "000000" }); assert.equal(mal.status, 401); assert.equal(mal.cab.getSetCookie().length, 0);
-    const bien = await entrar(m, { codigo: totp(clave, Date.now() + 30_000) }); assert.equal(bien.status, 200); assert.equal(bien.cab.getSetCookie().length, 2);
+    const bien = await entrar(m, { codigo: totp(clave, Date.now() + 30_000) }); assert.equal(bien.status, 200); assert.equal(bien.cab.getSetCookie().length, 3);
     assert.equal((await entrar(m, { codigo: totp(clave, Date.now() + 30_000) })).status, 401, "el mismo código no vale dos veces");
     const em = await entrar(m, { codigo: emergencia[0] }); assert.equal(em.status, 200); assert.equal((await entrar(m, { codigo: emergencia[0] })).status, 401, "un código de emergencia vale una vez"); assert.equal(m.accounts.dobleFactor("C1").emergencia, 7);
     assert.equal((await entrar(m, { codigo: emergencia[0].toLowerCase() })).status, 401);

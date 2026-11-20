@@ -14,6 +14,7 @@ import { elegirDestino, tapar } from "./correo-cliente.js";
 import { turnstileSite, turnstileActivo, robotActivo, retoPropioActivo, nuevoReto, verificarRobot, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
 
 const COOKIE = "vm_session";
+const COOKIE_SALIO = "vm_salio"; // «cerró sesión a propósito»: el aparato sigue recordado (no pide código al volver a entrar con su contraseña) pero NO reabre la sesión solo
 const COOKIE_APARATO = "vm_aparato"; // aparato de confianza: tras una aprobación de la oficina, este navegador vuelve a entrar solo
 const MENSAJE_ELIMINADA = "Esta cuenta se eliminó. Si quieres volver a usar la aplicación, llámanos o solicita el alta de nuevo.";
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
@@ -183,13 +184,14 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
 
   /** Cuenta de la sesión de esta petición (o null). */
   const cookieAparato = (token, maxAge, req) => `${COOKIE_APARATO}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${esHttps(req) ? "; Secure" : ""}`;
+  const cookieSalio = (v, maxAge, req) => `${COOKIE_SALIO}=${v}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${esHttps(req) ? "; Secure" : ""}`;
   const huella = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
   /** Cliente al que pertenece el aparato de confianza de esta petición (o null). */
   const aparatoDe = (req) => { const t = parseCookies(req.headers.cookie)[COOKIE_APARATO]; return t && t.length >= 20 && t.length <= 100 ? accounts.aparatoValido(huella(t)) : null; };
   /** Abre sesión como ese cliente y deja (o renueva) el aparato de confianza. Devuelve { ok, token, account, cookies } o { ok:false, reason }. */
   const abrirConAparato = (customerId, req, { nuevo = false } = {}) => {
     const r = accounts.loginNif([String(customerId)], () => true); if (!r.ok) return r;
-    const cookies = [cookie(r.token, 30 * 86400, req)];
+    const cookies = [cookie(r.token, 30 * 86400, req), cookieSalio("", 0, req)]; // al entrar de nuevo se quita la marca de «salió a propósito»
     if (nuevo) { const t = crypto.randomBytes(32).toString("base64url"); accounts.aparatoCrear(customerId, huella(t), navegadorCorto(req.headers["user-agent"])); cookies.push(cookieAparato(t, 365 * 86400, req)); }
     else { const t = parseCookies(req.headers.cookie)[COOKIE_APARATO]; if (t) cookies.push(cookieAparato(t, 365 * 86400, req)); } // se renueva el plazo en el navegador
     return { ...r, cookies };
@@ -581,14 +583,14 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (p === "/api/salir" && req.method === "POST") {
       const ck = parseCookies(req.headers.cookie);
       accounts.logout(ck[COOKIE]);
-      if (ck[COOKIE_APARATO]) accounts.aparatoOlvidar(huella(ck[COOKIE_APARATO])); // cerrar sesión también olvida ESTE aparato: la próxima vez tendrá que aprobarlo la oficina (seguro en ordenadores compartidos)
-      return send(res, 200, { ok: true }, { "Set-Cookie": [cookie("", 0, req), cookieAparato("", 0, req)] }), true;
+      // Cerrar sesión NO olvida el aparato (decisión de la empresa): quien ya entró una vez desde este móvil u ordenador vuelve a entrar solo con nombre + NIF + contraseña, sin código por correo. Sí se pone la marca «salió a propósito» para que la página no reabra la sesión sola.
+      return send(res, 200, { ok: true }, { "Set-Cookie": ck[COOKIE_APARATO] ? [cookie("", 0, req), cookieSalio("1", 365 * 86400, req)] : [cookie("", 0, req)] }), true;
     }
 
     if (p === "/api/yo" && req.method === "GET") {
       let acc = sessionOf(req), extra = {};
       if (!acc) { // sin sesión (caducó, o se cerró el navegador) pero con un aparato ya aprobado por la oficina: entra solo
-        const rec = pausaEntradas() ? null : aparatoDe(req), r = rec ? abrirConAparato(rec, req) : null; // en pausa de emergencia tampoco se reabre sola la sesión
+        const rec = pausaEntradas() || parseCookies(req.headers.cookie)[COOKIE_SALIO] ? null : aparatoDe(req), r = rec ? abrirConAparato(rec, req) : null; // en pausa de emergencia tampoco se reabre sola la sesión
         if (r?.ok) { acc = r.account; extra = { "Set-Cookie": (avisoAcceso(r.token, req), r.cookies) }; }
       }
       if (!acc) return send(res, 200, { cliente: null }), true; // invitado: sin sesión no es un error (la consola del navegador queda limpia)

@@ -126,7 +126,7 @@ test("FÁCIL: tras UNA aprobación el aparato queda recordado y vuelve a entrar 
   const m = await montar();
   try {
     const a = await pedir(m), id = m.accounts.accesoSolicitudes().pendientes[0].id; m.accounts.accesoSolicitudResolver(id, "aprobada");
-    const e = await estado(m, a.json.solicitud), cks = e.cab.getSetCookie(); assert.equal(cks.length, 2, "sesión + aparato");
+    const e = await estado(m, a.json.solicitud), cks = e.cab.getSetCookie(); assert.equal(cks.length, 3, "sesión + aparato + quitar la marca de «salió a propósito»");
     const ses = cks.find((c) => c.startsWith("vm_session=")).split(";")[0], apa = cks.find((c) => c.startsWith("vm_aparato=")); assert.match(apa, /HttpOnly/); assert.match(apa, /SameSite=Strict/); assert.match(apa, /Max-Age=31536000/);
     const apaCk = apa.split(";")[0];
     assert.equal(JSON.stringify(m.accounts.aparatosDe("C1")).includes(apaCk.split("=")[1]), false, "el secreto del aparato no se guarda en claro");
@@ -140,10 +140,11 @@ test("FÁCIL: tras UNA aprobación el aparato queda recordado y vuelve a entrar 
     // el aparato de un cliente NO sirve para otro, ni un secreto inventado
     const otro = await pedir(m, "65432199A", "Local Uno", {}, { Cookie: apaCk }); assert.notEqual(otro.json.entra, true);
     assert.equal((await fetch(`http://127.0.0.1:${m.port}/api/yo`, { headers: { Cookie: "vm_aparato=" + "x".repeat(43) } }).then((r) => r.json())).cliente, null);
-    // «Cerrar sesión» olvida este aparato: la próxima vez hará falta la oficina
+    // «Cerrar sesión» NO olvida el aparato (decisión de la empresa): la página no reabre la sesión sola, pero volver a entrar con la contraseña no pide ningún código
     const sal = await fetch(`http://127.0.0.1:${m.port}/api/salir`, { method: "POST", headers: { Cookie: `${ses}; ${apaCk}` } }); assert.equal(sal.status, 200);
-    assert.equal((await fetch(`http://127.0.0.1:${m.port}/api/yo`, { headers: { Cookie: apaCk } }).then((r) => r.json())).cliente, null);
-    assert.equal(m.accounts.aparatosDe("C1").length, 0);
+    assert.match(sal.headers.getSetCookie().join("|"), /vm_salio=1/); assert.ok(!/vm_aparato=;/.test(sal.headers.getSetCookie().join("|")), "no se borra el aparato");
+    assert.equal((await fetch(`http://127.0.0.1:${m.port}/api/yo`, { headers: { Cookie: `${apaCk}; vm_salio=1` } }).then((r) => r.json())).cliente, null, "tras cerrar sesión no se reabre sola");
+    assert.equal(m.accounts.aparatosDe("C1").length, 1, "el aparato sigue recordado");
   } finally { m.cerrar(); }
 });
 
@@ -181,7 +182,7 @@ test("CÓDIGO POR CORREO (sin la oficina): nombre + NIF → el código llega al 
     assert.equal(m.accounts.accesoSolicitudes().pendientes.length, 0, "la oficina NO ve ni tiene que aceptar nada");
     assert.equal(JSON.stringify(m.accounts.accesoSolicitudes()).includes(c.codigo), false);
     assert.equal((await estado(m, r.json.solicitud, c.codigo === "000000" ? "111111" : "000000")).status, 401);
-    const e = await estado(m, r.json.solicitud, c.codigo); assert.equal(e.status, 200); assert.equal(e.json.cliente.nombre, "BAR LA PLAZA S.L."); assert.equal(e.cab.getSetCookie().length, 2, "sesión + aparato recordado");
+    const e = await estado(m, r.json.solicitud, c.codigo); assert.equal(e.status, 200); assert.equal(e.json.cliente.nombre, "BAR LA PLAZA S.L."); assert.equal(e.cab.getSetCookie().length, 3, "sesión + aparato recordado");
     assert.notEqual((await estado(m, r.json.solicitud, c.codigo)).status, 200, "el código vale una vez");
     assert.equal((await m.get("/api/seguridad")).json.codigoCorreo, true);
   } finally { m.cerrar(); }
