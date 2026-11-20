@@ -2299,7 +2299,6 @@ function renderList() {
   const subsVarias = arbol && ordenCat === "hab" && nav.sub === "*" && new Set(items.map(p => p.sub)).size > 1; let subPrev = null; // título por subcategoría cuando se ve toda la categoría
   let grupo = null, famPrev = null;
   items.slice(0, limite).forEach(p => {
-    if (tab === "hab" && !q && items.some(x => grupoFam(x)) && grupoFam(p) !== famPrev) { famPrev = grupoFam(p); const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = nombreFam(p); list.appendChild(t); }
     if (conGrupos && (p.count > 0 ? "hab" : "resto") !== grupo) { grupo = p.count > 0 ? "hab" : "resto"; const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = grupo === "hab" ? "Lo que sueles pedir" : "Todo lo demás"; list.appendChild(t); }
     if (subsVarias && p.sub !== subPrev) { subPrev = p.sub; const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = marcaDe(p) || ""; if (t.textContent) list.appendChild(t); }
     list.appendChild(row(p));

@@ -48,3 +48,9 @@ test("INICIO: «Lo habitual» = lo que más se repite en los 6 meses (por veces 
   assert.match(leer("./cliente.html"), /j\.tieneHistorial \? "Lo habitual"/);
   assert.match(leer("./pedido.html"), /class="tb-t">Histórico</);
 });
+
+test("HISTÓRICO: los artículos salen en orden a3ERP pero SIN títulos de familia entre medias", async () => {
+  const p = (await import("node:fs")).readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.match(p, /items = items\.slice\(\)\.sort\(\(x, y\) => rs\(x\) - rs\(y\) \|\| porFamilia\(x, y\)/); // sigue ordenado
+  assert.ok(!/tab === "hab" && !q && items\.some\(x => grupoFam\(x\)\)/.test(p)); // sin cabeceras de familia
+});
