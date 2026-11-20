@@ -106,8 +106,8 @@ export function fotosPorFila(buf) {
     const dp = norm(h.path, draw), dx = f[dp]?.toString("utf8");
     if (!dx) continue;
     const dr = rel(f[dp.replace("drawings/", "drawings/_rels/") + ".rels"]);
-    for (const a of dx.matchAll(/<xdr:(?:two|one)CellAnchor[\s\S]*?<\/xdr:(?:two|one)CellAnchor>/g)) {
-      const row = /<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/.exec(a[0])?.[1], emb = /r:embed="([^"]+)"/.exec(a[0])?.[1];
+    for (const a of dx.matchAll(/<(?:xdr:)?(?:two|one)CellAnchor[\s\S]*?<\/(?:xdr:)?(?:two|one)CellAnchor>/g)) { // con o sin prefijo «xdr:» (Excel lo pone; LibreOffice y otros programas, a veces no)
+      const row = /<(?:xdr:)?from>[\s\S]*?<(?:xdr:)?row>(\d+)<\/(?:xdr:)?row>/.exec(a[0])?.[1], emb = /r:embed="([^"]+)"/.exec(a[0])?.[1];
       const mp = emb && dr.get(emb) ? norm(dp, dr.get(emb)) : null;
       if (row === undefined || !mp || !f[mp]) continue;
       porFila.set(Number(row) + 1, { ext: mp.split(".").pop().toLowerCase(), data: f[mp] });
