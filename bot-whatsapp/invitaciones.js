@@ -2,6 +2,8 @@
 // Todo lo que llega del panel se valida aquí; nada de esto envía mensajes (el envío lo hace siempre una persona).
 import { madridDay, addDays } from "./delivery.js";
 
+export const SIN_FIN = "9999-12-31T23:59:59.000Z", SIN_USOS = 1_000_000_000; // «sin límite» de tiempo y de veces
+export const sinFin = (iso) => String(iso ?? "") >= "9999";
 export const MAX_DIAS = 60, MAX_USOS = 20, MAX_MENSAJE = 300, MAX_PLANTILLA = 500;
 export const PLANTILLA_ALTA = "Hola {nombre}, este es tu enlace para darte de alta como cliente de Distribuciones Valentín Martín: {enlace}\n(Sirve {usos} y hasta el {caduca}.)";
 export const PLANTILLA_VER = "Hola {nombre}, este es tu enlace para ver el catálogo de Distribuciones Valentín Martín: {enlace}\n(Sirve {usos} y hasta el {caduca}.)";
@@ -22,7 +24,8 @@ export function opcionesInvitacion(b = {}, now = new Date().toISOString()) {
   const hoy = madridDay(now), hora = b.hora == null || b.hora === "" ? null : String(b.hora);
   if (hora !== null && !/^([01]\d|2[0-3]):[0-5]\d$/.test(hora)) return { error: "La hora de caducidad no es válida (por ejemplo, 10:00)." };
   let dia, expiresAt;
-  if (b.fecha != null && b.fecha !== "") {
+  if (b.dias === "ilimitado" || b.ilimitado === true) expiresAt = SIN_FIN;
+  else if (b.fecha != null && b.fecha !== "") {
     dia = String(b.fecha);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dia) || Number.isNaN(Date.parse(dia + "T00:00:00Z"))) return { error: "La fecha de caducidad no es válida." };
     if (dia < hoy) return { error: "La fecha de caducidad ya ha pasado." };
@@ -34,8 +37,9 @@ export function opcionesInvitacion(b = {}, now = new Date().toISOString()) {
     expiresAt = hora ? madridAIso(addDays(hoy, dias), hora) : new Date(new Date(now).getTime() + dias * 86_400_000).toISOString();
   }
   if (expiresAt <= now) return { error: "Esa hora de caducidad ya ha pasado." };
-  const usos = b.usos == null || b.usos === "" ? 1 : Number(b.usos);
-  if (!Number.isInteger(usos) || usos < 1 || usos > MAX_USOS) return { error: `Los usos deben estar entre 1 y ${MAX_USOS}.` };
+  const usosIlim = b.usos === "ilimitado" || b.usosIlimitados === true;
+  const usos = usosIlim ? SIN_USOS : b.usos == null || b.usos === "" ? 1 : Number(b.usos);
+  if (!usosIlim && (!Number.isInteger(usos) || usos < 1 || usos > MAX_USOS)) return { error: `Los usos deben estar entre 1 y ${MAX_USOS}.` };
   const mensaje = String(b.mensaje ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
   if (mensaje.length > MAX_MENSAJE) return { error: `El mensaje de bienvenida admite hasta ${MAX_MENSAJE} letras.` };
   return { expiresAt, usos, mensaje, soloVer: b.modo === "ver", pedirCodigo: b.pedirCodigo !== false && b.pedirCodigo !== "no" };
@@ -57,5 +61,11 @@ export function plantillaValida(t) {
 
 export function textoWhatsapp(plantilla, { nombre, url, usos, expiresAt }) {
   const caduca = fechaCorta(expiresAt) + (horaCorta(expiresAt) !== "23:59" ? ` a las ${horaCorta(expiresAt)}` : "");
-  return String(plantilla || PLANTILLA_DEFECTO).replace(/\{nombre\}/g, nombre || "").replace(/\{usos\}/g, usos === 1 ? "una sola vez" : `hasta ${usos} veces`).replace(/\{caduca\}/g, caduca).replace(/\{enlace\}/g, url).replace(/ +,/g, ",").replace(/Hola ,/, "Hola,");
+  const t = String(plantilla || PLANTILLA_DEFECTO);
+  if (sinFin(expiresAt) || usos >= SIN_USOS) {
+    // Sin límite: se quitan frases como «(Sirve una sola vez y hasta el …)»
+    const frase = sinFin(expiresAt) && usos >= SIN_USOS ? "Sirve siempre, sin límite de veces" : sinFin(expiresAt) ? (usos === 1 ? "Sirve una sola vez, sin fecha de caducidad" : `Sirve hasta ${usos} veces, sin fecha de caducidad`) : `Sirve todas las veces que quieras, hasta el ${caduca}`;
+    return t.replace(/Sirve \{usos\} y hasta el \{caduca\}\./g, frase + ".").replace(/\{usos\}/g, usos >= SIN_USOS ? "todas las veces que quieras" : usos === 1 ? "una sola vez" : `hasta ${usos} veces`).replace(/\{caduca\}/g, sinFin(expiresAt) ? "siempre (sin caducidad)" : caduca).replace(/\{nombre\}/g, nombre || "").replace(/\{enlace\}/g, url).replace(/ +,/g, ",").replace(/Hola ,/, "Hola,");
+  }
+  return t.replace(/\{nombre\}/g, nombre || "").replace(/\{usos\}/g, usos === 1 ? "una sola vez" : `hasta ${usos} veces`).replace(/\{caduca\}/g, caduca).replace(/\{enlace\}/g, url).replace(/ +,/g, ",").replace(/Hola ,/, "Hola,");
 }

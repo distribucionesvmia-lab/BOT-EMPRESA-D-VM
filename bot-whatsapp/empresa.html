@@ -759,10 +759,10 @@
           <h3 id="ip3"><span class="inv-num">3</span>¿Cuánto tiempo vale?</h3>
           <div class="form-grid">
             <label class="campo"><span>Días de validez</span>
-              <select id="inv-dias" aria-label="Días que vale el enlace"><option value="1">1 día</option><option value="3">3 días</option><option value="7" selected>7 días</option><option value="30">30 días</option><option value="fecha">Hasta una fecha…</option></select></label>
+              <select id="inv-dias" aria-label="Días que vale el enlace"><option value="1">1 día</option><option value="3">3 días</option><option value="7" selected>7 días</option><option value="30">30 días</option><option value="fecha">Hasta una fecha…</option><option value="ilimitado">Sin límite de tiempo</option></select></label>
             <label class="campo" id="inv-fecha-l" hidden><span>Fecha en la que caduca</span><input id="inv-fecha" type="date" aria-label="Fecha de caducidad"></label>
             <label class="campo"><span>Hora de caducidad (opcional)</span><input id="inv-hora" type="time" aria-label="Hora de caducidad"><small class="ayuda">Hora de Madrid. Si la dejas vacía vale hasta el final del día.</small></label>
-            <label class="campo"><span>Veces que se puede usar</span><input id="inv-usos" type="number" min="1" max="20" step="1" value="1" inputmode="numeric" aria-label="Usos del enlace"><small class="ayuda">De 1 a 20. Con 1, solo funciona una vez.</small></label>
+            <label class="campo"><span>Veces que se puede usar</span><label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" id="inv-usos-ilim"> Sin límite de veces</label><input id="inv-usos" type="number" min="1" max="20" step="1" value="1" inputmode="numeric" aria-label="Usos del enlace"><small class="ayuda">De 1 a 20. Con 1, solo funciona una vez. Con «sin límite», sirve siempre hasta que lo anules.</small></label>
           </div>
         </section>
         <section class="inv-paso" aria-labelledby="ip4">
@@ -1642,12 +1642,12 @@ $("inv-dias").onchange = () => { $("inv-fecha-l").hidden = $("inv-dias").value !
 function invResumen() {
   const nuevo = $("inv-para").value === "nuevo", tipo = $("inv-n-tipo").value, sel = $("inv-sel");
   const quien = nuevo ? ($("inv-n-nombre").value.trim() || "la persona nueva") : (sel.value ? sel.selectedOptions[0].textContent.replace(/ \(\w+\)$/, "") : "el cliente que elijas");
-  const dias = $("inv-dias").value, usos = Number($("inv-usos").value) || 1;
-  const vale = dias === "fecha" ? ($("inv-fecha").value ? "hasta el " + $("inv-fecha").value.split("-").reverse().join("/") : "hasta la fecha que elijas") : `${dias} ${dias === "1" ? "día" : "días"}`;
+  const dias = $("inv-dias").value, ilimUsos = $("inv-usos-ilim").checked, usos = Number($("inv-usos").value) || 1;
+  const vale = dias === "ilimitado" ? "sin límite de tiempo" : dias === "fecha" ? ($("inv-fecha").value ? "hasta el " + $("inv-fecha").value.split("-").reverse().join("/") : "hasta la fecha que elijas") : `${dias} ${dias === "1" ? "día" : "días"}`;
   const hace = nuevo && tipo === "alta" ? "solo podrá darse de alta" : (nuevo ? tipo === "ver" : $("inv-modo").value === "ver") ? "podrá ver el catálogo pero no pedir" : "podrá ver el catálogo y pedir";
-  $("inv-resumen").textContent = `Se creará un enlace para ${quien}: ${hace}. Vale ${vale}${$("inv-hora").value ? " (hasta las " + $("inv-hora").value + ")" : ""} y ${usos === 1 ? "se puede usar una sola vez" : "se puede usar hasta " + usos + " veces"}.`;
+  $("inv-resumen").textContent = `Se creará un enlace para ${quien}: ${hace}. Vale ${vale}${$("inv-hora").value && dias !== "ilimitado" ? " (hasta las " + $("inv-hora").value + ")" : ""} y ${ilimUsos ? "se puede usar todas las veces que quiera" : usos === 1 ? "se puede usar una sola vez" : "se puede usar hasta " + usos + " veces"}.`;
 }
-for (const id of ["inv-para", "inv-n-tipo", "inv-n-nombre", "inv-sel", "inv-modo", "inv-dias", "inv-fecha", "inv-hora", "inv-usos"]) { $(id).addEventListener("input", invResumen); $(id).addEventListener("change", invResumen); }
+for (const id of ["inv-para", "inv-n-tipo", "inv-n-nombre", "inv-sel", "inv-modo", "inv-dias", "inv-fecha", "inv-hora", "inv-usos", "inv-usos-ilim"]) { $(id).addEventListener("input", invResumen); $(id).addEventListener("change", invResumen); }
 new MutationObserver(() => { $("inv-sel-l").hidden = !$("inv-sel").options.length; invResumen(); }).observe($("inv-sel"), { childList: true });
 
 async function direccionEnlaces() {
@@ -1666,19 +1666,19 @@ async function invitaciones() {
   for (const x of r.enlaces) {
     const tr = document.createElement("tr"), acc = el("td");
     if (x.estado === "activo") { const b = el("button", "Anular"); b.type = "button"; b.onclick = async () => { if (!confirm(`¿Anular el enlace de ${x.nombre}? Dejará de funcionar ahora mismo.`)) return; const a = await call(`/api/admin/invitaciones/${x.id}/anular`, {}).catch((e) => ({ error: e.message })); if (a?.error) alert(a.error); invitaciones(); }; acc.append(b); }
-    tr.append(el("td", x.nombre), el("td", ESTADO[x.estado] ?? x.estado), el("td", `${x.usos} de ${x.usosMax}`), el("td", fechaEs(x.caduca)), el("td", (x.tipo === "alta" ? "Solo darse de alta" : x.soloVer ? "Solo ver" : "Ver y pedir") + (x.pedirCodigo ? "" : " · sin pedir código") + (x.conMensaje ? " · con mensaje" : "")), acc); tb.appendChild(tr);
+    tr.append(el("td", x.nombre), el("td", ESTADO[x.estado] ?? x.estado), el("td", x.usosMax >= 1e9 ? `${x.usos} (sin límite)` : `${x.usos} de ${x.usosMax}`), el("td", x.caduca >= "9999" ? "Sin caducidad" : fechaEs(x.caduca)), el("td", (x.tipo === "alta" ? "Solo darse de alta" : x.soloVer ? "Solo ver" : "Ver y pedir") + (x.pedirCodigo ? "" : " · sin pedir código") + (x.conMensaje ? " · con mensaje" : "")), acc); tb.appendChild(tr);
   }
 }
 $("inv-pl-g").onclick = async () => { const r = await call("/api/admin/invitaciones/plantilla", { texto: $("inv-plantilla").value }).catch((e) => ({ error: e.message })); $("inv-pl-msg").textContent = r?.error || "Texto guardado."; };
 $("inv-pl-r").onclick = async () => { const r = await call("/api/admin/invitaciones/plantilla", { restaurar: true }).catch((e) => ({ error: e.message })); if (r?.plantilla) $("inv-plantilla").value = r.plantilla; $("inv-pl-msg").textContent = r?.error || "Vuelve a estar el texto de siempre."; };
 $("inv-crear").onclick = async () => {
   const nuevo = $("inv-para").value === "nuevo", id = nuevo ? "nuevo" : $("inv-sel").value, m = $("inv-msg"); m.textContent = ""; if (!id) { m.textContent = "Busca y elige un cliente."; $("inv-res").hidden = false; return; }
-  const dias = $("inv-dias").value, cuerpo = { hora: $("inv-hora").value || "", usos: Number($("inv-usos").value), modo: $("inv-modo").value, pedirCodigo: $("inv-codigo").checked, mensaje: $("inv-msg-b").value };
-  if (dias === "fecha") { cuerpo.fecha = $("inv-fecha").value; if (!cuerpo.fecha) { $("inv-res").hidden = false; $("inv-url").value = ""; $("inv-info").textContent = ""; m.textContent = "Elige la fecha en la que caduca."; return; } } else cuerpo.dias = Number(dias);
+  const dias = $("inv-dias").value, cuerpo = { hora: $("inv-hora").value || "", usos: $("inv-usos-ilim").checked ? "ilimitado" : Number($("inv-usos").value), modo: $("inv-modo").value, pedirCodigo: $("inv-codigo").checked, mensaje: $("inv-msg-b").value };
+  if (dias === "fecha") { cuerpo.fecha = $("inv-fecha").value; if (!cuerpo.fecha) { $("inv-res").hidden = false; $("inv-url").value = ""; $("inv-info").textContent = ""; m.textContent = "Elige la fecha en la que caduca."; return; } } else cuerpo.dias = dias === "ilimitado" ? "ilimitado" : Number(dias);
   if (nuevo) Object.assign(cuerpo, { tipo: $("inv-n-tipo").value, nombre: $("inv-n-nombre").value, telefono: $("inv-n-tel").value, nif: $("inv-n-nif").value, direccion: $("inv-n-dir").value, poblacion: $("inv-n-pob").value, municipio: $("inv-n-mun").value, correo: $("inv-n-mail").value, razonSocial: $("inv-n-razon").value, recargo: $("inv-n-re").checked });
   const r = await call(nuevo ? "/api/admin/invitaciones/persona-nueva" : "/api/admin/clientes/" + encodeURIComponent(id) + "/invitacion", cuerpo).catch((e) => ({ error: e.message }));
   if (!r || r.error) { $("inv-res").hidden = false; $("inv-url").value = ""; $("inv-info").textContent = ""; m.textContent = (r && r.error) || "No se ha podido crear el enlace."; return; }
-  invActual = r; $("inv-res").hidden = false; $("inv-url").value = r.url; $("inv-dir").textContent = r.interna ? "ATENCIÓN: este enlace lleva una dirección interna (" + r.base + ") y el cliente no podrá abrirlo desde su móvil. Fija la dirección pública más abajo y créalo de nuevo." : "Dirección usada: " + r.base + ". Comprueba que es la que abren tus clientes."; $("inv-info").textContent = `Para ${r.cliente}. ${r.usos === 1 ? "Un solo uso" : "Hasta " + r.usos + " usos"}; caduca el ${fechaEs(r.caduca)}. ${r.tipo === "alta" ? "Solo puede darse de alta (se le abre el formulario con su nombre). " : r.soloVer ? "Solo puede ver el catálogo. " : ""}${r.codigoCliente ? `Se ha creado como cliente provisional ${r.codigoCliente}. ` : ""}${r.tipo === "alta" ? "" : "Si creas otro para este cliente, este deja de valer."}`;
+  invActual = r; $("inv-res").hidden = false; $("inv-url").value = r.url; $("inv-dir").textContent = r.interna ? "ATENCIÓN: este enlace lleva una dirección interna (" + r.base + ") y el cliente no podrá abrirlo desde su móvil. Fija la dirección pública más abajo y créalo de nuevo." : "Dirección usada: " + r.base + ". Comprueba que es la que abren tus clientes."; $("inv-info").textContent = `Para ${r.cliente}. ${r.usos >= 1e9 ? "Usos sin límite" : r.usos === 1 ? "Un solo uso" : "Hasta " + r.usos + " usos"}; ${r.caduca >= "9999" ? "no caduca" : "caduca el " + fechaEs(r.caduca)}. ${r.tipo === "alta" ? "Solo puede darse de alta (se le abre el formulario con su nombre). " : r.soloVer ? "Solo puede ver el catálogo. " : ""}${r.codigoCliente ? `Se ha creado como cliente provisional ${r.codigoCliente}. ` : ""}${r.tipo === "alta" ? "" : "Si creas otro para este cliente, este deja de valer."}`;
   $("inv-wa").disabled = !r.tieneTelefono; $("inv-wa").title = r.tieneTelefono ? "" : "Este cliente no tiene teléfono guardado: copia el enlace y mándalo tú";
   invitaciones();
 };
@@ -2209,7 +2209,7 @@ async function abrirFicha(id) {
     tabla.append(tb); const sc = el("div", "", { className: "scroll" }); sc.append(tabla);
     cuerpo.push(fiSec(`Pedidos recientes (${f.pedidos.length} de ${f.totalPedidosApp})`, sc));
   } else cuerpo.push(fiSec("Pedidos recientes", sinDatos("Sin pedidos hechos con la aplicación.")));
-  if (f.enlaces.length) { const ul = el("ul", "", { className: "fi-lista" }); const E = { activo: "Activo", agotado: "Usado", caducado: "Caducado", anulado: "Anulado", sustituido: "Sustituido" }; for (const x of f.enlaces) ul.append(el("li", `${E[x.estado] ?? x.estado} · ${x.usos} de ${x.usosMax} usos · caduca ${fechaCorta(x.caduca)} · ${x.soloVer ? "solo ver" : "ver y pedir"}`)); cuerpo.push(fiSec("Enlaces de acceso", ul)); }
+  if (f.enlaces.length) { const ul = el("ul", "", { className: "fi-lista" }); const E = { activo: "Activo", agotado: "Usado", caducado: "Caducado", anulado: "Anulado", sustituido: "Sustituido" }; for (const x of f.enlaces) ul.append(el("li", `${E[x.estado] ?? x.estado} · ${x.usosMax >= 1e9 ? x.usos + " usos (sin límite)" : x.usos + " de " + x.usosMax + " usos"} · ${x.caduca >= "9999" ? "no caduca" : "caduca " + fechaCorta(x.caduca)} · ${x.soloVer ? "solo ver" : "ver y pedir"}`)); cuerpo.push(fiSec("Enlaces de acceso", ul)); }
   $("fi-cuerpo").replaceChildren(...cuerpo); $("fi-cuerpo").scrollTop = 0;
 }
 $("fi-x").onclick = $("fi-cerrar").onclick = () => $("ficha").close();
