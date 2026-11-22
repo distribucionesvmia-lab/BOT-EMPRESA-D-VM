@@ -175,7 +175,7 @@ test("CONSUMO SOLO COMPRAS: apunta las compras y NO guarda precios ni descuentos
   assert.match(JSON.stringify(v.categorias), /solo compras/);
   a.aplicar("consumo", xl, { soloCompras: true });
   const c = customersDb.getById("4"); assert.deepEqual(c.discounts, {}); assert.deepEqual(c.specialPrices, {}); assert.equal(c.orders.length, 1);
-  const h = leer("./empresa.html"); assert.ok(h.includes('id="${t.p}-sc" checked') && h.includes("Solo compras (sin precios ni descuentos)") && h.includes("&soloCompras=1"));
+  const h = leer("./empresa.html"); assert.ok(!h.includes('-sc" checked') && h.includes('p === "co" ? "&soloCompras=1"') && h.includes("nunca se pisan"));
 });
 
 test("LECTOR DE PDF: caracteres sueltos («)», «]», «>») entre las instrucciones no lo dejan colgado y se sigue leyendo", async () => {

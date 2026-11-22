@@ -293,6 +293,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     if (r.desCien) aviso.push(`${r.desCien} líneas con descuento del 100 % (regalos): no se guarda ese descuento.`);
     if (r.conCoincidenciaSinCeros) aviso.push(`${r.conCoincidenciaSinCeros} clientes se han reconocido quitando ceros del código («0365» = «365»). Si no es correcto, no apliques.`);
     if (stats.sinPrecio) aviso.push(`${stats.sinPrecio} líneas a 0 € o sin precio (regalos, tazas, carteles, muestras…): se ignoran; no cuentan como compra ni cambian precios ni descuentos.`);
+    if (!soloCompras) aviso.push("OJO: esta carga también calcula precios y descuentos propios a partir de la última factura y puede pisar lo cargado con los PDF de «Descuentos especiales» y «Precios especiales». Desde el panel esto ya no se usa.");
     if (cambiar.size === 0 && r.iguales === 0) aviso.push("Ningún cliente del Excel existe en la base: sube antes el Excel de clientes. No se puede aplicar.");
     const confirmar = [];
     if (r.preNuevos + r.preCambian) confirmar.push(`${r.preNuevos + r.preCambian} precios propios de clientes serían DISTINTOS de la tarifa de hoy (mira «Precio · …» en el detalle). Confírmalo solo si son precios especiales de esos clientes y no una tarifa antigua: después, esos clientes pagarían ese precio aunque la tarifa cambie.`);
