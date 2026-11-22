@@ -667,10 +667,12 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
             ofertasCorreo: accounts.ofertasDe(id),
             correoPedidos: { destino: elegirDestino({ account: cu, customer: c }), activo: accounts.correoPedidoActivo(id), delaCuenta: !!cu?.email && elegirDestino({ account: cu, customer: c }) === cu.email },
             cuenta: cu ? { estado: cu.status, confirmada: cu.verified, bloqueada: cu.locked, ultimoAcceso: cu.lastLogin, creada: cu.createdAt, codigoPropio: cu.ownCode } : null,
-            preciosPropios: (() => { // lo que a ESTE cliente se le cobra distinto de la tarifa (descuentos y precios propios que vienen de a3ERP), para comprobarlo de un vistazo
-              const cat = new Map((catalogDb?.list({ activeOnly: false }) ?? []).map((x) => [String(x.id), x])), ids = new Set([...Object.keys(c.discounts ?? {}), ...Object.keys(c.specialPrices ?? {})]), filas = [];
-              for (const pid of ids) { const a = cat.get(pid); if (!a) continue; filas.push({ id: pid, nombre: a.name, dtoTarifa: a.discount ?? 0, dtoPropio: c.discounts?.[pid] ?? null, precioTarifa: a.price, precioPropio: c.specialPrices?.[pid] ?? null }); }
-              filas.sort((x, y) => x.nombre.localeCompare(y.nombre, "es")); return { total: filas.length, filas: filas.slice(0, 300) };
+            preciosPropios: (() => { // lo que a ESTE cliente se le cobra distinto de la tarifa: dos listas, productos con PRECIO especial y productos con DESCUENTO especial (datos del Excel «Consumo clientes»)
+              const cat = new Map((catalogDb?.list({ activeOnly: false }) ?? []).map((x) => [String(x.id), x])), r4 = (v) => Math.round(v * 10000) / 10000;
+              const fila = (pid) => { const a = cat.get(pid); if (!a) return null; const precio = c.specialPrices?.[pid] ?? a.price, dto = c.discounts?.[pid] ?? 0; return { id: pid, nombre: a.name, precioTarifa: a.price, precioPropio: c.specialPrices?.[pid] ?? null, dtoPropio: c.discounts?.[pid] ?? null, precioFinal: r4(precio * (1 - dto / 100)) }; };
+              const orden = (x, y) => x.nombre.localeCompare(y.nombre, "es");
+              const precios = Object.keys(c.specialPrices ?? {}).map(fila).filter(Boolean).sort(orden), descuentos = Object.keys(c.discounts ?? {}).filter((p) => Number(c.discounts[p]) > 0).map(fila).filter(Boolean).sort(orden);
+              return { total: new Set([...precios, ...descuentos].map((x) => x.id)).size, precios: precios.slice(0, 1000), totalPrecios: precios.length, descuentos: descuentos.slice(0, 1000), totalDescuentos: descuentos.length };
             })(),
             aparatos: accounts.aparatosDe(id).length, password: { ...accounts.passwordInfo(id), dobleFactor: accounts.dobleFactor(id).activo },
             totalPedidosApp: todos.length,

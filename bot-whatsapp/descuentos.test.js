@@ -128,3 +128,11 @@ test("CONSUMO sin descuento de tarifa: el descuento del cliente se guarda AUNQUE
     assert.deepEqual(customersDb.getById("365").discounts, { 1: 30 }, "el 30 % de ESE cliente queda guardado como suyo: " + JSON.stringify(r).slice(0, 200));
   } finally { if (antes !== undefined) process.env.DESCUENTO_TARIFA = antes; }
 });
+
+test("FICHA DEL CLIENTE: dos listas separadas (precio especial y descuento especial) con el precio final, siempre visibles", async () => {
+  const fs = await import("node:fs"), leer = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const a = leer("./admin.js"), h = leer("./empresa.html");
+  for (const t of ["totalPrecios", "totalDescuentos", "precioFinal"]) assert.ok(a.includes(t), t);
+  for (const t of ["Productos con PRECIO especial", "Productos con DESCUENTO especial", "Precio final", "No tiene ninguno"]) assert.ok(h.includes(t), t);
+  assert.ok(!h.includes("Precios y descuentos propios de este cliente ("), "ya no va plegado en un solo desplegable");
+});
