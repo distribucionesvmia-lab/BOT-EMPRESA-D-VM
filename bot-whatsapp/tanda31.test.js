@@ -46,5 +46,6 @@ test("DATOS Y EXCEL: las tarjetas de subida van primero, compactas y alineadas, 
   assert.ok(h.indexOf('id="dx-tarjetas"') < h.indexOf('id="entrada-panel"'));
   for (const t of ["dx-drop", "dx-rev", "dx-info", 'id="dx-revisiones"', "-cerrar", "MutationObserver", "Elegir archivo"]) assert.ok(h.includes(t), t);
   assert.ok(!h.includes('id="dx-pasos"'), "ya no hay el panel de explicación con los pasos");
-  for (const id of ["px", "cl", "hi", "co", "fo"]) assert.ok(h.includes('{ p: "' + id + '"'), id);
+  for (const id of ["px", "cl", "co", "fo"]) assert.ok(h.includes('{ p: "' + id + '"'), id);
+  assert.ok(!h.includes('{ p: "hi"'), "el historial de compras ya no tiene tarjeta (sale del Excel de consumo)");
 });

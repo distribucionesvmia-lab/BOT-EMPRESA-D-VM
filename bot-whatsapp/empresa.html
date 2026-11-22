@@ -1337,8 +1337,7 @@ const DX_ICO = {
 const TIPOS_DX = [
   { p: "px", tipo: "productos", icono: "", titulo: "Productos y precios", acepta: ".xlsx", desc: "Precios, IVA, cajas y categorías.", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Modo de venta (2 = solo caja, 3 = caja o unidad) · Bloqueado · Obsoleto · Cód. familia" },
   { p: "cl", tipo: "clientes", icono: "", titulo: "Clientes", acepta: ".xlsx", desc: "Altas y datos de contacto.", cols: "Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto" },
-  { p: "hi", tipo: "historial", icono: "", titulo: "Historial de compras", acepta: ".xlsx", desc: "Compras anteriores de cada cliente.", cols: "Cliente · Fecha · Nº Documento · Artículo · Unidades" },
-  { p: "co", tipo: "consumo", icono: "", titulo: "Consumo de clientes", acepta: ".xlsx", desc: "Precios y descuentos de cada cliente.", cols: "Cliente · Artículo · Unidades · Precio · Desc.1 · Fecha · Nº Documento (Base, Coste y almacén se ignoran)" },
+  { p: "co", tipo: "consumo", icono: "", titulo: "Consumo de clientes", acepta: ".xlsx", desc: "Compras de los últimos 6 meses, precios y descuentos de cada cliente.", cols: "Cliente · Artículo · Unidades · Precio · Desc.1 · Fecha · Nº Documento (Base, Coste y almacén se ignoran)" },
   { p: "fo", tipo: "fotos", icono: "", titulo: "Fotos de productos", acepta: ".zip,.xlsx", desc: "ZIP o Excel con una foto por artículo.", cols: "Archivos .jpg, .png o .webp (mejor de 800 px o más)" },
 ];
 const DX_SUBIR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>';
@@ -1361,7 +1360,7 @@ for (const t of TIPOS_DX) {
   $(t.p + "-cerrar").addEventListener("click", () => { $(t.p + "-res").textContent = ""; $(t.p + "-aplicar").hidden = true; $(t.p + "-msg").textContent = ""; r.hidden = true; });
   new MutationObserver(() => { r.hidden = !$(t.p + "-res").childNodes.length; }).observe($(t.p + "-res"), { childList: true });
 }
-const nombreTipo = { productos: "px", clientes: "cl", historial: "hi", consumo: "co", fotos: "fo" };
+const nombreTipo = { productos: "px", clientes: "cl", consumo: "co", fotos: "fo" }; // el historial de compras ya no tiene tarjeta: sale del Excel de consumo
 async function ultimasSubidas() {
   try {
     const lista = await call("/api/admin/actualizaciones");
@@ -1736,12 +1735,12 @@ async function entrada() {
   if (!r.archivos?.length) { const tr = document.createElement("tr"); tr.appendChild(el("td", "No hay archivos nuevos en la carpeta.", { className: "muted" })); tb.appendChild(tr); return; }
   for (const a of r.archivos) {
     const tr = document.createElement("tr"), acc = el("td");
-    const ver = el("button", "Ver cambios", { type: "button", className: "main" }); ver.disabled = !a.tipo; ver.onclick = () => entradaVer(a);
+    const ver = el("button", "Ver cambios", { type: "button", className: "main" }); ver.disabled = !a.tipo || !nombreTipo[a.tipo]; ver.onclick = () => entradaVer(a);
     const arch = el("button", "Archivar", { type: "button", title: "Lo mueve a la subcarpeta «aplicados» sin cambiar nada: úsalo si ya está aplicado o no hace falta" }); arch.style.marginLeft = "8px"; arch.onclick = () => entradaArchivar(a.nombre, a.carpeta, "Archivado.");
     acc.append(ver, arch);
     const espera = (r.auto?.pendientes ?? []).find((p) => p.carpeta === a.carpeta && p.nombre === a.nombre);
     const nom = el("td"); if (espera) nom.append(el("div", "⚠ No se ha aplicado solo: " + espera.motivo, { className: "muted", style: "color:#C8102E;font-weight:600" }));
-    nom.append(el("b", (a.carpeta ? a.carpeta + " / " : "") + a.nombre + (a.ultimo ? "  · Último" : "")), el("div", `${a.tipo ? TIPO_TXT[a.tipo] : a.aviso || "No sé de qué tipo es: súbelo a mano en su tarjeta"} · ${hora2(a.modificado)} · ${(a.tamano / 1048576).toFixed(1).replace(".", ",")} MB`, { className: "muted" }));
+    nom.append(el("b", (a.carpeta ? a.carpeta + " / " : "") + a.nombre + (a.ultimo ? "  · Último" : "")), el("div", `${a.tipo === "historial" ? "Historial antiguo: ya no se sube aquí (las compras salen del Excel de consumo)" : a.tipo ? TIPO_TXT[a.tipo] : a.aviso || "No sé de qué tipo es: súbelo a mano en su tarjeta"} · ${hora2(a.modificado)} · ${(a.tamano / 1048576).toFixed(1).replace(".", ",")} MB`, { className: "muted" }));
     tr.append(nom, acc); tb.appendChild(tr);
   }
 }
