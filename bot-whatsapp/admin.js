@@ -13,6 +13,7 @@ import { ipDe, eventoSeguridad } from "./seguridad.js";
 import { etiquetaAccion } from "./actividad.js";
 import { claveCodigoOficina } from "./nif-key.js";
 import { leerPausa, guardarPausa } from "./pausa.js";
+import { TEMPORADAS, validarTemporada, temporadaActiva } from "./temporada.js";
 import { revisar } from "./revision-seguridad.js";
 import { crear2fa } from "./panel-2fa.js";
 import { crearAutoBases } from "./auto-bases.js";
@@ -132,7 +133,7 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
   // Subcarpetas BASE-ARTICULOS, BASE-CLIENTES y BASE-HISTORICO (da igual mayúsculas, guiones, tildes o palabras detrás: «BASE-HISTORICO PEDIDOS» vale).
   // Pueden estar dentro de la carpeta de entrada (ENTRADA_DIR) o en BASES_DIR (p. ej. C:\vm); en Windows, si no se ha puesto, se busca junto a la carpeta de datos.
   // Lo que se deja ahí se entiende como de ese tipo; igualmente se mira el contenido, y si no cuadra se avisa y no se carga solo. Cada una tiene su propia subcarpeta «aplicados».
-  const SUBS = [["basearticulos", "productos"], ["baseproductos", "productos"], ["baseclientes", "clientes"], ["basehistorico", "historial"], ["basehistorial", "historial"]];
+  const SUBS = [["basearticulos", "productos"], ["baseproductos", "productos"], ["baseclientes", "clientes"], ["basehistorico", "historial"], ["basehistorial", "historial"], ["baseconsumo", "consumo"]];
   const normSub = (n) => String(n ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z]/g, "");
   const tipoDeSub = (n) => { const s = normSub(n); return SUBS.find(([pre]) => s.startsWith(pre))?.[1] ?? null; };
   const basesDir = () => {
@@ -504,6 +505,12 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       dosFactores.desactivar(); eventoSeguridad("panel-2fa-desactivado", "segundo factor desactivado"); return send(res, 200, { ok: true }), true;
     }
     // ---- Pausa de emergencia: cierra las entradas nuevas y/o los pedidos nuevos hasta que se reactive ----
+    if (p === "/api/admin/temporada" && get) return send(res, 200, { activa: temporadaActiva(accounts.ajuste("temporada"), madridDay()), opciones: Object.entries(TEMPORADAS).map(([id, t]) => ({ id, titulo: t.titulo, texto: t.texto })) }), true;
+    if (p === "/api/admin/temporada" && post) { // cambia el aspecto de fiestas de la web de los clientes (solo un banner; no toca código, logo ni cabecera). Pide confirmación.
+      const b = await readJson(req); if (b?.confirmo !== true) return send(res, 400, { error: "Falta la confirmación." }), true;
+      let v; try { v = validarTemporada(b, madridDay()); } catch (e) { return send(res, 400, { error: e.message }), true; }
+      accounts.ajusteGuardar("temporada", JSON.stringify(v)); return send(res, 200, { ok: true, activa: temporadaActiva(JSON.stringify(v), madridDay()) }), true;
+    }
     if (p === "/api/admin/pausa" && get) return send(res, 200, leerPausa(accounts, { fresco: true })), true;
     if (p === "/api/admin/pausa" && post) {
       const b = (await readJson(req)) ?? {};
@@ -855,15 +862,16 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       } catch (e) { return send(res, 409, { error: "No se pudo mover el archivo. Si lo tienes abierto en Excel, ciérralo y vuelve a intentarlo." }), true; }
     }
     // ---- Actualizar datos desde un Excel: vista previa de los cambios y aplicar solo las diferencias ----
-    m = /^\/api\/admin\/(vista-previa|aplicar)\/(productos|clientes|historial|fotos)$/.exec(p);
+    m = /^\/api\/admin\/(vista-previa|aplicar)\/(productos|clientes|historial|consumo|fotos)$/.exec(p);
     if (m && post) {
       if (!actualizador) return send(res, 400, { error: "La actualización de datos no está disponible." }), true;
       if (m[1] === "aplicar" && m[2] === "productos" && exigeReclave(req, res, who)) return true; // cambiar la tarifa entera: hay que volver a escribir la clave
       const buf = await readBuffer(req, m[2] === "fotos" ? 80_000_000 : 25_000_000); // los ZIP de fotos y los Excel con fotos pesan más que los de texto
       if (!buf || !buf.length) return send(res, 400, { error: `No se recibió el archivo (máximo ${m[2] === "fotos" ? 80 : 25} MB).` }), true;
       try {
-        if (m[1] === "vista-previa") return send(res, 200, { ok: true, tipo: m[2], ...actualizador.vistaPrevia(m[2], buf) }), true;
-        return send(res, 200, { ok: true, tipo: m[2], ...actualizador.aplicar(m[2], buf, { fichero: String(url.searchParams.get("fichero") ?? "").slice(0, 120), confirmo: url.searchParams.get("confirmo") === "1" }) }), true;
+        const opc = { sinPrecios: url.searchParams.get("sinPrecios") === "1" };
+        if (m[1] === "vista-previa") return send(res, 200, { ok: true, tipo: m[2], ...actualizador.vistaPrevia(m[2], buf, opc) }), true;
+        return send(res, 200, { ok: true, tipo: m[2], ...actualizador.aplicar(m[2], buf, { fichero: String(url.searchParams.get("fichero") ?? "").slice(0, 120), confirmo: url.searchParams.get("confirmo") === "1", ...opc }) }), true;
       } catch (e) {
         return send(res, e.confirmar ? 409 : 400, { error: e.message || "No se pudo leer el Excel.", ...(e.confirmar ? { confirmar: e.confirmar } : {}) }), true;
       }

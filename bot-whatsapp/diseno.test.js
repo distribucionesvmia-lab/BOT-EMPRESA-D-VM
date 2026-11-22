@@ -52,7 +52,7 @@ test("botones redondos con icono: el icono va centrado y el globo del carrito no
 test("navegación inferior: 5 pestañas, aria-current, sin «Paso 1 de 3» ni pestañas de arriba, carrito flotante", () => {
   const nav = (pedido.match(/<nav class="tabbar"[\s\S]*?<\/nav>/) || [""])[0];
   assert.equal((nav.match(/<button /g) || []).length, 5);
-  for (const t of ["Inicio", "Catálogo", "Pedido", "Lo habitual", "Ayuda"]) assert.match(nav, new RegExp(`class="tb-t">${t}<`));
+  for (const t of ["Inicio", "Catálogo", "Pedido", "Histórico", "Ayuda"]) assert.match(nav, new RegExp(`class="tb-t">${t}<`));
   assert.match(pedido, /setAttribute\("aria-current", "page"\)/);
   assert.doesNotMatch(pedido, /<div class="paso">/); assert.doesNotMatch(pedido, /<nav class="tabs">/);
   assert.match(pedido, /<footer hidden role="status" aria-live="polite"><button class="pill-cart"/);
@@ -78,7 +78,7 @@ test("Inicio: saludo por hora de Madrid, «hoy» solo con la regla de siempre, p
   assert.match(cli, /timeZone: "Europe\/Madrid", hour: "numeric"/); assert.match(cli, /"Buenos días" : h < 21 \? "Buenas tardes" : "Buenas noches"/);
   assert.match(cli, /fetch\("\/catalogo\/aviso"\)[^\n]*j\?\.entregaHoy/); // la misma regla del servidor (Medina del Campo, laborable, antes de las 10:00)
   assert.match(cli, /\.in-foto \{ width:44px; height:44px; margin-left:calc\(-1 \* var\(--s3\)\)/); // miniaturas solapadas
-  assert.match(cli, /Empieza tu primer pedido/); assert.match(cli, /"Lo más pedido"/); assert.match(cli, /"Lo que sueles pedir"/);
+  assert.match(cli, /Empieza tu primer pedido/); assert.match(cli, /"Lo más pedido"/); assert.match(cli, /"Lo habitual"/);
   assert.match(cli, /\.in-prod \{[^}]*width:148px/);
   assert.match(cli, /j\.ayuda && \(j\.ayuda\.tel \|\| j\.ayuda\.horario \|\| j\.ayuda\.whatsappHref\)/);
   assert.match(cli, /if \(!j\?\.fijo \|\| !j\.hoy\.toca \|\| j\.hoy\.yaPidio\) return;/); // «Revisar y enviar» solo el día que toca
@@ -90,7 +90,7 @@ test("fotos y estados: baldosa con la foto llenando el recuadro sin agrandar, fu
   assert.match(pedido, /\.av img, \.pf-av img[^{]*\{[^}]*max-width:100%; max-height:100%;[^}]*opacity:0; transition:opacity 200ms/);
   assert.match(pedido, /Math\.min\(Math\.max\(nat \* 2\.5, 240\)/); // el zoom se ve grande: las fotos pequeñas se amplían hasta 2,5 veces assert.match(pedido, /"Imagen orientativa"/);
   assert.match(cli, /max-width:100%; max-height:100%/); assert.equal((cli.match(/data:image\/png;base64,/g) || []).length, 1); // el logo, una sola vez
-  for (const t of ["Aún no tienes habituales", "Sin resultados", "Tu pedido está vacío", "Sin conexión", "No se ha podido enviar"]) assert.ok(pedido.includes(t), t);
+  for (const t of ["Aún no tienes histórico", "Sin resultados", "Tu pedido está vacío", "Sin conexión", "No se ha podido enviar"]) assert.ok(pedido.includes(t), t);
   assert.match(pedido, /\.estado svg \{ width:48px; height:48px/); assert.match(pedido, /boton: "Reintentar"/);
   assert.match(pedido, /navigator\.vibrate\(8\)/); assert.match(pedido, /sinMovimiento\(\)/); // vibración suave, nunca con «reducir movimiento»
   assert.match(pedido, /@keyframes pulso \{ 0% \{ transform:scale\(1\); \} 50% \{ transform:scale\(1\.15\)/);
@@ -142,10 +142,10 @@ test("direcciones guardadas: lista con «Quitar», casilla para guardar una nuev
   assert.match(pedido, /\.dirop \{[^}]*min-height:48px/);
 });
 
-test("Inicio: fila «Ofertas» con la etiqueta de % o € y la fecha de fin, antes de «Lo que sueles pedir»", () => {
+test("Inicio: fila «Ofertas» con la etiqueta de % o € y la fecha de fin, antes de «Lo habitual»", () => {
   const cli = leer("./cliente.html");
   assert.match(cli, /sec\.appendChild\(el\("h3", null, "Ofertas"\)\)/); assert.match(cli, /" · hasta el " \+ o\.hasta/);
-  assert.ok(cli.indexOf('"Ofertas"') < cli.indexOf('"Lo que sueles pedir"'));
+  assert.ok(cli.indexOf('"Ofertas"') < cli.indexOf('"Lo habitual"'));
   assert.match(cli, /\.vm-inicio \.in-oferta \{ position:absolute;/);
 });
 
@@ -235,7 +235,7 @@ test("tanda 3 (catálogo): barra de categoría con fondo, subcategorías como ch
   assert.match(pedido, /\.falta \.falta-fila \{ display:grid; grid-template-columns:56px minmax\(0, 1fr\);/); assert.match(pedido, /\.falta \.falta-n b \{ display:-webkit-box; -webkit-line-clamp:2;/); // 5
   assert.match(pedido, /\.pf-seg \{ height:44px; padding:2px; \}/); assert.match(pedido, /\.pf-sec \{ min-height:1\.25em; \}/); assert.match(pedido, /\.pf-ctl \{ margin-top:auto;/); // 7
   assert.match(pedido, /return r \|\| "•"/); assert.match(pedido, /sin nombre no hay tarjeta/); // 8
-  assert.match(pedido, /esPack \? " \/pack" : " \/ud"/); assert.match(pedido, /"Pack de "/); assert.match(pedido, /sp\.textContent = "Por unidades"/); // 9
+  assert.match(pedido, /esPack \? " \/pack" : " \/ud"/); assert.match(pedido, /"Pack de "/); assert.match(pedido, /"Por unidades"; box\.appendChild\(sp\)/); // 9
   assert.match(pedido, /className = "acceso"/); assert.match(pedido, /\[#&\]sub=/); // 11
 });
 

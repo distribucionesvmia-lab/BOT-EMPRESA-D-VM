@@ -382,7 +382,7 @@ function openCatalog(s, now = new Date()) {
   if (s.link) {
     // Con histórico (artículos comprados en los últimos 6 meses) el catálogo se abre en «Lo habitual»: las mismas tarjetas con fotos, Caja|Ud y «+», solo con lo que ya compra; el catálogo completo está en la pestaña «Catálogo»
     const tiene = s.customer && !s.unverified && habitualProducts(s.customer).length > 0;
-    if (tiene) return { reply: aviso + "🛒 *¡Abriendo tu catálogo!* Verás primero lo que has comprado en los últimos 6 meses (pestaña «Lo habitual»); el catálogo completo está en «Catálogo». Si no se abre solo, pulsa el botón.", session: s, ui: { type: "link", title: "Hacer pedido", url: `${String(s.link).split("#")[0]}#tab=hab`, open: true } };
+    if (tiene) return { reply: aviso + "🛒 *¡Abriendo tu catálogo!* Verás primero lo que has comprado en los últimos 6 meses (pestaña «Histórico»); el catálogo completo está en «Catálogo». Si no se abre solo, pulsa el botón.", session: s, ui: { type: "link", title: "Hacer pedido", url: `${String(s.link).split("#")[0]}#tab=hab`, open: true } };
     return { reply: aviso + "🛒 *¡Abriendo tu catálogo!* Si no se abre solo, pulsa el botón.", session: s, ui: { type: "link", title: "Hacer pedido", url: s.link, open: true } };
   }
   return showList(s, 0, aviso + "🛒 Elige lo que quieres pedir:");

@@ -18,6 +18,11 @@ const registra = (nombre, tipo, cuerpo) => {
 };
 
 /** Devuelve el HTML con sus <style>, <script> grandes y el logo sacados a ficheros estáticos. `nombre`: prefijo de los ficheros (p. ej. «pedido»). */
+// Fuera de <script>, <pre> y <textarea>: saltos de línea de Windows (CRLF) → LF y sin la sangría de cada línea ni líneas en blanco. Entre etiquetas el navegador junta
+// los espacios de todos modos, así que la página se ve igual; pero pesa lo mismo en cualquier ordenador (con CRLF pesaba unos 340 bytes más y superaba el límite de las pruebas).
+const PROTEGIDO = /(<script\b[\s\S]*?<\/script>|<pre\b[\s\S]*?<\/pre>|<textarea\b[\s\S]*?<\/textarea>)/gi;
+export const compactaHtml = (html) => String(html).replace(/\r\n/g, "\n").split(PROTEGIDO).map((t, i) => (i % 2 ? t : t.replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").replace(/\n{2,}/g, "\n"))).join("");
+
 export function empaquetar(html, nombre, { minificar = true } = {}) {
   const k = nombre + (minificar ? ":" : ":crudo:") + huella(html);
   const hecho = PAGINAS.get(k);
@@ -34,7 +39,7 @@ export function empaquetar(html, nombre, { minificar = true } = {}) {
   out = out.replace(/<style>([\s\S]*?)<\/style>/g, (m, css) => `<link rel="stylesheet" href="${registra(`${nombre}${++n > 1 ? "-" + n : ""}.css`, "text/css; charset=utf-8", minificar ? limpiaCss(css) : css)}">`);
   n = 0;
   out = out.replace(/<script>([\s\S]*?)<\/script>/g, (m, js) => (js.length < MIN_JS ? m : `<script src="${registra(`${nombre}-${++n}.js`, "text/javascript; charset=utf-8", minificar ? limpiaJs(js) : js)}"></script>`));
-  if (minificar) out = out.replace(/<!--(?!\[if)[\s\S]*?-->/g, ""); // comentarios del HTML
+  if (minificar) { out = out.replace(/<!--(?!\[if)[\s\S]*?-->/g, ""); out = compactaHtml(out); } // comentarios del HTML y sangría sobrante
   PAGINAS.set(k, out);
   if (PAGINAS.size > 20) PAGINAS.delete(PAGINAS.keys().next().value); // la web cambia poco: no hace falta guardar más
   return out;

@@ -44,7 +44,7 @@ test("Bench 9.2 tras enviar: «Recibido. Te llamamos en 24-48 h laborables» con
   assert.doesNotMatch(c.slice(c.indexOf("function altaHecha"), c.indexOf('$("alta-ok-v").onclick')), /\b9\d{2} ?\d{3} ?\d{3}\b/);
 });
 test("Bench 9.3-4 bienvenida de 3 pasos con los textos reales, «Entendido» para siempre por cliente y la oferta de poner código dentro", () => {
-  for (const t of ["Busca un artículo o mira «Lo que sueles pedir».", "Marca las cantidades con el «+».", "Pulsa «Revisar pedido», elige el día de entrega y envíalo."]) assert.ok(c.includes(t), t);
+  for (const t of ["Busca un artículo o mira «Lo habitual» y el «Histórico».", "Marca las cantidades con el «+».", "Pulsa «Revisar pedido», elige el día de entrega y envíalo."]) assert.ok(c.includes(t), t);
   assert.match(c, /post\("\/api\/bienvenida\/vista", \{\}\)/); assert.match(c, /y\?\.codigoPropio === false/); assert.match(c, /"Poner mi código"/); assert.match(c, /\$\("cambiar"\)\.click\(\)/); // abre el modal m-codigo que ya existe
   assert.match(s, /\/api\/bienvenida/); assert.match(s, /ordersOf\(account\.customerId, 1\)\.length > 0/); // no se enseña a quien ya ha pedido por la app
   assert.match(leer("./cuentas-db.js"), /DELETE FROM bienvenida_vista WHERE customer_id/); // se borra con la cuenta

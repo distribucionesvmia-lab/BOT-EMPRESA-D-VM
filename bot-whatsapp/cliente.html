@@ -495,6 +495,9 @@
   .vm-inicio ul.lineas li:last-child:not(:only-child) { color:var(--text-2); }
   .vm-inicio .in-secs { display:flex; flex-direction:column; gap:var(--s4); }
   .vm-inicio .in-hacer { align-self:stretch; }
+  .vm-inicio .in-botones { display:flex; flex-direction:column; gap:var(--s3,12px); }
+  .vm-inicio .in-botones .vm-btn { width:100%; max-width:none; min-height:56px; white-space:normal; }
+  .vm-inicio .in-botones .in-nuevo { background:var(--ok); color:var(--on-ok,#fff); }
   .vm-inicio .in-sec h3, .vm-inicio .in-ayuda h3 { margin:0 0 var(--s2); font-size:calc(var(--t-md) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; }
   .vm-inicio .in-hscroll { scroll-padding-left:var(--gutter); display:flex; gap:var(--s3); overflow-x:auto; padding:2px var(--gutter) var(--s2); margin:0 calc(-1 * var(--gutter)); scrollbar-width:none; scroll-snap-type:x proximity; }
   .vm-inicio .in-hscroll::-webkit-scrollbar { display:none; }
@@ -738,6 +741,11 @@
   html.solo-correo #cambiar, html.solo-correo .in-codigo, html.solo-correo .bv-codigo { display:none !important; }
   #co-cod { font-size:calc(24px / var(--k,1)); letter-spacing:.35em; text-align:center; font-variant-numeric:tabular-nums; }
   .co-ref-p { margin:10px 0; } .co-ref-p small { display:block; color:var(--text-2); } .co-ref { font:700 28px/1 ui-monospace, Consolas, monospace; letter-spacing:.2em; color:var(--accent); }
+  /* «Tu pedido de siempre» más limpio: una acción principal (Enviar ya), una secundaria (Repetir y revisar) y lo demás, más ligero */
+  .vm-inicio .in-card .in-rec { background:transparent; border:1px solid var(--line); }
+  .vm-inicio .in-card .in-sie-acc { gap:0; margin-top:var(--s3); padding-top:var(--s1,4px); border-top:1px solid var(--line); }
+  .vm-inicio .in-card .in-sie-acc .vm-btn.ghost { background:transparent; color:var(--text-2); }
+  .vm-inicio .in-card .in-sie-acc .vm-btn.ghost + .vm-btn.ghost { border-left:1px solid var(--line); border-radius:0; }
 </style>
 </head>
 <body>
@@ -1025,6 +1033,7 @@
       <label id="p-actual-l">Contraseña actual<input id="p-actual" type="password" maxlength="64" autocomplete="current-password"></label>
       <label>Nueva contraseña<input id="p-nueva" type="password" maxlength="64" autocomplete="new-password"></label>
       <label>Repite la nueva contraseña<input id="p-nueva2" type="password" maxlength="64" autocomplete="new-password"></label>
+      <div id="p-cc-fila" hidden><p id="p-cc-msg" role="status"></p><label>Código de 6 dígitos de tu correo<input id="p-cc" type="text" inputmode="numeric" maxlength="8" autocomplete="one-time-code"></label><button class="vm-link" type="button" id="p-cc-otro">Enviarme otro código</button></div>
       <div class="err" id="p-err" role="alert"></div><div class="okmsg" id="p-ok" role="status"></div>
       <button class="vm-btn primary">Guardar contraseña</button>
       <button class="vm-link" type="button" id="p-cerrar">Cerrar</button>
@@ -1185,16 +1194,28 @@ function validaAcceso() {
   return true;
 }
 // «No soy un robot» (Cloudflare Turnstile): solo si la empresa ha puesto sus claves; el alta lo pide siempre y el acceso solo tras muchos intentos
-let tsClave = null, tsListo = null; const tsToken = {}, tsId = {};
+let tsClave = null, tsListo = null, tsLocal = false; const tsToken = {}, tsId = {};
+// «No soy un robot» PROPIO (sin servicios externos): el navegador resuelve un reto de trabajo en segundo plano (~1 s) y manda el resultado como `cf`
+async function retoResolver() {
+  const j = await (await fetch("/api/reto", { cache: "no-store" })).json(), enc = new TextEncoder(), bits = j.bits, lote = 512;
+  const ceros = (u) => { let n = 0; for (const b of u) { if (b === 0) { n += 8; continue; } n += Math.clz32(b) - 24; break; } return n; };
+  for (let ini = 0; ini < 4_000_000; ini += lote) {
+    const hs = await Promise.all(Array.from({ length: lote }, (_, k) => crypto.subtle.digest("SHA-256", enc.encode(j.reto + ":" + (ini + k)))));
+    for (let k = 0; k < lote; k++) if (ceros(new Uint8Array(hs[k])) >= bits) return j.reto + "|" + (ini + k);
+  }
+  return null;
+}
 function tsCargar() {
   if (tsListo) return tsListo;
   return (tsListo = fetch("/api/seguridad").then((r) => r.json()).then((j) => {
-    tsClave = j.turnstile || null; if (!tsClave) return null;
+    tsClave = j.turnstile || null; tsLocal = !tsClave && !!j.retoPropio && !!(window.crypto && crypto.subtle); if (tsLocal) return "local"; if (!tsClave) return null;
     return new Promise((ok) => { const s = document.createElement("script"); s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"; s.async = true; s.onload = () => ok(window.turnstile); s.onerror = () => ok(null); document.head.appendChild(s); });
   }).catch(() => null));
 }
 async function tsPinta(hueco) {
-  const ts = await tsCargar(); const el = $(hueco); if (!ts || !tsClave || !el) return;
+  const ts = await tsCargar();
+  if (ts === "local") { tsToken[hueco] = null; try { const t = await retoResolver(); if (t) tsToken[hueco] = t; } catch { /* sin conexión: el servidor lo pedirá de nuevo */ } return; }
+  const el = $(hueco); if (!ts || !tsClave || !el) return;
   el.hidden = false; if (tsId[hueco] != null) { try { ts.reset(tsId[hueco]); } catch {} tsToken[hueco] = null; return; }
   tsId[hueco] = ts.render(el, { sitekey: tsClave, callback: (tk) => { tsToken[hueco] = tk; }, "expired-callback": () => { tsToken[hueco] = null; }, "error-callback": () => { tsToken[hueco] = null; } });
 }
@@ -1374,21 +1395,30 @@ $("f-acceso").onsubmit = (e) => {
 })();
 // ── Cambiar mi contraseña (dentro de la aplicación) ──
 $("cambiar-pw").onclick = async () => {
-  $("p-err").textContent = ""; $("p-ok").textContent = ""; $("f-pass").reset(); $("m-pass").hidden = false;
+  $("p-err").textContent = ""; $("p-ok").textContent = ""; $("f-pass").reset(); $("p-cc-fila").hidden = true; $("m-pass").hidden = false;
   try { const y = await fetch("/api/yo").then((r) => r.json()); $("p-actual-l").hidden = !y.cliente?.tienePassword; } catch {}
   ($("p-actual-l").hidden ? $("p-nueva") : $("p-actual")).focus();
 };
 $("p-cerrar").onclick = () => { $("m-pass").hidden = true; };
+let pOtro = false;
+$("p-cc-otro").onclick = () => { pOtro = true; $("p-cc").value = ""; $("f-pass").requestSubmit(); };
 $("f-pass").onsubmit = async (e) => {
   e.preventDefault(); $("p-err").textContent = ""; $("p-ok").textContent = "";
   const n1 = $("p-nueva").value, n2 = $("p-nueva2").value;
   if (!$("p-actual-l").hidden && !$("p-actual").value) { $("p-err").textContent = "Escribe tu contraseña actual."; return $("p-actual").focus(); }
   if (n1.length < 8) { $("p-err").textContent = "La contraseña nueva tiene que tener al menos 8 caracteres."; return $("p-nueva").focus(); }
   if (n1 !== n2) { $("p-err").textContent = "Las dos contraseñas nuevas no coinciden."; return $("p-nueva2").focus(); }
+  const otro = pOtro; pOtro = false, cc = $("p-cc").value.replace(/\D/g, "");
+  if (!$("p-cc-fila").hidden && !otro && cc.length !== 6) { $("p-err").textContent = "Escribe el código de 6 dígitos que te hemos enviado a tu correo."; return $("p-cc").focus(); }
+  const body = { actual: $("p-actual").value, nueva: n1, nueva2: n2 };
+  if (!$("p-cc-fila").hidden && !otro) { body.codigoCorreo = cc; body.codigo = $("p-cc").value.trim(); }
   try {
-    const r = await post("/api/password", { actual: $("p-actual").value, nueva: n1, nueva2: n2 }), j = await r.json().catch(() => ({}));
+    const r = await post("/api/password", body), j = await r.json().catch(() => ({}));
+    if (j.necesitaCodigoCorreo || j.necesitaCodigo) { // falta el código (o está mal): se enseña el campo con el aviso del servidor
+      $("p-cc-fila").hidden = false; $("p-cc-msg").textContent = j.mensaje || (j.correo ? `Te hemos enviado un código de 6 dígitos a ${j.correo}. Escríbelo para confirmar el cambio.` : "Escribe el código de la aplicación de tu móvil."); if (!j.enviado) $("p-err").textContent = j.error || ""; $("p-cc").focus(); return;
+    }
     if (!r.ok) { $("p-err").textContent = j.error || "No se pudo cambiar la contraseña."; return; }
-    $("p-ok").textContent = "Listo: desde ahora entras con tu nueva contraseña."; $("f-pass").reset(); setTimeout(() => ($("m-pass").hidden = true), 1800);
+    $("p-ok").textContent = "Listo: desde ahora entras con tu nueva contraseña."; $("f-pass").reset(); $("p-cc-fila").hidden = true; setTimeout(() => ($("m-pass").hidden = true), 1800);
   } catch { $("p-err").textContent = SIN_RED; }
 };
 $("cambiar").onclick = () => { $("c-err").textContent = ""; $("c-ok").textContent = ""; $("f-codigo").reset(); $("m-codigo").hidden = false; $("c-nuevo").focus(); };
@@ -1920,7 +1950,7 @@ function inicio(ui) {
     if (bv?.mostrar && !c.querySelector(".in-bienvenida:not(.in-enlace)")) { // primera vez: tarjeta de 3 pasos (se cierra para siempre con «Entendido», guardado por cliente); si entró con el NIF y aún no tiene código, se le ofrece ahí mismo
       const k = el("section", "in-bienvenida"); k.setAttribute("aria-label", "Bienvenida");
       k.appendChild(el("h3", null, "Así se hace un pedido"));
-      const ol = el("ol"); for (const t of ["Busca un artículo o mira «Lo que sueles pedir».", "Marca las cantidades con el «+».", "Pulsa «Revisar pedido», elige el día de entrega y envíalo."]) ol.appendChild(el("li", null, t)); k.appendChild(ol);
+      const ol = el("ol"); for (const t of ["Busca un artículo o mira «Lo habitual» y el «Histórico».", "Marca las cantidades con el «+».", "Pulsa «Revisar pedido», elige el día de entrega y envíalo."]) ol.appendChild(el("li", null, t)); k.appendChild(ol);
       if (y?.codigoPropio === false) { const o = el("div", "bv-codigo"); o.appendChild(el("p", null, "Pon tu código de entrada para entrar con el teléfono, sin acordarte del DNI.")); const b2 = el("button", "vm-btn ghost", "Poner mi código"); b2.type = "button"; b2.onclick = () => $("cambiar").click(); o.appendChild(b2); k.appendChild(o); }
       const ent = el("button", "vm-btn primary", "Entendido"); ent.type = "button"; ent.onclick = async () => { ent.disabled = true; const r = await post("/api/bienvenida/vista", {}).catch(() => null); if (r?.ok) k.remove(); else { ent.disabled = false; falloCarga(k, "No hemos podido guardarlo.", () => ent.click()); } };
       k.appendChild(ent); c.insertBefore(k, sal.nextSibling); return;
@@ -1933,38 +1963,50 @@ function inicio(ui) {
     fila.append(si, nop); k.append(el("p", null, "Entra más rápido y más seguro: elige un código personal de 6 letras o números y úsalo con tu teléfono."), fila); c.insertBefore(k, sal.nextSibling);
   });
   const hacer = el("button", "vm-btn primary in-hacer", "Hacer pedido"); hacer.type = "button"; hacer.onclick = () => enviar("h:open", "Hacer pedido"); // lo contesta el asistente (con el aviso de «entrega hoy» si toca) y abre el catálogo
-  // Tu pedido de siempre (o «Empieza tu primer pedido»)
+  // Tu pedido de siempre (o «Empieza tu primer pedido»). Desde nov 2026 la portada enseña DOS botones en vez de esta tarjeta (TARJETA_SIEMPRE = false); el código sigue por si se quiere volver.
+  const TARJETA_SIEMPRE = false;
   const ids = [];
-  if (ui.last?.lineas?.length) {
-    const m = /(?:^|[#&])c=([^&]*)/.exec(ui.last.repetir || ""); for (const par of (m ? m[1].split(",") : []).slice(0, 4)) { const i = par.lastIndexOf("."); if (i > 0) ids.push(decodeURIComponent(par.slice(0, i))); }
-    principal.append(el("small", "in-peq", "Tu pedido de siempre · " + ui.last.date));
-    const fotos = el("div", "in-fotos"); fotos.setAttribute("aria-hidden", "true"); principal.appendChild(fotos);
-    const lin = el("ul", "lineas"), todas = ui.last.lineas, resto = todas.slice(5), extra = el("ul", "lineas lineas-resto"), nResto = resto.length + (ui.last.mas || 0);
-    for (const l of todas.slice(0, 5)) lin.appendChild(el("li", null, l)); for (const l of resto) extra.appendChild(el("li", null, l)); extra.hidden = true; principal.appendChild(lin);
-    if (nResto > 0) { // «… y 3 más» se despliega con un toque
-      principal.appendChild(extra);
-      const mas = el("button", "in-mas-lineas", "… y " + nResto + " más"); mas.type = "button"; mas.setAttribute("aria-expanded", "false");
-      mas.onclick = () => { const ab = extra.hidden; extra.hidden = !ab; mas.setAttribute("aria-expanded", String(ab)); mas.textContent = ab ? "Ver menos" : "… y " + nResto + " más"; }; principal.appendChild(mas);
+  if (TARJETA_SIEMPRE) {
+      if (ui.last?.lineas?.length) {
+      const m = /(?:^|[#&])c=([^&]*)/.exec(ui.last.repetir || ""); for (const par of (m ? m[1].split(",") : []).slice(0, 4)) { const i = par.lastIndexOf("."); if (i > 0) ids.push(decodeURIComponent(par.slice(0, i))); }
+      principal.append(el("small", "in-peq", "Tu pedido de siempre · " + ui.last.date));
+      const fotos = el("div", "in-fotos"); fotos.setAttribute("aria-hidden", "true"); principal.appendChild(fotos);
+      const lin = el("ul", "lineas"), todas = ui.last.lineas, resto = todas.slice(5), extra = el("ul", "lineas lineas-resto"), nResto = resto.length + (ui.last.mas || 0);
+      for (const l of todas.slice(0, 5)) lin.appendChild(el("li", null, l)); for (const l of resto) extra.appendChild(el("li", null, l)); extra.hidden = true; principal.appendChild(lin);
+      if (nResto > 0) { // «… y 3 más» se despliega con un toque
+        principal.appendChild(extra);
+        const mas = el("button", "in-mas-lineas", "… y " + nResto + " más"); mas.type = "button"; mas.setAttribute("aria-expanded", "false");
+        mas.onclick = () => { const ab = extra.hidden; extra.hidden = !ab; mas.setAttribute("aria-expanded", String(ab)); mas.textContent = ab ? "Ver menos" : "… y " + nResto + " más"; }; principal.appendChild(mas);
+      }
+      principal.appendChild(el("p", "in-total", `${ui.last.articulos} artículo${ui.last.articulos === 1 ? "" : "s"} · ${eur(ui.last.total)} con IVA`));
+      const rep = el("button", "vm-btn primary", "Repetir y revisar"); rep.type = "button"; rep.onclick = () => { location.href = ui.url + "#" + ui.last.repetir; }; // carga con los precios de hoy y abre «Pedido»; nunca se envía solo
+      const dia = diaSemanaDe(ui.last.fecha);
+      const sem = el("button", "vm-btn ghost in-rec"); sem.append(el("span", "in-rec-t", dia ? "Repetir cada " + dia : "Repetir cada semana"), el("small", "in-rec-s", "Pedido recurrente: se guarda y tú lo revisas antes de enviar")); sem.type = "button"; sem.onclick = () => { location.href = ui.url + "#" + ui.last.repetir + "&f=1"; };
+      const rap = el("button", "vm-btn primary in-rapido", "Enviar ya"); rap.type = "button"; rap.hidden = true; // «Pedir en 10 segundos»: aparece con el total de hoy cuando llega la vista previa; pide confirmar día y dirección antes de enviar
+      rep.className = "vm-btn ghost"; // «Repetir y revisar» pasa a secundario: el botón principal es enviar con un toque
+      principal.append(rap, rep, sem);
+      fetch("/api/pedido-rapido").then((r) => (r.ok ? r.json() : null)).catch(() => null).then((j) => { if (!j?.posible) return; rap.textContent = "Enviar ya · " + eur(j.total); rap.hidden = false; rap.onclick = () => abrirRapido(ui); }); // si no carga, simplemente no sale el botón extra (siguen «Repetir y revisar» y «Hacer pedido»)
+      const acc = el("div", "in-sie-acc"), be = el("button", "vm-btn ghost", "Editar"), bb = el("button", "vm-btn ghost", "Borrar"); be.type = bb.type = "button";
+      be.setAttribute("aria-label", "Editar tu pedido de siempre"); bb.setAttribute("aria-label", "Borrar tu pedido de siempre");
+      be.onclick = () => abrirSiempre("editar"); bb.onclick = () => abrirSiempre("borrar"); acc.append(be, bb); principal.appendChild(acc);
+    } else if (ui.siempre === "borrado") {
+      principal.classList.add("vacio"); const rest = el("button", "vm-btn ghost", "Volver a mostrar mi último pedido"); rest.type = "button";
+      rest.onclick = async () => { rest.disabled = true; const r = await post("/api/pedido-de-siempre/restaurar", {}).catch(() => null); if (!r?.ok) { rest.disabled = false; falloCarga(principal, "No hemos podido recuperar tu último pedido.", () => rest.click()); return; } location.reload(); };
+      principal.append(el("h3", null, "Has borrado tu pedido de siempre"), el("p", null, "Puedes elegir lo que necesitas del catálogo o recuperar tu último pedido."), hacer, rest);
+    } else {
+      principal.classList.add("vacio"); principal.append(el("h3", null, "Empieza tu primer pedido"), el("p", null, "Elige lo que necesitas del catálogo y te lo llevamos."), hacer);
     }
-    principal.appendChild(el("p", "in-total", `${ui.last.articulos} artículo${ui.last.articulos === 1 ? "" : "s"} · ${eur(ui.last.total)} con IVA`));
-    const rep = el("button", "vm-btn primary", "Repetir y revisar"); rep.type = "button"; rep.onclick = () => { location.href = ui.url + "#" + ui.last.repetir; }; // carga con los precios de hoy y abre «Pedido»; nunca se envía solo
-    const dia = diaSemanaDe(ui.last.fecha);
-    const sem = el("button", "vm-btn ghost in-rec"); sem.append(el("span", "in-rec-t", dia ? "Repetir cada " + dia : "Repetir cada semana"), el("small", "in-rec-s", "Pedido recurrente: se guarda y tú lo revisas antes de enviar")); sem.type = "button"; sem.onclick = () => { location.href = ui.url + "#" + ui.last.repetir + "&f=1"; };
-    const rap = el("button", "vm-btn primary in-rapido", "Enviar ya"); rap.type = "button"; rap.hidden = true; // «Pedir en 10 segundos»: aparece con el total de hoy cuando llega la vista previa; pide confirmar día y dirección antes de enviar
-    rep.className = "vm-btn ghost"; // «Repetir y revisar» pasa a secundario: el botón principal es enviar con un toque
-    principal.append(rap, rep, sem);
-    fetch("/api/pedido-rapido").then((r) => (r.ok ? r.json() : null)).catch(() => null).then((j) => { if (!j?.posible) return; rap.textContent = "Enviar ya · " + eur(j.total); rap.hidden = false; rap.onclick = () => abrirRapido(ui); }); // si no carga, simplemente no sale el botón extra (siguen «Repetir y revisar» y «Hacer pedido»)
-    const acc = el("div", "in-sie-acc"), be = el("button", "vm-btn ghost", "Editar"), bb = el("button", "vm-btn ghost", "Borrar"); be.type = bb.type = "button";
-    be.setAttribute("aria-label", "Editar tu pedido de siempre"); bb.setAttribute("aria-label", "Borrar tu pedido de siempre");
-    be.onclick = () => abrirSiempre("editar"); bb.onclick = () => abrirSiempre("borrar"); acc.append(be, bb); principal.appendChild(acc);
-  } else if (ui.siempre === "borrado") {
-    principal.classList.add("vacio"); const rest = el("button", "vm-btn ghost", "Volver a mostrar mi último pedido"); rest.type = "button";
-    rest.onclick = async () => { rest.disabled = true; const r = await post("/api/pedido-de-siempre/restaurar", {}).catch(() => null); if (!r?.ok) { rest.disabled = false; falloCarga(principal, "No hemos podido recuperar tu último pedido.", () => rest.click()); return; } location.reload(); };
-    principal.append(el("h3", null, "Has borrado tu pedido de siempre"), el("p", null, "Puedes elegir lo que necesitas del catálogo o recuperar tu último pedido."), hacer, rest);
+    if (ui.last?.lineas?.length) c.insertBefore(hacer, principal); // «Hacer pedido» arriba del todo: lo primero que se alcanza (antes estaba tras la tarjeta del pedido anterior)
   } else {
-    principal.classList.add("vacio"); principal.append(el("h3", null, "Empieza tu primer pedido"), el("p", null, "Elige lo que necesitas del catálogo y te lo llevamos."), hacer);
+    // Dos botones: pedido nuevo (verde, al catálogo) y añadir desde el histórico (rojo, a la pestaña Histórico). Ninguno envía nada.
+    principal.remove();
+    hacer.className = "vm-btn in-hacer in-nuevo"; hacer.textContent = "Hacer pedido nuevo"; hacer.onclick = () => { location.href = cat; }; // directo al catálogo completo
+    const grupo = el("div", "in-botones"); grupo.appendChild(hacer);
+    const anad = el("button", "vm-btn primary in-anadir", "Añadir al carrito desde mi histórico"); anad.type = "button";
+    anad.onclick = () => { location.href = cat + "#tab=hab"; }; // directo a la pestaña «Histórico» del catálogo (lo pedido en los últimos 6 meses)
+    grupo.appendChild(anad);
+    c.insertBefore(grupo, secciones);
   }
-  if (ui.last?.lineas?.length) c.insertBefore(hacer, principal); // «Hacer pedido» arriba del todo: lo primero que se alcanza (antes estaba tras la tarjeta del pedido anterior)
   // Datos que completan la pantalla
   const cargaHoy = () => fetch("/catalogo/aviso").then((r) => { if (!r.ok) throw new Error("aviso"); return r.json(); }).then((j) => { if (j?.entregaHoy) hoy.hidden = false; }).catch(() => falloCarga(sitioFijo, "No hemos podido comprobar si hoy hay entrega.", cargaHoy));
   cargaHoy();
@@ -1989,9 +2031,9 @@ function inicio(ui) {
     }
     const lista = j.tieneHistorial ? j.habituales : j.loMasPedido;
     if (lista?.length) {
-      const sec = el("section", "in-sec"); sec.setAttribute("aria-label", j.tieneHistorial ? "Lo que sueles pedir" : "Lo más pedido");
-      const cab = el("div", "in-sec-cab"); cab.appendChild(el("h3", null, j.tieneHistorial ? "Lo que sueles pedir" : "Lo más pedido"));
-      if (j.tieneHistorial) { const todos = el("a", "in-vertodos", "Ver todos"); todos.href = cat + "#tab=hab"; todos.setAttribute("aria-label", "Ver todo lo que sueles pedir"); cab.appendChild(todos); }
+      const sec = el("section", "in-sec"); sec.setAttribute("aria-label", j.tieneHistorial ? "Lo habitual" : "Lo más pedido");
+      const cab = el("div", "in-sec-cab"); cab.appendChild(el("h3", null, j.tieneHistorial ? "Lo habitual" : "Lo más pedido"));
+      if (j.tieneHistorial) { const todos = el("a", "in-vertodos", "Ver todos"); todos.href = cat + "#tab=hab"; todos.setAttribute("aria-label", "Ver todo el histórico"); cab.appendChild(todos); }
       sec.appendChild(cab);
       const fila = el("div", "in-hscroll");
       for (const p of lista) fila.appendChild(tarjeta(p, ""));
@@ -2010,11 +2052,7 @@ function inicio(ui) {
       ins.appendChild(el("p", null, "Entra más rápido desde su icono en la pantalla de inicio y sin escribir la dirección."));
       const bi = el("button", "vm-btn ghost", "Instalar la app"); bi.type = "button"; bi.onclick = abrirInstalar; ins.appendChild(bi); secciones.appendChild(ins);
     }
-    if (j.categorias?.length) {
-      const sec = el("section", "in-sec"); sec.setAttribute("aria-label", "Categorías"); sec.appendChild(el("h3", null, "Categorías"));
-      const fila = el("div", "in-chips"); for (const a of j.accesos || []) { const x = el("a", "in-chip in-acceso", a.nombre); x.href = cat + "#cat=" + encodeURIComponent(a.cat) + "&sub=" + encodeURIComponent(a.sub); fila.appendChild(x); } for (const k of j.categorias) { const a = el("a", "in-chip", k.nombre); a.href = cat + "#cat=" + encodeURIComponent(k.id); fila.appendChild(a); }
-      sec.appendChild(fila); secciones.appendChild(sec);
-    }
+    // (Las «Categorías» y accesos directos se quitaron del Inicio a petición de la empresa; el catálogo las sigue teniendo.)
     chat.scrollTop = 0;
   }).catch(() => { quitaEsq(); });
   { const fila = document.createElement("div"); fila.className = "mrow in"; fila.appendChild(c); chat.appendChild(fila); chat.scrollTop = 0; }
@@ -2214,5 +2252,6 @@ addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); instalacion
 addEventListener("appinstalled", () => { instalacion = null; const m = document.getElementById("instalar-menu"); if (m) m.hidden = true; });
 { const m = document.getElementById("instalar-menu"); if (m) { m.hidden = yaInstalada(); m.onclick = () => { menu(false); abrirInstalar(); }; } }
 </script>
+<script>fetch("/api/temporada",{cache:"no-store"}).then((r)=>r.ok?r.json():null).then((t)=>{if(!t||t.id==="normal"||!t.texto)return;const d=document.createElement("div");d.className="vm-temporada";d.setAttribute("role","status");d.textContent=t.texto;d.style.cssText="background:"+t.fondo+";color:"+t.color+";text-align:center;padding:8px 14px;font-weight:600;font-size:calc(14px / var(--k,1));line-height:1.35";const m = document.querySelector("main"); if (m) m.insertBefore(d, m.firstChild); else document.body.insertBefore(d, document.body.firstChild);}).catch(()=>null);</script>
 </body>
 </html>

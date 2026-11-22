@@ -88,3 +88,28 @@ test("PANTALLA: campo del código del correo, aviso de dónde llega y botón «E
   for (const t of ["necesitaCodigoCorreo", "sinCorreo", "exigirCorreo", "CODIGO_CORREO_PW", "tapar(dest)"]) assert.ok(a.includes(t), t);
   assert.doesNotMatch(h, /\son[a-z]+="/);
 });
+
+test("CAMBIAR LA CONTRASEÑA: pide el código de 6 dígitos al correo de la ficha y no cambia nada hasta que es bueno", async () => {
+  const m = await montar();
+  try {
+    await crear(m, "Mesa-Verde-42"); const c = await crear(m, "Mesa-Verde-42", { codigoCorreo: codigoDe(m) });
+    const ck = { Cookie: cookies(c) }, n = m.correos.length;
+    const cambio = (extra = {}) => m.post("/api/password", { actual: "Mesa-Verde-42", nueva: "Nueva-Clave-88", nueva2: "Nueva-Clave-88", ...extra }, ck);
+    assert.equal((await m.post("/api/password", { actual: "mala", nueva: "Nueva-Clave-88" }, ck)).status, 401); assert.equal(m.correos.length, n, "con la contraseña actual mala no se manda ningún código");
+    const a = await cambio(); assert.equal(a.status, 409); assert.equal(a.json.necesitaCodigoCorreo, true); assert.equal(a.json.correo, "m******@ejemplo.es"); assert.equal(m.correos.length, n + 1);
+    assert.equal(m.accounts.passwordComprobar("C1", "Nueva-Clave-88").ok, false, "sin el código no cambia");
+    const mal = await cambio({ codigoCorreo: "000000" }); assert.equal(mal.status, 401); assert.equal(mal.json.necesitaCodigoCorreo, true);
+    assert.equal(m.accounts.passwordComprobar("C1", "Nueva-Clave-88").ok, false);
+    const bien = await cambio({ codigoCorreo: codigoDe(m) }); assert.equal(bien.status, 200);
+    assert.equal(m.accounts.passwordComprobar("C1", "Nueva-Clave-88").ok, true);
+    assert.equal((await m.post("/api/password", { actual: "Nueva-Clave-88", nueva: "Otra-Mas-9977", nueva2: "Otra-Mas-9977", codigoCorreo: codigoDe(m) }, ck)).status === 200, false, "el código gastado no sirve para otro cambio");
+  } finally { m.cerrar(); }
+  const s = await montar({ conCorreo: false });
+  try { await crear(s, "Mesa-Verde-42").then((r) => s.post("/api/password", { actual: "Mesa-Verde-42", nueva: "Nueva-Clave-88", nueva2: "Nueva-Clave-88" }, { Cookie: cookies(r) })).then((r) => assert.equal(r.status, 200, "sin correo configurado no se exige código")); } finally { s.cerrar(); }
+});
+
+test("CAMBIAR LA CONTRASEÑA, pantalla: campo del código, aviso de dónde llega y «Enviarme otro código»", () => {
+  const h = leer("./cliente.html");
+  for (const t of ['id="p-cc-fila"', 'id="p-cc"', 'id="p-cc-otro"', "body.codigoCorreo"]) assert.ok(h.includes(t), t);
+  assert.ok(leer("./auth.js").includes("exigirCorreoDe(req, res, b, acc.customerId)"));
+});

@@ -14,7 +14,8 @@ import { leerPausa, TEXTO_PAUSA_PEDIDOS } from "./pausa.js";
 import { crearFrenoCopia } from "./freno-copia.js";
 import { estadoCliente } from "./revision-seguridad.js";
 import { resumenGeo } from "./geoip.js";
-import { turnstileActivo } from "./seguridad.js";
+import { turnstileActivo, retoPropioActivo } from "./seguridad.js";
+import { temporadaActiva } from "./temporada.js";
 import { cabecerasSeguridad, CSP, eventoSeguridad, usarRegistro, ipDe, claveDebil, crearEscudo, origenAjeno, panelPermitido, cspEstricta } from "./seguridad.js";
 import { createAdmin } from "./admin.js";
 import { crearActualizador } from "./actualizar-datos.js";
@@ -596,11 +597,12 @@ const sendJson = (res, code, data) => enviar(res, code, { "Content-Type": "appli
 function aplicarSiempre(account, customer, ui) {
   if (!ui?.home) return ui;
   const u = getAccountsDb().getUsual(account.customerId);
-  if (!u) return { ...ui, siempre: "auto" };
+  const ultimoRepetir = ui.last?.repetir; // el del último pedido de verdad (para «Añadir al carrito los productos de mi último pedido»), aunque haya editado o borrado «Tu pedido de siempre»
+  if (!u) return { ...ui, ultimoRepetir, siempre: "auto" };
   const { last, ...resto } = ui;
-  if (u.hidden) return { ...resto, siempre: "borrado" };
+  if (u.hidden) return { ...resto, ultimoRepetir, siempre: "borrado" };
   const t = tarjetaSiempre(customer, u.lines, last?.fecha ?? lineasUltimoPedido(customer).fecha);
-  return t ? { ...resto, last: t, siempre: "propio" } : { ...resto, siempre: "borrado" };
+  return t ? { ...resto, last: t, ultimoRepetir, siempre: "propio" } : { ...resto, ultimoRepetir, siempre: "borrado" };
 }
 // Conversación de un cliente con sesión: el cliente sale SIEMPRE de la cuenta (nunca de lo que envíe el navegador)
 async function accountChat(account, text, msgId, carrito = null) {
@@ -723,6 +725,7 @@ async function appRoutes(req, res, url) {
     const z = zipNode(archivos);
     return void res.writeHead(200, { "Content-Type": "application/zip", "Content-Disposition": `attachment; filename="pedidos-${mes}.zip"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Length": z.length }).end(z);
   }
+  if (p === "/api/temporada" && req.method === "GET") { const t = temporadaActiva(getAccountsDb().ajuste("temporada"), madridDay()); return void sendJson(res, 200, { id: t.id, texto: t.texto, fondo: t.fondo, color: t.color }); } // franja de fiestas (Navidad…): solo texto y colores
   if (p === "/api/ayuda" && req.method === "GET") return void sendJson(res, 200, { ayuda: ayudaPublica() }); // datos públicos de contacto de la empresa
   // Datos de la pantalla de Inicio del cliente: lo que suele pedir, lo más pedido, categorías y fotos de su último pedido (todo de su catálogo; nada de otros clientes)
   if (p === "/api/inicio" && req.method === "GET") {
@@ -1136,7 +1139,7 @@ const servidorHttp = http
   .listen(PORT, process.env.HOST || undefined, () => {
     console.log(`Bot escuchando en http://localhost:${PORT}` + (process.env.HOST ? ` (solo ${process.env.HOST})` : ""));
     if (clientEnabled) { // la aplicación de los clientes le cuenta al panel cómo está configurada (sin claves) para la «Revisión de seguridad»
-      const contar = () => { try { getAccountsDb().ajusteGuardar("estado_cliente", JSON.stringify(estadoCliente({ ...process.env, PUBLIC_URL }, { turnstile: turnstileActivo(), smtp: !!smtpDesdeEntorno(), geo: resumenGeo() }))); } catch { /* sin guardar */ } };
+      const contar = () => { try { getAccountsDb().ajusteGuardar("estado_cliente", JSON.stringify(estadoCliente({ ...process.env, PUBLIC_URL }, { turnstile: turnstileActivo(), retoPropio: retoPropioActivo(), smtp: !!smtpDesdeEntorno(), geo: resumenGeo() }))); } catch { /* sin guardar */ } };
       contar(); setInterval(contar, 10 * 60_000).unref();
     }
     // Si la oficina actualiza los archivos y el programa se queda con el código antiguo (no se reinició), se reinicia solo: el archivo iniciar-*.bat lo vuelve a arrancar a los 10 s.

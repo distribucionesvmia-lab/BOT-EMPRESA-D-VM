@@ -18,6 +18,37 @@ export async function verificarTurnstile(token, ip, fetchFn = globalThis.fetch) 
   } catch { return { ok: true, sinRespuesta: true }; }
 }
 
+// ── «No soy un robot» PROPIO (sin servicios externos): un reto de trabajo (prueba de esfuerzo). El servidor firma un reto; el navegador tiene que
+// encontrar un número que, junto al reto, dé un SHA-256 con N ceros al principio (~1 s en un móvil). A una persona no le cuesta nada; a un bot que
+// intenta miles de altas o contraseñas, sí. Cada reto vale una vez, caduca a los 15 min y no se puede inventar (va firmado). No sustituye a Turnstile
+// (no distingue personas de máquinas, solo encarece los ataques en masa): si Turnstile está configurado, manda Turnstile.
+export const retoPropioActivo = () => !turnstileActivo() && process.env.RETO_PROPIO !== "0" && (process.env.RETO_PROPIO === "1" || (process.env.DEMO !== "1" && !process.env.VM_TEST && !process.env.NODE_TEST_CONTEXT));
+export const robotActivo = () => turnstileActivo() || retoPropioActivo();
+export const retoBits = () => Math.min(22, Math.max(10, Number(process.env.RETO_BITS ?? 16) || 16));
+const RETO_CLAVE = crypto.randomBytes(32), RETO_VALE_MS = 15 * 60_000, retosUsados = new Map();
+const firmaReto = (base) => crypto.createHmac("sha256", RETO_CLAVE).update(base).digest("hex").slice(0, 32);
+export function nuevoReto(ahora = Date.now()) { const base = `${ahora}.${crypto.randomBytes(12).toString("hex")}`; return { reto: `${base}.${firmaReto(base)}`, bits: retoBits() }; }
+const cerosIniciales = (buf) => { let n = 0; for (const b of buf) { if (b === 0) { n += 8; continue; } n += Math.clz32(b) - 24; break; } return n; };
+/** token = «<reto>|<número>». Comprueba firma, caducidad, que no se haya usado y que el trabajo esté hecho. */
+export function verificarReto(token, ahora = Date.now()) {
+  if (typeof token !== "string" || token.length > 200) return { ok: false };
+  const [reto, n] = token.split("|"), partes = String(reto ?? "").split(".");
+  if (partes.length !== 3 || !/^\d{1,12}$/.test(String(n ?? ""))) return { ok: false };
+  const base = `${partes[0]}.${partes[1]}`, esperada = firmaReto(base);
+  if (partes[2].length !== esperada.length || !crypto.timingSafeEqual(Buffer.from(partes[2]), Buffer.from(esperada))) return { ok: false };
+  const edad = ahora - Number(partes[0]); if (!(edad >= 0 && edad <= RETO_VALE_MS) || retosUsados.has(reto)) return { ok: false };
+  if (cerosIniciales(crypto.createHash("sha256").update(`${reto}:${n}`).digest()) < retoBits()) return { ok: false };
+  for (const [k, t] of retosUsados) if (ahora - t > RETO_VALE_MS) retosUsados.delete(k); // limpieza
+  if (retosUsados.size > 50_000) return { ok: false }; // freno de memoria
+  retosUsados.set(reto, ahora); return { ok: true };
+}
+/** La comprobación que usa el acceso: Turnstile si está configurado; si no, el reto propio; si ninguno está activo, vale. */
+export async function verificarRobot(token, ip, fetchFn) {
+  if (turnstileActivo()) return verificarTurnstile(token, ip, fetchFn);
+  if (retoPropioActivo()) return verificarReto(token);
+  return { ok: true };
+}
+
 /** Intentos por dirección en una ventana: pasado el tope, se pide la comprobación «no soy un robot». */
 export function contadorIntentos(tope, ventanaMs) {
   const m = new Map();
@@ -124,6 +155,7 @@ export function origenAjeno(req, permitidos = []) {
   if (METODOS_SEGUROS.has(String(req.method).toUpperCase())) return null;
   const sfs = String(req.headers["sec-fetch-site"] ?? "").toLowerCase();
   if (sfs && sfs !== "same-origin" && sfs !== "none") return `sec-fetch-site=${sfs}`;
+  if (sfs === "same-origin") return null; // el navegador mismo certifica que la página y la petición son del mismo sitio (con túneles, el Host que ve el programa puede no ser el de la barra)
   const origen = req.headers.origin;
   if (origen !== undefined) {
     const o = String(origen);

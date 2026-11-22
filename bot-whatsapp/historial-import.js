@@ -34,6 +34,12 @@ export function parseDate(v) {
   return null;
 }
 
+/** Los pedidos que se guardan de un cliente: del más reciente al más antiguo, como mínimo los 10 últimos y todos los de los últimos 6 meses (tope 400). */
+export function recortarPedidos(lista) {
+  const desde = hace(MESES_HABITUALES);
+  return [...lista].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).filter((o, i) => i < MAX_ORDERS_PER_CUSTOMER || o.date >= desde).slice(0, MAX_PEDIDOS_SEIS_MESES);
+}
+
 /** Filas → { byCustomer: Map(cliente → [{ doc, date, lines:[{ productId, qty }] }]), stats }. */
 export function parseHistorial(rows) {
   let hi = -1, col = {};
@@ -61,8 +67,8 @@ export function parseHistorial(rows) {
     byDoc.get(k).lines.push({ productId: pid, qty: Math.max(1, Math.round(qty)) });
     stats.lineas++;
   }
-  const byCustomer = new Map(), desde = hace(MESES_HABITUALES);
-  for (const [cid, byDoc] of orders) byCustomer.set(cid, [...byDoc.values()].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)).filter((o, i) => i < MAX_ORDERS_PER_CUSTOMER || o.date >= desde).slice(0, MAX_PEDIDOS_SEIS_MESES));
+  const byCustomer = new Map();
+  for (const [cid, byDoc] of orders) byCustomer.set(cid, recortarPedidos([...byDoc.values()]));
   return { byCustomer, stats: { ...stats, clientes: byCustomer.size } };
 }
 

@@ -49,3 +49,13 @@ for (const [nombre, hacer] of [["flotantes", flotante], ["dentro de la celda", e
 test("un Excel de fotos subido en la tarjeta de productos avisa en vez de decir «0 cambios»", () => {
   const { a } = montar(); assert.throws(() => a.vistaPrevia("productos", Buffer.from(flotante())), /Fotos de productos/);
 });
+
+test("Excel con fotos hecho por otros programas (LibreOffice, openpyxl…): el dibujo viene sin el prefijo «xdr:» y se lee igual", () => {
+  const buf = zip({
+    ...base(`<worksheet><sheetData>${celdas([["Nombre", "Foto"], ["AGUA BEZOYA PET 1,5L", null]])}</sheetData></worksheet>`),
+    "xl/worksheets/_rels/sheet1.xml.rels": `<Relationships><Relationship Id="rId1" Target="../drawings/drawing1.xml"/></Relationships>`,
+    "xl/drawings/drawing1.xml": `<wsDr xmlns="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"><oneCellAnchor><from><col>1</col><colOff>0</colOff><row>1</row><rowOff>0</rowOff></from><pic><blipFill><blip xmlns:r="x" r:embed="rId1"/></blipFill></pic></oneCellAnchor></wsDr>`,
+    "xl/drawings/_rels/drawing1.xml.rels": `<Relationships><Relationship Id="rId1" Target="../media/image1.png"/></Relationships>`,
+  });
+  const r = filasConFoto(buf); assert.equal(r.length, 1); assert.equal(r[0].fila, 2); assert.deepEqual(r[0].textos, ["AGUA BEZOYA PET 1,5L"]); assert.equal(r[0].ext, "png");
+});

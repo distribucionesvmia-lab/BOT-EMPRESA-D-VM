@@ -33,7 +33,7 @@ test("primera vez: entrar dice «crea tu contraseña»; al crearla entra, queda 
   try {
     const a = await entrar(m, "loquesea1"); assert.equal(a.status, 409); assert.equal(a.json.necesitaCrear, true);
     const c = await crear(m, "Mesa-Verde-42"); assert.equal(c.status, 200); assert.equal(c.json.cliente.nombre, "BAR LA PLAZA S.L.");
-    assert.equal(c.cab.getSetCookie().length, 2, "sesión + aparato recordado");
+    assert.equal(c.cab.getSetCookie().length, 3, "sesión + aparato recordado + quitar la marca de «salió a propósito»");
     assert.equal((await m.get("/api/yo", { Cookie: cookies(c) })).json.cliente.tienePassword, true);
     const lista = m.accounts.accesosNuevos(); assert.equal(lista.length, 1); assert.equal(lista[0].customerId, "C1"); assert.equal(lista[0].tipo, "primera");
     assert.equal(m.avisos.includes("C1"), true, "se avisa al móvil del cliente (si lo tiene)");

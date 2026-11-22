@@ -50,9 +50,9 @@ test("cabeceras de seguridad: CSP sin permitir dominios ajenos salvo Cloudflare,
 });
 
 test("pantalla y servidor: campo trampa, Turnstile en el alta y tras muchos intentos de acceso, y límite de pedidos", () => {
-  const html = src("./cliente.html"), auth = src("./auth.js"), server = src("./server.js");
+  const html = src("./cliente.html"), auth = src("./auth.js"), server = src("./server.js"), seg = src("./seguridad.js");
   assert.match(html, /id="r-web" name="sitio_web" tabindex="-1" autocomplete="off"/); assert.match(html, /\.trampa\{position:absolute;left:-9999px/);
   assert.match(html, /sitio_web: \$\("r-web"\)\.value, cf: tsToken\["ts-alta"\]/); assert.match(html, /j\.necesitaVerificacion/);
-  assert.match(auth, /String\(b\.sitio_web \?\? ""\)\.trim\(\)/); assert.match(auth, /verificarTurnstile\(b\.cf/); assert.match(auth, /CAPTCHA_DESPUES_DE/);
+  assert.match(auth, /String\(b\.sitio_web \?\? ""\)\.trim\(\)/); assert.match(auth, /verificarRobot\(b\.cf/); assert.match(seg, /verificarTurnstile\(token, ip, fetchFn\)/); assert.match(auth, /CAPTCHA_DESPUES_DE/);
   assert.match(server, /pedidosLimite\(String\(cuentaId\)\)/); assert.match(server, /topePedidos\(account\.id\)/); assert.match(server, /PEDIDOS_LIMIT/); // el tope por hora está dentro de topePedidos (con los de día y en total)
 });

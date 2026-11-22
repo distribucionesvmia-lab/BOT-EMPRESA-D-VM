@@ -11,9 +11,10 @@ import { navegadorCorto } from "./errores.js";
 import { leerPausa, TEXTO_PAUSA_ENTRADAS } from "./pausa.js";
 import { modoGeo, claseDe } from "./geoip.js";
 import { elegirDestino, tapar } from "./correo-cliente.js";
-import { turnstileSite, turnstileActivo, verificarTurnstile, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
+import { turnstileSite, turnstileActivo, robotActivo, retoPropioActivo, nuevoReto, verificarRobot, contadorIntentos, eventoSeguridad, cabecerasSeguridad, ipDe, conexionHttps } from "./seguridad.js";
 
 const COOKIE = "vm_session";
+const COOKIE_SALIO = "vm_salio"; // «cerró sesión a propósito»: el aparato sigue recordado (no pide código al volver a entrar con su contraseña) pero NO reabre la sesión solo
 const COOKIE_APARATO = "vm_aparato"; // aparato de confianza: tras una aprobación de la oficina, este navegador vuelve a entrar solo
 const MENSAJE_ELIMINADA = "Esta cuenta se eliminó. Si quieres volver a usar la aplicación, llámanos o solicita el alta de nuevo.";
 const JSON_HEADERS = { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
@@ -103,6 +104,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
   const nifGlobalFails = rateLimiter(Number(process.env.NIF_GLOBAL_FAILS ?? 15), 60 * 60_000); // fallos de NIF por hora, entre todos los clientes
   const usoLimit = rateLimiter(300, 10 * 60_000); // contadores: muchos permitidos, pero no infinitos por IP
   const registerLimit = rateLimiter(Number(process.env.REGISTER_LIMIT ?? 20), 60 * 60_000);
+  const retosPedidos = contadorIntentos(Number(process.env.RETO_LIMIT ?? 60), 10 * 60_000); // retos del «no soy un robot» propio por dirección
   const intentosAcceso = contadorIntentos(Number(process.env.CAPTCHA_DESPUES_DE ?? 5), 10 * 60_000); // pasados N intentos en 10 min desde una dirección, se pide «no soy un robot»
   // Entrada aprobada por la oficina: topes por dirección, por cliente y en total (que nadie pueda llenar el panel de la empresa de solicitudes)
   // Entrada con NOMBRE + NIF + CONTRASEÑA (por defecto). La primera vez, el cliente crea su contraseña; después solo la escribe (y el aparato queda recordado un año). ACCESO_MODO=oficina vuelve a «la oficina da paso / código por correo».
@@ -182,18 +184,42 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
 
   /** Cuenta de la sesión de esta petición (o null). */
   const cookieAparato = (token, maxAge, req) => `${COOKIE_APARATO}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${esHttps(req) ? "; Secure" : ""}`;
+  const cookieSalio = (v, maxAge, req) => `${COOKIE_SALIO}=${v}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${esHttps(req) ? "; Secure" : ""}`;
   const huella = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
   /** Cliente al que pertenece el aparato de confianza de esta petición (o null). */
   const aparatoDe = (req) => { const t = parseCookies(req.headers.cookie)[COOKIE_APARATO]; return t && t.length >= 20 && t.length <= 100 ? accounts.aparatoValido(huella(t)) : null; };
   /** Abre sesión como ese cliente y deja (o renueva) el aparato de confianza. Devuelve { ok, token, account, cookies } o { ok:false, reason }. */
   const abrirConAparato = (customerId, req, { nuevo = false } = {}) => {
     const r = accounts.loginNif([String(customerId)], () => true); if (!r.ok) return r;
-    const cookies = [cookie(r.token, 30 * 86400, req)];
+    const cookies = [cookie(r.token, 30 * 86400, req), cookieSalio("", 0, req)]; // al entrar de nuevo se quita la marca de «salió a propósito»
     if (nuevo) { const t = crypto.randomBytes(32).toString("base64url"); accounts.aparatoCrear(customerId, huella(t), navegadorCorto(req.headers["user-agent"])); cookies.push(cookieAparato(t, 365 * 86400, req)); }
     else { const t = parseCookies(req.headers.cookie)[COOKIE_APARATO]; if (t) cookies.push(cookieAparato(t, 365 * 86400, req)); } // se renueva el plazo en el navegador
     return { ...r, cookies };
   };
   const sessionOf = (req) => accounts.sessionAccount(parseCookies(req.headers.cookie)[COOKIE]);
+
+  /** Código de 6 dígitos al correo de la ficha. true si ya ha respondido (falta el código, es incorrecto o no hay correo); false si el código es bueno. */
+  async function exigirCorreoDe(req, res, b, id) {
+        const dest = elegirDestino({ account: { email: accounts.emailDe(id) }, customer: customers.getById(id) });
+        if (!dest) { console.warn(`[VM acceso] El cliente ${id} no tiene correo en su ficha: no se le puede mandar el código`); eventoSeguridad("acceso-sin-correo", `cliente ${id}`); return send(res, 409, { sinCorreo: true, error: "No tenemos ningún correo tuyo en tu ficha, así que no podemos enviarte el código de seguridad. Llámanos y lo añadimos." }), true; }
+        const escrito = String(b.codigoCorreo ?? "").replace(/\D/g, "");
+        if (escrito) {
+          if (!pwCorreoVerIp(ip(req))) return demasiados(res, pwCorreoVerIp, ip(req)), true;
+          const v = accounts.codigoCorreoComprobar([id], (cid) => claveCodigoCorreo(cid, escrito));
+          if (v.ok) return false;
+          eventoSeguridad("pw-codigo-correo-incorrecto", `cliente ${id}`);
+          return send(res, 401, { necesitaCodigoCorreo: true, correo: tapar(dest), error: v.reason === "expired" ? "El código ha caducado. Pide uno nuevo." : v.reason === "agotado" ? "Has fallado demasiadas veces con ese código. Pide uno nuevo." : "El código no es correcto. Revisa tu correo y escríbelo de nuevo." }), true;
+        }
+        if (!pwCorreoIp(ip(req))) return demasiados(res, pwCorreoIp, ip(req)), true;
+        if (!pwCorreoGlobal("todas")) return eventoSeguridad("pw-correo-tope-global", "se alcanzó el máximo de códigos por correo por hora"), send(res, 429, { error: "Ahora mismo no podemos enviar más códigos. Inténtalo en unos minutos o llámanos." }), true;
+        const codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+        const cr = accounts.codigoCorreoCrear(id, claveCodigoCorreo(id, codigo));
+        if (!cr.ok) return send(res, 409, { necesitaCodigoCorreo: true, correo: tapar(dest), error: `Ya te hemos enviado un código hace un momento a ${tapar(dest)}. Revisa tu correo (mira también el spam). Si no llega, espera ${cr.espera} segundos y pide otro.` }), true;
+        try { await enviarCodigo({ to: dest, nombre: customers.getById(id)?.name ?? "", codigo, minutos: 10 }); }
+        catch (e) { console.error("[VM acceso] El servidor de correo NO ha enviado el código:", e?.message); eventoSeguridad("codigo-correo-error", String(e?.message ?? "error").slice(0, 120)); return send(res, 503, { error: "No hemos podido enviar el correo con el código. Inténtalo en unos minutos o llámanos." }), true; }
+        console.log(`[VM acceso] Código por correo para el cliente ${id} (${tapar(dest)})`);
+        return send(res, 409, { necesitaCodigoCorreo: true, correo: tapar(dest), enviado: true, mensaje: `Te hemos enviado un código de 6 dígitos a ${tapar(dest)}. Escríbelo aquí para entrar. Vale 10 minutos.` }), true;
+  }
 
   /** Atiende las rutas del cliente: /api/registro, /api/acceso, /api/salir y /api/yo. Devuelve true si la ruta era suya. */
   async function route(req, res, url) {
@@ -230,14 +256,19 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     }
     if (!p.startsWith("/api/")) return false;
 
-    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null, accesoOficina: oficinaActiva(), soloOficina: soloOficina(), codigoCorreo: codigoPorCorreo(), accesoPassword: pwActiva() }), true; // solo la clave PÚBLICA, si está activada
+    if (p === "/api/reto" && req.method === "GET") { // reto del «no soy un robot» propio (sin servicios externos); límite por dirección para que no sirva de martillo
+      if (!retoPropioActivo()) return send(res, 404, { error: "No disponible." }), true;
+      if (retosPedidos.pasado(retosPedidos.suma(ip(req)))) return send(res, 429, { error: "Demasiadas comprobaciones seguidas. Espera un minuto." }), true;
+      return send(res, 200, nuevoReto()), true;
+    }
+    if (p === "/api/seguridad" && req.method === "GET") return send(res, 200, { turnstile: turnstileSite() || null, retoPropio: retoPropioActivo(), accesoOficina: oficinaActiva(), soloOficina: soloOficina(), codigoCorreo: codigoPorCorreo(), accesoPassword: pwActiva() }), true; // solo la clave PÚBLICA, si está activada
 
     if (p === "/api/registro" && req.method === "POST") {
       if (!registerLimit(ip(req))) return eventoSeguridad("muchas-solicitudes-de-alta", ip(req)), demasiados(res, registerLimit, ip(req)), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       if (String(b.sitio_web ?? "").trim()) return eventoSeguridad("alta-con-campo-trampa", ip(req)), send(res, 200, { ok: true, estado: "pendiente" }), true; // campo oculto relleno = un bot: se finge que ha ido bien y no se guarda nada
-      if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("alta-sin-comprobacion-robot", ip(req)), send(res, 400, { error: "No hemos podido comprobar que no eres un robot. Recarga la página e inténtalo de nuevo.", verificacion: true }), true;
+      if (!(await verificarRobot(b.cf, ip(req))).ok) return eventoSeguridad("alta-sin-comprobacion-robot", ip(req)), send(res, 400, { error: "No hemos podido comprobar que no eres un robot. Recarga la página e inténtalo de nuevo.", verificacion: true }), true;
       const empresa = String(b.empresa ?? "").trim().replace(/\s+/g, " ");
       const correo = String(b.correo ?? "").trim();
       const pin = String(b.pin ?? "");
@@ -278,9 +309,9 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
       if (!solicitudIp(ip(req))) return eventoSeguridad("acceso-oficina-muchas-peticiones", ip(req)), demasiados(res, solicitudIp, ip(req)), true;
-      if (turnstileActivo() && !aparatoDe(req)) { // un aparato nuevo (el único caso que molesta a la oficina) tiene que pasar «no soy un robot» si está configurado
+      if (robotActivo() && !aparatoDe(req)) { // un aparato nuevo (el único caso que molesta a la oficina) tiene que pasar «no soy un robot» si está configurado
         intentosAcceso.suma(ip(req));
-        if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
+        if (!(await verificarRobot(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
       }
       if (pedirNombre(res, b)) return true;
       if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe tu NIF: los 6 primeros dígitos de tu DNI o CIF, o el NIF completo." }), true;
@@ -357,8 +388,8 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       // Contra bots: campo trampa o enviado más rápido de lo que escribe una persona (o sin decirlo) → se responde como un fallo normal y no se prueba nada
       if (String(b.sitio_web ?? "").trim()) return eventoSeguridad("acceso-con-campo-trampa", ip(req)), send(res, 401, MAL), true;
       if (!(Number(b.t) >= 1500)) return eventoSeguridad("acceso-demasiado-rapido", ip(req)), send(res, 401, MAL), true;
-      if (turnstileActivo() && (crear || intentosAcceso.pasado(intentosAcceso.suma(ip(req))))) { // «no soy un robot»: siempre para crear una contraseña, y al entrar cuando hay muchos intentos
-        if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
+      if (robotActivo() && (crear || intentosAcceso.pasado(intentosAcceso.suma(ip(req))))) { // «no soy un robot»: siempre para crear una contraseña, y al entrar cuando hay muchos intentos
+        if (!(await verificarRobot(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
       }
       if (nifCodes(b.nif).length === 0) return send(res, 400, { error: "Escribe tu NIF: los 6 primeros dígitos de tu DNI o CIF, o el NIF completo." }), true;
       const password = typeof b.password === "string" ? b.password : "";
@@ -395,27 +426,7 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       // ── Código de 6 dígitos al correo que consta en su ficha (aparato nuevo, sin verificación en dos pasos propia). Solo con correo configurado (SMTP); CODIGO_CORREO_PW=0 lo apaga. ──
       const pideCorreo = (id) => codigoPorCorreo() && process.env.CODIGO_CORREO_PW !== "0" && aparatoDe(req) !== id && !accounts.dobleFactor(id).activo;
       /** true si ya ha respondido (hay que parar: falta el código, es incorrecto o no hay correo); false si el código es bueno y se puede seguir. */
-      const exigirCorreo = async (id) => {
-        const dest = elegirDestino({ account: { email: accounts.emailDe(id) }, customer: customers.getById(id) });
-        if (!dest) { console.warn(`[VM acceso] El cliente ${id} no tiene correo en su ficha: no se le puede mandar el código`); eventoSeguridad("acceso-sin-correo", `cliente ${id}`); return send(res, 409, { sinCorreo: true, error: "No tenemos ningún correo tuyo en tu ficha, así que no podemos enviarte el código de seguridad. Llámanos y lo añadimos." }), true; }
-        const escrito = String(b.codigoCorreo ?? "").replace(/\D/g, "");
-        if (escrito) {
-          if (!pwCorreoVerIp(ip(req))) return demasiados(res, pwCorreoVerIp, ip(req)), true;
-          const v = accounts.codigoCorreoComprobar([id], (cid) => claveCodigoCorreo(cid, escrito));
-          if (v.ok) return false;
-          eventoSeguridad("pw-codigo-correo-incorrecto", `cliente ${id}`);
-          return send(res, 401, { necesitaCodigoCorreo: true, correo: tapar(dest), error: v.reason === "expired" ? "El código ha caducado. Pide uno nuevo." : v.reason === "agotado" ? "Has fallado demasiadas veces con ese código. Pide uno nuevo." : "El código no es correcto. Revisa tu correo y escríbelo de nuevo." }), true;
-        }
-        if (!pwCorreoIp(ip(req))) return demasiados(res, pwCorreoIp, ip(req)), true;
-        if (!pwCorreoGlobal("todas")) return eventoSeguridad("pw-correo-tope-global", "se alcanzó el máximo de códigos por correo por hora"), send(res, 429, { error: "Ahora mismo no podemos enviar más códigos. Inténtalo en unos minutos o llámanos." }), true;
-        const codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
-        const cr = accounts.codigoCorreoCrear(id, claveCodigoCorreo(id, codigo));
-        if (!cr.ok) return send(res, 409, { necesitaCodigoCorreo: true, correo: tapar(dest), error: `Ya te hemos enviado un código hace un momento a ${tapar(dest)}. Revisa tu correo (mira también el spam). Si no llega, espera ${cr.espera} segundos y pide otro.` }), true;
-        try { await enviarCodigo({ to: dest, nombre: customers.getById(id)?.name ?? "", codigo, minutos: 10 }); }
-        catch (e) { console.error("[VM acceso] El servidor de correo NO ha enviado el código:", e?.message); eventoSeguridad("codigo-correo-error", String(e?.message ?? "error").slice(0, 120)); return send(res, 503, { error: "No hemos podido enviar el correo con el código. Inténtalo en unos minutos o llámanos." }), true; }
-        console.log(`[VM acceso] Código por correo para el cliente ${id} (${tapar(dest)})`);
-        return send(res, 409, { necesitaCodigoCorreo: true, correo: tapar(dest), enviado: true, mensaje: `Te hemos enviado un código de 6 dígitos a ${tapar(dest)}. Escríbelo aquí para entrar. Vale 10 minutos.` }), true;
-      };
+      const exigirCorreo = (id) => exigirCorreoDe(req, res, b, id);
       if (crear) {
         const motivo = motivoPassword(password, b.nif, b.empresa); // se mira SIEMPRE (coincida o no el cliente): así no se averigua nada
         if (motivo) return send(res, 400, { error: motivo }), true;
@@ -494,6 +505,14 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       }
       const motivo = motivoPassword(b.nueva, "", ""); if (motivo) return send(res, 400, { error: motivo }), true;
       if (typeof b.nueva2 === "string" && b.nueva2 !== b.nueva) return send(res, 400, { error: "Las dos contraseñas no coinciden." }), true;
+      // Cambiar la contraseña también exige el código de 6 dígitos al correo de su ficha (o el de su aplicación si tiene verificación en dos pasos): así una sesión abierta o un móvil prestado no bastan.
+      if (codigoPorCorreo() && process.env.CODIGO_CORREO_PW !== "0") {
+        if (accounts.dobleFactor(acc.customerId).activo) {
+          const cod = typeof b.codigo === "string" ? b.codigo.trim() : "";
+          if (!cod) return send(res, 409, { necesitaCodigo: true, error: "Escribe el código de la aplicación de tu móvil (o uno de tus códigos de emergencia)." }), true;
+          if (!comprobarSegundoFactor(acc.customerId, cod)) { eventoSeguridad("cliente-2fa-incorrecto", "código de segundo factor incorrecto al cambiar la contraseña"); return send(res, 401, { necesitaCodigo: true, error: "El código no es correcto o ya se usó. Espera al siguiente de la aplicación o usa uno de emergencia." }), true; }
+        } else if (await exigirCorreoDe(req, res, b, acc.customerId)) return true;
+      }
       accounts.passwordCambiar(acc.id, b.nueva, parseCookies(req.headers.cookie)[COOKIE]);
       try { onCodigo?.(acc); } catch {}
       return send(res, 200, { ok: true }), true;
@@ -514,8 +533,8 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
       if (soloOficina()) return send(res, 403, { error: "Para entrar, escribe el nombre de tu empresa y tu NIF: la oficina te dará paso." }), true;
       const b = await readJson(req);
       if (!b) return send(res, 400, { error: "Solicitud no válida." }), true;
-      if (turnstileActivo() && intentosAcceso.pasado(intentosAcceso.suma(ip(req)))) { // muchos intentos seguidos: a partir de aquí, «no soy un robot»
-        if (!(await verificarTurnstile(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
+      if (robotActivo() && intentosAcceso.pasado(intentosAcceso.suma(ip(req)))) { // muchos intentos seguidos: a partir de aquí, «no soy un robot»
+        if (!(await verificarRobot(b.cf, ip(req))).ok) return eventoSeguridad("muchos-intentos-de-acceso", ip(req)), send(res, 403, { necesitaVerificacion: true, error: "Por seguridad, marca «No soy un robot» y vuelve a intentarlo." }), true;
       }
       const empresa = String(b.empresa ?? "").slice(0, 80);
       // Cliente habitual: solo los 6 primeros dígitos del DNI/CIF (el nombre es opcional: si se envía, estrecha la búsqueda)
@@ -564,14 +583,14 @@ export function createAuth({ accounts, customers, misDatos = null, secure = fals
     if (p === "/api/salir" && req.method === "POST") {
       const ck = parseCookies(req.headers.cookie);
       accounts.logout(ck[COOKIE]);
-      if (ck[COOKIE_APARATO]) accounts.aparatoOlvidar(huella(ck[COOKIE_APARATO])); // cerrar sesión también olvida ESTE aparato: la próxima vez tendrá que aprobarlo la oficina (seguro en ordenadores compartidos)
-      return send(res, 200, { ok: true }, { "Set-Cookie": [cookie("", 0, req), cookieAparato("", 0, req)] }), true;
+      // Cerrar sesión NO olvida el aparato (decisión de la empresa): quien ya entró una vez desde este móvil u ordenador vuelve a entrar solo con nombre + NIF + contraseña, sin código por correo. Sí se pone la marca «salió a propósito» para que la página no reabra la sesión sola.
+      return send(res, 200, { ok: true }, { "Set-Cookie": ck[COOKIE_APARATO] ? [cookie("", 0, req), cookieSalio("1", 365 * 86400, req)] : [cookie("", 0, req)] }), true;
     }
 
     if (p === "/api/yo" && req.method === "GET") {
       let acc = sessionOf(req), extra = {};
       if (!acc) { // sin sesión (caducó, o se cerró el navegador) pero con un aparato ya aprobado por la oficina: entra solo
-        const rec = pausaEntradas() ? null : aparatoDe(req), r = rec ? abrirConAparato(rec, req) : null; // en pausa de emergencia tampoco se reabre sola la sesión
+        const rec = pausaEntradas() || parseCookies(req.headers.cookie)[COOKIE_SALIO] ? null : aparatoDe(req), r = rec ? abrirConAparato(rec, req) : null; // en pausa de emergencia tampoco se reabre sola la sesión
         if (r?.ok) { acc = r.account; extra = { "Set-Cookie": (avisoAcceso(r.token, req), r.cookies) }; }
       }
       if (!acc) return send(res, 200, { cliente: null }), true; // invitado: sin sesión no es un error (la consola del navegador queda limpia)

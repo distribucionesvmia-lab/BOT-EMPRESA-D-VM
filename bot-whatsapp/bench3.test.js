@@ -32,7 +32,7 @@ test("2. el código del artículo y el del cliente NO se ven en la aplicación d
 });
 test("3. precio claro: 17 px en negrita seguido de «/ud» o «/caja (N ud)»; con descuento, el original tachado y el neto al lado", () => {
   assert.match(p, /\.pf-pr b \{ font-size:calc\(17px \/ var\(--k,1\)\); font-weight:700; \}/);
-  assert.match(p, /ud\.textContent = enCaja \? ` \/caja \(\$\{p\.unitsPerBox\} ud\)` : \(esPack \? " \/pack" : " \/ud"\)/);
+  assert.match(p, /ud\.textContent = enCaja \? ` \/caja \(\$\{p\.unitsPerBox\} ud\)` : \(esKilo\(p\.name\) \? " \/kg" : esPack \? " \/pack" : " \/ud"\)/);
   assert.match(p, /viejo\.className = "pf-viejo"; viejo\.textContent = fmtP\(enCaja \? Number\(p\.price\) \* p\.unitsPerBox : Number\(p\.price\)\); price\.textContent = fmtP\(enCaja \? precioCaja\(p\) : precioUd\(p\)\)/);
 });
 test("4. corazón de favorito: icono de 20 px en un círculo de 32 px (zona de toque de 44 px)", () => {

@@ -7,7 +7,8 @@ import path from "node:path";
 import { parseClientesXlsx, extractPhones, extractEmails } from "./clientes-import.js";
 import { parseNumber, PRECIO_MAXIMO } from "./productos-import.js";
 import { nifKeys } from "./nif-key.js";
-import { parseHistorialXlsx } from "./historial-import.js";
+import { parseHistorialXlsx, recortarPedidos } from "./historial-import.js";
+import { parseConsumoXlsx, esCabeceraConsumo } from "./consumo-import.js";
 import { unzip, readXlsx, filasConFoto } from "./xlsx-read.js";
 import { leerExcel, saltosDePrecio } from "./actualizar-productos.js";
 import { clasificar } from "./categorias.js";
@@ -16,9 +17,9 @@ import { compararProductos, aplicarProductos, CAMPOS, vendible } from "./product
 const MUESTRA = 40; // filas de detalle que se enseñan por apartado
 const LIMITE_CLIENTES = 500; // en clientes se enseña todo el detalle (hasta 500 por apartado); si hay más, la pantalla dice cuántos faltan
 const MIN_RATIO = 0.5; // un Excel con menos de la mitad de lo que hay se rechaza: casi seguro está incompleto
-export const TIPOS = ["productos", "clientes", "historial", "fotos"];
-const ETIQUETA_TIPO = { productos: "de productos o artículos", clientes: "de clientes", historial: "del historial de compras", fotos: "de fotos (ZIP)" };
-const TARJETA_TIPO = { productos: "Productos y precios", clientes: "Clientes", historial: "Historial de compras", fotos: "Fotos de productos (ZIP o Excel)" };
+export const TIPOS = ["productos", "clientes", "historial", "consumo", "fotos"];
+const ETIQUETA_TIPO = { productos: "de productos o artículos", clientes: "de clientes", historial: "del historial de compras", consumo: "de consumo de clientes (precios y descuentos)", fotos: "de fotos (ZIP)" };
+const TARJETA_TIPO = { productos: "Productos y precios", clientes: "Clientes", historial: "Historial de compras", consumo: "Consumo de clientes", fotos: "Fotos de productos (ZIP o Excel)" };
 const nrm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 
 /**
@@ -32,6 +33,7 @@ export function detectarTipo(buf) {
       const h = fila.map(nrm);
       const tiene = (re) => h.some((c) => re.test(c));
       if (tiene(/^cod/) && tiene(/^organizacion/)) return "clientes";
+      if (esCabeceraConsumo(fila)) return "consumo"; // cliente + artículo + precio + descuento + fecha: va antes que el historial (que también tiene fecha y documento)
       if (tiene(/^fecha/) && tiene(/documento/) && tiene(/^(unidades|cantidad)/)) return "historial";
       if (tiene(/(precio|tarifa|pvp)/) && tiene(/^(descrip|nombre|denomin|articulo)/) && !tiene(/^fecha/)) return "productos";
     }
@@ -210,6 +212,74 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     };
   }
 
+  // ---------- consumo de clientes (precio y descuento propios de cada cliente + artículos que compra) ----------
+  function consumo(buf, { sinPrecios = false } = {}) {
+    const { items, nombres, stats } = parseConsumoXlsx(buf);
+    if (!items.size) throw new Error("El Excel de consumo no tiene líneas válidas.");
+    const sinCeros = (x) => String(x).trim().replace(/^0+(?=\d)/, ""); // «0365» y «365» son el mismo código si no hay otro igual
+    const indice = (ids) => { const m = new Map(); for (const id of ids) { const k = sinCeros(id); m.set(k, m.has(k) ? null : id); } return m; };
+    const prods = new Map(catalogDb.list({ activeOnly: false }).map((p) => [String(p.id), p])), prodIdx = indice(prods.keys());
+    const cliIdx = indice(customersDb.list().map((c) => String(c.id)));
+    const producto = (pid) => { const id = prods.has(pid) ? pid : prodIdx.get(sinCeros(pid)); return id ? [id, prods.get(id)] : [null, null]; };
+    const clienteId = (cid) => (customersDb.getById(cid) ? String(cid) : cliIdx.get(sinCeros(cid)) ?? null);
+    // El código no basta: el nombre que trae el Excel tiene que parecerse al del cliente de la base (nombre comercial o razón social). Si no, NO se toca a ese cliente.
+    const STOP = new Set(["restaurante", "cafeteria", "hotel", "sociedad", "limitada", "anonima", "hermanos", "comunidad", "bienes", "servicios", "hosteleria", "cafe", "bar"]);
+    const palabras = (t) => nrm(t).split(" ").filter((w) => w.length >= 3 && !STOP.has(w));
+    const mismoNombre = (excel, ...base) => { const A = palabras(excel), B = base.flatMap(palabras); if (!A.length || !B.length) return null; /* no se puede comprobar */ return A.some((w) => B.some((v) => v === w || (w.length >= 5 && v.length >= 5 && (w.startsWith(v) || v.startsWith(w))))); };
+    const eur = (n) => `${Number(n).toFixed(4).replace(/\.?0+$/, "")} €`, pc = (n) => `${Number(n)} %`;
+    const r = { desNuevos: 0, desCambian: 0, preNuevos: 0, preCambian: 0, pedNuevos: 0, iguales: 0, desconocidos: 0, otroNombre: 0, sinComprobar: 0, desCien: 0, artDesconocidos: 0, conCoincidenciaSinCeros: 0 };
+    const paraPrecios = new Map(), paraPedidos = new Map(), filas = [], noExisten = [], artSin = new Set(), otroNombre = [];
+    for (const [cidRaw, pares] of items) {
+      const cid = clienteId(cidRaw);
+      if (!cid) { r.desconocidos++; noExisten.push({ id: cidRaw, nombre: "no existe en la base de clientes" }); continue; }
+      const a = customersDb.getById(cid);
+      const mismo = mismoNombre(nombres.get(cidRaw), a.name, a.legalName); if (mismo === null) r.sinComprobar++;
+      if (mismo === false) { r.otroNombre++; otroNombre.push({ id: cid, nombre: `${a.name} · en el Excel: ${nombres.get(cidRaw)}`, motivo: "el nombre no coincide: no se toca" }); continue; }
+      if (cid !== String(cidRaw).trim()) r.conCoincidenciaSinCeros++;
+      const cambios = [], precios = {}, descuentos = {}, docs = new Map();
+      for (const [pidRaw, it] of pares) {
+        const [pid, prod] = producto(pidRaw);
+        if (!pid) { r.artDesconocidos++; artSin.add(pidRaw); continue; }
+        const k = `${it.date}|${it.doc}`;
+        if (!docs.has(k)) docs.set(k, { doc: it.doc, date: it.date, lines: [] });
+        docs.get(k).lines.push({ productId: pid, qty: it.qty });
+        { // DESCUENTO especial: lo que se le cobró (también 0 %: si la tarifa tiene descuento y a él no se le hizo, se guarda 0 %) si es distinto del que ya le sale; el 100 % (regalo) no cuenta. Es independiente del precio: un artículo a precio de tarifa puede llevar descuento propio y uno a precio especial puede llevar el suyo aparte.
+          const efectivo = a.discounts[pid] ?? prod.discount ?? 0;
+          if (it.pct >= 100) r.desCien++; // 100 %: es un regalo, nunca se guarda como descuento del cliente
+          if (it.pct >= 100) { /* regalo: no se toca el descuento */ }
+          else if (Math.abs(it.pct - efectivo) >= 0.005) { (pid in a.discounts ? r.desCambian++ : r.desNuevos++); descuentos[pid] = it.pct; cambios.push({ campo: `Descuento · ${prod.name}`, antes: pc(efectivo), despues: pc(it.pct) }); }
+        }
+        if (it.price !== null && !sinPrecios) { // (con «solo descuentos e historial» los precios propios ni se miran) precio de tarifa que se le aplicó; solo es «propio» si no es el de la tarifa de hoy
+          const efectivo = a.specialPrices[pid] ?? prod.price ?? 0;
+          if (Math.abs(it.price - efectivo) > 0.0005) { (pid in a.specialPrices ? r.preCambian++ : r.preNuevos++); precios[pid] = it.price; cambios.push({ campo: `Precio · ${prod.name}`, antes: eur(efectivo), despues: eur(it.price) }); }
+        }
+      }
+      // historial: se AÑADEN los documentos que el cliente aún no tiene (por fecha y número); lo que ya tenía no se toca ni se borra
+      const tenidos = new Set(a.orders.map((o) => `${o.date}|${o.doc}`)), nuevosDocs = [...docs.values()].filter((o) => !tenidos.has(`${o.date}|${o.doc}`));
+      if (nuevosDocs.length) { r.pedNuevos += nuevosDocs.length; paraPedidos.set(cid, recortarPedidos([...a.orders, ...nuevosDocs])); }
+      if (Object.keys(precios).length || Object.keys(descuentos).length) paraPrecios.set(cid, { precios, descuentos });
+      if (!cambios.length && !nuevosDocs.length) { r.iguales++; continue; }
+      filas.push({ id: cid, nombre: a.name, pedidosNuevos: nuevosDocs.length, cambios: cambios.slice(0, 80) });
+    }
+    const cambiar = new Set([...paraPrecios.keys(), ...paraPedidos.keys()]);
+    const aviso = [];
+    if (r.desconocidos) aviso.push(`${r.desconocidos} clientes del Excel no existen en la base: se ignoran (¿falta subir antes el Excel de clientes?).`);
+    if (r.artDesconocidos) aviso.push(`${r.artDesconocidos} líneas son de artículos que no están en el catálogo (${artSin.size} artículos distintos): se ignoran (¿falta subir antes el Excel de artículos?).`);
+    if (r.otroNombre) aviso.push(`${r.otroNombre} clientes NO se tocan porque el nombre del Excel no se parece al de la base (mira «El nombre no coincide»): el código puede ser de otro cliente.`);
+    if (r.sinComprobar) aviso.push(`${r.sinComprobar} clientes no se han podido comprobar por nombre (el Excel o la ficha no traen un nombre con palabras que comparar): se aplican por su código.`);
+    if (r.desCien) aviso.push(`${r.desCien} líneas con descuento del 100 % (regalos): no se guarda ese descuento.`);
+    if (r.conCoincidenciaSinCeros) aviso.push(`${r.conCoincidenciaSinCeros} clientes se han reconocido quitando ceros del código («0365» = «365»). Si no es correcto, no apliques.`);
+    if (stats.sinPrecio) aviso.push(`${stats.sinPrecio} líneas a 0 € o sin precio (regalos, tazas, carteles, muestras…): se ignoran; no cuentan como compra ni cambian precios ni descuentos.`);
+    if (cambiar.size === 0 && r.iguales === 0) aviso.push("Ningún cliente del Excel existe en la base: sube antes el Excel de clientes. No se puede aplicar.");
+    const confirmar = [];
+    if (r.preNuevos + r.preCambian) confirmar.push(`${r.preNuevos + r.preCambian} precios propios de clientes serían DISTINTOS de la tarifa de hoy (mira «Precio · …» en el detalle). Confírmalo solo si son precios especiales de esos clientes y no una tarifa antigua: después, esos clientes pagarían ese precio aunque la tarifa cambie.`);
+    const resumen = { clientesConCambios: cambiar.size, descuentosNuevos: r.desNuevos, descuentosCambian: r.desCambian, preciosPropiosNuevos: r.preNuevos, preciosPropiosCambian: r.preCambian, pedidosNuevos: r.pedNuevos, iguales: r.iguales, desconocidos: r.desconocidos, nombreNoCoincide: r.otroNombre, lineas: stats.filas, sinFecha: stats.sinFecha };
+    return {
+      resumen, detalle: { conCambios: filas.slice(0, LIMITE_CLIENTES), nombreNoCoincide: otroNombre.slice(0, LIMITE_CLIENTES), desconocidos: noExisten.slice(0, MUESTRA) }, detalleTotal: { conCambios: filas.length, nombreNoCoincide: otroNombre.length, desconocidos: noExisten.length },
+      aviso, ...(confirmar.length ? { confirmar } : {}), aplicable: cambiar.size > 0,
+      aplicar() { const p = customersDb.setPreciosPropios(paraPrecios), h = customersDb.setPurchases(paraPedidos); return { clientes: cambiar.size, descuentos: p.descuentos, precios: p.precios, pedidos: r.pedNuevos, lineas: h.lineas }; },
+    };
+  }
 
   // ---------- fotos (un ZIP con «<código>.jpg|png|webp», en cualquier carpeta) ----------
   function fotos(buf) {
@@ -351,21 +421,21 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     return { id, nombre: name, creado: !antes, provisional, sinNif: !nifTxt, sinTelefono: !phones.length };
   }
 
-  const por = { productos, clientes, historial, fotos };
-  const preparar = (tipo, buf) => {
+  const por = { productos, clientes, historial, consumo, fotos };
+  const preparar = (tipo, buf, opc = {}) => {
     if (!por[tipo]) throw new Error("Tipo de datos desconocido.");
     const real = detectarTipo(buf);
     if (real && real !== tipo) throw new Error(`Este archivo parece un Excel ${ETIQUETA_TIPO[real]}, no ${ETIQUETA_TIPO[tipo]}. Súbelo en la tarjeta «${TARJETA_TIPO[real]}».`);
-    return por[tipo](buf);
+    return por[tipo](buf, opc);
   };
   return {
     anadirProducto, anadirCliente,
-    vistaPrevia(tipo, buf) {
-      const { aplicar: _a, ...r } = preparar(tipo, buf);
+    vistaPrevia(tipo, buf, opc = {}) {
+      const { aplicar: _a, ...r } = preparar(tipo, buf, opc);
       return r;
     },
-    aplicar(tipo, buf, { fichero = "", confirmo = false } = {}) {
-      const p = preparar(tipo, buf);
+    aplicar(tipo, buf, { fichero = "", confirmo = false, ...opc } = {}) {
+      const p = preparar(tipo, buf, opc);
       if (!p.aplicable) throw new Error(p.aviso.find((a) => /No se puede aplicar|no se pueden añadir/.test(a)) ?? "No hay nada que aplicar.");
       if (p.confirmar?.length && !confirmo) { // hay precios que cambian mucho, productos que se quitan o datos raros: se aplica solo si lo has confirmado
         const e = new Error("Hay cosas que confirmar antes de aplicar: " + p.confirmar.join(" "));

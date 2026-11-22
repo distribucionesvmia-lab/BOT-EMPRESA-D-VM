@@ -4,10 +4,10 @@
 import { claveDebil } from "./seguridad.js";
 
 /** Lo que la aplicación de los clientes cuenta de sí misma (sin claves ni datos personales). */
-export function estadoCliente(env, { turnstile = false, smtp = false, geo = null } = {}, ahora = new Date().toISOString()) {
+export function estadoCliente(env, { turnstile = false, retoPropio = false, smtp = false, geo = null } = {}, ahora = new Date().toISOString()) {
   const https = /^https:\/\//i.test(String(env.PUBLIC_URL ?? ""));
   return {
-    at: ahora, https, trustProxy: env.TRUST_PROXY === "1", hsts: env.HSTS === "1", turnstile: !!turnstile, smtp: !!smtp,
+    at: ahora, https, trustProxy: env.TRUST_PROXY === "1", hsts: env.HSTS === "1", turnstile: !!turnstile, retoPropio: !!retoPropio, smtp: !!smtp,
     modo: env.ACCESO_MODO === "oficina" ? "oficina" : "contraseña", legacyAbierto: env.ACCESO_SOLO_OFICINA === "0", altaAutomatica: env.ALTA_AUTOMATICA === "1",
     geo: geo && { modo: geo.modo, lista: !!geo.lista, fecha: geo.fecha ?? null, es: geo.es ?? 0, fuera: geo.fuera ?? 0, local: geo.local ?? 0, sinDato: geo.sinDato ?? 0 }, cspEstricta: env.CSP_ESTRICTA !== "0", escudo: !(env.DEMO === "1" || env.VM_TEST) || env.ESCUDO === "1",
   };
@@ -43,7 +43,8 @@ export function revisar({ cliente = null, env = {}, copias = null, eventos24h = 
     if (cliente.legacyAbierto) add("legacy", "mal", "Están abiertas las formas antiguas de entrar (solo con el NIF)", "Es solo para emergencias: cualquiera con un NIF podría entrar.", "Quita ACCESO_SOLO_OFICINA=0 de cliente.env y reinicia «VM Cliente».");
     else add("legacy", "ok", "Las formas antiguas de entrar están cerradas");
     if (cliente.altaAutomatica) add("alta-auto", "aviso", "Las altas nuevas entran solas", "Con ALTA_AUTOMATICA=1 una solicitud que encaje con un cliente entra sin que la mires.", "Quita ALTA_AUTOMATICA=1 de cliente.env.");
-    if (!cliente.turnstile) add("turnstile", "aviso", "«No soy un robot» (Cloudflare Turnstile) no está activado", "Es la mejor defensa contra bots al crear una contraseña o darse de alta. Es gratis y opcional.", "Crea una cuenta gratuita en Cloudflare y pon TURNSTILE_SITE y TURNSTILE_SECRET en cliente.env.");
+    if (!cliente.turnstile && cliente.retoPropio) add("turnstile", "ok", "«No soy un robot» propio activado (sin servicios externos)", "Al crear una contraseña o darse de alta, el navegador resuelve una pequeña prueba de esfuerzo (~1 segundo): a una persona no le cuesta nada y a un bot que prueba miles de veces, sí.", "Si algún día quieres una defensa más fuerte, Cloudflare Turnstile (gratis) la sustituye con TURNSTILE_SITE y TURNSTILE_SECRET en cliente.env.");
+    else if (!cliente.turnstile) add("turnstile", "aviso", "«No soy un robot» (Cloudflare Turnstile) no está activado", "Es la mejor defensa contra bots al crear una contraseña o darse de alta. Es gratis y opcional.", "Crea una cuenta gratuita en Cloudflare y pon TURNSTILE_SITE y TURNSTILE_SECRET en cliente.env.");
     else add("turnstile", "ok", "«No soy un robot» está activado");
     if (!cliente.cspEstricta) add("csp", "aviso", "La política estricta de scripts está desactivada (CSP_ESTRICTA=0)", "Protege contra código inyectado en las páginas.", "Quita CSP_ESTRICTA=0 de cliente.env cuando ya no haga falta.");
     if (!cliente.escudo) add("escudo", "aviso", "El escudo contra inundaciones de peticiones está apagado", "", "Es normal solo en pruebas (DEMO).");

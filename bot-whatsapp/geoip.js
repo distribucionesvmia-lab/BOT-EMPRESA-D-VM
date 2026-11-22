@@ -77,9 +77,9 @@ export function geoPrograma(ahora = Date.now()) {
 export function reiniciarGeo() { actual = null; miradoEn = 0; firma = ""; for (const k of Object.keys(cuenta)) cuenta[k] = 0; }
 /** Modo del filtro: GEO_MODO = off | vigilar | aprobar (por defecto «aprobar» si hay lista; sin lista, off). */
 export function modoGeo() {
-  const m = String(process.env.GEO_MODO ?? "aprobar").toLowerCase();
+  const m = String(process.env.GEO_MODO ?? "vigilar").toLowerCase(); // por defecto SOLO VIGILA: detrás de un túnel (Tailscale Funnel…) la dirección que ve el programa puede no ser la del cliente y todos parecerían «de fuera»; «aprobar» hay que pedirlo a propósito (GEO_MODO=aprobar)
   if (m === "off" || !geoPrograma()) return "off";
-  return m === "vigilar" ? "vigilar" : "aprobar";
+  return m === "aprobar" ? "aprobar" : "vigilar";
 }
 // Contadores desde que arrancó el programa (sin direcciones): sirven para saber si el programa de verdad ve la dirección real de los clientes
 const cuenta = { ES: 0, fuera: 0, local: 0, "sin-dato": 0 };

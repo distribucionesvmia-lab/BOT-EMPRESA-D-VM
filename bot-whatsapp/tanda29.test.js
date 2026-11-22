@@ -89,3 +89,16 @@ test("panel de la empresa: cabecera roja con el logo, rojo de la marca en vez de
   assert.match(e, /\.filtros \{ display:grid; grid-template-columns:repeat\(4, minmax\(128px, 170px\)\) minmax\(220px, 1fr\) auto;/); assert.match(e, /\.filtros input \{[^}]*height:40px/);
   assert.match(e, /@media \(max-width: 640px\) \{ \.filtros \{ grid-template-columns:repeat\(2, minmax\(0, 1fr\)\)/);
 });
+
+import { opcionesInvitacion as _opInv, textoWhatsapp as _txtWa, SIN_FIN as _SIN_FIN, SIN_USOS as _SIN_USOS } from "./invitaciones.js";
+test("ENLACE SIN LÍMITE de tiempo y de veces", () => {
+  const o = _opInv({ dias: "ilimitado", usos: "ilimitado", hora: "10:00" });
+  assert.equal(o.error, undefined);
+  assert.equal(o.expiresAt, _SIN_FIN);
+  assert.equal(o.usos, _SIN_USOS);
+  const t = _txtWa(null, { nombre: "Bar Pepe", url: "https://x/entrar/abc", usos: o.usos, expiresAt: o.expiresAt });
+  assert.match(t, /Sirve siempre, sin límite de veces/);
+  assert.doesNotMatch(t, /9999|1000000000/);
+  assert.match(_opInv({ dias: 7, usos: 99 }).error, /usos/);
+  assert.equal(_opInv({ dias: 7 }).usos, 1);
+});
