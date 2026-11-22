@@ -1,3 +1,4 @@
+process.env.DESCUENTO_TARIFA = "1"; // estas pruebas comprueban el cálculo con descuento de tarifa (por defecto está apagado)
 // Artículos que no se venden: precio 0 o descuento del 100 % no salen en el catálogo del cliente ni en el chat.
 import test from "node:test";
 import assert from "node:assert/strict";

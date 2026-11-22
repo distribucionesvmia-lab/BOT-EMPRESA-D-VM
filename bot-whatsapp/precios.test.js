@@ -1,3 +1,4 @@
+process.env.DESCUENTO_TARIFA = "1"; // estas pruebas comprueban el cálculo con descuento de tarifa (por defecto está apagado)
 // Auditoría de los cálculos de dinero: importes de línea, IVA y recargo de equivalencia, comparados con una referencia EXACTA (enteros, BigInt)
 // y con el cálculo que hace la página del cliente (pedido.html). Si algo cambia en un céntimo, estas pruebas fallan.
 import test from "node:test";

@@ -1,3 +1,4 @@
+process.env.DESCUENTO_TARIFA = "1"; // estas pruebas comprueban el cálculo con descuento de tarifa (por defecto está apagado)
 // REGLAS DE DESCUENTO (dinero en juego): qué descuento se aplica y cuál no, lo que ve el cliente = lo que se le cobra, y la vigilancia al subir el Excel de artículos.
 // Datos ficticios.
 import test from "node:test";
@@ -90,4 +91,16 @@ test("QUITAR PRECIOS Y DESCUENTOS PROPIOS DE UN CLIENTE: solo ese cliente, y el 
   const leer = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.ok(leer("./admin.js").includes("precios-propios\\/quitar") && leer("./admin.js").includes("clientes-antes-de-quitar-precios"));
   assert.ok(leer("./empresa.html").includes("Quitar sus precios y descuentos propios"));
+});
+
+test("POR DEFECTO NO HAY DESCUENTOS DE TARIFA: solo valen el propio del cliente y la oferta del panel", async () => {
+  const { precioEfectivo } = await import("./pricing.js"), antes = process.env.DESCUENTO_TARIFA; delete process.env.DESCUENTO_TARIFA;
+  try {
+    const p = { id: "1", price: 10, discount: 30 };
+    assert.equal(precioEfectivo(p, null, "1").discount, 0, "el 30 % antiguo de la ficha no se aplica a nadie");
+    assert.equal(precioEfectivo(p, { discounts: {} }, "1").discount, 0);
+    assert.equal(precioEfectivo(p, { discounts: { 1: 12 } }, "1").discount, 12, "el propio del cliente sí");
+    assert.equal(precioEfectivo({ ...p, promo: { tipo: "pct", valor: 5 } }, null, "1").discount, 5, "la oferta del panel sí");
+    process.env.DESCUENTO_TARIFA = "1"; assert.equal(precioEfectivo(p, null, "1").discount, 30, "con DESCUENTO_TARIFA=1 vuelve el de la tarifa");
+  } finally { if (antes === undefined) delete process.env.DESCUENTO_TARIFA; else process.env.DESCUENTO_TARIFA = antes; }
 });
