@@ -5,13 +5,12 @@ import fs from "node:fs";
 const html = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 const srv = fs.readFileSync(new URL("./server.js", import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
-test("INICIO: «Hacer pedido nuevo» (verde) y «Añadir al carrito los productos de mi último pedido» (rojo, &a=1)", () => {
+test("INICIO: «Hacer pedido nuevo» (verde) lleva al catálogo y el rojo al Histórico", () => {
   assert.match(html, /const TARJETA_SIEMPRE = false/);
-  assert.match(html, /"Hacer pedido nuevo"/);
-  assert.match(html, /"Añadir al carrito los productos de mi último pedido"/);
-  assert.match(html, /\+ "&a=1"; \}/); // suma al carrito, nunca envía
+  assert.match(html, /"Hacer pedido nuevo"; hacer\.onclick = \(\) => \{ location\.href = cat; \}/);
+  assert.match(html, /"Añadir al carrito desde mi histórico"/);
+  assert.match(html, /location\.href = cat \+ "#tab=hab"/);
   assert.match(html, /\.in-nuevo \{ background:var\(--ok\)/);
-  assert.match(html, /ui\.ultimoRepetir/);
 });
 test("INICIO: el último pedido sigue disponible aunque se haya borrado o editado «Tu pedido de siempre»", () => {
   assert.match(srv, /const ultimoRepetir = ui\.last\?\.repetir/);

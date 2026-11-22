@@ -1998,16 +1998,13 @@ function inicio(ui) {
     }
     if (ui.last?.lineas?.length) c.insertBefore(hacer, principal); // «Hacer pedido» arriba del todo: lo primero que se alcanza (antes estaba tras la tarjeta del pedido anterior)
   } else {
-    // Dos botones: pedido nuevo (verde) y añadir al carrito lo del último pedido (rojo). Ninguno envía nada.
+    // Dos botones: pedido nuevo (verde, al catálogo) y añadir desde el histórico (rojo, a la pestaña Histórico). Ninguno envía nada.
     principal.remove();
-    hacer.className = "vm-btn in-hacer in-nuevo"; hacer.textContent = "Hacer pedido nuevo";
-    const ultimo = ui.ultimoRepetir || ui.last?.repetir || "";
+    hacer.className = "vm-btn in-hacer in-nuevo"; hacer.textContent = "Hacer pedido nuevo"; hacer.onclick = () => { location.href = cat; }; // directo al catálogo completo
     const grupo = el("div", "in-botones"); grupo.appendChild(hacer);
-    if (ultimo) {
-      const anad = el("button", "vm-btn primary in-anadir", "Añadir al carrito los productos de mi último pedido"); anad.type = "button";
-      anad.onclick = () => { location.href = ui.url + "#" + ultimo.replace(/&r=1/, "").replace(/&x=1/, "") + "&a=1"; }; // suma a lo que ya haya en el carrito; el cliente lo revisa antes de enviar
-      grupo.appendChild(anad);
-    }
+    const anad = el("button", "vm-btn primary in-anadir", "Añadir al carrito desde mi histórico"); anad.type = "button";
+    anad.onclick = () => { location.href = cat + "#tab=hab"; }; // directo a la pestaña «Histórico» del catálogo (lo pedido en los últimos 6 meses)
+    grupo.appendChild(anad);
     c.insertBefore(grupo, secciones);
   }
   // Datos que completan la pantalla
