@@ -78,3 +78,16 @@ test("QUITAR DESCUENTOS DE TARIFA: el panel lo ofrece, pide clave y confirmació
   for (const t of ["/api/admin/articulos/quitar-descuentos", "catalogo-antes-de-quitar-descuentos", "b.confirmo !== true", "exigeReclave(req, res, who)", "discount: 0"]) assert.ok(a.includes(t), t);
   for (const t of ['id="ar-dto-quitar"', "Quitar TODOS los descuentos de tarifa", "ar-dto-caja"]) assert.ok(h.includes(t), t);
 });
+
+test("QUITAR PRECIOS Y DESCUENTOS PROPIOS DE UN CLIENTE: solo ese cliente, y el panel lo ofrece con clave", async () => {
+  const { openCustomersDb } = await import("./clientes-db.js"), fs = await import("node:fs");
+  const db = openCustomersDb(":memory:");
+  db.upsertCustomers([{ id: "1", name: "UNO", active: true, orders: [] }, { id: "2", name: "DOS", active: true, orders: [] }]);
+  db.setPreciosPropios(new Map([["1", { precios: { 10: 1.5 }, descuentos: { 10: 30, 11: 5 } }], ["2", { precios: {}, descuentos: { 10: 20 } }]]));
+  assert.deepEqual(db.quitarPreciosPropios("1"), { descuentos: 2, precios: 1 });
+  assert.deepEqual(db.getById("1").discounts, {}); assert.deepEqual(db.getById("1").specialPrices, {});
+  assert.deepEqual(db.getById("2").discounts, { 10: 20 }, "el otro cliente no cambia");
+  const leer = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.ok(leer("./admin.js").includes("precios-propios\\/quitar") && leer("./admin.js").includes("clientes-antes-de-quitar-precios"));
+  assert.ok(leer("./empresa.html").includes("Quitar sus precios y descuentos propios"));
+});

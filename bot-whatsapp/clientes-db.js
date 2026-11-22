@@ -224,6 +224,11 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       }
     },
 
+    /** Quita TODOS los precios y descuentos propios de UN cliente (los demás no cambian). Devuelve cuántos había. */
+    quitarPreciosPropios(id) {
+      const k = String(id), d = db.prepare("DELETE FROM customer_discounts WHERE customer_id = ?").run(k).changes, p = db.prepare("DELETE FROM customer_prices WHERE customer_id = ?").run(k).changes;
+      return { descuentos: Number(d), precios: Number(p) };
+    },
     /**
      * Precios y descuentos PROPIOS de cada cliente (Excel de consumo): Map(cliente → { precios: { artículo: precio }, descuentos: { artículo: % } }).
      * Solo escribe lo que viene (añade o cambia); NO borra lo que el cliente ya tenía y no aparece. Todo o nada.

@@ -74,6 +74,8 @@ export const customerDirectory = {
   /** Lo escrito a mano en la ficha (panel de la empresa) y su edición. */
   manualOf: (id) => dbs().customersDb.manualOf(id),
   editar: (id, patch) => dbs().customersDb.editar(id, patch),
+  quitarPreciosPropios: (id) => dbs().customersDb.quitarPreciosPropios(id),
+  backupTo: (file) => dbs().customersDb.backupTo(file),
   /** Cliente cuyo teléfono habitual de contacto coincide (si lo comparten varios, ninguno). */
   getByPhone: (phone) => dbs().customersDb.getByPhone(phone),
   /** Comprueba una solicitud de alta contra los clientes guardados (ver clientes-db.js). */

@@ -521,6 +521,17 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       return send(res, 200, v), true;
     }
     // ---- Contraseñas de los clientes: quién se ha activado (creó su contraseña) y restablecer si hace falta ----
+    if (post) { const mq = /^\/api\/admin\/cliente\/([\w-]{1,20})\/precios-propios\/quitar$/.exec(p); // quita los precios y descuentos propios de UN cliente (copia antes)
+      if (mq) {
+        if (exigeReclave(req, res, who)) return true;
+        const b = (await readJson(req)) ?? {};
+        if (b.confirmo !== true) return send(res, 400, { error: "Falta la confirmación." }), true;
+        if (!customers.getById(mq[1])) return send(res, 404, { error: "No existe ese cliente." }), true;
+        let copia; try { copia = path.basename(backupDb(customers, { dir: process.env.BACKUP_DIR ?? "respaldos", name: "clientes-antes-de-quitar-precios" })); }
+        catch (e) { console.error("Copia antes de quitar precios propios:", e); return send(res, 500, { error: "No se pudo hacer la copia de seguridad, así que NO se ha cambiado nada." }), true; }
+        const r = customers.quitarPreciosPropios(mq[1]); console.log(`Precios propios quitados al cliente ${mq[1]}: ${r.descuentos} descuentos, ${r.precios} precios (copia: ${copia})`);
+        return send(res, 200, { ok: true, ...r, copia }), true;
+      } }
     if (p === "/api/admin/accesos-nuevos" && get) return send(res, 200, { lista: accounts.accesosNuevos({ dias: 30 }).map((x) => ({ ...x, cliente: customers.getById(x.customerId)?.name ?? `Cliente ${x.customerId}`, telefono: customers.getById(x.customerId)?.phone ?? "" })) }), true;
     if (post) { const mr = /^\/api\/admin\/cliente\/([\w-]{1,20})\/password\/restablecer$/.exec(p);
       if (mr) { if (exigeReclave(req, res, who)) return true; if (!customers.getById(mr[1])) return send(res, 404, { error: "No existe ese cliente." }), true; accounts.passwordQuitar(mr[1]); return send(res, 200, { ok: true }), true; } }
