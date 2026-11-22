@@ -495,6 +495,9 @@
   .vm-inicio ul.lineas li:last-child:not(:only-child) { color:var(--text-2); }
   .vm-inicio .in-secs { display:flex; flex-direction:column; gap:var(--s4); }
   .vm-inicio .in-hacer { align-self:stretch; }
+  .vm-inicio .in-botones { display:flex; flex-direction:column; gap:var(--s3,12px); }
+  .vm-inicio .in-botones .vm-btn { width:100%; max-width:none; min-height:56px; white-space:normal; }
+  .vm-inicio .in-botones .in-nuevo { background:var(--ok); color:var(--on-ok,#fff); }
   .vm-inicio .in-sec h3, .vm-inicio .in-ayuda h3 { margin:0 0 var(--s2); font-size:calc(var(--t-md) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; }
   .vm-inicio .in-hscroll { scroll-padding-left:var(--gutter); display:flex; gap:var(--s3); overflow-x:auto; padding:2px var(--gutter) var(--s2); margin:0 calc(-1 * var(--gutter)); scrollbar-width:none; scroll-snap-type:x proximity; }
   .vm-inicio .in-hscroll::-webkit-scrollbar { display:none; }
@@ -1960,38 +1963,53 @@ function inicio(ui) {
     fila.append(si, nop); k.append(el("p", null, "Entra más rápido y más seguro: elige un código personal de 6 letras o números y úsalo con tu teléfono."), fila); c.insertBefore(k, sal.nextSibling);
   });
   const hacer = el("button", "vm-btn primary in-hacer", "Hacer pedido"); hacer.type = "button"; hacer.onclick = () => enviar("h:open", "Hacer pedido"); // lo contesta el asistente (con el aviso de «entrega hoy» si toca) y abre el catálogo
-  // Tu pedido de siempre (o «Empieza tu primer pedido»)
+  // Tu pedido de siempre (o «Empieza tu primer pedido»). Desde nov 2026 la portada enseña DOS botones en vez de esta tarjeta (TARJETA_SIEMPRE = false); el código sigue por si se quiere volver.
+  const TARJETA_SIEMPRE = false;
   const ids = [];
-  if (ui.last?.lineas?.length) {
-    const m = /(?:^|[#&])c=([^&]*)/.exec(ui.last.repetir || ""); for (const par of (m ? m[1].split(",") : []).slice(0, 4)) { const i = par.lastIndexOf("."); if (i > 0) ids.push(decodeURIComponent(par.slice(0, i))); }
-    principal.append(el("small", "in-peq", "Tu pedido de siempre · " + ui.last.date));
-    const fotos = el("div", "in-fotos"); fotos.setAttribute("aria-hidden", "true"); principal.appendChild(fotos);
-    const lin = el("ul", "lineas"), todas = ui.last.lineas, resto = todas.slice(5), extra = el("ul", "lineas lineas-resto"), nResto = resto.length + (ui.last.mas || 0);
-    for (const l of todas.slice(0, 5)) lin.appendChild(el("li", null, l)); for (const l of resto) extra.appendChild(el("li", null, l)); extra.hidden = true; principal.appendChild(lin);
-    if (nResto > 0) { // «… y 3 más» se despliega con un toque
-      principal.appendChild(extra);
-      const mas = el("button", "in-mas-lineas", "… y " + nResto + " más"); mas.type = "button"; mas.setAttribute("aria-expanded", "false");
-      mas.onclick = () => { const ab = extra.hidden; extra.hidden = !ab; mas.setAttribute("aria-expanded", String(ab)); mas.textContent = ab ? "Ver menos" : "… y " + nResto + " más"; }; principal.appendChild(mas);
+  if (TARJETA_SIEMPRE) {
+      if (ui.last?.lineas?.length) {
+      const m = /(?:^|[#&])c=([^&]*)/.exec(ui.last.repetir || ""); for (const par of (m ? m[1].split(",") : []).slice(0, 4)) { const i = par.lastIndexOf("."); if (i > 0) ids.push(decodeURIComponent(par.slice(0, i))); }
+      principal.append(el("small", "in-peq", "Tu pedido de siempre · " + ui.last.date));
+      const fotos = el("div", "in-fotos"); fotos.setAttribute("aria-hidden", "true"); principal.appendChild(fotos);
+      const lin = el("ul", "lineas"), todas = ui.last.lineas, resto = todas.slice(5), extra = el("ul", "lineas lineas-resto"), nResto = resto.length + (ui.last.mas || 0);
+      for (const l of todas.slice(0, 5)) lin.appendChild(el("li", null, l)); for (const l of resto) extra.appendChild(el("li", null, l)); extra.hidden = true; principal.appendChild(lin);
+      if (nResto > 0) { // «… y 3 más» se despliega con un toque
+        principal.appendChild(extra);
+        const mas = el("button", "in-mas-lineas", "… y " + nResto + " más"); mas.type = "button"; mas.setAttribute("aria-expanded", "false");
+        mas.onclick = () => { const ab = extra.hidden; extra.hidden = !ab; mas.setAttribute("aria-expanded", String(ab)); mas.textContent = ab ? "Ver menos" : "… y " + nResto + " más"; }; principal.appendChild(mas);
+      }
+      principal.appendChild(el("p", "in-total", `${ui.last.articulos} artículo${ui.last.articulos === 1 ? "" : "s"} · ${eur(ui.last.total)} con IVA`));
+      const rep = el("button", "vm-btn primary", "Repetir y revisar"); rep.type = "button"; rep.onclick = () => { location.href = ui.url + "#" + ui.last.repetir; }; // carga con los precios de hoy y abre «Pedido»; nunca se envía solo
+      const dia = diaSemanaDe(ui.last.fecha);
+      const sem = el("button", "vm-btn ghost in-rec"); sem.append(el("span", "in-rec-t", dia ? "Repetir cada " + dia : "Repetir cada semana"), el("small", "in-rec-s", "Pedido recurrente: se guarda y tú lo revisas antes de enviar")); sem.type = "button"; sem.onclick = () => { location.href = ui.url + "#" + ui.last.repetir + "&f=1"; };
+      const rap = el("button", "vm-btn primary in-rapido", "Enviar ya"); rap.type = "button"; rap.hidden = true; // «Pedir en 10 segundos»: aparece con el total de hoy cuando llega la vista previa; pide confirmar día y dirección antes de enviar
+      rep.className = "vm-btn ghost"; // «Repetir y revisar» pasa a secundario: el botón principal es enviar con un toque
+      principal.append(rap, rep, sem);
+      fetch("/api/pedido-rapido").then((r) => (r.ok ? r.json() : null)).catch(() => null).then((j) => { if (!j?.posible) return; rap.textContent = "Enviar ya · " + eur(j.total); rap.hidden = false; rap.onclick = () => abrirRapido(ui); }); // si no carga, simplemente no sale el botón extra (siguen «Repetir y revisar» y «Hacer pedido»)
+      const acc = el("div", "in-sie-acc"), be = el("button", "vm-btn ghost", "Editar"), bb = el("button", "vm-btn ghost", "Borrar"); be.type = bb.type = "button";
+      be.setAttribute("aria-label", "Editar tu pedido de siempre"); bb.setAttribute("aria-label", "Borrar tu pedido de siempre");
+      be.onclick = () => abrirSiempre("editar"); bb.onclick = () => abrirSiempre("borrar"); acc.append(be, bb); principal.appendChild(acc);
+    } else if (ui.siempre === "borrado") {
+      principal.classList.add("vacio"); const rest = el("button", "vm-btn ghost", "Volver a mostrar mi último pedido"); rest.type = "button";
+      rest.onclick = async () => { rest.disabled = true; const r = await post("/api/pedido-de-siempre/restaurar", {}).catch(() => null); if (!r?.ok) { rest.disabled = false; falloCarga(principal, "No hemos podido recuperar tu último pedido.", () => rest.click()); return; } location.reload(); };
+      principal.append(el("h3", null, "Has borrado tu pedido de siempre"), el("p", null, "Puedes elegir lo que necesitas del catálogo o recuperar tu último pedido."), hacer, rest);
+    } else {
+      principal.classList.add("vacio"); principal.append(el("h3", null, "Empieza tu primer pedido"), el("p", null, "Elige lo que necesitas del catálogo y te lo llevamos."), hacer);
     }
-    principal.appendChild(el("p", "in-total", `${ui.last.articulos} artículo${ui.last.articulos === 1 ? "" : "s"} · ${eur(ui.last.total)} con IVA`));
-    const rep = el("button", "vm-btn primary", "Repetir y revisar"); rep.type = "button"; rep.onclick = () => { location.href = ui.url + "#" + ui.last.repetir; }; // carga con los precios de hoy y abre «Pedido»; nunca se envía solo
-    const dia = diaSemanaDe(ui.last.fecha);
-    const sem = el("button", "vm-btn ghost in-rec"); sem.append(el("span", "in-rec-t", dia ? "Repetir cada " + dia : "Repetir cada semana"), el("small", "in-rec-s", "Pedido recurrente: se guarda y tú lo revisas antes de enviar")); sem.type = "button"; sem.onclick = () => { location.href = ui.url + "#" + ui.last.repetir + "&f=1"; };
-    const rap = el("button", "vm-btn primary in-rapido", "Enviar ya"); rap.type = "button"; rap.hidden = true; // «Pedir en 10 segundos»: aparece con el total de hoy cuando llega la vista previa; pide confirmar día y dirección antes de enviar
-    rep.className = "vm-btn ghost"; // «Repetir y revisar» pasa a secundario: el botón principal es enviar con un toque
-    principal.append(rap, rep, sem);
-    fetch("/api/pedido-rapido").then((r) => (r.ok ? r.json() : null)).catch(() => null).then((j) => { if (!j?.posible) return; rap.textContent = "Enviar ya · " + eur(j.total); rap.hidden = false; rap.onclick = () => abrirRapido(ui); }); // si no carga, simplemente no sale el botón extra (siguen «Repetir y revisar» y «Hacer pedido»)
-    const acc = el("div", "in-sie-acc"), be = el("button", "vm-btn ghost", "Editar"), bb = el("button", "vm-btn ghost", "Borrar"); be.type = bb.type = "button";
-    be.setAttribute("aria-label", "Editar tu pedido de siempre"); bb.setAttribute("aria-label", "Borrar tu pedido de siempre");
-    be.onclick = () => abrirSiempre("editar"); bb.onclick = () => abrirSiempre("borrar"); acc.append(be, bb); principal.appendChild(acc);
-  } else if (ui.siempre === "borrado") {
-    principal.classList.add("vacio"); const rest = el("button", "vm-btn ghost", "Volver a mostrar mi último pedido"); rest.type = "button";
-    rest.onclick = async () => { rest.disabled = true; const r = await post("/api/pedido-de-siempre/restaurar", {}).catch(() => null); if (!r?.ok) { rest.disabled = false; falloCarga(principal, "No hemos podido recuperar tu último pedido.", () => rest.click()); return; } location.reload(); };
-    principal.append(el("h3", null, "Has borrado tu pedido de siempre"), el("p", null, "Puedes elegir lo que necesitas del catálogo o recuperar tu último pedido."), hacer, rest);
+    if (ui.last?.lineas?.length) c.insertBefore(hacer, principal); // «Hacer pedido» arriba del todo: lo primero que se alcanza (antes estaba tras la tarjeta del pedido anterior)
   } else {
-    principal.classList.add("vacio"); principal.append(el("h3", null, "Empieza tu primer pedido"), el("p", null, "Elige lo que necesitas del catálogo y te lo llevamos."), hacer);
+    // Dos botones: pedido nuevo (verde) y añadir al carrito lo del último pedido (rojo). Ninguno envía nada.
+    principal.remove();
+    hacer.className = "vm-btn in-hacer in-nuevo"; hacer.textContent = "Hacer pedido nuevo";
+    const ultimo = ui.ultimoRepetir || ui.last?.repetir || "";
+    const grupo = el("div", "in-botones"); grupo.appendChild(hacer);
+    if (ultimo) {
+      const anad = el("button", "vm-btn primary in-anadir", "Añadir al carrito los productos de mi último pedido"); anad.type = "button";
+      anad.onclick = () => { location.href = ui.url + "#" + ultimo.replace(/&r=1/, "").replace(/&x=1/, "") + "&a=1"; }; // suma a lo que ya haya en el carrito; el cliente lo revisa antes de enviar
+      grupo.appendChild(anad);
+    }
+    c.insertBefore(grupo, secciones);
   }
-  if (ui.last?.lineas?.length) c.insertBefore(hacer, principal); // «Hacer pedido» arriba del todo: lo primero que se alcanza (antes estaba tras la tarjeta del pedido anterior)
   // Datos que completan la pantalla
   const cargaHoy = () => fetch("/catalogo/aviso").then((r) => { if (!r.ok) throw new Error("aviso"); return r.json(); }).then((j) => { if (j?.entregaHoy) hoy.hidden = false; }).catch(() => falloCarga(sitioFijo, "No hemos podido comprobar si hoy hay entrega.", cargaHoy));
   cargaHoy();
@@ -2037,11 +2055,7 @@ function inicio(ui) {
       ins.appendChild(el("p", null, "Entra más rápido desde su icono en la pantalla de inicio y sin escribir la dirección."));
       const bi = el("button", "vm-btn ghost", "Instalar la app"); bi.type = "button"; bi.onclick = abrirInstalar; ins.appendChild(bi); secciones.appendChild(ins);
     }
-    if (j.categorias?.length) {
-      const sec = el("section", "in-sec"); sec.setAttribute("aria-label", "Categorías"); sec.appendChild(el("h3", null, "Categorías"));
-      const fila = el("div", "in-chips"); for (const a of j.accesos || []) { const x = el("a", "in-chip in-acceso", a.nombre); x.href = cat + "#cat=" + encodeURIComponent(a.cat) + "&sub=" + encodeURIComponent(a.sub); fila.appendChild(x); } for (const k of j.categorias) { const a = el("a", "in-chip", k.nombre); a.href = cat + "#cat=" + encodeURIComponent(k.id); fila.appendChild(a); }
-      sec.appendChild(fila); secciones.appendChild(sec);
-    }
+    // (Las «Categorías» y accesos directos se quitaron del Inicio a petición de la empresa; el catálogo las sigue teniendo.)
     chat.scrollTop = 0;
   }).catch(() => { quitaEsq(); });
   { const fila = document.createElement("div"); fila.className = "mrow in"; fila.appendChild(c); chat.appendChild(fila); chat.scrollTop = 0; }
