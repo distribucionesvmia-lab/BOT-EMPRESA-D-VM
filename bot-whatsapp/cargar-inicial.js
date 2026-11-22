@@ -8,6 +8,7 @@
 //
 //   Uso:   node --env-file=C:\vm\config\empresa.env cargar-inicial.js [carpeta]
 // Los archivos de esa carpeta llevan datos REALES de clientes: nunca se suben a GitHub (la carpeta «inicial» está en .gitignore).
+import { descuentoTarifaActivo } from "./pricing.js";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -63,6 +64,7 @@ function main() {
 function descuentos(dbs) {
   const f = path.join(dir, "descuentos.json");
   if (!fs.existsSync(f)) return;
+  if (!descuentoTarifaActivo()) { dicho("  descuentos.json: se IGNORA (la empresa no tiene descuentos generales de tarifa; los descuentos son solo de cada cliente)."); return; }
   const d = JSON.parse(fs.readFileSync(f, "utf8"));
   const lista = Object.entries(d).filter(([id, pct]) => dbs.catalogDb.get(id) && Number(pct) > 0 && Number(pct) <= 100).map(([id, pct]) => ({ id, discount: Number(pct) }));
   const r = dbs.catalogDb.upsertProducts(lista, { partial: true });

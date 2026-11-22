@@ -104,3 +104,11 @@ test("POR DEFECTO NO HAY DESCUENTOS DE TARIFA: solo valen el propio del cliente 
     process.env.DESCUENTO_TARIFA = "1"; assert.equal(precioEfectivo(p, null, "1").discount, 30, "con DESCUENTO_TARIFA=1 vuelve el de la tarifa");
   } finally { if (antes === undefined) delete process.env.DESCUENTO_TARIFA; else process.env.DESCUENTO_TARIFA = antes; }
 });
+
+test("EXCEL DE ARTÍCULOS Y CONSUMO sin descuento de tarifa: los artículos van siempre a 0 % y el consumo compara contra 0", async () => {
+  const { parseProductos } = await import("./productos-import.js"), antes = process.env.DESCUENTO_TARIFA; delete process.env.DESCUENTO_TARIFA;
+  try {
+    const r = parseProductos([["Cód. artículo", "Artículo", "Precio venta", "Tipo IVA ventas", "Dto"], ["1", "AGUA", "0,50", "RED10", "30"], ["2", "LECHE", "2", "RED10", ""]]);
+    assert.deepEqual(r.products.map((p) => p.discount), [0, 0], "ni la columna ni lo antiguo ponen descuento general");
+  } finally { if (antes === undefined) delete process.env.DESCUENTO_TARIFA; else process.env.DESCUENTO_TARIFA = antes; }
+});

@@ -1,3 +1,4 @@
+process.env.DESCUENTO_TARIFA = "1"; // estas pruebas comprueban el descuento de tarifa (por defecto está apagado)
 // Excel de «Consumo de clientes» (precio y descuento propios de cada cliente + historial): vista previa con diferencias, aplicar y repetir.
 // Todo con datos ficticios (el Excel real lleva datos de clientes y costes: nunca va a GitHub).
 import test from "node:test";

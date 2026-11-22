@@ -44,12 +44,15 @@ export function promoVigente(product, hoy = hoyMadrid()) {
  * Precio y descuento que paga un cliente por un artículo: los suyos si los tiene (precio y descuento especiales) o los de la ficha, y encima la
  * oferta de la empresa: en % sustituye al descuento si es mayor (no se suma); en € se resta al precio de cada unidad.
  */
+/** ¿Hay descuento general de tarifa? NO (decisión de la empresa, 22/11/2026): solo descuentos y precios propios de cada cliente. DESCUENTO_TARIFA=1 lo reactiva. */
+export const descuentoTarifaActivo = () => process.env.DESCUENTO_TARIFA === "1";
+
 export function precioEfectivo(product, customer, id, precioDelPedido, hoy) {
   // Un descuento solo puede ser un número entre 0 y 100; cualquier otra cosa (texto, vacío, negativo, más de 100) cuenta como SIN descuento: nunca se aplica un descuento raro.
   const pct = (v) => { const n = Number(v); return v !== null && v !== undefined && v !== "" && Number.isFinite(n) && n >= 0 && n <= 100 ? n : null; };
   let price = customer?.specialPrices?.[id] ?? product?.price ?? precioDelPedido ?? 0;
   // Decisión de la empresa (22/11/2026): NO hay descuentos generales de tarifa (el Excel de artículos de a3ERP no trae descuento); solo valen los PROPIOS de cada cliente (Excel «Consumo»). DESCUENTO_TARIFA=1 vuelve a aplicar el de la tarifa.
-  const dtoTarifa = process.env.DESCUENTO_TARIFA === "1" ? pct(product?.discount) : null;
+  const dtoTarifa = descuentoTarifaActivo() ? pct(product?.discount) : null;
   let discount = pct(customer?.discounts?.[id]) ?? dtoTarifa ?? 0; // el descuento PROPIO del cliente en ese artículo (incluso 0 %) manda
   const o = promoVigente(product, hoy);
   if (o) { if (o.tipo === "pct") discount = Math.max(discount, Number(o.valor)); else price = Math.max(0, Math.round((price - Number(o.valor)) * 10000) / 10000); }

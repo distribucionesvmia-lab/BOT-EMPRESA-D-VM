@@ -1,6 +1,7 @@
 // Actualización de datos desde la aplicación de la empresa: se sube un Excel (productos, clientes o histórico), se ENSEÑAN los
 // cambios respecto a lo que ya hay y, al confirmar, se escriben SOLO las diferencias. Sin estado en el servidor: al aplicar
 // se vuelve a leer y comparar el mismo Excel, así lo que se aplica es siempre lo que acaba de verse.
+import { descuentoTarifaActivo } from "./pricing.js";
 import { emparejar } from "./fotos-emparejar.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -83,7 +84,8 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const famCambian = lista.filter((p) => famDe(p) && famDe(p) !== (famGuardada.get(String(p.id)) ?? "")).length;
     const saltos = saltosDePrecio(cmp);
     const dtos = revisarDescuentos(cambiosDeDescuento(actual, aplicarProductos(actual, nuevos)), { columna: columnas?.discount ?? "" }); // descuentos: qué cambia y qué hay que confirmar
-    const aviso = [...dtos.aviso];
+    const aviso = descuentoTarifaActivo() ? [...dtos.aviso] : [];
+    if (!descuentoTarifaActivo()) { dtos.confirmar.length = 0; const q = dtos.detalle.length; if (q) aviso.push(`Los artículos no llevan descuento de tarifa (los descuentos son solo de cada cliente): se quitan ${q} descuentos antiguos de artículos.`); }
     if (activos >= 20 && lista.length < activos * MIN_RATIO) aviso.push(`El Excel tiene ${lista.length} productos y hay ${activos} activos: parece incompleto. No se puede aplicar.`);
     const sinIva = cmp.anadidos.filter((p) => p.vat === undefined).length;
     if (sinIva) aviso.push(`${sinIva} productos nuevos tienen un código de IVA sin porcentaje conocido: no se pueden añadir hasta que se indique su tipo.`);
@@ -248,7 +250,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
         if (!docs.has(k)) docs.set(k, { doc: it.doc, date: it.date, lines: [] });
         docs.get(k).lines.push({ productId: pid, qty: it.qty });
         { // DESCUENTO especial: lo que se le cobró (también 0 %: si la tarifa tiene descuento y a él no se le hizo, se guarda 0 %) si es distinto del que ya le sale; el 100 % (regalo) no cuenta. Es independiente del precio: un artículo a precio de tarifa puede llevar descuento propio y uno a precio especial puede llevar el suyo aparte.
-          const efectivo = a.discounts[pid] ?? prod.discount ?? 0;
+          const efectivo = a.discounts[pid] ?? (descuentoTarifaActivo() ? prod.discount : 0) ?? 0;
           if (it.pct >= 100) r.desCien++; // 100 %: es un regalo, nunca se guarda como descuento del cliente
           if (it.pct >= 100) { /* regalo: no se toca el descuento */ }
           else if (Math.abs(it.pct - efectivo) >= 0.005) { (pid in a.discounts ? r.desCambian++ : r.desNuevos++); descuentos[pid] = it.pct; cambios.push({ campo: `Descuento · ${prod.name}`, antes: pc(efectivo), despues: pc(it.pct) }); }
