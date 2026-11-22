@@ -56,24 +56,32 @@
   .datos-wrap { display:grid; gap:14px; }
   .datos-wrap[hidden] { display:none; }
   #inv-card label:not([style*="flex"]) { display:grid; gap:4px; min-width:0; } #inv-card label input:not([type="checkbox"]), #inv-card label select, #inv-card label textarea { width:100%; max-width:100%; min-width:0; } #inv-card p { overflow-wrap:anywhere; }
-  .pasoDx { background:var(--soft); color:var(--accent); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:700; }
-  .dx-card h2 { text-transform:none; letter-spacing:0; font-size:18px; }
-  #dx-tarjetas { align-items:start !important; }
-  .dx-card { display:flex; flex-direction:column; gap:12px; }
-  .dx-cab { display:flex; align-items:center; gap:12px; } .dx-cab h2 { margin:0; line-height:1.25; color:var(--fg); }
+  /* Datos y Excel: cinco tarjetas iguales arriba (subir) y un panel de revisión a todo el ancho debajo */
+  #dx-tarjetas { display:grid; grid-template-columns:repeat(auto-fit,minmax(196px,1fr)); gap:14px; align-items:stretch; }
+  .dx-card { position:relative; display:flex; flex-direction:column; gap:12px; padding:16px; min-width:0; }
+  .dx-cab { display:flex; align-items:center; gap:12px; min-width:0; padding-right:22px; }
+  .dx-cab h2 { margin:0; font-size:15px; line-height:1.25; text-transform:none; letter-spacing:0; color:var(--fg); min-width:0; flex:1; overflow-wrap:anywhere; }
   .dx-ico { flex:none; width:40px; height:40px; border-radius:12px; background:var(--soft); color:var(--accent); display:grid; place-items:center; } .dx-ico svg { width:22px; height:22px; }
-  .dx-desc { margin:0; color:var(--muted); font-size:13.5px; line-height:1.55; }
-  .dx-card .ult { align-self:flex-start; margin:0; padding:5px 11px; border-radius:999px; background:var(--th); border:1px solid var(--line); font-size:12.5px; color:var(--muted); line-height:1.3; }
-  .dx-cols { border:1px solid var(--line); border-radius:10px; background:var(--th); font-size:12.5px; color:var(--muted); }
-  .dx-cols summary { cursor:pointer; padding:8px 12px; font-weight:600; color:var(--fg); list-style:none; } .dx-cols summary::-webkit-details-marker { display:none; }
-  .dx-cols summary::after { content:"▾"; float:right; color:var(--muted); } .dx-cols[open] summary::after { content:"▴"; }
-  .dx-cols div { padding:0 12px 10px; line-height:1.6; }
-  .dx-subir { border:1.5px dashed var(--line); border-radius:12px; padding:12px; display:grid; gap:10px; background:var(--panel); }
-  .dx-subir input[type=file] { width:100%; max-width:100%; height:auto; min-height:0; margin:0; border:0; padding:0; background:transparent; font-size:13px; }
-  .dx-subir .acc { display:flex; flex-wrap:wrap; gap:8px; } .dx-subir .acc button { min-width:132px; }
-  .dx-opcion { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--th); font-size:13px; line-height:1.45; cursor:pointer; }
-  .dx-opcion input { margin-top:3px; flex:none; } .dx-opcion b { color:var(--fg); }
-  .dx-card .muted[role=status]:empty { display:none; }
+  .dx-desc { margin:0; color:var(--muted); font-size:13px; line-height:1.45; min-height:2.9em; }
+  .dx-info { position:absolute; top:12px; right:12px; width:24px; min-width:24px; height:24px; min-height:24px; box-sizing:border-box; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--muted); font-size:13px; font-weight:700; line-height:1; padding:0; display:grid; place-items:center; cursor:help; }
+  .dx-info::after { content:attr(data-tip); position:absolute; z-index:30; right:0; top:30px; width:260px; max-width:70vw; padding:10px 12px; border-radius:10px; background:var(--fg); color:var(--panel); font-size:12px; font-weight:400; line-height:1.5; text-align:left; box-shadow:0 8px 24px rgba(0,0,0,.18); opacity:0; pointer-events:none; transform:translateY(-4px); transition:opacity .15s, transform .15s; }
+  .dx-info:hover::after, .dx-info:focus-visible::after { opacity:1; transform:none; }
+  .dx-card .ult { margin:0; font-size:12px; color:var(--muted); line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dx-subir { margin-top:auto; display:grid; gap:10px; }
+  .sr-only { position:absolute !important; width:1px; height:1px; margin:-1px; padding:0; border:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  .dx-drop { display:flex; align-items:center; gap:10px; height:48px; padding:0 14px; border:1.5px dashed var(--line); border-radius:12px; background:var(--th); color:var(--muted); font-size:13.5px; cursor:pointer; min-width:0; transition:border-color .15s, background .15s; }
+  .dx-drop:hover, .dx-drop.sobre, .dx-card:focus-within .dx-drop { border-color:var(--accent); background:var(--soft); color:var(--fg); }
+  .dx-drop svg { flex:none; width:18px; height:18px; color:var(--accent); }
+  .dx-drop span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dx-drop.lleno { border-style:solid; color:var(--fg); font-weight:600; }
+  .dx-card .dx-ver { width:100%; height:44px; }
+  .dx-opcion { display:flex; gap:8px; align-items:center; font-size:12.5px; color:var(--muted); cursor:pointer; line-height:1.3; } .dx-opcion input { flex:none; margin:0; }
+  .dx-card .muted[role=status] { margin:0; font-size:12.5px; min-height:0; } .dx-card .muted[role=status]:empty { display:none; }
+  .dx-rev { display:grid; gap:12px; scroll-margin-top:80px; }
+  .dx-rev[hidden] { display:none; }
+  .dx-rev-cab { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .dx-rev-cab h2 { margin:0; font-size:17px; text-transform:none; letter-spacing:0; color:var(--fg); flex:1; min-width:180px; }
+  .dx-rev-acc { display:flex; gap:8px; flex-wrap:wrap; } .dx-rev-acc button { min-width:150px; height:44px; }
 
   /* ═════════ Diseño de panel profesional (tipo gestión / contabilidad): barra lateral, tarjetas limpias, tablas legibles ═════════ */
   :root { --bg:#f3f5f8; --panel:#fff; --fg:#0f172a; --muted:#64748b; --line:#e3e8ef; --line-2:#eef2f6; --accent:#C8102E; --accent-2:#a30d26; --soft:#fbe6ea; --th:#f8fafc; --hover:#f6f9fb; --shadow:0 1px 2px rgba(15,23,42,.05), 0 1px 3px rgba(15,23,42,.04); --nav:#0f1d2b; --nav-fg:#cbd5e1; --nav-on:#fff; --nav-hover:rgba(255,255,255,.07); --nav-act:rgba(255,107,125,.18); --nav-acc:#FF6B7D; --r:12px; }
@@ -554,7 +562,15 @@
     <!-- Cuentas -->
     <!-- Datos y Excel: todo lo de subir Excel en un solo sitio -->
     <div id="p-datos" class="datos-wrap" hidden>
-      <div class="pag-cab"><h1>Datos y Excel</h1><p>Altas a mano, importación de Excel de a3ERP, sincronización y actualizaciones del programa.</p></div>
+      <div class="pag-cab"><h1>Datos y Excel</h1><p>Sube los archivos de a3ERP y revisa los cambios antes de aplicarlos.</p></div>
+      <div id="dx-tarjetas"></div>
+      <div id="dx-revisiones"></div>
+      <div class="panel" id="entrada-panel" hidden>
+        <h2>Bandeja de entrada</h2>
+        <p class="muted" id="entrada-info" style="margin:0 0 8px"></p>
+        <div class="scroll"><table><tbody id="entrada-lista"></tbody></table></div>
+        <p class="muted" id="entrada-msg" role="status" style="margin:8px 0 0"></p>
+      </div>
       <details class="panel" id="alta-cli"><summary class="alta-sum">Añadir un cliente a mano</summary><div id="alta-cli-cuerpo"></div></details>
       <details class="panel" id="alta-prod"><summary class="alta-sum">Añadir un producto a mano</summary><div id="alta-prod-cuerpo"></div></details>
       <div class="panel" id="sync-panel">
@@ -576,18 +592,6 @@
         <div class="row"><button class="main" id="act-ahora" type="button">Actualizar ahora</button><span class="muted" id="act-msg" role="status"></span></div>
         <p class="muted" style="margin:8px 0 0">El ordenador mira por sí solo cada 10 minutos si hay mejoras nuevas. Si las hay, comprueba que todo funciona y se actualiza; si algo falla, se queda con la versión anterior. Tus pedidos y datos no se tocan.</p>
       </div>
-      <div class="panel">
-        <h2>Datos y Excel</h2>
-        <p class="muted" style="margin:0 0 10px">Sube aquí los Excel de a3ERP (y las fotos). Siempre pasa lo mismo: <b>1</b> eliges el archivo, <b>2</b> «Ver cambios» te enseña qué se añade, qué cambia y qué se quita <b>sin tocar nada</b>, y <b>3</b> «Aplicar cambios» escribe solo las diferencias. Orden recomendado la primera vez: <b>clientes → productos → historial → fotos</b>.</p>
-        <div id="dx-pasos" class="row" style="gap:8px;flex-wrap:wrap"><span class="pasoDx">1 · Elige el archivo</span><span class="pasoDx">2 · Revisa los cambios</span><span class="pasoDx">3 · Aplica</span></div>
-      </div>
-      <div class="panel" id="entrada-panel" hidden>
-        <h2>Bandeja de entrada</h2>
-        <p class="muted" id="entrada-info" style="margin:0 0 8px"></p>
-        <div class="scroll"><table><tbody id="entrada-lista"></tbody></table></div>
-        <p class="muted" id="entrada-msg" role="status" style="margin:8px 0 0"></p>
-      </div>
-      <div id="dx-tarjetas" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:14px;align-items:start"></div>
     </div>
     <div id="p-articulos" hidden>
       <div class="pag-cab"><h1>Artículos</h1><p>Precios y ofertas del catálogo: cambia un precio, pon una oferta y avisa a los clientes con la campana.</p></div>
@@ -1331,27 +1335,40 @@ const DX_ICO = {
   fotos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-9 9"/></svg>',
 };
 const TIPOS_DX = [
-  { p: "px", tipo: "productos", icono: "", titulo: "Productos y precios", acepta: ".xlsx", desc: "Añade los productos nuevos, actualiza precios, IVA, unidades por caja y categorías, y retira los que ya no vienen (pasan a inactivos, no se borran).", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Modo de venta (2 = solo caja, 3 = caja o unidad) · Bloqueado · Obsoleto · Cód. familia" },
-  { p: "cl", tipo: "clientes", icono: "", titulo: "Clientes", acepta: ".xlsx", desc: "Crea los clientes nuevos (con su cuenta) y actualiza nombre, dirección, teléfonos y correos. Los que no vienen en el Excel no se dan de baja solos.", cols: "Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto" },
-  { p: "hi", tipo: "historial", icono: "", titulo: "Historial de compras", acepta: ".xlsx", desc: "Relaciona cada compra con su cliente por el código. Cada cliente conserva sus 10 últimos pedidos. Sube antes el Excel de clientes.", cols: "Cliente · Fecha · Nº Documento · Artículo · Unidades" },
-  { p: "co", tipo: "consumo", icono: "", titulo: "Consumo de clientes (precios y descuentos)", acepta: ".xlsx", desc: "El Excel «Consumo clientes… último servicio» de a3ERP: por cada cliente y artículo, lo último que se le sirvió. Pone el descuento propio de cada cliente, su precio si no es el de la tarifa, y añade a su historial los documentos que aún no tenía (no borra nada). Si subes otro más adelante, solo cambia lo que sea distinto. El coste que trae el Excel no se lee ni se guarda. Sube antes clientes y artículos.", cols: "Cliente · Artículo · Unidades · Precio · Desc.1 · Fecha · Nº Documento (Base, Coste y almacén se ignoran)" },
-  { p: "fo", tipo: "fotos", icono: "", titulo: "Fotos de productos (ZIP o Excel)", acepta: ".zip,.xlsx", desc: "Un ZIP con una foto por producto (con el código como nombre, 11098.jpg, o con el nombre del artículo; en cualquier carpeta) o un EXCEL con una foto en cada fila junto al código o nombre del artículo. Si trae un Excel de control con la columna «tipo» (IA), avisa en el catálogo de las fotos creadas con IA.", cols: "Archivos .jpg, .png o .webp (mejor de 800 px o más)" },
+  { p: "px", tipo: "productos", icono: "", titulo: "Productos y precios", acepta: ".xlsx", desc: "Precios, IVA, cajas y categorías.", cols: "Cód. artículo · Artículo · Precio venta · Tipo IVA ventas · Unidades paquete venta · Modo de venta (2 = solo caja, 3 = caja o unidad) · Bloqueado · Obsoleto · Cód. familia" },
+  { p: "cl", tipo: "clientes", icono: "", titulo: "Clientes", acepta: ".xlsx", desc: "Altas y datos de contacto.", cols: "Cód. cliente · Organización · Razón social · Población · Dirección fiscal · Teléfono · E-Mail · NIF · Bloqueado · Obsoleto" },
+  { p: "hi", tipo: "historial", icono: "", titulo: "Historial de compras", acepta: ".xlsx", desc: "Compras anteriores de cada cliente.", cols: "Cliente · Fecha · Nº Documento · Artículo · Unidades" },
+  { p: "co", tipo: "consumo", icono: "", titulo: "Consumo de clientes", acepta: ".xlsx", desc: "Precios y descuentos de cada cliente.", cols: "Cliente · Artículo · Unidades · Precio · Desc.1 · Fecha · Nº Documento (Base, Coste y almacén se ignoran)" },
+  { p: "fo", tipo: "fotos", icono: "", titulo: "Fotos de productos", acepta: ".zip,.xlsx", desc: "ZIP o Excel con una foto por artículo.", cols: "Archivos .jpg, .png o .webp (mejor de 800 px o más)" },
 ];
+const DX_SUBIR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>';
+const dxNombre = (p) => { const f = $(p + "-file").files[0], d = $(p + "-drop"); d.classList.toggle("lleno", !!f); d.querySelector("span").textContent = f ? f.name : "Elegir archivo"; };
 for (const t of TIPOS_DX) {
   const c = document.createElement("div"); c.className = "panel dx-card"; c.dataset.tipo = t.tipo;
-  c.innerHTML = `<div class="dx-cab"><span class="dx-ico" aria-hidden="true">${DX_ICO[t.tipo] ?? ""}</span><h2>${t.titulo}</h2></div><p class="dx-desc">${t.desc}</p><details class="dx-cols"><summary>Columnas que lee el programa</summary><div>${t.cols}</div></details><p class="ult" id="${t.p}-ult"></p><input type="hidden" id="${t.p}-tipo" value="${t.tipo}"><div class="dx-subir"><input type="file" id="${t.p}-file" accept="${t.acepta}" aria-label="Archivo de ${t.titulo}"><div class="acc"><button class="main" id="${t.p}-ver" type="button">Ver cambios</button><button id="${t.p}-aplicar" type="button" hidden>Aplicar cambios</button></div></div>${t.tipo === "consumo" ? `<label class="dx-opcion"><input type="checkbox" id="${t.p}-sp"><span><b>Aplicar solo descuentos e historial</b>, sin los precios propios (los precios distintos de la tarifa se revisan aparte; marca la casilla ANTES de pulsar «Ver cambios»).</span></label>` : ""}<p class="muted" id="${t.p}-msg" role="status"></p><div id="${t.p}-res"></div>`;
+  c.innerHTML = `<div class="dx-cab"><span class="dx-ico" aria-hidden="true">${DX_ICO[t.tipo] ?? ""}</span><h2>${t.titulo}</h2><button type="button" class="dx-info" aria-label="Columnas que lee el programa en ${t.titulo}" data-tip="Columnas que lee el programa: ${t.cols.replace(/"/g, "&quot;")}">i</button></div><p class="dx-desc">${t.desc}</p><p class="ult" id="${t.p}-ult"></p><input type="hidden" id="${t.p}-tipo" value="${t.tipo}">${t.tipo === "consumo" ? `<label class="dx-opcion" title="Se aplican solo los descuentos y el historial; los precios propios (distintos de la tarifa) se revisan aparte. Márcala ANTES de pulsar «Ver cambios»."><input type="checkbox" id="${t.p}-sp"><span>Solo descuentos e historial</span></label>` : ""}<div class="dx-subir"><label class="dx-drop" id="${t.p}-drop" for="${t.p}-file">${DX_SUBIR}<span></span></label><input type="file" class="sr-only" id="${t.p}-file" accept="${t.acepta}" aria-label="Archivo de ${t.titulo}"><button class="main dx-ver" id="${t.p}-ver" type="button">Ver cambios</button><p class="muted" id="${t.p}-msg" role="status"></p></div>`;
   $("dx-tarjetas").appendChild(c);
+  const r = document.createElement("section"); r.className = "panel dx-rev"; r.id = t.p + "-rev"; r.hidden = true;
+  r.innerHTML = `<div class="dx-rev-cab"><h2>${t.titulo}: revisión</h2><div class="dx-rev-acc"><button id="${t.p}-aplicar" class="main" type="button" hidden>Aplicar cambios</button><button id="${t.p}-cerrar" type="button">Cerrar</button></div></div><div id="${t.p}-res"></div>`;
+  $("dx-revisiones").appendChild(r);
   montarExcel(t.p, () => { ultimasSubidas(); entradaTrasAplicar(t.p); });
-  $(t.p + "-file").addEventListener("change", () => { if (enRevision?.p === t.p) enRevision = null; }); // si elige otro archivo a mano, ya no es el de la bandeja
-  $(t.p + "-ver").addEventListener("click", () => { c.style.gridColumn = "1 / -1"; }); // la tarjeta que se está revisando ocupa todo el ancho
+  const drop = $(t.p + "-drop"), inp = $(t.p + "-file");
+  dxNombre(t.p);
+  inp.addEventListener("change", () => { if (enRevision?.p === t.p) enRevision = null; dxNombre(t.p); });
+  for (const ev of ["dragenter", "dragover"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("sobre"); });
+  for (const ev of ["dragleave", "drop"]) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("sobre"); });
+  drop.addEventListener("drop", (e) => { if (e.dataTransfer?.files?.length) { inp.files = e.dataTransfer.files; inp.dispatchEvent(new Event("change")); } });
+  $(t.p + "-ver").addEventListener("click", () => { dxNombre(t.p); setTimeout(() => { if (!r.hidden) r.scrollIntoView({ behavior: "smooth", block: "start" }); }, 350); });
+  $(t.p + "-cerrar").addEventListener("click", () => { $(t.p + "-res").textContent = ""; $(t.p + "-aplicar").hidden = true; $(t.p + "-msg").textContent = ""; r.hidden = true; });
+  new MutationObserver(() => { r.hidden = !$(t.p + "-res").childNodes.length; }).observe($(t.p + "-res"), { childList: true });
 }
 const nombreTipo = { productos: "px", clientes: "cl", historial: "hi", consumo: "co", fotos: "fo" };
 async function ultimasSubidas() {
   try {
     const lista = await call("/api/admin/actualizaciones");
     for (const [tipo, p] of Object.entries(nombreTipo)) {
-      const e = lista.find((x) => x.tipo === tipo);
-      $(p + "-ult").textContent = e ? `Última subida: ${new Date(e.at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}${e.fichero ? " · " + e.fichero : ""}` : "Todavía no se ha subido ninguno.";
+      const e = lista.find((x) => x.tipo === tipo), u = $(p + "-ult");
+      u.textContent = e ? `Subido el ${new Date(e.at).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })}` : "Sin subir todavía";
+      u.title = e?.fichero ? `Último archivo: ${e.fichero}` : "";
     }
   } catch { /* sin registro */ }
 }
@@ -1735,8 +1752,8 @@ async function entradaVer(a) {
     if (!r.ok) throw new Error("No se pudo leer el archivo de la carpeta.");
     const p = nombreTipo[a.tipo], dt = new DataTransfer(); dt.items.add(new File([await r.blob()], a.nombre));
     $(p + "-file").files = dt.files; enRevision = { p, nombre: a.nombre, carpeta: a.carpeta || "" };
-    $(p + "-ver").click(); document.querySelector(`.dx-card[data-tipo="${a.tipo}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    $("entrada-msg").textContent = `Revisa los cambios de «${a.nombre}» más abajo y pulsa «Aplicar cambios» si son correctos. Al aplicarlos, el archivo pasa a la subcarpeta «aplicados».`;
+    $(p + "-ver").click(); setTimeout(() => $(p + "-rev")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+    $("entrada-msg").textContent = `Revisa los cambios de «${a.nombre}» (panel de revisión, arriba) y pulsa «Aplicar cambios» si son correctos. Al aplicarlos, el archivo pasa a la subcarpeta «aplicados».`;
   } catch (e) { $("entrada-msg").textContent = e.message; }
 }
 async function entradaArchivar(nombre, carpeta, msg) {
