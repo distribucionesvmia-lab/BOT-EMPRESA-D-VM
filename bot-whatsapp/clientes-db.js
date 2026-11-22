@@ -231,15 +231,17 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
     },
     /**
      * Precios y descuentos PROPIOS de cada cliente (Excel de consumo): Map(cliente → { precios: { artículo: precio }, descuentos: { artículo: % } }).
-     * Solo escribe lo que viene (añade o cambia); NO borra lo que el cliente ya tenía y no aparece. Todo o nada.
+     * Solo escribe lo que viene (añade o cambia); NO borra lo que el cliente ya tenía y no aparece, salvo lo que se pida expresamente con `quitarPrecios` / `quitarDescuentos` (listas de artículos). Todo o nada.
      */
     setPreciosPropios(porCliente) {
       db.exec("BEGIN IMMEDIATE");
       try {
-        const out = { clientes: 0, precios: 0, descuentos: 0, desconocidos: 0 };
+        const out = { clientes: 0, precios: 0, descuentos: 0, quitados: 0, desconocidos: 0 };
         for (const [cid, d] of porCliente) {
           const id = String(cid).trim();
           if (!byId.get(id)) { out.desconocidos++; continue; }
+          for (const pid of d.quitarPrecios ?? []) out.quitados += Number(db.prepare("DELETE FROM customer_prices WHERE customer_id = ? AND product_id = ?").run(id, String(pid)).changes);
+          for (const pid of d.quitarDescuentos ?? []) out.quitados += Number(db.prepare("DELETE FROM customer_discounts WHERE customer_id = ? AND product_id = ?").run(id, String(pid)).changes);
           for (const [pid, price] of Object.entries(d.precios ?? {})) { db.prepare("INSERT OR REPLACE INTO customer_prices VALUES (?, ?, ?)").run(id, String(pid), Number(price)); out.precios++; }
           for (const [pid, pct] of Object.entries(d.descuentos ?? {})) { db.prepare("INSERT OR REPLACE INTO customer_discounts VALUES (?, ?, ?)").run(id, String(pid), Number(pct)); out.descuentos++; }
           out.clientes++;

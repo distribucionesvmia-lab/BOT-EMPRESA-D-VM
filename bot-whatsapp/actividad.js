@@ -2,7 +2,7 @@
 // No se guardan datos de clientes ni el contenido de lo enviado: solo la acción en palabras y la ruta.
 const ETIQUETAS = [
   [/\/(vista|vista-previa|audiencia|prueba|comprobar|exportar\/vista)(\/|$)/, null], // solo mirar: no se apunta
-  [/^\/api\/admin\/aplicar\/(\w+)$/, (m) => `Aplicó una actualización de ${{ productos: "productos", clientes: "clientes", historial: "historial", fotos: "fotos" }[m[1]] ?? m[1]}`],
+  [/^\/api\/admin\/aplicar\/(\w+)$/, (m) => `Aplicó una actualización de ${{ productos: "productos", clientes: "clientes", historial: "historial", consumo: "consumo de clientes", descuentos: "descuentos especiales de clientes", precios: "precios especiales de clientes", fotos: "fotos" }[m[1]] ?? m[1]}`],
   [/^\/api\/admin\/articulos\/[^/]+\/precio$/, () => "Cambió el precio de un artículo"],
   [/^\/api\/admin\/articulos\/[^/]+\/oferta$/, () => "Puso o quitó una oferta"],
   [/^\/api\/admin\/articulos\/[^/]+\/avisar$/, () => "Avisó a los clientes de un artículo"],

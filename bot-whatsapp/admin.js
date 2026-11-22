@@ -893,14 +893,14 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       } catch (e) { return send(res, 409, { error: "No se pudo mover el archivo. Si lo tienes abierto en Excel, ciérralo y vuelve a intentarlo." }), true; }
     }
     // ---- Actualizar datos desde un Excel: vista previa de los cambios y aplicar solo las diferencias ----
-    m = /^\/api\/admin\/(vista-previa|aplicar)\/(productos|clientes|historial|consumo|fotos)$/.exec(p);
+    m = /^\/api\/admin\/(vista-previa|aplicar)\/(productos|clientes|historial|consumo|fotos|descuentos|precios)$/.exec(p);
     if (m && post) {
       if (!actualizador) return send(res, 400, { error: "La actualización de datos no está disponible." }), true;
       if (m[1] === "aplicar" && m[2] === "productos" && exigeReclave(req, res, who)) return true; // cambiar la tarifa entera: hay que volver a escribir la clave
       const buf = await readBuffer(req, m[2] === "fotos" ? 80_000_000 : 25_000_000); // los ZIP de fotos y los Excel con fotos pesan más que los de texto
       if (!buf || !buf.length) return send(res, 400, { error: `No se recibió el archivo (máximo ${m[2] === "fotos" ? 80 : 25} MB).` }), true;
       try {
-        const opc = { sinPrecios: url.searchParams.get("sinPrecios") === "1" };
+        const opc = { sinPrecios: url.searchParams.get("sinPrecios") === "1", quitarSobrantes: url.searchParams.get("quitarSobrantes") === "1", soloCompras: url.searchParams.get("soloCompras") === "1" };
         if (m[1] === "vista-previa") return send(res, 200, { ok: true, tipo: m[2], ...actualizador.vistaPrevia(m[2], buf, opc) }), true;
         return send(res, 200, { ok: true, tipo: m[2], ...actualizador.aplicar(m[2], buf, { fichero: String(url.searchParams.get("fichero") ?? "").slice(0, 120), confirmo: url.searchParams.get("confirmo") === "1", ...opc }) }), true;
       } catch (e) {
