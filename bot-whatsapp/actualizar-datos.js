@@ -232,20 +232,23 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const STOP = new Set(["restaurante", "cafeteria", "hotel", "sociedad", "limitada", "anonima", "hermanos", "comunidad", "bienes", "servicios", "hosteleria", "cafe", "bar"]);
     const palabras = (t) => nrm(t).split(" ").filter((w) => w.length >= 3 && !STOP.has(w));
     const mismoNombre = (excel, ...base) => { const A = palabras(excel), B = base.flatMap(palabras); if (!A.length || !B.length) return null; /* no se puede comprobar */ return A.some((w) => B.some((v) => v === w || (w.length >= 5 && v.length >= 5 && (w.startsWith(v) || v.startsWith(w))))); };
-    const eur = (n) => `${Number(n).toFixed(4).replace(/\.?0+$/, "")} €`, pc = (n) => `${Number(n)} %`;
+    const coma = (t) => String(t).replace(".", ","), eur = (n) => coma(`${Number(n).toFixed(4).replace(/\.?0+$/, "")} €`), pc = (n) => coma(`${Number(n)} %`);
     const r = { desNuevos: 0, desCambian: 0, preNuevos: 0, preCambian: 0, pedNuevos: 0, iguales: 0, desconocidos: 0, otroNombre: 0, sinComprobar: 0, desCien: 0, artDesconocidos: 0, conCoincidenciaSinCeros: 0 };
     const paraPrecios = new Map(), paraPedidos = new Map(), filas = [], noExisten = [], artSin = new Set(), otroNombre = [];
+    // Resumen por tipo de línea (cada pareja cliente–artículo cae en UNA sola), con el desglose de cada una
+    const grupos = { normal: [], descuento: [], regalo: [], soloPrecio: [], artSin: [], cliSin: [], otroNombre: [] };
+    const nombreArt = (pid) => producto(pid)[1]?.name ?? String(pid);
     for (const [cidRaw, pares] of items) {
       const cid = clienteId(cidRaw);
-      if (!cid) { r.desconocidos++; noExisten.push({ id: cidRaw, nombre: "no existe en la base de clientes" }); continue; }
+      if (!cid) { r.desconocidos++; noExisten.push({ id: cidRaw, nombre: "no existe en la base de clientes" }); for (const [pidRaw] of pares) grupos.cliSin.push({ cliente: `Código ${cidRaw}`, articulo: nombreArt(pidRaw), texto: "ese cliente no está en la base: súbelo antes en «Clientes»", orden: 0 }); continue; }
       const a = customersDb.getById(cid);
       const mismo = mismoNombre(nombres.get(cidRaw), a.name, a.legalName); if (mismo === null) r.sinComprobar++;
-      if (mismo === false) { r.otroNombre++; otroNombre.push({ id: cid, nombre: `${a.name} · en el Excel: ${nombres.get(cidRaw)}`, motivo: "el nombre no coincide: no se toca" }); continue; }
+      if (mismo === false) { r.otroNombre++; otroNombre.push({ id: cid, nombre: `${a.name} · en el Excel: ${nombres.get(cidRaw)}`, motivo: "el nombre no coincide: no se toca" }); for (const [pidRaw] of pares) grupos.otroNombre.push({ cliente: `${a.name} (en el Excel: ${nombres.get(cidRaw)})`, articulo: nombreArt(pidRaw), texto: "el nombre no coincide: no se toca", orden: 0 }); continue; }
       if (cid !== String(cidRaw).trim()) r.conCoincidenciaSinCeros++;
       const cambios = [], precios = {}, descuentos = {}, docs = new Map();
       for (const [pidRaw, it] of pares) {
         const [pid, prod] = producto(pidRaw);
-        if (!pid) { r.artDesconocidos++; artSin.add(pidRaw); continue; }
+        if (!pid) { r.artDesconocidos++; artSin.add(pidRaw); grupos.artSin.push({ cliente: a.name, articulo: `Código ${pidRaw}`, texto: "no está en el catálogo: sube antes «Productos y precios»", orden: 0 }); continue; }
         const k = `${it.date}|${it.doc}`;
         if (!docs.has(k)) docs.set(k, { doc: it.doc, date: it.date, lines: [] });
         docs.get(k).lines.push({ productId: pid, qty: it.qty });
@@ -258,6 +261,17 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
         if (it.price !== null && !sinPrecios) { // (con «solo descuentos e historial» los precios propios ni se miran) precio de tarifa que se le aplicó; solo es «propio» si no es el de la tarifa de hoy
           const efectivo = a.specialPrices[pid] ?? prod.price ?? 0;
           if (Math.abs(it.price - efectivo) > 0.0005) { (pid in a.specialPrices ? r.preCambian++ : r.preNuevos++); precios[pid] = it.price; cambios.push({ campo: `Precio · ${prod.name}`, antes: eur(efectivo), despues: eur(it.price) }); }
+        }
+        { // en qué grupo del resumen cae esta pareja y qué pasará con ella
+          const tarifaDist = it.price !== null && Math.abs(it.price - prod.price) > 0.0005;
+          const efD = a.discounts[pid] ?? (descuentoTarifaActivo() ? prod.discount : 0) ?? 0, efP = a.specialPrices[pid] ?? prod.price ?? 0;
+          const cambiaD = it.pct < 100 && Math.abs(it.pct - efD) >= 0.005, cambiaP = it.price !== null && !sinPrecios && Math.abs(it.price - efP) > 0.0005;
+          const estado = cambiaD || cambiaP ? (cambiaD && pid in a.discounts) || (cambiaP && pid in a.specialPrices) ? "SE CAMBIARÁ" : "SE GUARDARÁ" : "ya estaba guardado", orden = cambiaD || cambiaP ? 0 : 1;
+          const f = { cliente: a.name, articulo: prod.name, orden };
+          if (it.pct >= 100) grupos.regalo.push({ ...f, texto: "descuento del 100 % (regalo): no se guarda", orden: 1 });
+          else if (it.pct > 0) grupos.descuento.push({ ...f, texto: `${pc(it.pct)} de descuento${tarifaDist ? ` · su precio ${eur(it.price)} (tarifa ${eur(prod.price)})` : ""} · ${estado}` });
+          else if (tarifaDist) grupos.soloPrecio.push({ ...f, texto: sinPrecios ? `tarifa ${eur(prod.price)} → su precio ${eur(it.price)} · no se aplica (casilla «solo descuentos e historial»)` : `tarifa ${eur(prod.price)} → su precio ${eur(it.price)} · ${estado}`, orden: sinPrecios ? 1 : orden });
+          else grupos.normal.push({ ...f, texto: cambiaD || cambiaP ? `precio de tarifa ${eur(prod.price)}, sin descuento · se quita lo especial que tenía (${estado})` : `precio de tarifa ${eur(prod.price)}, sin descuento`, orden });
         }
       }
       // historial: se AÑADEN los documentos que el cliente aún no tiene (por fecha y número); lo que ya tenía no se toca ni se borra
@@ -280,8 +294,20 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const confirmar = [];
     if (r.preNuevos + r.preCambian) confirmar.push(`${r.preNuevos + r.preCambian} precios propios de clientes serían DISTINTOS de la tarifa de hoy (mira «Precio · …» en el detalle). Confírmalo solo si son precios especiales de esos clientes y no una tarifa antigua: después, esos clientes pagarían ese precio aunque la tarifa cambie.`);
     const resumen = { clientesConCambios: cambiar.size, descuentosNuevos: r.desNuevos, descuentosCambian: r.desCambian, preciosPropiosNuevos: r.preNuevos, preciosPropiosCambian: r.preCambian, pedidosNuevos: r.pedNuevos, iguales: r.iguales, desconocidos: r.desconocidos, nombreNoCoincide: r.otroNombre, lineas: stats.filas, sinFecha: stats.sinFecha };
+    const TOPE_CAT = 300, ordena = (l) => l.map((x, k) => [x, k]).sort((a, b) => a[0].orden - b[0].orden || a[1] - b[1]).map(([x]) => ({ cliente: x.cliente, articulo: x.articulo, texto: x.texto }));
+    const cat = (id, titulo, lista, extra = {}) => ({ id, titulo, total: extra.total ?? lista.length, filas: ordena(lista).slice(0, TOPE_CAT) });
+    const categorias = [
+      cat("normal", "Sin descuento y a precio de tarifa (no hay nada especial que guardar)", grupos.normal),
+      cat("descuento", "Con descuento (entre 1 % y 99 %)", grupos.descuento),
+      cat("regalo", "Con descuento del 100 % (regalos: no se guardan como descuento)", grupos.regalo),
+      cat("soloPrecio", "Sin descuento, pero a un precio distinto de la tarifa", grupos.soloPrecio),
+      cat("artSin", "Artículo que no está en tu catálogo (se ignora)", grupos.artSin),
+      cat("cliSin", "Cliente que no existe en la base (se ignora)", grupos.cliSin),
+      ...(grupos.otroNombre.length ? [cat("otroNombre", "Cliente cuyo nombre no coincide con el de la base (no se toca)", grupos.otroNombre)] : []),
+      ...(stats.sinPrecio ? [{ id: "ceros", titulo: "Líneas a 0 € o sin precio (regalos, material): se ignoran", total: stats.sinPrecio, filas: [] }] : []),
+    ];
     return {
-      resumen, detalle: { conCambios: filas.slice(0, LIMITE_CLIENTES), nombreNoCoincide: otroNombre.slice(0, LIMITE_CLIENTES), desconocidos: noExisten.slice(0, MUESTRA) }, detalleTotal: { conCambios: filas.length, nombreNoCoincide: otroNombre.length, desconocidos: noExisten.length },
+      categorias, resumen, detalle: { conCambios: filas.slice(0, LIMITE_CLIENTES), nombreNoCoincide: otroNombre.slice(0, LIMITE_CLIENTES), desconocidos: noExisten.slice(0, MUESTRA) }, detalleTotal: { conCambios: filas.length, nombreNoCoincide: otroNombre.length, desconocidos: noExisten.length },
       aviso, ...(confirmar.length ? { confirmar } : {}), aplicable: cambiar.size > 0,
       aplicar() { const p = customersDb.setPreciosPropios(paraPrecios), h = customersDb.setPurchases(paraPedidos); return { clientes: cambiar.size, descuentos: p.descuentos, precios: p.precios, pedidos: r.pedNuevos, lineas: h.lineas }; },
     };

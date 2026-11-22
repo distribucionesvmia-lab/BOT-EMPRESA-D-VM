@@ -52,7 +52,7 @@ test("CONSUMO: vista previa sin escribir; aplicar añade descuento y precio prop
   assert.deepEqual([p.resumen.descuentosNuevos, p.resumen.preciosPropiosNuevos, p.resumen.pedidosNuevos, p.resumen.desconocidos], [1, 1, 1, 1]);
   assert.match(p.aviso.join(" "), /quitando ceros/); assert.match(p.aviso.join(" "), /no están en el catálogo/);
   const c = p.detalle.conCambios[0];
-  assert.deepEqual(c.cambios.map((x) => [x.campo, x.antes, x.despues]), [["Descuento · AGUA", "0 %", "10 %"], ["Precio · LECHE", "2 €", "2.5 €"]]);
+  assert.deepEqual(c.cambios.map((x) => [x.campo, x.antes, x.despues]), [["Descuento · AGUA", "0 %", "10 %"], ["Precio · LECHE", "2 €", "2,5 €"]]);
   assert.deepEqual(customersDb.getById("365").discounts, {}); // la vista previa no escribe
   assert.ok(p.confirmar?.length); // un precio distinto de la tarifa: hay que confirmarlo
   assert.throws(() => a.aplicar("consumo", f1), /confirmar/);
@@ -140,4 +140,22 @@ test("CONSUMO: precio y descuento son cosas distintas: a tarifa con descuento pr
   assert.deepEqual([A.discounts, A.specialPrices], [{ 1: 10, 2: 0 }, { 2: 2.5 }]);
   assert.deepEqual([B.discounts, B.specialPrices], [{ 2: 15 }, { 2: 2.5 }]);
   assert.ok(A.orders.some((o) => o.doc === "D1" && o.date === "2026-11-09"), JSON.stringify(A.orders.map((o) => [o.doc, o.date]))); // la compra con su fecha queda en su historial
+});
+
+test("CONSUMO: la vista previa trae el resumen por tipo (sin descuento, con descuento, regalos, solo precio, artículo o cliente que no existe) con su desglose, y las cifras cuadran", async () => {
+  const { a } = montar();
+  const x = consumo(
+    fila(1, 2, 0.5, 0, 46335, "D1", "365"),            // a precio de tarifa y sin descuento
+    fila(2, 1, 2, 10, 46335, "D2", "365"),             // con descuento
+    fila(1, 1, 0.5, 100, 46336, "D3", "400", "Dos"),   // regalo al 100 %
+    fila(2, 1, 3, 0, 46335, "D4", "400", "Dos"),       // precio distinto de la tarifa, sin descuento
+    fila(99, 1, 1, 0, 46335, "D5", "365"),             // artículo que no existe
+    fila(1, 1, 1, 0, 46335, "D6", "777", "Nadie"),     // cliente que no existe
+    fila(1, 1, 0, 0, 46335, "D7", "365"));             // 0 €
+  const v = a.vistaPrevia("consumo", x), por = Object.fromEntries(v.categorias.map((c) => [c.id, c]));
+  assert.deepEqual(["normal", "descuento", "regalo", "soloPrecio", "artSin", "cliSin", "ceros"].map((k) => por[k]?.total), [1, 1, 1, 1, 1, 1, 1]);
+  assert.equal(v.categorias.filter((c) => c.id !== "ceros").reduce((t, c) => t + c.total, 0), 6, "cada pareja cliente–artículo cae en un solo grupo");
+  assert.match(por.descuento.filas[0].texto, /10 % de descuento/); assert.match(por.soloPrecio.filas[0].texto, /tarifa 2 € → su precio 3 €/);
+  assert.ok(por.descuento.filas[0].cliente && por.descuento.filas[0].articulo);
+  const h = (await import("node:fs")).readFileSync(new URL("./empresa.html", import.meta.url), "utf8").replace(/\r\n/g, "\n"); for (const t of ["adResumen", "dx-cat", "Al aplicar se guardarán"]) assert.ok(h.includes(t), t);
 });
