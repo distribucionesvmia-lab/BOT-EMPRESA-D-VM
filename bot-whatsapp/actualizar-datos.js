@@ -11,6 +11,7 @@ import { parseHistorialXlsx, recortarPedidos } from "./historial-import.js";
 import { parseConsumoXlsx, esCabeceraConsumo } from "./consumo-import.js";
 import { unzip, readXlsx, filasConFoto } from "./xlsx-read.js";
 import { leerExcel, saltosDePrecio } from "./actualizar-productos.js";
+import { cambiosDeDescuento, revisarDescuentos } from "./descuentos-auditoria.js";
 import { clasificar } from "./categorias.js";
 import { compararProductos, aplicarProductos, CAMPOS, vendible } from "./productos-diff.js";
 
@@ -81,7 +82,8 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const famGuardada = new Map(actual.map((p) => [String(p.id), String(p.family ?? "")]));
     const famCambian = lista.filter((p) => famDe(p) && famDe(p) !== (famGuardada.get(String(p.id)) ?? "")).length;
     const saltos = saltosDePrecio(cmp);
-    const aviso = [];
+    const dtos = revisarDescuentos(cambiosDeDescuento(actual, aplicarProductos(actual, nuevos)), { columna: columnas?.discount ?? "" }); // descuentos: qué cambia y qué hay que confirmar
+    const aviso = [...dtos.aviso];
     if (activos >= 20 && lista.length < activos * MIN_RATIO) aviso.push(`El Excel tiene ${lista.length} productos y hay ${activos} activos: parece incompleto. No se puede aplicar.`);
     const sinIva = cmp.anadidos.filter((p) => p.vat === undefined).length;
     if (sinIva) aviso.push(`${sinIva} productos nuevos tienen un código de IVA sin porcentaje conocido: no se pueden añadir hasta que se indique su tipo.`);
@@ -104,6 +106,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
       quitados: cmp.quitados.slice(0, MUESTRA).map((p) => ({ id: p.id, nombre: p.name, motivo: p.motivo })),
       saltosPrecio: saltos.slice(0, MUESTRA),
       rechazados: rechazados.slice(0, MUESTRA).map((x) => ({ id: x.id, nombre: x.name, motivo: x.motivo })),
+      descuentosArticulos: dtos.detalle.slice(0, MUESTRA),
     };
     // Cómo se ha leído el Excel: qué columna es el precio, etc., y los 3 primeros productos tal como han quedado, para comprobarlo de un vistazo
     const lectura = { columnas, ejemplos: lista.slice(0, 3).map((p) => ({ codigo: p.id, nombre: p.name, precio: p.price, iva: p.vat ?? null, unidadesPorCaja: p.unitsPerBox ?? null, descuento: p.discount ?? null })) };
@@ -112,6 +115,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     if (saltos.length) confirmar.push(`${saltos.length} productos cambian de precio más de un 25 % (el mayor: ${saltos[0].id} ${saltos[0].antes} € → ${saltos[0].despues} €). Compruébalos en la lista de «Precios que cambian mucho».`);
     if (cmp.quitados.length >= 5 && cmp.quitados.length > activos * 0.1) confirmar.push(`Se quitan ${cmp.quitados.length} productos (el ${Math.round((cmp.quitados.length / activos) * 100)} % del catálogo).`);
     if (rechazados.length) confirmar.push(`${rechazados.length} productos con datos raros NO se importan (precio disparatado o IVA que no existe).`);
+    confirmar.push(...dtos.confirmar);
     for (const x of avisosLectura.slice(0, 5)) aviso.push(x);
     if (avisosLectura.length > 5) aviso.push(`… y ${avisosLectura.length - 5} avisos más de datos raros.`);
     if (famCambian) aviso.push(`${famCambian} artículos guardarán su código de familia de a3ERP (es lo que ordena los pedidos, el Excel y el histórico: familia, subfamilia y artículo).`);

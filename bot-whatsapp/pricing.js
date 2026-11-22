@@ -45,8 +45,10 @@ export function promoVigente(product, hoy = hoyMadrid()) {
  * oferta de la empresa: en % sustituye al descuento si es mayor (no se suma); en € se resta al precio de cada unidad.
  */
 export function precioEfectivo(product, customer, id, precioDelPedido, hoy) {
+  // Un descuento solo puede ser un número entre 0 y 100; cualquier otra cosa (texto, vacío, negativo, más de 100) cuenta como SIN descuento: nunca se aplica un descuento raro.
+  const pct = (v) => { const n = Number(v); return v !== null && v !== undefined && v !== "" && Number.isFinite(n) && n >= 0 && n <= 100 ? n : null; };
   let price = customer?.specialPrices?.[id] ?? product?.price ?? precioDelPedido ?? 0;
-  let discount = customer?.discounts?.[id] ?? product?.discount ?? 0;
+  let discount = pct(customer?.discounts?.[id]) ?? pct(product?.discount) ?? 0; // el descuento PROPIO del cliente en ese artículo (incluso 0 %) manda sobre el de la tarifa
   const o = promoVigente(product, hoy);
   if (o) { if (o.tipo === "pct") discount = Math.max(discount, Number(o.valor)); else price = Math.max(0, Math.round((price - Number(o.valor)) * 10000) / 10000); }
   return { price, discount };

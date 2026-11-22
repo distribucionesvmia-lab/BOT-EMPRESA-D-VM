@@ -656,6 +656,11 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
             ofertasCorreo: accounts.ofertasDe(id),
             correoPedidos: { destino: elegirDestino({ account: cu, customer: c }), activo: accounts.correoPedidoActivo(id), delaCuenta: !!cu?.email && elegirDestino({ account: cu, customer: c }) === cu.email },
             cuenta: cu ? { estado: cu.status, confirmada: cu.verified, bloqueada: cu.locked, ultimoAcceso: cu.lastLogin, creada: cu.createdAt, codigoPropio: cu.ownCode } : null,
+            preciosPropios: (() => { // lo que a ESTE cliente se le cobra distinto de la tarifa (descuentos y precios propios que vienen de a3ERP), para comprobarlo de un vistazo
+              const cat = new Map((catalogDb?.list({ activeOnly: false }) ?? []).map((x) => [String(x.id), x])), ids = new Set([...Object.keys(c.discounts ?? {}), ...Object.keys(c.specialPrices ?? {})]), filas = [];
+              for (const pid of ids) { const a = cat.get(pid); if (!a) continue; filas.push({ id: pid, nombre: a.name, dtoTarifa: a.discount ?? 0, dtoPropio: c.discounts?.[pid] ?? null, precioTarifa: a.price, precioPropio: c.specialPrices?.[pid] ?? null }); }
+              filas.sort((x, y) => x.nombre.localeCompare(y.nombre, "es")); return { total: filas.length, filas: filas.slice(0, 300) };
+            })(),
             aparatos: accounts.aparatosDe(id).length, password: { ...accounts.passwordInfo(id), dobleFactor: accounts.dobleFactor(id).activo },
             totalPedidosApp: todos.length,
             pedidos: todos.slice(0, 12).map(orderView).map((o) => ({ ref: o.ref, fecha: o.fecha, entrega: o.entrega?.texto ?? "", total: o.total, estado: o.estado, modificado: o.modificado, lineas: o.lineas.slice(0, 30).map((l) => ({ nombre: l.nombre, unidades: l.unidades, cajas: l.unidad === "caja" ? l.cajas : 0 })) })),
@@ -715,9 +720,9 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
           oferta: vig ? { tipo: vig.tipo, valor: Number(vig.valor), hasta: vig.hasta ?? null } : null, ofertaCaducada: x.promo && !vig ? { tipo: x.promo.tipo, valor: Number(x.promo.valor), hasta: x.promo.hasta ?? null } : null,
           cambioPrecio: ch ? { antes: ch.antes, despues: ch.despues, at: ch.at } : null, campana: cp?.tipo ?? null, aviso: cp ? { titulo: cp.titulo, texto: cp.texto } : null, avisado: hecho };
       });
-      const filas = todas.filter((x) => (!q || sinTildes(`${x.id} ${x.nombre}`).includes(q)) && (!cat || x.categoriaId === cat) && (filtro !== "oferta" || x.oferta) && (filtro !== "bajada" || x.campana === "bajada") && (filtro !== "campana" || x.campana) && (filtro !== "fotopequena" || fotos.info(x.id).calidad === "pequena") && (filtro !== "sinfoto" || !fotos.info(x.id).existe));
+      const filas = todas.filter((x) => (!q || sinTildes(`${x.id} ${x.nombre}`).includes(q)) && (!cat || x.categoriaId === cat) && (filtro !== "oferta" || x.oferta) && (filtro !== "descuento" || x.descuento > 0) && (filtro !== "bajada" || x.campana === "bajada") && (filtro !== "campana" || x.campana) && (filtro !== "fotopequena" || fotos.info(x.id).calidad === "pequena") && (filtro !== "sinfoto" || !fotos.info(x.id).existe));
       const categorias = [...new Map(todas.map((x) => [x.categoriaId, x.categoria])).entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre));
-      return send(res, 200, { total: filas.length, pagina, porPagina: por, categorias, conOferta: todas.filter((x) => x.oferta).length, filas: filas.slice(pagina * por, pagina * por + por).map((x) => ({ ...x, foto: fotos.info(x.id) })) }), true;
+      return send(res, 200, { total: filas.length, pagina, porPagina: por, categorias, conOferta: todas.filter((x) => x.oferta).length, conDescuento: todas.filter((x) => x.descuento > 0).length, filas: filas.slice(pagina * por, pagina * por + por).map((x) => ({ ...x, foto: fotos.info(x.id) })) }), true;
     }
     // ---- Cambiar la foto de un artículo (la anterior se guarda en «anteriores», nunca se borra) ----
     { const mf = /^\/api\/admin\/articulos\/([\w.-]{1,40})\/foto$/.exec(p);
