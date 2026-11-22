@@ -112,3 +112,19 @@ test("EXCEL DE ARTÍCULOS Y CONSUMO sin descuento de tarifa: los artículos van 
     assert.deepEqual(r.products.map((p) => p.discount), [0, 0], "ni la columna ni lo antiguo ponen descuento general");
   } finally { if (antes === undefined) delete process.env.DESCUENTO_TARIFA; else process.env.DESCUENTO_TARIFA = antes; }
 });
+
+test("CONSUMO sin descuento de tarifa: el descuento del cliente se guarda AUNQUE el artículo tuviera guardado un descuento igual (dato antiguo)", async () => {
+  const { buildWorkbook } = await import("./xlsx.js"), { openCatalogDb } = await import("./catalogo-db.js"), { openCustomersDb } = await import("./clientes-db.js"), { openAccountsDb } = await import("./cuentas-db.js"), { crearActualizador } = await import("./actualizar-datos.js");
+  const antes = process.env.DESCUENTO_TARIFA; delete process.env.DESCUENTO_TARIFA;
+  try {
+    const catalogDb = openCatalogDb(":memory:"), customersDb = openCustomersDb(":memory:"), accountsDb = openAccountsDb(":memory:");
+    catalogDb.upsertProducts([{ id: "1", name: "AGUA", price: 10, vat: 10, unitsPerBox: 6, discount: 30 }]); // dato antiguo: 30 % guardado en el artículo
+    customersDb.upsertCustomers([{ id: "365", name: "BAR UNO", active: true, orders: [] }]);
+    const a = crearActualizador({ catalogDb, customersDb, accountsDb, imgDir: null, registro: () => {} });
+    const CAB = ["Artículo", "Descripción ", "Unidades", "", "Precio", "Fecha", "Desc.1", "Nº Documento", "Base", "Nombre", "Cód Almacén", "Cliente", "Desc. Almacén", "Coste", "Obt. precio coste"];
+    const f = ["          1", "AGUA", "2", "", "10", "46335", "30", "D1", "0", "BAR UNO", "1", "    365", "Almacén central", "1", ""];
+    const xl = Buffer.from(buildWorkbook([{ name: "H", widths: [], rows: [CAB, f] }]));
+    const r = a.aplicar("consumo", xl, { confirmo: true });
+    assert.deepEqual(customersDb.getById("365").discounts, { 1: 30 }, "el 30 % de ESE cliente queda guardado como suyo: " + JSON.stringify(r).slice(0, 200));
+  } finally { if (antes !== undefined) process.env.DESCUENTO_TARIFA = antes; }
+});
