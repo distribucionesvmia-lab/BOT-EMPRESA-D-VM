@@ -107,6 +107,7 @@ export function parseProductos(rows) {
     else if (String(get(r, "vat") ?? "").trim()) p.vatCode = String(get(r, "vat")).trim(); // código de IVA sin porcentaje conocido («SRE»)
     if (dto !== null && dto >= 0 && dto <= 100) p.discount = dto;
     else if (dto !== null) stats.avisos.push(`${id} ${name}: descuento imposible (${dto} %), se ignora`);
+    else if (col.discount >= 0 && !String(get(r, "discount") ?? "").trim()) p.discount = 0; // el Excel TIENE columna de descuento y esta celda va vacía = sin descuento (antes se conservaba el antiguo para siempre)
     const cat = String(get(r, "category") ?? "").trim(), sub = String(get(r, "subcategory") ?? "").trim();
     if (cat) p.category = cat;
     if (sub) p.subcategory = sub;
