@@ -724,6 +724,19 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       const categorias = [...new Map(todas.map((x) => [x.categoriaId, x.categoria])).entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre));
       return send(res, 200, { total: filas.length, pagina, porPagina: por, categorias, conOferta: todas.filter((x) => x.oferta).length, conDescuento: todas.filter((x) => x.descuento > 0).length, filas: filas.slice(pagina * por, pagina * por + por).map((x) => ({ ...x, foto: fotos.info(x.id) })) }), true;
     }
+    if (p === "/api/admin/articulos/quitar-descuentos" && post && catalogDb) { // deja a 0 % el descuento de TARIFA de todos los artículos (no toca los descuentos propios de cada cliente ni las ofertas)
+      if (exigeReclave(req, res, who)) return true;
+      const b = (await readJson(req)) ?? {};
+      if (b.confirmo !== true) return send(res, 400, { error: "Falta la confirmación." }), true;
+      const con = catalogDb.list({ activeOnly: false }).filter((x) => Number(x.discount) > 0);
+      if (!con.length) return send(res, 200, { ok: true, quitados: 0, copia: null }), true;
+      let copia;
+      try { copia = path.basename(backupDb(catalogDb, { dir: process.env.BACKUP_DIR ?? "respaldos", name: "catalogo-antes-de-quitar-descuentos" })); }
+      catch (e) { console.error("Copia antes de quitar descuentos:", e); return send(res, 500, { error: "No se pudo hacer la copia de seguridad, así que NO se ha cambiado nada." }), true; }
+      let quitados = 0; for (const x of con) if (catalogDb.update(x.id, { discount: 0 }) === "updated") quitados++;
+      console.log(`Descuentos de tarifa quitados por la empresa: ${quitados} (copia: ${copia})`);
+      return send(res, 200, { ok: true, quitados, copia }), true;
+    }
     // ---- Cambiar la foto de un artículo (la anterior se guarda en «anteriores», nunca se borra) ----
     { const mf = /^\/api\/admin\/articulos\/([\w.-]{1,40})\/foto$/.exec(p);
       if (mf && post) {

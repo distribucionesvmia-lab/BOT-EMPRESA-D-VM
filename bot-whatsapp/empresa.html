@@ -604,6 +604,7 @@
         <div class="scroll"><table><thead><tr><th>Artículo</th><th class="num">Precio</th><th>Oferta</th><th></th><th></th></tr></thead><tbody id="ar-lista"></tbody></table></div>
         <div class="acciones paginacion"><button id="ar-ant" type="button">← Anterior</button><button id="ar-sig" type="button">Siguiente →</button><span class="muted" id="ar-pag"></span></div>
         <p class="muted" id="ar-msg" role="status" style="margin:8px 0 0"></p>
+        <div class="acciones" id="ar-dto-caja" hidden><button type="button" class="peligro" id="ar-dto-quitar">Quitar TODOS los descuentos de tarifa…</button><span class="muted">Deja a 0 % el descuento de los artículos (hace copia antes). No toca los descuentos propios de cada cliente ni las ofertas.</span></div>
       </div>
       <div class="panel" id="fm-panel">
         <h2>Fotos pequeñas para el móvil</h2>
@@ -1394,6 +1395,7 @@ async function articulos() {
   const r = await call("/api/admin/articulos?" + qs);
   const sel = $("ar-cat"), actual = sel.value; if (sel.options.length <= 1 || sel.dataset.n !== String(r.categorias.length)) { sel.innerHTML = ""; sel.appendChild(el("option", "Todas", { value: "" })); for (const c of r.categorias) sel.appendChild(el("option", c.nombre, { value: c.id })); sel.value = actual; sel.dataset.n = String(r.categorias.length); }
   $("ar-quitar").hidden = !(f.q || f.categoria || f.filtro);
+  $("ar-dto-caja").hidden = !r.conDescuento;
   $("ar-estado").textContent = `${r.total} artículo${r.total === 1 ? "" : "s"}${r.conOferta ? ` · ${r.conOferta} con oferta ahora` : ""}${r.conDescuento ? ` · ${r.conDescuento} con descuento de tarifa` : ""}.`;
   const tb = $("ar-lista"); tb.innerHTML = "";
   if (!r.filas.length) { const tr = document.createElement("tr"); tr.appendChild(el("td", "Ningún artículo cumple estos filtros.", { className: "muted" })); tb.appendChild(tr); }
@@ -1460,6 +1462,12 @@ async function avisarArticulo(a, boton) {
     await articulos();
   } catch (e) { $("ar-msg").textContent = e.message; boton.disabled = false; }
 }
+$("ar-dto-quitar").onclick = async () => {
+  if (!confirm("¿Quitar el descuento de tarifa de TODOS los artículos?\n\nSe hace una copia antes. Los descuentos propios de cada cliente y las ofertas no cambian. Después, si tu Excel de artículos trae columna de descuento, se volverán a poner al subirlo.")) return;
+  $("ar-msg").textContent = "Quitando descuentos…";
+  try { const r = await conReclave("Vas a quitar los descuentos de tarifa. Escribe otra vez la clave del panel para continuar.", (h) => call("/api/admin/articulos/quitar-descuentos", { confirmo: true }, false, h)); if (!r) { $("ar-msg").textContent = ""; return; } $("ar-msg").textContent = r.quitados ? `Listo: ${r.quitados} artículos sin descuento de tarifa (copia: ${r.copia}).` : "No había descuentos que quitar."; await articulos(); }
+  catch (e) { $("ar-msg").textContent = e.message; }
+};
 const recargarArticulos = () => { clearTimeout(tAr); tAr = setTimeout(() => { pagAr = 0; articulos().catch((e) => ($("ar-msg").textContent = e.message)); }, 300); };
 // ---- Poner fotos desde un ZIP (revisar → marcar → poner) ----
 {

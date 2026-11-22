@@ -71,3 +71,10 @@ test("IMPORTAR ARTÍCULOS: sin columna de descuento se avisa de que no se toca n
   const r = revisarDescuentos(cambiosDeDescuento(actual, aplicarProductos(actual, nuevo)), { columna: "" });
   assert.deepEqual(r.confirmar, []); assert.match(r.aviso[0], /no trae columna de descuento/);
 });
+
+test("QUITAR DESCUENTOS DE TARIFA: el panel lo ofrece, pide clave y confirmación, y la ruta existe", async () => {
+  const fs = await import("node:fs"), leer = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  const a = leer("./admin.js"), h = leer("./empresa.html");
+  for (const t of ["/api/admin/articulos/quitar-descuentos", "catalogo-antes-de-quitar-descuentos", "b.confirmo !== true", "exigeReclave(req, res, who)", "discount: 0"]) assert.ok(a.includes(t), t);
+  for (const t of ['id="ar-dto-quitar"', "Quitar TODOS los descuentos de tarifa", "ar-dto-caja"]) assert.ok(h.includes(t), t);
+});
