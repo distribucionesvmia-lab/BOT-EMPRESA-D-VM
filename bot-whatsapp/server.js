@@ -597,11 +597,12 @@ const sendJson = (res, code, data) => enviar(res, code, { "Content-Type": "appli
 function aplicarSiempre(account, customer, ui) {
   if (!ui?.home) return ui;
   const u = getAccountsDb().getUsual(account.customerId);
-  if (!u) return { ...ui, siempre: "auto" };
+  const ultimoRepetir = ui.last?.repetir; // el del último pedido de verdad (para «Añadir al carrito los productos de mi último pedido»), aunque haya editado o borrado «Tu pedido de siempre»
+  if (!u) return { ...ui, ultimoRepetir, siempre: "auto" };
   const { last, ...resto } = ui;
-  if (u.hidden) return { ...resto, siempre: "borrado" };
+  if (u.hidden) return { ...resto, ultimoRepetir, siempre: "borrado" };
   const t = tarjetaSiempre(customer, u.lines, last?.fecha ?? lineasUltimoPedido(customer).fecha);
-  return t ? { ...resto, last: t, siempre: "propio" } : { ...resto, siempre: "borrado" };
+  return t ? { ...resto, last: t, ultimoRepetir, siempre: "propio" } : { ...resto, ultimoRepetir, siempre: "borrado" };
 }
 // Conversación de un cliente con sesión: el cliente sale SIEMPRE de la cuenta (nunca de lo que envíe el navegador)
 async function accountChat(account, text, msgId, carrito = null) {
