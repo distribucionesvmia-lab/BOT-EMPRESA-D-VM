@@ -1,6 +1,7 @@
 // Informe de fotos pequeñas (SOLO LECTURA: no cambia ni borra ninguna foto).
-// Uso:  node fotos-pequenas.js [carpeta-de-fotos] [catalogo.sqlite] [salida.csv]
-// Lista los artículos cuya foto mide 200 px o menos de lado (se ven borrosas): código, nombre, categoría y tamaño. Los datos no salen del ordenador.
+// Uso:  node fotos-pequenas.js [carpeta-de-fotos] [catalogo.sqlite] [salida.csv] [limite-en-px]
+// Lista los artículos cuya foto mide MENOS de 300 px de lado (la misma regla que el filtro «Foto pequeña» del panel; se ven borrosas): código, nombre, categoría y tamaño. Los datos no salen del ordenador.
+// El límite se puede cambiar con el 4.º argumento o con FOTOS_LIMITE (p. ej. 200 = solo las muy pequeñas; 600 = también las «justas»).
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -42,10 +43,10 @@ export function informe(carpeta, filas, { limite = 200 } = {}) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"))) {
-  const carpeta = process.argv[2] ?? process.env.IMG_DIR ?? "imagenes", dbRuta = process.argv[3] ?? process.env.CATALOG_DB ?? "catalogo.sqlite", salida = process.argv[4] ?? "fotos-pequenas.csv";
+  const carpeta = process.argv[2] || process.env.IMG_DIR || "imagenes", dbRuta = process.argv[3] || process.env.CATALOG_DB || "catalogo.sqlite", salida = process.argv[4] || "fotos-pequenas.csv", limite = Number(process.argv[5] ?? process.env.FOTOS_LIMITE ?? 300) - 1; // «menos de N px» = N − 1 como máximo
   if (!fs.existsSync(carpeta)) { console.error(`No existe la carpeta de fotos ${carpeta}.`); process.exit(1); }
   const filas = fs.existsSync(dbRuta) ? new DatabaseSync(dbRuta, { readOnly: true }).prepare("SELECT id, name, category, subcategory FROM products").all() : [];
-  const lista = informe(carpeta, filas);
+  const lista = informe(carpeta, filas, { limite });
   fs.writeFileSync(salida, "﻿" + ["Código;Nombre;Categoría;Tamaño", ...lista.map((r) => [r.codigo, r.nombre, r.categoria, r.tamano].map(csv).join(";"))].join("\r\n"));
-  console.log(`Fotos de 200 px o menos: ${lista.length}. Guardado en ${salida} (no se ha cambiado ninguna foto).`);
+  console.log(`Fotos de menos de ${limite + 1} px (se ven borrosas): ${lista.length}. Guardado en ${salida} (no se ha cambiado ninguna foto).`);
 }
