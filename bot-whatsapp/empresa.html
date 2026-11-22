@@ -1346,7 +1346,7 @@ async function adLlamar(ruta, p, fichero, extra = "", cabExtra = {}) {
   if (fichero.size > max) throw new Error(`El archivo pesa ${Math.round(fichero.size / 1e6)} MB y el máximo es ${max / 1e6} MB. Haz un ZIP con las fotos (pesa mucho menos que un Excel con fotos) o súbelo en dos partes.`);
   const r = await fetch(`/api/admin/${ruta}/${$(p + "-tipo").value}?fichero=${encodeURIComponent(fichero.name)}${extra}`, { method: "POST", headers: { ...cabsAdmin(cabExtra), "Content-Type": "application/octet-stream" }, body: fichero });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || "No se pudo procesar el Excel");
+  if (!r.ok) throw new Error(j.error || (r.status === 404 ? "El programa de la oficina todavía no tiene esta función: espera a que se actualice del todo o reinicia «VM Empresa»." : `El programa ha dado un error (${r.status}). Mira el final del registro en C:\\vm\\logs.`));
   return j;
 }
 const dxOpciones = (p) => ($(p + "-sp")?.checked ? "&sinPrecios=1" : "") + ($(p + "-sc")?.checked ? "&soloCompras=1" : "") + ($(p + "-qs")?.checked ? "&quitarSobrantes=1" : ""); // casillas de cada tarjeta

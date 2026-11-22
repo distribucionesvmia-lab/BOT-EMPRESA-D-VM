@@ -80,7 +80,7 @@ function decodifica(bytes, fuente) {
 function trozosDePagina(contenido, fuentesMapa) {
   const s = contenido.toString("latin1"), items = [];
   let fuente = null, x = 0, y = 0, lx = 0, ly = 0, lead = 0, i = 0;
-  const pila = [];
+  const pila = []; let pasos = 0;
   const ws = (c) => c === " " || c === "\n" || c === "\r" || c === "\t" || c === "\f" || c === "\0";
   const cad = () => { // cadena literal que empieza en s[i] === "("
     const bytes = []; let prof = 1; i++;
@@ -112,7 +112,8 @@ function trozosDePagina(contenido, fuentesMapa) {
     if (c === "/") { let j = i + 1; while (j < s.length && !ws(s[j]) && !"/[]<>()".includes(s[j])) j++; operandos.push({ nombre: s.slice(i + 1, j) }); i = j; continue; }
     if (/[+\-.\d]/.test(c)) { const n = num(); if (n !== null) operandos.push(n); continue; }
     let j = i; while (j < s.length && !ws(s[j]) && !"/[]<>()%".includes(s[j])) j++;
-    const op = s.slice(i, j); i = j || i + 1;
+    const op = s.slice(i, j); i = j > i ? j : i + 1; // (si el carácter no empieza ningún operador, se salta: antes un «)» o «]» suelto dejaba el bucle parado para siempre)
+    if (++pasos > 20_000_000) throw new Error("El PDF es demasiado raro para leerlo.");
     const nums = operandos.filter((o) => typeof o === "number");
     switch (op) {
       case "q": pila.push([fuente, x, y, lx, ly, lead]); break;

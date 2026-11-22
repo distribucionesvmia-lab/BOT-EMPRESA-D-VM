@@ -177,3 +177,19 @@ test("CONSUMO SOLO COMPRAS: apunta las compras y NO guarda precios ni descuentos
   const c = customersDb.getById("4"); assert.deepEqual(c.discounts, {}); assert.deepEqual(c.specialPrices, {}); assert.equal(c.orders.length, 1);
   const h = leer("./empresa.html"); assert.ok(h.includes('id="${t.p}-sc" checked') && h.includes("Solo compras (sin precios ni descuentos)") && h.includes("&soloCompras=1"));
 });
+
+test("LECTOR DE PDF: caracteres sueltos («)», «]», «>») entre las instrucciones no lo dejan colgado y se sigue leyendo", async () => {
+  const { leerPdf: leer2 } = await import("./pdf-texto.js");
+  const b = pdf([[{ x: 10, y: 700, t: "Antes" }]]);
+  // se mete basura entre instrucciones, como pasa con imágenes dentro de la página o contenido raro
+  const s = b.toString("latin1"), cont = zlib.deflateSync(Buffer.from("BT /F1 10 Tf 1 0 0 1 10 700 Tm (Antes) Tj ET\n) ] > ) ]\nBT /F1 10 Tf 1 0 0 1 10 680 Tm (Despues) Tj ET", "latin1"));
+  const i = s.indexOf("stream\n") + 7, f = s.indexOf("\nendstream"), nuevo = Buffer.concat([b.subarray(0, i), cont, b.subarray(f)]).toString("latin1").replace(/\/Length \d+/, `/Length ${cont.length}`);
+  const t0 = Date.now(), p = leer2(Buffer.from(nuevo, "latin1"));
+  assert.ok(Date.now() - t0 < 3000, "no se queda colgado"); assert.deepEqual(p[0].lineas.map((l) => l[0].t), ["Antes", "Despues"]);
+});
+
+test("ERRORES CON MOTIVO: un fallo interno del programa contesta con un mensaje (no vacío) y el panel explica el 404", () => {
+  const s = leer("./server.js"), h = leer("./empresa.html");
+  assert.ok(s.includes("Error interno del programa (") && s.includes('url.pathname.startsWith("/api/")'));
+  assert.ok(h.includes("todavía no tiene esta función") && h.includes("El programa ha dado un error ("));
+});
