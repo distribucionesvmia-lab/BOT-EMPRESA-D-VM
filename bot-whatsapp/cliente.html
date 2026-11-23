@@ -1932,7 +1932,7 @@ function inicio(ui) {
   const cat = ui.url || "/catalogo", c = el("div", "vm-inicio");
   const nombre = ($("cli").textContent || "").trim();
   const sal = el("div", "in-saludo"); sal.append(el("h2", null, saludoMadrid() + (nombre ? ", " + nombre : "")), el("p", null, "¿Qué necesitas hoy?")); c.appendChild(sal);
-  const hoy = el("div", "in-hoy"); hoy.hidden = true; hoy.setAttribute("role", "status"); hoy.textContent = "Si haces el pedido antes de las 10:00, te lo entregamos hoy."; c.appendChild(hoy);
+  const hoy = el("div", "in-hoy"); hoy.hidden = true; hoy.setAttribute("role", "status"); hoy.textContent = "Solo en Medina del Campo: si haces el pedido antes de las 10:00, te lo entregamos hoy."; c.appendChild(hoy);
   const sitioFijo = el("div", "in-fijo"); c.appendChild(sitioFijo);
   const principal = el("div", "in-card"); c.appendChild(principal);
   const secciones = el("div", "in-secs"); c.appendChild(secciones);

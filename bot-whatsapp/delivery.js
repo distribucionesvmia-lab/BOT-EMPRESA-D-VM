@@ -82,7 +82,7 @@ export function deliveryOptions(nowIso = new Date().toISOString(), opts = {}) {
 }
 
 /** Texto del aviso de «entrega hoy» (el catálogo y el chat dicen exactamente esto). */
-export const AVISO_HOY = "Si haces el pedido antes de las 10:00, te lo entregamos hoy.";
+export const AVISO_HOY = "Solo en Medina del Campo: si haces el pedido antes de las 10:00, te lo entregamos hoy.";
 /**
  * ¿Se puede ofrecer entrega HOY ahora mismo? Sale de las propias opciones de entrega (deliveryOptions): si la opción «Hoy» existe, hay aviso;
  * si no, no. Así el aviso y la opción «Hoy» del calendario se deciden con el mismo código y no pueden contradecirse

@@ -138,7 +138,7 @@ test("«hoy» solo para los clientes del municipio 47085; los demás empiezan en
 
 test("AVISO «entrega hoy»: solo Medina del Campo, día laborable y antes de las 10:00 de Madrid (la misma regla que la opción «Hoy»)", async () => {
   const { entregaHoyDisponible, deliveryOptions, puedeHoy, AVISO_HOY } = await import("./delivery.js");
-  assert.equal(AVISO_HOY, "Si haces el pedido antes de las 10:00, te lo entregamos hoy.");
+  assert.equal(AVISO_HOY, "Solo en Medina del Campo: si haces el pedido antes de las 10:00, te lo entregamos hoy.");
   const medina = { municipio: "47085", city: "MEDINA DEL CAMPO" }, medinaSinCodigo = { city: "Medina del Campo" }, otro = { municipio: "47186", city: "TORDESILLAS" };
   const caso = (cliente, iso) => entregaHoyDisponible(cliente, iso);
   // lunes 9 de noviembre de 2026 (Madrid = UTC+1)
