@@ -41,11 +41,11 @@ test("sin código de familia en los artículos, categorías y subcategorías sig
   assert.deepEqual(d.tree.map(c => c.id), ["p", "a", "c"]); assert.deepEqual(d.tree[0].subs.map(s => s.id), ["l", "y"]);
 });
 
-test("INICIO: «Lo habitual» = lo que más se repite en los 6 meses (por veces pedido); «Histórico» = todo lo pedido alguna vez en 6 meses", async () => {
+test("INICIO: «Los 5 artículos que más consumes» = lo que más se repite (por veces pedido); «Histórico» = todo lo pedido alguna vez en 6 meses", async () => {
   const fs = await import("node:fs"), leer = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
-  assert.match(leer("./server.js"), /const habituales = todos\.filter\(\(x\) => x\.count > 0\)\.slice\(0, 10\)/); // `todos` ya viene ordenado por count (veces pedido)
+  assert.match(leer("./server.js"), /const cincoTop = todos\.filter\(\(x\) => x\.count > 0\)\.sort\(\(a, b\) => b\.count - a\.count[^\n]*slice\(0, 5\)\.sort\(\(a, b\) => compararFamilias\(a\.fam, b\.fam\)/); // los 5 que más consume, en orden de familia
   assert.match(leer("./weborder.js"), /\.sort\(\(a, b\) => b\.count - a\.count/);
-  assert.match(leer("./cliente.html"), /j\.tieneHistorial \? "Lo habitual"/);
+  assert.match(leer("./cliente.html"), /j\.tieneHistorial \? "Los 5 artículos que más consumes"/);
   assert.match(leer("./pedido.html"), /class="tb-t">Histórico</);
 });
 

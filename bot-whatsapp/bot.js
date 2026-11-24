@@ -163,20 +163,20 @@ export function habitualProducts(customer, { hoy = ahora() } = {}) {
   for (const o of customer?.orders ?? []) {
     if (String(o.date) < desde) continue;
     for (const l of o.lines) {
-      const st = stats.get(l.productId) ?? { count: 0, lastDate: "", lastQty: l.qty };
-      st.count++;
+      const st = stats.get(l.productId) ?? { count: 0, units: 0, lastDate: "", lastQty: l.qty };
+      st.count++; st.units += Math.max(0, Number(l.qty) || 0); // veces pedido y unidades de TODAS las compras de los últimos 6 meses (a3ERP + las hechas en la app)
       if (o.date >= st.lastDate) Object.assign(st, { lastDate: o.date, lastQty: l.qty });
       stats.set(l.productId, st);
     }
   }
-  for (const u of customer?.usual ?? []) if (!stats.has(u.productId)) stats.set(u.productId, { count: 1, lastDate: "", lastQty: u.qty });
+  for (const u of customer?.usual ?? []) if (!stats.has(u.productId)) stats.set(u.productId, { count: 1, units: Math.max(0, Number(u.qty) || 0), lastDate: "", lastQty: u.qty });
   return [...stats]
     .map(([id, st]) => {
       const p = CATALOG.find((x) => x.id === id);
       return p && { ...p, ...st };
     })
     .filter(Boolean)
-    .sort((a, b) => b.count - a.count || b.lastDate.localeCompare(a.lastDate));
+    .sort((a, b) => b.count - a.count || b.units - a.units || b.lastDate.localeCompare(a.lastDate)); // los que más consume: más veces comprado y, si empatan, más unidades
 }
 
 // ---- Mensajes interactivos de WhatsApp (límites: lista 10 filas, botones 3; títulos 24 y 20 caracteres) ----

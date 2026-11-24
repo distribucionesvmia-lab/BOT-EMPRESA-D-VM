@@ -25,7 +25,7 @@ export const esCabeceraConsumo = (fila) => {
 
 /**
  * Filas → { items: Map(cliente → Map(artículo → { price, pct, qty, date, doc })), nombres: Map(cliente → nombre que trae el Excel), stats }.
- * Si un cliente repite un artículo, vale la fila de fecha más reciente. Las filas sin fecha, sin unidades o a 0 € (regalos) no cuentan como compra.
+ * Si un cliente repite un artículo, para el precio y el descuento vale la fila de fecha más reciente; para el historial de compras valen TODAS las filas. Las filas sin fecha, sin unidades o a 0 € (regalos) no cuentan como compra.
  */
 export function parseConsumo(rows) {
   let hi = -1, col = {};
@@ -35,7 +35,7 @@ export function parseConsumo(rows) {
     if (c.cliente >= 0 && c.articulo >= 0 && c.qty >= 0 && c.price >= 0 && c.date >= 0) (hi = i), (col = c);
   }
   if (hi < 0) throw new Error("No encuentro la cabecera: el Excel de consumo debe tener «Cliente», «Artículo», «Unidades», «Precio», «Desc.», «Fecha» y «Nº Documento».");
-  const items = new Map(), nombres = new Map();
+  const items = new Map(), nombres = new Map(), todas = new Map(); // `todas`: TODAS las compras (cliente → [{ pid, qty, date, doc }]); `items`: la última de cada artículo (para precio y descuento)
   const stats = { filas: 0, descartadas: 0, sinFecha: 0, sinUnidades: 0, sinPrecio: 0 };
   for (const r of rows.slice(hi + 1)) {
     if (!r.some((c) => String(c).trim())) continue;
@@ -50,10 +50,12 @@ export function parseConsumo(rows) {
     const doc = col.doc >= 0 ? String(r[col.doc] ?? "").trim() || date : date;
     if (!items.has(cid)) items.set(cid, new Map());
     const nom = col.nombre >= 0 ? String(r[col.nombre] ?? "").trim() : ""; if (nom && !nombres.has(cid)) nombres.set(cid, nom);
+    if (!todas.has(cid)) todas.set(cid, []);
+    todas.get(cid).push({ pid, qty: Math.max(1, Math.round(qty)), date, doc }); // el Excel puede traer TODO lo consumido en 6 meses (varias compras del mismo artículo)
     const m = items.get(cid), antes = m.get(pid);
     if (!antes || date >= antes.date) m.set(pid, { price: Math.round(price * 10000) / 10000, pct: Math.min(100, Math.max(0, Math.round(pct * 100) / 100)), qty: Math.max(1, Math.round(qty)), date, doc });
   }
-  return { items, nombres, stats: { ...stats, clientes: items.size } };
+  return { items, nombres, todas, stats: { ...stats, clientes: items.size } };
 }
 
 export const parseConsumoXlsx = (buf) => parseConsumo(readXlsx(buf));
