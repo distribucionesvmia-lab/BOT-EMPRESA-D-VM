@@ -7,6 +7,7 @@ const bytes = (t) => Buffer.from([...String(t ?? "").replace(/[\r\n\t]+/g, " ")]
 const esc = (b) => Buffer.from([...b].flatMap((x) => (x === 0x28 || x === 0x29 || x === 0x5c ? [0x5c, x] : [x])));
 const ancho = (t, pt) => [...String(t)].reduce((s, c) => s + (/[0-9€]/.test(c) ? 556 : /[ .,:]/.test(c) ? 278 : c === "-" ? 333 : /[A-Z]/.test(c) ? 667 : 520), 0) * pt / 1000;
 const fmt = (n) => Number(n ?? 0).toFixed(2).replace(".", ",") + " €";
+const fmtP = (n) => Number(n ?? 0).toFixed(3).replace(".", ",") + " €"; // precio unitario: 3 decimales
 const fecha = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? "")); return m ? `${m[3]}/${m[2]}/${m[1]}` : ""; };
 const DIAS_L = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"], MESES_L = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const fechaLarga = (iso) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? "")); return m ? `${DIAS_L[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()]} ${+m[3]} de ${MESES_L[+m[2] - 1]} de ${m[1]}` : ""; };
@@ -29,7 +30,7 @@ export function pdfPedido(d) {
     const nombre = parte(l.nombre, 205), formato = parte(l.formato ?? "", 88); const alto = Math.max(nombre.length, formato.length, 1) * 12 + 4;
     if (y - alto < M + 30) { nueva(); cabeceraTabla(); }
     txt(M, y, String(l.cant), { pt: 9 }); formato.forEach((n, i) => txt(M + 38, y - i * 12, n, { pt: 9 })); nombre.forEach((n, i) => txt(M + 130, y - i * 12, n, { pt: 9 }));
-    txt(W - M - 70, y, fmt(l.precio), { pt: 9, der: true }); txt(W - M - 38, y, l.dto ? String(l.dto).replace(".", ",") + " %" : "—", { pt: 9, der: true }); txt(W - M, y, fmt(l.importe), { pt: 9, der: true });
+    txt(W - M - 70, y, fmtP(l.precio), { pt: 9, der: true }); txt(W - M - 38, y, l.dto ? String(l.dto).replace(".", ",") + " %" : "—", { pt: 9, der: true }); txt(W - M, y, fmt(l.importe), { pt: 9, der: true });
     y -= alto;
   }
   if (y < M + 120) { nueva(); }

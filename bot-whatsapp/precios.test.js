@@ -117,10 +117,10 @@ test("MÓVIL con letra grande (Samsung): ninguna caja de altura fija corta los t
   assert.match(ped, /\.ud button \{ flex:1 1 auto; white-space:nowrap/);
 });
 
-test("PRECIOS DE ARTÍCULO: se enseñan con 2 decimales, y con 3 solo si cuestan menos de 1 € y el tercero no es cero (catálogo web); los importes y totales, con 2", async () => {
+test("PRECIOS DE ARTÍCULO: se enseñan SIEMPRE con 3 decimales (catálogo web); los importes y totales, con 2", async () => {
   const fs = await import("node:fs");
   const ped = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
-  assert.match(ped, /const eurp = n => \{ n = Number\(n\); const t = Math\.round\(n \* 1000\)/); // 2 decimales; 3 solo si <1 € y el tercero no es 0
+  assert.match(ped, /const eurp = n => Number\(n\)\.toFixed\(3\)/); // siempre 3 decimales
   assert.match(ped, /price\.textContent = fmtP\(enCaja \? precioCaja\(p\) : Number\(p\.price\)\)/);
   assert.match(ped, /pr\.textContent = eurp\(l\.price\) \+ " \/ ud"/);
   assert.match(ped, /const eur = n => n\.toFixed\(2\)/); // los totales siguen con 2
@@ -173,7 +173,7 @@ test("CATÁLOGO WEB: controles del carrito a 48 px, sin barra fija con el carrit
   assert.match(ped, /\.tl \.hstep button \{ width:48px; height:100%;/);
   assert.match(ped, /<footer hidden role="status"/); // «Añade productos para empezar» solo existe cuando hay algo en el carrito
   assert.match(ped, /document\.querySelector\("footer"\)\.hidden = !n/);
-  assert.match(ped, /"Caja de " \+ p\.unitsPerBox \+ " · " \+ eur\(precioCaja\(p\)\)/); // el precio de la caja, calculado como el importe de línea
+  assert.match(ped, /"Caja de " \+ p\.unitsPerBox \+ " · " \+ eurp\(precioCaja\(p\)\)/); // el precio de la caja, calculado como el importe de línea
   assert.match(ped, /\.app\.compacto \.buscar \{ max-height:0;/); // en apaisado se pliega también el buscador al bajar
   const cli = fs.readFileSync(new URL("./cliente.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
   assert.doesNotMatch(cli, /data-q="hacer pedido"/); // el atajo de abajo se quitó…
