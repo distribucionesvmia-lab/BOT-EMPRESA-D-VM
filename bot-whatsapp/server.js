@@ -737,7 +737,8 @@ async function appRoutes(req, res, url) {
     const corto = (x) => ({ id: x.id, name: x.name, price: x.price, ...(x.img ? { img: x.mini ?? x.img } : {}), ...(x.unitsPerBox ? { unitsPerBox: x.unitsPerBox } : {}), ...(x.soloCaja ? { soloCaja: true } : {}) });
     const ids = String(url.searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 8);
     const porId = new Map(todos.map((x) => [x.id, x]));
-    const habituales = todos.filter((x) => x.count > 0).slice(0, 10).map((x) => ({ ...corto(x), ...(x.lastQty > 0 ? { ultima: x.lastQty } : {}) })); // «La última vez»: unidades
+    const cincoTop = todos.filter((x) => x.count > 0).sort((a, b) => b.count - a.count || String(a.id).localeCompare(String(b.id), "es", { numeric: true })).slice(0, 5).sort((a, b) => compararFamilias(a.fam, b.fam) || String(a.id).localeCompare(String(b.id), "es", { numeric: true })); // los 5 que más consume (de todo su histórico), en el orden de familia y subfamilia de a3ERP
+    const habituales = cincoTop.map((x) => ({ ...corto(x), ...(x.lastQty > 0 ? { ultima: x.lastQty } : {}) })); // «La última vez»: unidades
     const ofertas = todos.filter((x) => x.oferta).slice(0, 10).map((x) => ({ ...corto(x), oferta: { tipo: x.oferta.tipo, valor: x.oferta.valor, ...(x.oferta.hasta ? { hasta: x.oferta.hasta } : {}) } })); // solo las que de verdad le cambian el precio a ESTE cliente
     const lo_mas = habituales.length ? [] : topIds().map((id) => porId.get(String(id))).filter(Boolean).slice(0, 8).map(corto);
     return void sendJson(res, 200, {

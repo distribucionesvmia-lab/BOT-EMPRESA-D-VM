@@ -1366,6 +1366,10 @@
   @media (min-width:768px) and (max-width:1023px) { .pf { grid-template-columns:128px minmax(0, 1fr) auto; } .pf-av { width:128px; height:128px; } }
   @media (min-width:1024px) { .pf-av { width:100%; max-width:230px; height:auto; aspect-ratio:1 / 1; margin:0 auto; } }
   .tl .tl-fam td { padding:var(--s3) var(--s3) var(--s1); font-size:calc(var(--t-cap) / var(--k,1)); font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:var(--text-2); background:transparent; border:0; }
+  .pf.pf-top { border:2px solid var(--ok); background:var(--ok-bg); border-radius:var(--r-card); }
+  .pregunta-nuevo { margin:var(--s4) var(--gutter); padding:var(--s4); background:var(--surface); border:1px solid var(--line); border-radius:var(--r-card); text-align:center; }
+  .pregunta-nuevo p { margin:0 0 var(--s3); font-weight:600; font-size:calc(var(--t-body) / var(--k,1)); }
+  .pregunta-botones { display:flex; gap:var(--s3); } .pregunta-botones .big { flex:1; margin:0; }
 </style>
 </head>
 <body>
@@ -2160,6 +2164,7 @@ function pintarRecientes() {
   for (const x of r) { const b = document.createElement("button"); b.type = "button"; b.textContent = x; b.setAttribute("aria-label", "Buscar de nuevo " + x); b.onpointerdown = ev => ev.preventDefault(); b.onclick = () => { $("q").value = x; query = x; limite = 150; fMarca = fFormato = null; renderList(); }; g.appendChild(b); }
   box.appendChild(g);
 }
+let preguntaNuevoNo = false; // «¿Quieres añadir algún producto nuevo?»: si dice que no, no vuelve a salir hasta recargar
 let ordenCat = "hab", marcaCat = ""; // orden y marca elegidos dentro de una categoría grande
 let limite = 150; // productos pintados a la vez; «Mostrar más» amplía
 let soloCantidad = false; // filtro de la pestaña de habituales: ocultar los artículos sin cantidad marcada
@@ -2281,7 +2286,11 @@ function renderList() {
     }
     return;
   }
-  if (tab === "hab" && !q) items = items.slice().sort((a, b) => compararFamilias(a.fam, b.fam) || (b.count || 0) - (a.count || 0) || compararCodigos(a.id, b.id)); // por familia, subfamilia y artículo (como en a3ERP); dentro de cada subfamilia, lo que más pide primero
+  let topIds = new Set(); // «Histórico»: primero los 5 artículos que más consume (de todo su histórico), luego el resto de los últimos 6 meses; cada grupo en orden de familia, subfamilia y artículo (a3ERP)
+  if (tab === "hab" && !q) {
+    topIds = new Set(data.products.filter(p => p.count > 0).sort((a, b) => b.count - a.count || String(a.id).localeCompare(String(b.id), "es", { numeric: true })).slice(0, 5).map(p => p.id));
+    items = items.slice().sort((a, b) => (topIds.has(a.id) ? 0 : 1) - (topIds.has(b.id) ? 0 : 1) || compararFamilias(a.fam, b.fam) || compararCodigos(a.id, b.id));
+  }
   else if (arbol && ordenCat === "nombre") items = items.slice().sort(cmpNombre);
   else if (arbol && (ordenCat === "pa" || ordenCat === "pd")) items = items.slice().sort((a, b) => (ordenCat === "pa" ? 1 : -1) * (precioUd(a) - precioUd(b)) || cmpNombre(a, b));
   else if (arbol) { // ORDEN FIJO dentro de cada sección: subcategoría (como en el árbol), código de familia/subfamilia de a3ERP, código de artículo y, si no hay código de familia, el nombre. Lo que ya compra NO sube arriba (eso está en «Lo habitual» y en la etiqueta «Lo compras»)
@@ -2297,14 +2306,23 @@ function renderList() {
   if (items.length > limite) { const info = document.createElement("div"); info.className = "cuenta-lista"; info.setAttribute("role", "status"); info.textContent = `Mostrando ${limite} de ${items.length}`; list.appendChild(info); }
   const conGrupos = false; // ya no se separa «lo que sueles pedir» arriba: el orden de la sección es fijo
   const subsVarias = arbol && ordenCat === "hab" && nav.sub === "*" && new Set(items.map(p => p.sub)).size > 1; let subPrev = null; // título por subcategoría cuando se ve toda la categoría
-  let grupo = null, famPrev = null;
+  let grupo = null, famPrev = null, grupoTop = null;
   items.slice(0, limite).forEach(p => {
     if (conGrupos && (p.count > 0 ? "hab" : "resto") !== grupo) { grupo = p.count > 0 ? "hab" : "resto"; const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = grupo === "hab" ? "Lo que sueles pedir" : "Todo lo demás"; list.appendChild(t); }
     if (subsVarias && p.sub !== subPrev) { subPrev = p.sub; const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = marcaDe(p) || ""; if (t.textContent) list.appendChild(t); }
-    list.appendChild(row(p));
+    if (tab === "hab" && !q) { const esTop = topIds.has(p.id); if (esTop !== grupoTop) { grupoTop = esTop; const t = document.createElement("h3"); t.className = "grp-tit"; t.textContent = esTop ? "Los 5 artículos que más consumes" : "Otros artículos de los últimos 6 meses"; list.appendChild(t); } }
+    const fr = row(p); if (tab === "hab" && !q && topIds.has(p.id)) fr.classList.add("pf-top"); list.appendChild(fr);
   });
   entrada(list, ".pf");
   if (obsMas) { obsMas.disconnect(); obsMas = null; }
+  if (tab === "hab" && !q && items.length && items.length <= limite && !preguntaNuevoNo) { // al final del Histórico: ¿algún artículo nuevo del catálogo?
+    const pq = document.createElement("div"); pq.className = "pregunta-nuevo"; pq.setAttribute("role", "group"); pq.setAttribute("aria-label", "¿Quieres añadir algún producto nuevo del catálogo?");
+    const t = document.createElement("p"); t.textContent = "¿Quieres añadir algún producto nuevo del catálogo?"; pq.appendChild(t);
+    const fl = document.createElement("div"); fl.className = "pregunta-botones";
+    const si = document.createElement("button"); si.type = "button"; si.className = "big"; si.textContent = "Sí"; si.onclick = () => cambiarTab("all");
+    const no = document.createElement("button"); no.type = "button"; no.className = "big sec"; no.textContent = "No"; no.onclick = () => { preguntaNuevoNo = true; pq.remove(); aviso("Vale. Cuando quieras, revisa tu pedido."); };
+    fl.append(si, no); pq.appendChild(fl); list.appendChild(pq);
+  }
   if (items.length > limite) {
     const m = document.createElement("button"); m.type = "button"; m.className = "big sec"; m.style.margin = "12px 14px"; m.style.width = "calc(100% - 28px)"; // sin esto el botón se salía 28 px y la lista se movía de lado
     const mas = () => { const alto = list.scrollTop; limite += 150; renderList(); list.scrollTop = alto; };

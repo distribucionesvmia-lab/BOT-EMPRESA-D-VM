@@ -498,6 +498,7 @@
   .vm-inicio .in-botones { display:flex; flex-direction:column; gap:var(--s3,12px); }
   .vm-inicio .in-botones .vm-btn { width:100%; max-width:none; min-height:56px; white-space:normal; }
   .vm-inicio .in-botones .in-nuevo { background:var(--ok); color:var(--on-ok,#fff); }
+  .vm-inicio .in-prod.in-verde { background:var(--ok-bg); border:2px solid var(--ok); border-radius:22px; }
   .vm-inicio .in-sec h3, .vm-inicio .in-ayuda h3 { margin:0 0 var(--s2); font-size:calc(var(--t-md) / var(--k,1)); line-height:1.2; font-weight:700; letter-spacing:-.015em; }
   .vm-inicio .in-hscroll { scroll-padding-left:var(--gutter); display:flex; gap:var(--s3); overflow-x:auto; padding:2px var(--gutter) var(--s2); margin:0 calc(-1 * var(--gutter)); scrollbar-width:none; scroll-snap-type:x proximity; }
   .vm-inicio .in-hscroll::-webkit-scrollbar { display:none; }
@@ -1998,13 +1999,10 @@ function inicio(ui) {
     }
     if (ui.last?.lineas?.length) c.insertBefore(hacer, principal); // «Hacer pedido» arriba del todo: lo primero que se alcanza (antes estaba tras la tarjeta del pedido anterior)
   } else {
-    // Dos botones: pedido nuevo (verde, al catálogo) y añadir desde el histórico (rojo, a la pestaña Histórico). Ninguno envía nada.
+    // Un botón verde grande que lleva al Histórico del catálogo. No envía nada.
     principal.remove();
-    hacer.className = "vm-btn in-hacer in-nuevo"; hacer.textContent = "Hacer pedido nuevo"; hacer.onclick = () => { location.href = cat; }; // directo al catálogo completo
+    hacer.className = "vm-btn in-hacer in-nuevo"; hacer.textContent = "Hacer pedido de productos habituales"; hacer.onclick = () => { location.href = cat + "#tab=hab"; }; // directo a «Histórico» (sus artículos: los 5 que más consume y el resto de los últimos 6 meses)
     const grupo = el("div", "in-botones"); grupo.appendChild(hacer);
-    const anad = el("button", "vm-btn primary in-anadir", "Añadir al carrito desde mi histórico"); anad.type = "button";
-    anad.onclick = () => { location.href = cat + "#tab=hab"; }; // directo a la pestaña «Histórico» del catálogo (lo pedido en los últimos 6 meses)
-    grupo.appendChild(anad);
     c.insertBefore(grupo, secciones);
   }
   // Datos que completan la pantalla
@@ -2031,12 +2029,12 @@ function inicio(ui) {
     }
     const lista = j.tieneHistorial ? j.habituales : j.loMasPedido;
     if (lista?.length) {
-      const sec = el("section", "in-sec"); sec.setAttribute("aria-label", j.tieneHistorial ? "Lo habitual" : "Lo más pedido");
-      const cab = el("div", "in-sec-cab"); cab.appendChild(el("h3", null, j.tieneHistorial ? "Lo habitual" : "Lo más pedido"));
-      if (j.tieneHistorial) { const todos = el("a", "in-vertodos", "Ver todos"); todos.href = cat + "#tab=hab"; todos.setAttribute("aria-label", "Ver todo el histórico"); cab.appendChild(todos); }
+      const sec = el("section", "in-sec"); sec.setAttribute("aria-label", j.tieneHistorial ? "Los 5 artículos que más consumes" : "Lo más pedido");
+      const cab = el("div", "in-sec-cab"); cab.appendChild(el("h3", null, j.tieneHistorial ? "Los 5 artículos que más consumes" : "Lo más pedido"));
+      if (j.tieneHistorial) { const todos = el("a", "in-vertodos", "Mis artículos"); todos.href = cat + "#tab=hab"; todos.setAttribute("aria-label", "Mis artículos: todo lo que has pedido en los últimos 6 meses"); cab.appendChild(todos); }
       sec.appendChild(cab);
       const fila = el("div", "in-hscroll");
-      for (const p of lista) fila.appendChild(tarjeta(p, ""));
+      for (const p of lista) { const t = tarjeta(p, ""); if (j.tieneHistorial) t.classList.add("in-verde"); fila.appendChild(t); } // los 5 que más consume: tarjeta redondeada en verde
       sec.appendChild(fila); secciones.appendChild(sec);
     }
     if (j.ayuda && (j.ayuda.tel || j.ayuda.horario || j.ayuda.whatsappHref)) { // tarjeta comercial: solo con teléfono u horario configurados

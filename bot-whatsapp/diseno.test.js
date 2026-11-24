@@ -78,7 +78,7 @@ test("Inicio: saludo por hora de Madrid, «hoy» solo con la regla de siempre, p
   assert.match(cli, /timeZone: "Europe\/Madrid", hour: "numeric"/); assert.match(cli, /"Buenos días" : h < 21 \? "Buenas tardes" : "Buenas noches"/);
   assert.match(cli, /fetch\("\/catalogo\/aviso"\)[^\n]*j\?\.entregaHoy/); // la misma regla del servidor (Medina del Campo, laborable, antes de las 10:00)
   assert.match(cli, /\.in-foto \{ width:44px; height:44px; margin-left:calc\(-1 \* var\(--s3\)\)/); // miniaturas solapadas
-  assert.match(cli, /Empieza tu primer pedido/); assert.match(cli, /"Lo más pedido"/); assert.match(cli, /"Lo habitual"/);
+  assert.match(cli, /Empieza tu primer pedido/); assert.match(cli, /"Lo más pedido"/); assert.match(cli, /"Los 5 artículos que más consumes"/);
   assert.match(cli, /\.in-prod \{[^}]*width:148px/);
   assert.match(cli, /j\.ayuda && \(j\.ayuda\.tel \|\| j\.ayuda\.horario \|\| j\.ayuda\.whatsappHref\)/);
   assert.match(cli, /if \(!j\?\.fijo \|\| !j\.hoy\.toca \|\| j\.hoy\.yaPidio\) return;/); // «Revisar y enviar» solo el día que toca
@@ -142,10 +142,10 @@ test("direcciones guardadas: lista con «Quitar», casilla para guardar una nuev
   assert.match(pedido, /\.dirop \{[^}]*min-height:48px/);
 });
 
-test("Inicio: fila «Ofertas» con la etiqueta de % o € y la fecha de fin, antes de «Lo habitual»", () => {
+test("Inicio: fila «Ofertas» con la etiqueta de % o € y la fecha de fin, antes de «Los 5 artículos que más consumes»", () => {
   const cli = leer("./cliente.html");
   assert.match(cli, /sec\.appendChild\(el\("h3", null, "Ofertas"\)\)/); assert.match(cli, /" · hasta el " \+ o\.hasta/);
-  assert.ok(cli.indexOf('"Ofertas"') < cli.indexOf('"Lo habitual"'));
+  assert.ok(cli.indexOf('"Ofertas"') < cli.indexOf('"Los 5 artículos que más consumes"'));
   assert.match(cli, /\.vm-inicio \.in-oferta \{ position:absolute;/);
 });
 
