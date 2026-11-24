@@ -1389,6 +1389,9 @@
   .pregunta-nuevo { margin:var(--s4) var(--gutter); padding:var(--s4); background:var(--surface); border:1px solid var(--line); border-radius:var(--r-card); text-align:center; }
   .pregunta-nuevo p { margin:0 0 var(--s3); font-weight:600; font-size:calc(var(--t-body) / var(--k,1)); }
   .pregunta-botones { display:flex; gap:var(--s3); } .pregunta-botones .big { flex:1; margin:0; }
+
+  /* Tarjetas de subcategoría dentro de una categoría */
+  .ver-todo { margin:var(--s2) var(--gutter) 0; width:calc(100% - 2 * var(--gutter)); }
 </style>
 </head>
 <body>
@@ -1983,7 +1986,7 @@ function conTransicion(fn) {
   const h = document.documentElement; h.classList.add("vt-lista");
   try { const t = document.startViewTransition(fn); t.finished.finally(() => h.classList.remove("vt-lista")); } catch { h.classList.remove("vt-lista"); fn(); }
 }
-const irA = (cat, sub) => conTransicion(() => { if (cat !== nav.cat) { ordenCat = "hab"; marcaCat = ""; } animarLista = true; limite = 150; nav = { cat, sub: cat && sub === null ? "*" : sub }; $("list").scrollTop = 0; renderList(); }); // entrar en una categoría enseña ya sus productos (las subcategorías son chips arriba)
+const irA = (cat, sub) => conTransicion(() => { if (cat !== nav.cat) { ordenCat = "hab"; marcaCat = ""; } animarLista = true; limite = 150; nav = { cat, sub: cat && cat !== FAVS && sub === null ? ((((data.tree || []).find(x => x.id === cat) || {}).subs || []).length > 1 ? null : "*") : cat && sub === null ? "*" : sub }; $("list").scrollTop = 0; renderList(); }); // entrar en una categoría enseña ya sus productos (las subcategorías son chips arriba)
 // Foto representativa de una sección: un producto suyo con foto (se prefiere el más típico de la sección); sin foto, una letra de color
 const PREFIERE = { cafe: /capsula|molido|grano|natural/i, pascual: /leche/i, vinos: /ribera|crianza|reserva|verdejo|rueda|cava/i, aguas: /\bagua\b|bezoya/i, despensa: /aceite|oliva/i, refrigerados: /queso|jamon|chorizo|salchich/i, "f-hosteleria-y-menaje": /\bvaso|copa/i };
 function fotoDe(cat, sub) {
@@ -2050,6 +2053,22 @@ function migas(list, texto, atras, etiqueta = "Catálogo") {
   m.append(b, t); list.appendChild(m);
 }
 const esc = t => String(t).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+function renderSubTarjetas(list, c) { // tarjetas de subcategoría (foto del más vendido + «N artículos»), como las de las categorías
+  migas(list, `<b>${esc(c.nombre)}</b>`, () => irA(null, null));
+  const todo = document.createElement("button"); todo.type = "button"; todo.className = "sub todo ver-todo";
+  todo.innerHTML = `<span>Ver todo ${esc(c.nombre)}</span><small>${c.count} ›</small>`; todo.onclick = () => irA(c.id, "*"); list.appendChild(todo);
+  const g = document.createElement("div"); g.className = "cats";
+  for (const s of c.subs) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "cat";
+    const i = document.createElement("span"); i.className = "ico";
+    const tf = s.top && (escritorio() ? s.top.img : s.top.mini || s.top.img);
+    if (tf) { i.classList.add("foto-fam"); const im = document.createElement("img"); im.src = tf; im.alt = ""; im.width = 72; im.height = 72; im.decoding = "async"; im.loading = "lazy"; i.appendChild(im); } else i.innerHTML = iconoCat(c.id);
+    const n = document.createElement("b"); n.textContent = s.nombre;
+    const k = document.createElement("small"); k.textContent = s.count + (s.count === 1 ? " artículo" : " artículos");
+    b.append(i, n, k); b.onclick = () => irA(c.id, s.id); g.appendChild(b);
+  }
+  list.appendChild(g);
+}
 function renderSubs(list, c) {
   migas(list, `<b>${esc(c.nombre)}</b>`, () => irA(null, null));
   const g = document.createElement("div"); g.className = "subs";
@@ -2248,10 +2267,12 @@ function renderList() {
     if (nav.cat === FAVS) { renderFavoritos(list); return entrada(list, ".pf"); } // «Mis favoritos»: una sección más del catálogo (entra en el historial del navegador como cualquier categoría)
     const c = data.tree.find(x => x.id === nav.cat);
     if (!c) { nav = { cat: null, sub: null }; return renderCategorias(list); }
+    if (nav.sub === null && c.subs.length > 1) { renderSubTarjetas(list, c); return entrada(list, ".cat"); } // categoría con varias subcategorías: sus propias tarjetas
     if (nav.sub === null) nav.sub = "*";
     cabecera = () => { // barra fija con fondo: «‹ Catálogo», el nombre y, si hay varias, las subcategorías como chips
       const w = document.createElement("div"); w.className = "cab-cat";
-      migas(w, `<b>${esc(c.nombre)}</b>`, () => irA(null, null), "Catálogo");
+      const variasSubs = c.subs.length > 1, subActual = variasSubs && nav.sub !== "*" ? c.subs.find(x => x.id === nav.sub) : null;
+      migas(w, `<b>${esc(subActual ? subActual.nombre : c.nombre)}</b>`, variasSubs ? () => irA(c.id, null) : () => irA(null, null), variasSubs ? c.nombre : "Catálogo");
       if (c.subs.length > 1) {
         const ch = document.createElement("div"); ch.className = "subchips"; ch.setAttribute("role", "group"); ch.setAttribute("aria-label", "Subcategorías de " + c.nombre);
         const chip = (txt, n, on, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "subchip"; b.setAttribute("aria-pressed", String(on)); b.append(txt + " "); const sm = document.createElement("small"); sm.textContent = n; b.appendChild(sm); b.onclick = fn; ch.appendChild(b); };
@@ -2475,6 +2496,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden && !pe
 // Categorías y subcategorías en el orden de a3ERP: primero la que tiene el código de familia más bajo (la leche de Pascual, etc.); sin código de familia, al final y como estaban
 function ordenarArbol(d) {
   if (!d || !(d.tree || []).length) return;
+  if (d.tree.every(c => typeof c.o === "number")) { d.tree = d.tree.slice().sort((a, b) => a.o - b.o); for (const c of d.tree) c.subs = (c.subs || []).slice().sort((a, b) => (a.o ?? 99) - (b.o ?? 99)); return; } // catálogo por tipo: el servidor ya manda el orden
   const minimo = new Map(); // «cat» y «cat/sub» → menor código de familia de sus artículos
   for (const p of d.products) { const f = limpiaFam(p.fam); if (!f) continue; for (const k of [p.cat, p.cat + "/" + p.sub]) { const m = minimo.get(k); if (m === undefined || compararFamilias(f, m) < 0) minimo.set(k, f); } }
   // sin código de familia en los artículos (aún no se ha subido el Excel de a3ERP), se usa el del mapa de categorías del servidor (data.famOrden, por nombre)

@@ -22,6 +22,7 @@ import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2, promoVigente, precioEfectivo, hoyMadrid } from "./pricing.js";
 import { categorizar, CATEGORIAS } from "./categorias.js";
 import { conArbolA3erp } from "./arbol-a3erp.js";
+import { conArbolTipos, TIPOS } from "./arbol-tipos.js";
 import { compararFamilias } from "./ordenfamilia.js";
 import { descargarFoto } from "./foto-url.js";
 import { runExport } from "./exporter.js";
@@ -104,9 +105,11 @@ function vistaExcel(lista) {
 const leerJson = (f) => { try { return JSON.parse(fs.readFileSync(new URL(f, import.meta.url), "utf8")); } catch { return {}; } };
 const FAM_NOMBRES = leerJson("./familias-nombres.json"), FAM_CATEGORIAS = leerJson("./familias-categorias.json");
 // Mismo árbol y mismo orden que ve el cliente (catalogoParaClientes de server.js): familias de a3ERP si ya vienen en los artículos; si no, el árbol de la web
-export function clasificarComoCliente(lista) { return process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(lista, FAM_NOMBRES, FAM_CATEGORIAS) : lista; }
+export function clasificarComoCliente(lista) { if (process.env.ARBOL_TIPOS !== "0") return conArbolTipos(lista); return process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(lista, FAM_NOMBRES, FAM_CATEGORIAS) : lista; }
 /** Orden de las categorías como en la vista del cliente: menor código de familia de a3ERP de sus artículos; sin código, el orden de la web (CATEGORIAS), y al final las demás. */
 export function ordenCategorias(filas) {
+  const nombreDe = new Map(filas.map((x) => [x.categoriaId, x.categoria])), tipoPos = (id) => TIPOS.findIndex((t) => t.nombre === nombreDe.get(id));
+  if (process.env.ARBOL_TIPOS !== "0" && filas.some((x) => tipoPos(x.categoriaId) >= 0)) return (idA, idB) => ((tipoPos(idA) < 0 ? 99 : tipoPos(idA)) - (tipoPos(idB) < 0 ? 99 : tipoPos(idB))) || String(idA).localeCompare(String(idB)); // catálogo por tipo: su orden
   const menor = new Map();
   for (const x of filas) { const f = String(x.familia ?? "").trim(); if (!f) continue; const a = menor.get(x.categoriaId); if (a === undefined || compararFamilias(f, a) < 0) menor.set(x.categoriaId, f); }
   const web = new Map(CATEGORIAS.map((c, i) => [c.id, i]));

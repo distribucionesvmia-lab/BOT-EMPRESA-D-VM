@@ -26,6 +26,7 @@ export function accesosDe(tree) {
   for (const [titulo, re] of quiero) {
     let mejor = null;
     for (const c of tree ?? []) for (const s of c.subs ?? []) if (re.test(s.nombre) && (!mejor || s.count > mejor.count)) mejor = { cat: c.id, sub: s.id, count: s.count };
+    if (!mejor && /^cervezas?$/i.source === re.source) { const c = (tree ?? []).find((x) => re.test(x.nombre)); if (c) mejor = { cat: c.id, sub: "*", count: c.count }; } // categoría «Cervezas» (catálogo por tipo)
     if (mejor) out.push({ nombre: titulo, ...mejor });
   }
   return out;
