@@ -8,7 +8,7 @@ import path from "node:path";
 import { parseClientesXlsx, extractPhones, extractEmails } from "./clientes-import.js";
 import { parseNumber, PRECIO_MAXIMO } from "./productos-import.js";
 import { nifKeys } from "./nif-key.js";
-import { parseHistorialXlsx, recortarPedidos } from "./historial-import.js";
+import { parseHistorialXlsx, recortarPedidos, hace, MESES_HABITUALES } from "./historial-import.js";
 import { parseConsumoXlsx, esCabeceraConsumo } from "./consumo-import.js";
 import { unzip, readXlsx, filasConFoto } from "./xlsx-read.js";
 import { leerExcel, saltosDePrecio } from "./actualizar-productos.js";
@@ -223,7 +223,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
 
   // ---------- consumo de clientes (precio y descuento propios de cada cliente + artículos que compra) ----------
   function consumo(buf, { sinPrecios = false, soloCompras = false } = {}) {
-    const { items, nombres, stats } = parseConsumoXlsx(buf);
+    const { items, nombres, todas, stats } = parseConsumoXlsx(buf);
     if (!items.size) throw new Error("El Excel de consumo no tiene líneas válidas.");
     const sinCeros = (x) => String(x).trim().replace(/^0+(?=\d)/, ""); // «0365» y «365» son el mismo código si no hay otro igual
     const indice = (ids) => { const m = new Map(); for (const id of ids) { const k = sinCeros(id); m.set(k, m.has(k) ? null : id); } return m; };
@@ -236,7 +236,7 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     const palabras = (t) => nrm(t).split(" ").filter((w) => w.length >= 3 && !STOP.has(w));
     const mismoNombre = (excel, ...base) => { const A = palabras(excel), B = base.flatMap(palabras); if (!A.length || !B.length) return null; /* no se puede comprobar */ return A.some((w) => B.some((v) => v === w || (w.length >= 5 && v.length >= 5 && (w.startsWith(v) || v.startsWith(w))))); };
     const coma = (t) => String(t).replace(".", ","), eur = (n) => coma(`${Number(n).toFixed(4).replace(/\.?0+$/, "")} €`), pc = (n) => coma(`${Number(n)} %`);
-    const r = { desNuevos: 0, desCambian: 0, preNuevos: 0, preCambian: 0, pedNuevos: 0, iguales: 0, desconocidos: 0, otroNombre: 0, sinComprobar: 0, desCien: 0, artDesconocidos: 0, conCoincidenciaSinCeros: 0 };
+    const r = { desNuevos: 0, desCambian: 0, preNuevos: 0, preCambian: 0, pedNuevos: 0, pedCambian: 0, pedQuitan: 0, iguales: 0, desconocidos: 0, otroNombre: 0, sinComprobar: 0, desCien: 0, artDesconocidos: 0, conCoincidenciaSinCeros: 0 };
     const paraPrecios = new Map(), paraPedidos = new Map(), filas = [], noExisten = [], artSin = new Set(), otroNombre = [];
     // Resumen por tipo de línea (cada pareja cliente–artículo cae en UNA sola), con el desglose de cada una
     const grupos = { normal: [], descuento: [], regalo: [], soloPrecio: [], artSin: [], cliSin: [], otroNombre: [] };
@@ -252,9 +252,6 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
       for (const [pidRaw, it] of pares) {
         const [pid, prod] = producto(pidRaw);
         if (!pid) { r.artDesconocidos++; artSin.add(pidRaw); grupos.artSin.push({ cliente: a.name, articulo: `Código ${pidRaw}`, texto: "no está en el catálogo: sube antes «Productos y precios»", orden: 0 }); continue; }
-        const k = `${it.date}|${it.doc}`;
-        if (!docs.has(k)) docs.set(k, { doc: it.doc, date: it.date, lines: [] });
-        docs.get(k).lines.push({ productId: pid, qty: it.qty });
         { // DESCUENTO especial: lo que se le cobró (también 0 %: si la tarifa tiene descuento y a él no se le hizo, se guarda 0 %) si es distinto del que ya le sale; el 100 % (regalo) no cuenta. Es independiente del precio: un artículo a precio de tarifa puede llevar descuento propio y uno a precio especial puede llevar el suyo aparte.
           const efectivo = a.discounts[pid] ?? (descuentoTarifaActivo() ? prod.discount : 0) ?? 0;
           if (it.pct >= 100) r.desCien++; // 100 %: es un regalo, nunca se guarda como descuento del cliente
@@ -277,12 +274,26 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
           else grupos.normal.push({ ...f, texto: cambiaD || cambiaP ? `precio de tarifa ${eur(prod.price)}, sin descuento · se quita lo especial que tenía (${estado})` : `precio de tarifa ${eur(prod.price)}, sin descuento`, orden });
         }
       }
-      // historial: se AÑADEN los documentos que el cliente aún no tiene (por fecha y número); lo que ya tenía no se toca ni se borra
-      const tenidos = new Set(a.orders.map((o) => `${o.date}|${o.doc}`)), nuevosDocs = [...docs.values()].filter((o) => !tenidos.has(`${o.date}|${o.doc}`));
-      if (nuevosDocs.length) { r.pedNuevos += nuevosDocs.length; paraPedidos.set(cid, recortarPedidos([...a.orders, ...nuevosDocs])); }
+      // historial: el Excel trae TODAS las compras de los últimos 6 meses. Cada compra (fecha + nº de documento) del Excel SUSTITUYE a la que hubiera guardada con la misma clave (las cargas antiguas solo traían el último servicio de cada artículo: líneas incompletas) y las compras de los últimos 6 meses que ya no salen en el Excel se quitan (eran incompletas o falsas); lo anterior a 6 meses no se toca
+      for (const t of todas.get(cidRaw) ?? []) {
+        const [pid] = producto(t.pid); if (!pid) continue;
+        const k = `${t.date}|${t.doc}`;
+        if (!docs.has(k)) docs.set(k, { doc: t.doc, date: t.date, lines: [] });
+        const d = docs.get(k), l = d.lines.find((x) => x.productId === pid);
+        if (l) l.qty += t.qty; else d.lines.push({ productId: pid, qty: t.qty });
+      }
+      const desdeSeis = hace(MESES_HABITUALES), firma = (o) => o.lines.map((l) => `${l.productId}:${Math.floor(Number(l.qty))}`).sort().join(","), key = (o) => `${o.date}|${o.doc}`;
+      const guardados = new Map(a.orders.map((o) => [key(o), o])), nuevosDocs = [], cambiadosDocs = [];
+      for (const o of docs.values()) { const g = guardados.get(key(o)); if (!g) nuevosDocs.push(o); else if (firma(g) !== firma(o)) cambiadosDocs.push(o); }
+      const quitadosDocs = docs.size ? a.orders.filter((o) => String(o.date) >= desdeSeis && !docs.has(key(o))) : [];
+      if (nuevosDocs.length || cambiadosDocs.length || quitadosDocs.length) {
+        r.pedNuevos += nuevosDocs.length; r.pedCambian += cambiadosDocs.length; r.pedQuitan += quitadosDocs.length;
+        const sinTocar = a.orders.filter((o) => !docs.has(key(o)) && !quitadosDocs.includes(o));
+        paraPedidos.set(cid, recortarPedidos([...sinTocar, ...docs.values()]));
+      }
       if (Object.keys(precios).length || Object.keys(descuentos).length) paraPrecios.set(cid, { precios, descuentos });
-      if (!cambios.length && !nuevosDocs.length) { r.iguales++; continue; }
-      filas.push({ id: cid, nombre: a.name, pedidosNuevos: nuevosDocs.length, cambios: cambios.slice(0, 80) });
+      if (!cambios.length && !nuevosDocs.length && !cambiadosDocs.length && !quitadosDocs.length) { r.iguales++; continue; }
+      filas.push({ id: cid, nombre: a.name, pedidosNuevos: nuevosDocs.length, pedidosCambian: cambiadosDocs.length, pedidosQuitan: quitadosDocs.length, cambios: cambios.slice(0, 80) });
     }
     const cambiar = new Set([...paraPrecios.keys(), ...paraPedidos.keys()]);
     const aviso = [];
@@ -296,8 +307,9 @@ export function crearActualizador({ catalogDb, customersDb, accountsDb, imgDir =
     if (!soloCompras) aviso.push("OJO: esta carga también calcula precios y descuentos propios a partir de la última factura y puede pisar lo cargado con los PDF de «Descuentos especiales» y «Precios especiales». Desde el panel esto ya no se usa.");
     if (cambiar.size === 0 && r.iguales === 0) aviso.push("Ningún cliente del Excel existe en la base: sube antes el Excel de clientes. No se puede aplicar.");
     const confirmar = [];
+    if (r.pedQuitan) confirmar.push(`${r.pedQuitan} compras de los últimos 6 meses que ya estaban guardadas NO salen en este Excel y se quitarán (y ${r.pedCambian} se completarán con sus líneas de verdad): este Excel pasa a ser la verdad de los últimos 6 meses de esos clientes. Confírmalo solo si el Excel trae TODO lo que consumieron esos clientes en ese tiempo.`);
     if (r.preNuevos + r.preCambian) confirmar.push(`${r.preNuevos + r.preCambian} precios propios de clientes serían DISTINTOS de la tarifa de hoy (mira «Precio · …» en el detalle). Confírmalo solo si son precios especiales de esos clientes y no una tarifa antigua: después, esos clientes pagarían ese precio aunque la tarifa cambie.`);
-    const resumen = { clientesConCambios: cambiar.size, descuentosNuevos: r.desNuevos, descuentosCambian: r.desCambian, preciosPropiosNuevos: r.preNuevos, preciosPropiosCambian: r.preCambian, pedidosNuevos: r.pedNuevos, iguales: r.iguales, desconocidos: r.desconocidos, nombreNoCoincide: r.otroNombre, lineas: stats.filas, sinFecha: stats.sinFecha };
+    const resumen = { clientesConCambios: cambiar.size, descuentosNuevos: r.desNuevos, descuentosCambian: r.desCambian, preciosPropiosNuevos: r.preNuevos, preciosPropiosCambian: r.preCambian, pedidosNuevos: r.pedNuevos, pedidosCompletados: r.pedCambian, pedidosQuitados: r.pedQuitan, iguales: r.iguales, desconocidos: r.desconocidos, nombreNoCoincide: r.otroNombre, lineas: stats.filas, sinFecha: stats.sinFecha };
     const TOPE_CAT = 300, ordena = (l) => l.map((x, k) => [x, k]).sort((a, b) => a[0].orden - b[0].orden || a[1] - b[1]).map(([x]) => ({ cliente: x.cliente, articulo: x.articulo, texto: x.texto }));
     const cat = (id, titulo, lista, extra = {}) => ({ id, titulo, total: extra.total ?? lista.length, filas: ordena(lista).slice(0, TOPE_CAT) });
     const categorias = [

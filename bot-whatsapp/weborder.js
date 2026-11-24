@@ -66,8 +66,9 @@ export function webProducts(customer, catalog, habitualProducts, imgOf = () => n
       ...(imgOf(String(p.id)) && iaOf(String(p.id)) ? { ia: true } : {}), // la foto está generada con IA (se avisa en pequeño)
       lastQty: habit.get(p.id)?.lastQty ?? null,
       count: habit.get(p.id)?.count ?? 0,
+      units: habit.get(p.id)?.units ?? 0,
     }))
-    .sort((a, b) => b.count - a.count || claveOrdenNombre(a.name).localeCompare(claveOrdenNombre(b.name), "es"))
+    .sort((a, b) => b.count - a.count || b.units - a.units || claveOrdenNombre(a.name).localeCompare(claveOrdenNombre(b.name), "es"))
     .filter((p) => !sinCoste(p)) // precio 0 o descuento del 100 % (el precio y el descuento ya son los de ESTE cliente): no se vende
     .filter((p, i, todos) => todos.findIndex((x) => x.id === p.id) === i && String(p.name ?? "").trim()) // mismo código solo una vez; sin nombre, no hay tarjeta
     .reduce((acc, p) => { // mismo nombre, precio y caja → se enseña uno: el que el cliente ya compra o, si no, el de código menor
