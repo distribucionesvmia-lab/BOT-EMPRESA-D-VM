@@ -1730,3 +1730,15 @@ test("DIRECCIÓN DE LOS ENLACES: se puede fijar desde el panel, se rechaza una i
   assert.equal((await dir({ direccion: "" })).status, 200); // vaciar vuelve a la detectada
   assert.match(fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8").replace(/\r\n/g, "\n"), /id="inv-base-g"/);
 });
+
+test("ARTÍCULOS DEL PANEL: mismo orden de categorías que el cliente, familia en cada fila, descarga de fotos solo de internet y miniatura del panel", async () => {
+  const l = (await call("GET", "/api/admin/articulos", { admin: true })).json;
+  assert.ok(l.filas.length && l.categorias.length && "familia" in l.filas[0] && "subcategoria" in l.filas[0]);
+  const orden = l.categorias.map((c) => c.id), vistas = []; for (const x of l.filas) if (!vistas.includes(x.categoriaId)) vistas.push(x.categoriaId);
+  assert.deepEqual(vistas, orden.filter((c) => vistas.includes(c)), "las filas salen agrupadas por categoría en el mismo orden que el desplegable");
+  const desc = (url, admin = true) => fetch(BASE + "/api/admin/fotos/descargar", { method: "POST", headers: { ...(admin ? { Authorization: `Bearer ${ADMIN}` } : {}), "Content-Type": "application/json" }, body: JSON.stringify({ url }) });
+  assert.ok([401, 403].includes((await desc("https://example.com/a.jpg", false)).status));
+  for (const u of ["http://127.0.0.1:3000/health", "http://localhost/x.png", "http://192.168.1.5/x.png", "ftp://example.com/a.jpg", "file:///etc/passwd", "no es una dirección"]) { const r = await desc(u); assert.equal(r.status, 400, u); assert.ok((await r.json()).error); }
+  assert.equal((await call("GET", "/api/admin/foto/NOEXISTE9?t=m", { admin: true })).status, 404);
+  assert.match(fs.readFileSync(new URL("./empresa.html", import.meta.url), "utf8").replace(/\r\n/g, "\n"), /fotoDeArrastre/);
+});

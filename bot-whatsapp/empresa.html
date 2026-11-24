@@ -214,7 +214,7 @@
   @media (max-width: 640px) { .pausa-botones { grid-template-columns:1fr; } }
   @media (prefers-color-scheme: dark) { .pausa-pill { color:#6fd49b; border-color:#6fd49b; background:rgba(111,212,155,.1); } .pausa-pill.on { color:#fff; background:var(--accent); border-color:var(--accent); } }
   #nuevos-lista { max-height:280px; overflow:auto; } .hoy-tareas details { margin-top:4px; } .hoy-tareas summary { cursor:pointer; color:var(--accent); font-size:12px; } .hoy-tareas details p { margin:4px 0 0; font-size:12px; color:var(--muted); word-break:break-word; }
-  dialog.reclave { border:1px solid var(--line); border-radius:14px; padding:20px; max-width:420px; width:calc(100% - 32px); background:var(--card, #fff); color:var(--text); } dialog.reclave::backdrop { background:rgba(0,0,0,.45); } dialog.reclave h3 { margin:0 0 6px; } dialog.reclave p { margin:0 0 12px; color:var(--muted); } dialog.reclave input { width:100%; margin-bottom:12px; } dialog.reclave .acciones { margin:0; }
+  dialog.reclave { border:1px solid var(--line); border-radius:14px; padding:20px; max-width:420px; width:calc(100% - 32px); background:var(--panel); color:var(--text); } dialog.reclave::backdrop { background:rgba(0,0,0,.45); } dialog.reclave h3 { margin:0 0 6px; } dialog.reclave p { margin:0 0 12px; color:var(--muted); } dialog.reclave input { width:100%; margin-bottom:12px; } dialog.reclave .acciones { margin:0; }
   .f2-lista { margin:0 0 10px 18px; padding:0; display:grid; gap:6px; } .f2-rec { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; } .f2-rec span { font:700 15px/1 ui-monospace, Consolas, monospace; padding:8px 10px; background:var(--line-2); border-radius:8px; text-align:center; letter-spacing:.08em; }
   .rev-fila { display:flex; gap:12px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line-2); } .rev-fila:last-child { border-bottom:0; }
   .rev-fila small { color:var(--muted); display:block; margin-top:2px; } .rev-fila .rev-fix { color:var(--text); }
@@ -257,6 +257,9 @@
   .fi-ch button { min-height:22px; width:22px; padding:0; border-radius:50%; font-size:11px; line-height:1; } .fi-fila-add { display:flex; gap:8px; min-width:0; } .fi-fila-add input { flex:1 1 0; min-width:0; width:auto; } .fi-fila-add button { flex:none; } .fi-form .campo { min-width:0; }
   .fi-form label.inv-check { display:flex; flex-direction:row; align-items:flex-start; justify-content:flex-start; text-align:left; gap:10px; } .fi-form label.inv-check > span { text-align:left; } .ayuda.err { color:var(--accent); font-weight:600; }
   .av-seg { margin:0 0 14px; max-width:420px; } .co-vista { white-space:pre-wrap; word-break:break-word; margin:14px 0 0; padding:14px; border:1px dashed var(--line); border-radius:10px; background:var(--th); font:13px/1.5 ui-monospace, Menlo, Consolas, monospace; max-height:340px; overflow:auto; }
+  .ar-fila { display:flex; gap:12px; align-items:flex-start; } .ar-txt { min-width:0; flex:1 1 auto; } .ar-miniatura { flex:0 0 72px; width:72px; height:72px; border:1px solid var(--line); border-radius:8px; background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden; } .ar-miniatura img { width:100%; height:100%; object-fit:contain; display:block; } .ar-miniatura.sin { background:var(--th); } .ar-miniatura.sin img { display:none; } .ar-miniatura span { font-size:11px; color:var(--accent); font-weight:600; text-align:center; padding:2px; }
+  #ar-lista tr.ar-soltar td { background:rgba(200,16,46,.08); outline:2px dashed var(--accent); outline-offset:-3px; }
+  .foto-conf { margin-top:10px; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--panel); } .foto-par { display:flex; gap:16px; flex-wrap:wrap; } .foto-comp { display:grid; gap:4px; justify-items:start; } .foto-comp img { width:150px; height:150px; object-fit:contain; border:1px solid var(--line); border-radius:8px; background:#fff; } .foto-vacia { width:150px; height:150px; display:flex; align-items:center; justify-content:center; border:1px dashed var(--line); border-radius:8px; color:var(--muted, #6e6e73); }
   .foto-linea { margin-top:4px; } .foto-mala { color:var(--accent); font-weight:600; } .foto-btn { min-height:28px; padding:0 10px; font-size:12.5px; margin-left:6px; }
   .est-exp { display:inline-flex; gap:8px; margin-left:auto; }
   .est-exp button { height:40px; }
@@ -618,6 +621,7 @@
           <label class="campo"><span>Mostrar</span><select id="ar-filtro"><option value="">Todos</option><option value="oferta">Con oferta</option><option value="descuento">Con descuento de tarifa</option><option value="bajada">Con bajada de precio reciente</option><option value="campana">Con campana (oferta o bajada)</option><option value="quitados">Quitados del catálogo</option><option value="retirados">Retirados (no se venden)</option><option value="fotopequena">Foto pequeña (se ve borrosa)</option><option value="sinfoto">Sin foto</option></select></label>
           <button type="button" id="ar-quitar" hidden>Quitar filtros</button>
         </form>
+        <p class="muted" style="margin:0 0 8px"><b>Fotos:</b> cada artículo enseña su foto actual. Para cambiarla, <b>arrastra una foto encima de su fila</b> (desde el ordenador o desde una página de internet, p. ej. Google) o usa «Cambiar foto» / «Pegar dirección…». Siempre verás la actual y la nueva juntas y tendrás que pulsar «Confirmar el cambio». Para que salga grande en Google: pulsa la foto para verla ampliada y arrástrala desde ahí. La foto anterior nunca se borra.</p>
         <p class="muted" id="ar-estado" role="status" style="margin:0 0 8px"></p>
         <div class="scroll"><table><thead><tr><th>Artículo</th><th class="num">Precio</th><th>Oferta</th><th></th><th></th></tr></thead><tbody id="ar-lista"></tbody></table></div>
         <div class="acciones paginacion"><button id="ar-ant" type="button">← Anterior</button><button id="ar-sig" type="button">Siguiente →</button><span class="muted" id="ar-pag"></span></div>
@@ -1450,6 +1454,29 @@ const arFiltros = () => ({ q: $("ar-q").value.trim(), categoria: $("ar-cat").val
   parar.onclick = () => { cancelar = true; };
   window.vmMinisEstado = () => estado().catch(() => {});
 })();
+// ---- Fotos en «Artículos»: miniatura de la foto actual, y fotos que se arrastran (archivo o página de internet) ----
+const miniUrls = new Map(); let miniObs = null;
+function miniaturaDePanel(img, id) { // la miniatura se pide con la clave del panel (un <img> normal no puede mandarla), solo cuando la fila se ve
+  const cargar = async () => { try { let u = miniUrls.get(id); if (!u) { const r = await fetch(`/api/admin/foto/${encodeURIComponent(id)}?t=m`, { headers: cabsAdmin() }); if (!r.ok) return; u = URL.createObjectURL(await r.blob()); miniUrls.set(id, u); } img.src = u; } catch { /* sin miniatura: se queda el hueco */ } };
+  if (!("IntersectionObserver" in window)) return cargar();
+  miniObs ??= new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { miniObs.unobserve(e.target); e.target.__cargar?.(); } }, { rootMargin: "200px" });
+  img.__cargar = cargar; miniObs.observe(img);
+}
+function fotoDeArrastre(dt) { // qué se ha soltado: un archivo (foto), una foto incrustada (data:) o la dirección de una foto/página
+  if (!dt) return null;
+  const f = [...(dt.files ?? [])].find((x) => /^image\/(jpeg|png|webp)$/.test(x.type)); if (f) return { blob: f, origen: "archivo" };
+  const html = dt.getData("text/html") || "", m = /<img[^>]+src=["']([^"']+)["']/i.exec(html), src = m ? m[1].replace(/&amp;/g, "&") : "";
+  const d = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/i.exec(src);
+  if (d) { try { const bin = atob(d[2].replace(/\s/g, "")), u8 = Uint8Array.from(bin, (c) => c.charCodeAt(0)); return { blob: new Blob([u8], { type: d[1].toLowerCase() }), origen: "foto incrustada de la página (suele ser pequeña)" }; } catch { /* sigue */ } }
+  if (/^https?:\/\//i.test(src)) return { url: src };
+  const uri = (dt.getData("text/uri-list") || dt.getData("text/plain") || "").split(/\r?\n/).map((x) => x.trim()).find((x) => /^https?:\/\//i.test(x));
+  return uri ? { url: uri } : null;
+}
+async function bajarFotoDeInternet(direccion) { // la baja el programa (el navegador no puede por seguridad); no se guarda nada hasta confirmar
+  const r = await fetch("/api/admin/fotos/descargar", { method: "POST", headers: cabsAdmin({ "Content-Type": "application/json" }), body: JSON.stringify({ url: direccion }) });
+  if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || "No he podido bajar la foto de esa dirección."); }
+  return await r.blob();
+}
 async function articulos() {
   if (!articulos.mini) { articulos.mini = true; if (window.vmMinisEstado) window.vmMinisEstado(); } // el estado de las fotos pequeñas, la primera vez que se abre «Artículos»
   const f = arFiltros(), qs = new URLSearchParams({ ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), pagina: pagAr }).toString();
@@ -1461,23 +1488,59 @@ async function articulos() {
   const tb = $("ar-lista"); tb.innerHTML = "";
   if (!r.filas.length) { const tr = document.createElement("tr"); tr.appendChild(el("td", "Ningún artículo cumple estos filtros.", { className: "muted" })); tb.appendChild(tr); }
   for (const a of r.filas) {
-    const tr = document.createElement("tr"), nom = el("td"); nom.append(el("b", a.nombre), el("div", `${a.id} · ${a.categoria}${a.unidadesPorCaja ? " · caja de " + a.unidadesPorCaja : ""}${a.activo ? "" : " · RETIRADO"}${a.quitado ? " · QUITADO DEL CATÁLOGO" : ""}`, { className: "muted" }));
-    { // Foto del artículo: tamaño y botón para cambiarla (las pequeñas se ven borrosas en el móvil)
+    const tr = document.createElement("tr"), nom = el("td"), contenido = el("div", "", { className: "ar-txt" }); contenido.append(el("b", a.nombre), el("div", `${a.id} · ${a.categoria}${a.unidadesPorCaja ? " · caja de " + a.unidadesPorCaja : ""}${a.activo ? "" : " · RETIRADO"}${a.quitado ? " · QUITADO DEL CATÁLOGO" : ""}`, { className: "muted" }));
+    { // Foto del artículo: la ACTUAL (miniatura), su tamaño, y cambiarla: botón, ARRASTRAR un archivo o una foto de internet sobre la fila, o pegar su dirección. Siempre se enseña la nueva junto a la actual y se pide confirmar.
       const f = a.foto ?? { existe: false }, txt = !f.existe ? "Sin foto" : f.w ? `Foto ${f.w}×${f.h} px` : "Foto", cal = { pequena: "pequeña: se ve borrosa", justa: "justa", buena: "buena" }[f.calidad] ?? "";
+      const caja = el("div", "", { className: "ar-miniatura" + (f.existe ? "" : " sin") }), img = el("img", "", { alt: f.existe ? "Foto actual de " + a.nombre : "", width: 72, height: 72 });
+      caja.append(img); if (!f.existe) caja.append(el("span", "Sin foto")); else miniaturaDePanel(img, a.id);
       const linea = el("div", "", { className: "muted foto-linea" }), etq = el("span", txt + (cal ? " · " + cal : ""), { className: f.calidad === "pequena" || !f.existe ? "foto-mala" : "" });
-      const inp = el("input", "", { type: "file", accept: "image/jpeg,image/png,image/webp", hidden: true }), bt = el("button", f.existe ? "Cambiar foto" : "Poner foto", { type: "button", className: "foto-btn" });
-      bt.onclick = () => inp.click();
-      inp.onchange = async () => {
-        const fi = inp.files[0]; inp.value = ""; if (!fi) return;
-        if (f.existe && !confirm(`¿Cambiar la foto de «${a.nombre}»?\n\nLa foto actual no se borra: se guarda en la carpeta «anteriores».`)) return;
-        bt.disabled = true; etq.textContent = "Subiendo…";
-        try {
-          const r = await fetch(`/api/admin/articulos/${encodeURIComponent(a.id)}/foto`, { method: "POST", headers: { ...cabsAdmin(), "Content-Type": fi.type }, body: fi }), j = await r.json().catch(() => ({}));
-          if (!r.ok) throw new Error(j.error || "No se ha podido guardar la foto.");
-          etq.textContent = `Foto ${j.w}×${j.h} px · ${{ pequena: "pequeña: se ve borrosa", justa: "justa", buena: "buena" }[j.calidad]} · guardada (los clientes la verán en un minuto)`; etq.className = j.calidad === "pequena" ? "foto-mala" : "";
-        } catch (e) { etq.textContent = e.message; etq.className = "foto-mala"; } finally { bt.disabled = false; }
+      const inp = el("input", "", { type: "file", accept: "image/jpeg,image/png,image/webp", hidden: true }), bt = el("button", f.existe ? "Cambiar foto" : "Poner foto", { type: "button", className: "foto-btn" }), bUrl = el("button", "Pegar dirección…", { type: "button", className: "foto-btn", title: "Pega la dirección de una foto de internet" });
+      const conf = el("div", "", { className: "foto-conf", hidden: true });
+      const cerrar = () => { conf.hidden = true; conf.replaceChildren(); };
+      const proponer = async (blob, origen) => { // enseña actual y nueva, y pide confirmar
+        conf.hidden = false; conf.replaceChildren();
+        const urlNueva = URL.createObjectURL(blob), dim = await new Promise((ok) => { const t = new Image(); t.onload = () => ok({ w: t.naturalWidth, h: t.naturalHeight }); t.onerror = () => ok(null); t.src = urlNueva; });
+        if (!dim) { URL.revokeObjectURL(urlNueva); conf.append(el("p", "Eso no es una foto que se pueda abrir. Prueba con otra (JPG, PNG o WebP).", { className: "foto-mala" })); const c = el("button", "Cerrar", { type: "button" }); c.onclick = cerrar; conf.append(c); return; }
+        const caja2 = (titulo, src, pie, mala) => { const c = el("div", "", { className: "foto-comp" }); c.append(el("b", titulo)); if (src) c.append(el("img", "", { src, alt: titulo })); else c.append(el("div", "Sin foto", { className: "foto-vacia" })); c.append(el("small", pie, { className: mala ? "foto-mala" : "muted" })); return c; };
+        const peq = Math.max(dim.w, dim.h) < 300, mismo = f.existe && f.w === dim.w && f.h === dim.h;
+        const par = el("div", "", { className: "foto-par" }); par.append(caja2("Foto actual", f.existe ? img.src : "", f.existe ? `${f.w}×${f.h} px` : "no hay", f.calidad === "pequena"), caja2("Foto nueva", urlNueva, `${dim.w}×${dim.h} px${peq ? " · pequeña: se verá borrosa" : ""}${origen ? " · " + origen : ""}`, peq));
+        conf.append(par);
+        if (f.existe) conf.append(el("p", "La foto actual no se borra: se guarda en la carpeta «anteriores».", { className: "muted" }));
+        if (mismo) conf.append(el("p", "Tiene el mismo tamaño que la actual: comprueba que no es la misma foto.", { className: "muted" }));
+        const ok = el("button", "Confirmar el cambio", { type: "button", className: "main" }), no = el("button", "Cancelar", { type: "button" }), msg = el("span", "", { className: "muted", role: "status" });
+        no.onclick = () => { URL.revokeObjectURL(urlNueva); cerrar(); };
+        ok.onclick = async () => {
+          ok.disabled = no.disabled = true; msg.textContent = "Subiendo…";
+          try {
+            const r = await fetch(`/api/admin/articulos/${encodeURIComponent(a.id)}/foto`, { method: "POST", headers: { ...cabsAdmin(), "Content-Type": blob.type || "image/jpeg" }, body: blob }), j = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(j.error || "No se ha podido guardar la foto.");
+            img.src = urlNueva; caja.classList.remove("sin"); caja.querySelector("span")?.remove(); a.foto = { existe: true, w: j.w, h: j.h, calidad: j.calidad };
+            etq.textContent = `Foto ${j.w}×${j.h} px · ${{ pequena: "pequeña: se ve borrosa", justa: "justa", buena: "buena" }[j.calidad]} · guardada (los clientes la verán en un minuto)`; etq.className = j.calidad === "pequena" ? "foto-mala" : ""; cerrar();
+          } catch (e) { msg.textContent = e.message; msg.className = "foto-mala"; ok.disabled = no.disabled = false; }
+        };
+        const acc = el("div", "", { className: "acciones" }); acc.append(ok, no, msg); conf.append(acc);
       };
-      linea.append(etq, " ", bt, inp); nom.append(linea);
+      const desdeDireccion = async (direccion) => { conf.hidden = false; conf.replaceChildren(el("p", "Bajando la foto…", { className: "muted" })); try { await proponer(await bajarFotoDeInternet(direccion), "de internet"); } catch (e) { conf.replaceChildren(el("p", e.message, { className: "foto-mala" })); const c = el("button", "Cerrar", { type: "button" }); c.onclick = cerrar; conf.append(c); } };
+      bt.onclick = () => inp.click();
+      inp.onchange = () => { const fi = inp.files[0]; inp.value = ""; if (fi) proponer(fi, "archivo"); };
+      bUrl.onclick = () => {
+        conf.hidden = false; conf.replaceChildren();
+        const campo = el("input", "", { type: "url", placeholder: "https://… (clic derecho en la foto → «Copiar dirección de la imagen»)", "aria-label": "Dirección de la foto" }), go = el("button", "Bajar foto", { type: "button", className: "main" }), x = el("button", "Cancelar", { type: "button" });
+        campo.style.minWidth = "min(100%, 360px)"; go.onclick = () => campo.value.trim() && desdeDireccion(campo.value.trim()); x.onclick = cerrar; campo.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); go.click(); } };
+        const acc = el("div", "", { className: "acciones" }); acc.append(campo, go, x); conf.append(acc); campo.focus();
+      };
+      // arrastrar sobre toda la fila: archivo del ordenador, o foto de una página (Google…)
+      let dentro = 0;
+      tr.addEventListener("dragenter", (e) => { e.preventDefault(); dentro++; tr.classList.add("ar-soltar"); });
+      tr.addEventListener("dragover", (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; });
+      tr.addEventListener("dragleave", () => { if (--dentro <= 0) { dentro = 0; tr.classList.remove("ar-soltar"); } });
+      tr.addEventListener("drop", async (e) => {
+        e.preventDefault(); dentro = 0; tr.classList.remove("ar-soltar");
+        const r = fotoDeArrastre(e.dataTransfer); if (!r) { conf.hidden = false; conf.replaceChildren(el("p", "No he visto ninguna foto ahí. Arrastra la foto desde la página o, si no se deja, usa «Pegar dirección…».", { className: "foto-mala" })); return; }
+        if (r.blob) proponer(r.blob, r.origen); else desdeDireccion(r.url);
+      });
+      linea.append(etq, " ", bt, bUrl, inp); contenido.append(linea, conf);
+      const fila = el("div", "", { className: "ar-fila" }); fila.append(caja, contenido); nom.append(fila);
     }
     const precio = el("td", eur3(a.precio), { className: "num" }); if (a.descuento) precio.appendChild(el("div", `−${String(a.descuento).replace(".", ",")} % habitual`, { className: "muted" })); if (a.cambioPrecio && Date.now() - Date.parse(a.cambioPrecio.at) < 7 * 86400e3) precio.appendChild(el("div", `antes ${eur3(a.cambioPrecio.antes)}`, { className: "muted" }));
     const of = el("td"); if (a.oferta) of.appendChild(el("span", ofertaTxt(a.oferta), { className: "oferta-tag" })); else if (a.ofertaCaducada) of.appendChild(el("span", "terminó: " + ofertaTxt(a.ofertaCaducada), { className: "oferta-tag vieja" }));
