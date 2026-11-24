@@ -41,11 +41,11 @@ export function tipoDeImagen(buf) {
   return null;
 }
 
-function pedir(url, ip, { maxBytes, tiempoMs }) {
+export function pedir(url, ip, { maxBytes, tiempoMs }) {
   return new Promise((resolve, reject) => {
     const lib = url.protocol === "https:" ? https : http;
     const req = lib.request({ protocol: url.protocol, hostname: url.hostname, port: url.port || undefined, path: url.pathname + url.search, method: "GET", servername: net.isIP(url.hostname) ? undefined : url.hostname,
-      lookup: (_h, _o, cb) => cb(null, ip, net.isIPv6(ip) ? 6 : 4), // conecta justo a la dirección que se comprobó (nada de volver a preguntar al DNS)
+      lookup: (_h, o, cb) => (o && o.all ? cb(null, [{ address: ip, family: net.isIPv6(ip) ? 6 : 4 }]) : cb(null, ip, net.isIPv6(ip) ? 6 : 4)), // conecta justo a la dirección que se comprobó (nada de volver a preguntar al DNS)
       headers: { "User-Agent": "Mozilla/5.0 (compatible; VM-fotos)", Accept: "image/jpeg,image/png,image/webp,image/*;q=0.8", "Accept-Encoding": "identity" }, timeout: tiempoMs }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { res.resume(); return resolve({ redir: res.headers.location }); }
       if (res.statusCode !== 200) { res.resume(); return reject(new Error(`La página contestó ${res.statusCode}.`)); }

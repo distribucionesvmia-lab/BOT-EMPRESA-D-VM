@@ -41,3 +41,15 @@ test("REDIRECCIONES: se revisa cada salto y hay tope", async () => {
   await assert.rejects(descargarFoto("https://a.ejemplo/1", { resolver: r, pedirFn: salta({ "https://a.ejemplo/1": "http://127.0.0.1:3001/api/admin/estado" }) }), /no es de una página de internet/);
   await assert.rejects(descargarFoto("https://a.ejemplo/1", { resolver: r, pedirFn: async () => ({ redir: "https://a.ejemplo/1" }) }), /redirige demasiadas veces/);
 });
+
+test("la conexión real usa la dirección comprobada también cuando Node pide la lista de direcciones (fallo «Invalid IP address: undefined»)", async () => {
+  const http = await import("node:http");
+  const { pedir } = await import("./foto-url.js");
+  const srv = http.createServer((_q, r) => { r.writeHead(200, { "Content-Type": "image/jpeg" }); r.end(Buffer.from([0xff, 0xd8, 0xff, 1, 2, 3])); });
+  await new Promise((ok) => srv.listen(0, "127.0.0.1", ok));
+  try {
+    const url = new URL(`http://nombre-inventado.ejemplo:${srv.address().port}/a.jpg`);
+    const r = await pedir(url, "127.0.0.1", { maxBytes: 1000, tiempoMs: 3000 });
+    assert.equal(r.buf.length, 6);
+  } finally { srv.close(); }
+});
