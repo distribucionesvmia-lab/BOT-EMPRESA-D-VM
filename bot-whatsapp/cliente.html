@@ -1859,6 +1859,7 @@ function escribiendo(on) {
   fila.append(av, d); chat.appendChild(fila); if (!ancla?.isConnected) chat.scrollTop = chat.scrollHeight;
 }
 const eur = (n) => Number(n).toFixed(2).replace(".", ",") + " €";
+const eurp = (n) => Number(n).toFixed(3).replace(".", ",") + " €"; // precio de un artículo: siempre 3 decimales
 
 // Tabla de un pedido (cantidad · producto · importe) con su total
 function tarjetaTabla(card) {
@@ -1933,7 +1934,7 @@ function inicio(ui) {
   const cat = ui.url || "/catalogo", c = el("div", "vm-inicio");
   const nombre = ($("cli").textContent || "").trim();
   const sal = el("div", "in-saludo"); sal.append(el("h2", null, saludoMadrid() + (nombre ? ", " + nombre : "")), el("p", null, "¿Qué necesitas hoy?")); c.appendChild(sal);
-  const hoy = el("div", "in-hoy"); hoy.hidden = true; hoy.setAttribute("role", "status"); hoy.textContent = "Si haces el pedido antes de las 10:00, te lo entregamos hoy."; c.appendChild(hoy);
+  const hoy = el("div", "in-hoy"); hoy.hidden = true; hoy.setAttribute("role", "status"); hoy.textContent = "Solo en Medina del Campo: si haces el pedido antes de las 10:00, te lo entregamos hoy."; c.appendChild(hoy);
   const sitioFijo = el("div", "in-fijo"); c.appendChild(sitioFijo);
   const principal = el("div", "in-card"); c.appendChild(principal);
   const secciones = el("div", "in-secs"); c.appendChild(secciones);
@@ -2018,7 +2019,7 @@ function inicio(ui) {
       const im = el("span", "in-pim"); if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.width = 148; i.height = 148; i.onerror = () => i.remove(); im.appendChild(i); } else im.textContent = p.name.slice(0, 2).toUpperCase();
       if (etiqueta) im.appendChild(el("span", "in-oferta", etiqueta));
       const mas = el("span", "in-mas"); mas.setAttribute("aria-hidden", "true"); mas.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
-      const pie = el("span", "in-pie"); pie.append(el("small", null, p.soloCaja && p.unitsPerBox ? eur(Math.round(p.price * p.unitsPerBox * 100) / 100) + " /caja" : eur(p.price) + " /ud"), mas);
+      const pie = el("span", "in-pie"); pie.append(el("small", null, p.soloCaja && p.unitsPerBox ? eurp(Math.round(p.price * p.unitsPerBox * 1000) / 1000) + " /caja" : eurp(p.price) + " /ud"), mas);
       t.append(im, el("b", "in-pn", p.name), ...(p.unitsPerBox ? [el("small", "in-fmt", "Caja de " + p.unitsPerBox)] : []), ...(p.ultima ? [el("small", "in-ult", "La última vez: " + ultimaTxt(p))] : []), pie); return t; // nombre entero (hasta 4 líneas) y el formato
     };
     if (j.ofertas?.length) { // ofertas vigentes que le cambian el precio (la empresa las pone desde el panel)

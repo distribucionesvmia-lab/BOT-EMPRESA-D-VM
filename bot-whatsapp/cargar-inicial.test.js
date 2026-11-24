@@ -1,3 +1,4 @@
+process.env.DESCUENTO_TARIFA = "1"; // estas pruebas comprueban el descuento de tarifa (por defecto está apagado)
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";

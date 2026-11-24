@@ -1,3 +1,4 @@
+import { descuentoTarifaActivo } from "./pricing.js";
 // Importación de la lista de productos (Excel/Hoja de cálculo que exporta a3ERP o que prepara la empresa):
 // código, descripción, precio, unidades por caja, IVA, descuento y bloqueado/obsoleto. Se reconocen las columnas por su cabecera,
 // sin importar el orden, las tildes ni las mayúsculas. Solo hacen falta código, descripción y precio.
@@ -105,8 +106,10 @@ export function parseProductos(rows) {
     else if (upb !== null && upb !== 0 && upb !== 1) stats.avisos.push(`${id} ${name}: unidades por caja raras (${upb}), se ignoran`);
     if (vat !== null && vat >= 0 && vat <= 100) p.vat = vat;
     else if (String(get(r, "vat") ?? "").trim()) p.vatCode = String(get(r, "vat")).trim(); // código de IVA sin porcentaje conocido («SRE»)
-    if (dto !== null && dto >= 0 && dto <= 100) p.discount = dto;
+    if (!descuentoTarifaActivo()) p.discount = 0; // el Excel de artículos NO lleva descuentos: los artículos van siempre sin descuento de tarifa (los descuentos son solo de cada cliente, Excel «Consumo»)
+    else if (dto !== null && dto >= 0 && dto <= 100) p.discount = dto;
     else if (dto !== null) stats.avisos.push(`${id} ${name}: descuento imposible (${dto} %), se ignora`);
+    else if (col.discount >= 0 && !String(get(r, "discount") ?? "").trim()) p.discount = 0; // el Excel TIENE columna de descuento y esta celda va vacía = sin descuento (antes se conservaba el antiguo para siempre)
     const cat = String(get(r, "category") ?? "").trim(), sub = String(get(r, "subcategory") ?? "").trim();
     if (cat) p.category = cat;
     if (sub) p.subcategory = sub;

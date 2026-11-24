@@ -39,3 +39,13 @@ test("transiciones suaves y foco visible, y todo se queda quieto con «reducir m
 test("pedido desplegado: las líneas se adaptan al ancho de la celda y no ensanchan la tabla", () => {
   assert.match(e, /#ped \.lines tr \{ display:flex; flex-wrap:wrap;/); assert.match(e, /#ped \.lines td:nth-child\(2\) \{ order:-1; flex:1 1 100%;/); // el nombre arriba y debajo código, unidades, precio e importe
 });
+
+test("DATOS Y EXCEL: las tarjetas de subida van primero, compactas y alineadas, y la revisión va en un panel aparte", async () => {
+  const h = (await import("node:fs")).readFileSync(new URL("./empresa.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.ok(h.indexOf('id="dx-tarjetas"') < h.indexOf('id="alta-cli"'), "las tarjetas de subida van antes que lo demás");
+  assert.ok(h.indexOf('id="dx-tarjetas"') < h.indexOf('id="entrada-panel"'));
+  for (const t of ["dx-drop", "dx-rev", "dx-info", 'id="dx-revisiones"', "-cerrar", "MutationObserver", "Elegir archivo"]) assert.ok(h.includes(t), t);
+  assert.ok(!h.includes('id="dx-pasos"'), "ya no hay el panel de explicación con los pasos");
+  for (const id of ["px", "cl", "co", "fo"]) assert.ok(h.includes('{ p: "' + id + '"'), id);
+  assert.ok(!h.includes('{ p: "hi"'), "el historial de compras ya no tiene tarjeta (sale del Excel de consumo)");
+});

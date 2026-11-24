@@ -46,7 +46,7 @@ test("MCP: ver_excel manda el archivo SIN aplicar nada; aplicar_excel exige el s
   try {
     respuesta = () => ({ estado: 200, json: { ok: true, resumen: { nuevos: 2, cambian: 1 }, aviso: ["Una línea sin precio"], aplicable: true } });
     const v = texto(await c.llamar("ver_excel", { ruta: xlsx, tipo: "consumo", solo_descuentos_e_historial: true })); assert.match(v, /VISTA PREVIA \(no se ha cambiado nada\)/); assert.match(v, /Una línea sin precio/);
-    let q = peticiones[0]; assert.equal(q.ruta, "/api/admin/vista-previa/consumo?fichero=datos.xlsx&sinPrecios=1"); assert.equal(q.tipo, "application/octet-stream"); assert.equal(q.cuerpo.toString(), "PK-falso-pero-suficiente");
+    let q = peticiones[0]; assert.equal(q.ruta, "/api/admin/vista-previa/consumo?fichero=datos.xlsx&sinPrecios=1&soloCompras=1"); assert.equal(q.tipo, "application/octet-stream"); assert.equal(q.cuerpo.toString(), "PK-falso-pero-suficiente");
     peticiones.length = 0; assert.match(texto(await c.llamar("aplicar_excel", { ruta: xlsx, tipo: "clientes" })), /falta la confirmación/); assert.equal(peticiones.length, 0);
     const ap = texto(await c.llamar("aplicar_excel", { ruta: xlsx, tipo: "clientes", confirmado_por_el_usuario: true })); assert.match(ap, /^APLICADO/); assert.equal(peticiones[0].ruta, "/api/admin/aplicar/clientes?fichero=datos.xlsx"); assert.equal(peticiones[0].reclave, undefined);
     peticiones.length = 0; await c.llamar("aplicar_excel", { ruta: xlsx, tipo: "productos", confirmado_por_el_usuario: true }); assert.equal(peticiones[0].reclave, TOKEN); // la tarifa pide la clave otra vez y esta conexión ya la tiene

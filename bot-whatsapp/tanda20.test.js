@@ -10,7 +10,7 @@ test("1. «La última vez: N» con su unidad, y el primer «+» pone justo eso (
   assert.match(p, /function ultimaVez\(p\)/); assert.match(p, /p\.soloCaja \|\| L % k === 0/); assert.match(p, /b\.onclick = \(\) => primerMas\(p\)/);
   assert.match(p, /"La última vez: " \+ uv\.texto/); assert.match(p, /tab === "hab" \? ultimaVez\(p\)/);
   assert.match(c, /"La última vez: " \+ ultimaTxt\(p\)/); assert.match(c, /p\.ultima > 0 \? Math\.min\(999, p\.ultima\) : 1\) \+ "&a=1"/);
-  assert.match(c, /eur\(Math\.round\(p\.price \* p\.unitsPerBox \* 100\) \/ 100\) \+ " \/caja"/); // solo-cajas: el precio va por caja también en el Inicio
+  assert.match(c, /eurp\(Math\.round\(p\.price \* p\.unitsPerBox \* 1000\) \/ 1000\) \+ " \/caja"/); // solo-cajas: el precio va por caja también en el Inicio
 });
 test("2-3. saltar esta semana, Mi pedido fijo desde Mi cuenta y aviso de retirados con parecidos antes de abrir el fijo", () => {
   assert.match(c, /"Saltar esta semana"/); assert.match(c, /\/api\/pedido-fijo\/saltar/); assert.match(c, /nodo\("button", "Mi pedido fijo", "vm-btn ghost"\)/);

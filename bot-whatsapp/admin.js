@@ -1,6 +1,7 @@
 // Rutas HTTP de la EMPRESA (el empresario): pedidos recibidos y su exportación a Excel, solicitudes de alta de
 // clientes y cuentas. Es una aplicación aparte de la del cliente: todo va bajo /api/admin y exige la clave de la empresa.
 import crypto from "node:crypto";
+import { leerOcultos, ponerOculto } from "./articulos-ocultos.js";
 import { deliveryInfo, madridDay } from "./delivery.js";
 import { leerExcluidos, resolverExcluidos, excluidosValidos, prepararPedidos, rangoDe, calcular, atrasados, patronesCliente } from "./estadisticas.js";
 import { xlsxDeEstadisticas, csvDeEstadisticas } from "./estadisticas-export.js";
@@ -19,7 +20,10 @@ import { crear2fa } from "./panel-2fa.js";
 import { crearAutoBases } from "./auto-bases.js";
 import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2, promoVigente, precioEfectivo, hoyMadrid } from "./pricing.js";
-import { categorizar } from "./categorias.js";
+import { categorizar, CATEGORIAS } from "./categorias.js";
+import { conArbolA3erp } from "./arbol-a3erp.js";
+import { compararFamilias } from "./ordenfamilia.js";
+import { descargarFoto } from "./foto-url.js";
 import { runExport } from "./exporter.js";
 import { backupDb } from "./backup.js";
 import { estadoCopias, comprobarCopias } from "./copias.js";
@@ -97,6 +101,18 @@ function vistaExcel(lista) {
   for (const sh of sheets) for (const row of sh.rows) for (const c of row) { const st = c && typeof c === "object" ? c.s ?? 0 : 0; if (st && !estilos[st]) estilos[st] = { css: estiloCss(st), dec: estiloDecimales(st) }; }
   return { orderCount: lista.length, lineCount, sheets, estilos };
 }
+const leerJson = (f) => { try { return JSON.parse(fs.readFileSync(new URL(f, import.meta.url), "utf8")); } catch { return {}; } };
+const FAM_NOMBRES = leerJson("./familias-nombres.json"), FAM_CATEGORIAS = leerJson("./familias-categorias.json");
+// Mismo árbol y mismo orden que ve el cliente (catalogoParaClientes de server.js): familias de a3ERP si ya vienen en los artículos; si no, el árbol de la web
+export function clasificarComoCliente(lista) { return process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(lista, FAM_NOMBRES, FAM_CATEGORIAS) : lista; }
+/** Orden de las categorías como en la vista del cliente: menor código de familia de a3ERP de sus artículos; sin código, el orden de la web (CATEGORIAS), y al final las demás. */
+export function ordenCategorias(filas) {
+  const menor = new Map();
+  for (const x of filas) { const f = String(x.familia ?? "").trim(); if (!f) continue; const a = menor.get(x.categoriaId); if (a === undefined || compararFamilias(f, a) < 0) menor.set(x.categoriaId, f); }
+  const web = new Map(CATEGORIAS.map((c, i) => [c.id, i]));
+  return (idA, idB) => { const a = menor.get(idA), b = menor.get(idB); if (a && b) return compararFamilias(a, b) || String(idA).localeCompare(String(idB)); if (a) return -1; if (b) return 1; return (web.get(idA) ?? 999) - (web.get(idB) ?? 999) || String(idA).localeCompare(String(idB)); };
+}
+
 export function createAdmin({ imgDir = null, sync = null, mail = null, actualizador = null, estado = null, actualizaciones = () => [], accounts, customers, orders, adminToken, exportDir = () => process.env.EXPORT_DIR ?? "exportaciones", entradaDir = () => process.env.ENTRADA_DIR ?? "", catalogDb = null, respaldar = () => {} }) {
   const isAdmin = makeAdminCheck(adminToken);
   const dosFactores = crear2fa(accounts, { token: () => adminToken }); // segundo factor del panel (código del móvil), si se ha activado
@@ -521,6 +537,17 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       return send(res, 200, v), true;
     }
     // ---- Contraseñas de los clientes: quién se ha activado (creó su contraseña) y restablecer si hace falta ----
+    if (post) { const mq = /^\/api\/admin\/cliente\/([\w-]{1,20})\/precios-propios\/quitar$/.exec(p); // quita los precios y descuentos propios de UN cliente (copia antes)
+      if (mq) {
+        if (exigeReclave(req, res, who)) return true;
+        const b = (await readJson(req)) ?? {};
+        if (b.confirmo !== true) return send(res, 400, { error: "Falta la confirmación." }), true;
+        if (!customers.getById(mq[1])) return send(res, 404, { error: "No existe ese cliente." }), true;
+        let copia; try { copia = path.basename(backupDb(customers, { dir: process.env.BACKUP_DIR ?? "respaldos", name: "clientes-antes-de-quitar-precios" })); }
+        catch (e) { console.error("Copia antes de quitar precios propios:", e); return send(res, 500, { error: "No se pudo hacer la copia de seguridad, así que NO se ha cambiado nada." }), true; }
+        const r = customers.quitarPreciosPropios(mq[1]); console.log(`Precios propios quitados al cliente ${mq[1]}: ${r.descuentos} descuentos, ${r.precios} precios (copia: ${copia})`);
+        return send(res, 200, { ok: true, ...r, copia }), true;
+      } }
     if (p === "/api/admin/accesos-nuevos" && get) return send(res, 200, { lista: accounts.accesosNuevos({ dias: 30 }).map((x) => ({ ...x, cliente: customers.getById(x.customerId)?.name ?? `Cliente ${x.customerId}`, telefono: customers.getById(x.customerId)?.phone ?? "" })) }), true;
     if (post) { const mr = /^\/api\/admin\/cliente\/([\w-]{1,20})\/password\/restablecer$/.exec(p);
       if (mr) { if (exigeReclave(req, res, who)) return true; if (!customers.getById(mr[1])) return send(res, 404, { error: "No existe ese cliente." }), true; accounts.passwordQuitar(mr[1]); return send(res, 200, { ok: true }), true; } }
@@ -656,6 +683,13 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
             ofertasCorreo: accounts.ofertasDe(id),
             correoPedidos: { destino: elegirDestino({ account: cu, customer: c }), activo: accounts.correoPedidoActivo(id), delaCuenta: !!cu?.email && elegirDestino({ account: cu, customer: c }) === cu.email },
             cuenta: cu ? { estado: cu.status, confirmada: cu.verified, bloqueada: cu.locked, ultimoAcceso: cu.lastLogin, creada: cu.createdAt, codigoPropio: cu.ownCode } : null,
+            preciosPropios: (() => { // lo que a ESTE cliente se le cobra distinto de la tarifa: dos listas, productos con PRECIO especial y productos con DESCUENTO especial (datos del Excel «Consumo clientes»)
+              const cat = new Map((catalogDb?.list({ activeOnly: false }) ?? []).map((x) => [String(x.id), x])), r4 = (v) => Math.round(v * 10000) / 10000;
+              const fila = (pid) => { const a = cat.get(pid); if (!a) return null; const precio = c.specialPrices?.[pid] ?? a.price, dto = c.discounts?.[pid] ?? 0; return { id: pid, nombre: a.name, precioTarifa: a.price, precioPropio: c.specialPrices?.[pid] ?? null, dtoPropio: c.discounts?.[pid] ?? null, precioFinal: r4(precio * (1 - dto / 100)) }; };
+              const orden = (x, y) => x.nombre.localeCompare(y.nombre, "es");
+              const precios = Object.keys(c.specialPrices ?? {}).map(fila).filter(Boolean).sort(orden), descuentos = Object.keys(c.discounts ?? {}).filter((p) => Number(c.discounts[p]) > 0).map(fila).filter(Boolean).sort(orden);
+              return { total: new Set([...precios, ...descuentos].map((x) => x.id)).size, precios: precios.slice(0, 1000), totalPrecios: precios.length, descuentos: descuentos.slice(0, 1000), totalDescuentos: descuentos.length };
+            })(),
             aparatos: accounts.aparatosDe(id).length, password: { ...accounts.passwordInfo(id), dobleFactor: accounts.dobleFactor(id).activo },
             totalPedidosApp: todos.length,
             pedidos: todos.slice(0, 12).map(orderView).map((o) => ({ ref: o.ref, fecha: o.fecha, entrega: o.entrega?.texto ?? "", total: o.total, estado: o.estado, modificado: o.modificado, lineas: o.lineas.slice(0, 30).map((l) => ({ nombre: l.nombre, unidades: l.unidades, cajas: l.unidad === "caja" ? l.cajas : 0 })) })),
@@ -709,15 +743,40 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       const q = sinTildes(url.searchParams.get("q") ?? "").slice(0, 60), cat = url.searchParams.get("categoria") ?? "", filtro = url.searchParams.get("filtro") ?? "";
       const pagina = Math.max(0, Number(url.searchParams.get("pagina")) || 0), por = 50, hoy = hoyMadrid();
       const cambios = catalogDb.ultimosCambiosDePrecio(), hechos = catalogDb.avisosHechos();
-      const todas = catalogDb.list({ activeOnly: filtro !== "retirados" }).filter((x) => filtro !== "retirados" || !x.active).map((x) => {
+      const ocultos = leerOcultos(accounts), todas = clasificarComoCliente(catalogDb.list({ activeOnly: false })).filter((x) => filtro === "retirados" ? !x.active : x.active).map((x) => {
         const k = categorizar(x), vig = promoVigente(x, hoy), ch = cambios.get(x.id) ?? null, cp = campanaDe(x, ch, hoy), hecho = cp && hechos.get(x.id)?.clave === cp.clave ? hechos.get(x.id).at : null;
-        return { id: x.id, nombre: x.name, categoria: k.catNombre, categoriaId: k.cat, precio: x.price, descuento: x.discount ?? 0, unidadesPorCaja: x.unitsPerBox ?? null, iva: x.vat, activo: x.active,
+        return { id: x.id, nombre: x.name, categoria: k.catNombre, categoriaId: k.cat, subcategoria: k.subNombre, familia: x.family ?? "", precio: x.price, descuento: x.discount ?? 0, unidadesPorCaja: x.unitsPerBox ?? null, iva: x.vat, activo: x.active, quitado: ocultos.has(String(x.id)),
           oferta: vig ? { tipo: vig.tipo, valor: Number(vig.valor), hasta: vig.hasta ?? null } : null, ofertaCaducada: x.promo && !vig ? { tipo: x.promo.tipo, valor: Number(x.promo.valor), hasta: x.promo.hasta ?? null } : null,
           cambioPrecio: ch ? { antes: ch.antes, despues: ch.despues, at: ch.at } : null, campana: cp?.tipo ?? null, aviso: cp ? { titulo: cp.titulo, texto: cp.texto } : null, avisado: hecho };
       });
-      const filas = todas.filter((x) => (!q || sinTildes(`${x.id} ${x.nombre}`).includes(q)) && (!cat || x.categoriaId === cat) && (filtro !== "oferta" || x.oferta) && (filtro !== "bajada" || x.campana === "bajada") && (filtro !== "campana" || x.campana) && (filtro !== "fotopequena" || fotos.info(x.id).calidad === "pequena") && (filtro !== "sinfoto" || !fotos.info(x.id).existe));
-      const categorias = [...new Map(todas.map((x) => [x.categoriaId, x.categoria])).entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre));
-      return send(res, 200, { total: filas.length, pagina, porPagina: por, categorias, conOferta: todas.filter((x) => x.oferta).length, filas: filas.slice(pagina * por, pagina * por + por).map((x) => ({ ...x, foto: fotos.info(x.id) })) }), true;
+      { const porCat = ordenCategorias(todas), num = (t) => (/^\d+$/.test(t) ? Number(t) : Infinity); // mismo orden que ve el cliente: categoría → familia/subfamilia de a3ERP → código → nombre
+        todas.sort((a, b) => porCat(a.categoriaId, b.categoriaId) || (a.familia && b.familia ? compararFamilias(a.familia, b.familia) : a.familia ? -1 : b.familia ? 1 : 0) || num(String(a.id)) - num(String(b.id)) || String(a.id).localeCompare(String(b.id)) || a.nombre.localeCompare(b.nombre)); }
+      const filas = todas.filter((x) => (!q || sinTildes(`${x.id} ${x.nombre}`).includes(q)) && (!cat || x.categoriaId === cat) && (filtro !== "oferta" || x.oferta) && (filtro !== "quitados" || x.quitado) && (filtro !== "descuento" || x.descuento > 0) && (filtro !== "bajada" || x.campana === "bajada") && (filtro !== "campana" || x.campana) && (filtro !== "fotopequena" || fotos.info(x.id).calidad === "pequena") && (filtro !== "sinfoto" || !fotos.info(x.id).existe));
+      const categorias = [...new Map(todas.map((x) => [x.categoriaId, x.categoria])).entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => ordenCategorias(todas)(a.id, b.id));
+      return send(res, 200, { total: filas.length, pagina, porPagina: por, categorias, conOferta: todas.filter((x) => x.oferta).length, conDescuento: todas.filter((x) => x.descuento > 0).length, filas: filas.slice(pagina * por, pagina * por + por).map((x) => ({ ...x, foto: fotos.info(x.id) })) }), true;
+    }
+    { // «Quitar del catálogo»: los clientes dejan de ver el artículo (pantalla y chat) SIN borrarlo; se puede volver a poner. Sobrevive a las actualizaciones de a3ERP.
+      const mq = /^\/api\/admin\/articulos\/([^/]+)\/(quitar|poner)$/.exec(p);
+      if (mq && post && catalogDb) {
+        const id = decodeURIComponent(mq[1]), quitar = mq[2] === "quitar", b = (await readJson(req)) ?? {};
+        if (!catalogDb.list({ activeOnly: false }).some((x) => String(x.id) === id)) return send(res, 404, { error: "No encontramos ese artículo." }), true;
+        if (quitar && b.confirmo !== true) return send(res, 400, { error: "Hace falta confirmar para quitar el artículo del catálogo." }), true;
+        ponerOculto(accounts, id, quitar);
+        return send(res, 200, { ok: true, id, quitado: quitar }), true;
+      }
+    }
+    if (p === "/api/admin/articulos/quitar-descuentos" && post && catalogDb) { // deja a 0 % el descuento de TARIFA de todos los artículos (no toca los descuentos propios de cada cliente ni las ofertas)
+      if (exigeReclave(req, res, who)) return true;
+      const b = (await readJson(req)) ?? {};
+      if (b.confirmo !== true) return send(res, 400, { error: "Falta la confirmación." }), true;
+      const con = catalogDb.list({ activeOnly: false }).filter((x) => Number(x.discount) > 0);
+      if (!con.length) return send(res, 200, { ok: true, quitados: 0, copia: null }), true;
+      let copia;
+      try { copia = path.basename(backupDb(catalogDb, { dir: process.env.BACKUP_DIR ?? "respaldos", name: "catalogo-antes-de-quitar-descuentos" })); }
+      catch (e) { console.error("Copia antes de quitar descuentos:", e); return send(res, 500, { error: "No se pudo hacer la copia de seguridad, así que NO se ha cambiado nada." }), true; }
+      let quitados = 0; for (const x of con) if (catalogDb.update(x.id, { discount: 0 }) === "updated") quitados++;
+      console.log(`Descuentos de tarifa quitados por la empresa: ${quitados} (copia: ${copia})`);
+      return send(res, 200, { ok: true, quitados, copia }), true;
     }
     // ---- Cambiar la foto de un artículo (la anterior se guarda en «anteriores», nunca se borra) ----
     { const mf = /^\/api\/admin\/articulos\/([\w.-]{1,40})\/foto$/.exec(p);
@@ -727,10 +786,16 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
         const r = fotos.guardar(mf[1], buf, req.headers["content-type"]); if (r.error) return send(res, 400, { error: r.error }), true;
         return send(res, 200, r), true;
       } }
+    // ---- «Arrastrar una foto de Google»: baja la foto de una dirección web y la DEVUELVE (no guarda nada: el panel la enseña y, si se confirma, la sube por la ruta de siempre) ----
+    if (p === "/api/admin/fotos/descargar" && post) {
+      const b = (await readJson(req)) ?? {};
+      try { const r = await descargarFoto(b.url); res.writeHead(200, { "Content-Type": r.tipo, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }).end(r.buf); return true; }
+      catch (e) { return send(res, 400, { error: e.message || "No he podido bajar la foto." }), true; }
+    }
     // ---- Miniaturas de las fotos (las prepara el navegador del panel: Node no trae nada para reducir imágenes; son copias, la foto grande no se toca) ----
     if (p === "/api/admin/fotos/minis" && !post) return send(res, 200, (() => { const e = fotos.estadoMinis(); return { total: e.total, conMini: e.conMini, pendientes: e.pendientes.slice(0, 5000) }; })()), true;
     { const mo = /^\/api\/admin\/foto\/([\w.-]{1,40})$/.exec(p); // la foto grande, para que el navegador del panel prepare la pequeña
-      if (mo && !post) { const f = fotos.rutaOriginal(mo[1]); if (!f) return send(res, 404, { error: "Ese artículo no tiene foto." }), true; const ext = path.extname(f).slice(1).toLowerCase();
+      if (mo && !post) { const m = url.searchParams.get("t") === "m" ? fotos.rutaMini(mo[1]) : null; if (m) { res.writeHead(200, { "Content-Type": "image/jpeg", "Cache-Control": "private, max-age=60", "X-Content-Type-Options": "nosniff" }).end(fs.readFileSync(m)); return true; } const f = fotos.rutaOriginal(mo[1]); if (!f) return send(res, 404, { error: "Ese artículo no tiene foto." }), true; const ext = path.extname(f).slice(1).toLowerCase();
         res.writeHead(200, { "Content-Type": ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }).end(fs.readFileSync(f)); return true; } }
     { const mm = /^\/api\/admin\/articulos\/([\w.-]{1,40})\/foto-mini$/.exec(p);
       if (mm && post) { const buf = await readBuffer(req, MAX_MINI + 1000).catch(() => null); if (!buf) return send(res, 413, { error: "La miniatura pesa demasiado." }), true;
@@ -862,14 +927,14 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       } catch (e) { return send(res, 409, { error: "No se pudo mover el archivo. Si lo tienes abierto en Excel, ciérralo y vuelve a intentarlo." }), true; }
     }
     // ---- Actualizar datos desde un Excel: vista previa de los cambios y aplicar solo las diferencias ----
-    m = /^\/api\/admin\/(vista-previa|aplicar)\/(productos|clientes|historial|consumo|fotos)$/.exec(p);
+    m = /^\/api\/admin\/(vista-previa|aplicar)\/(productos|clientes|historial|consumo|fotos|descuentos|precios)$/.exec(p);
     if (m && post) {
       if (!actualizador) return send(res, 400, { error: "La actualización de datos no está disponible." }), true;
       if (m[1] === "aplicar" && m[2] === "productos" && exigeReclave(req, res, who)) return true; // cambiar la tarifa entera: hay que volver a escribir la clave
       const buf = await readBuffer(req, m[2] === "fotos" ? 80_000_000 : 25_000_000); // los ZIP de fotos y los Excel con fotos pesan más que los de texto
       if (!buf || !buf.length) return send(res, 400, { error: `No se recibió el archivo (máximo ${m[2] === "fotos" ? 80 : 25} MB).` }), true;
       try {
-        const opc = { sinPrecios: url.searchParams.get("sinPrecios") === "1" };
+        const opc = { sinPrecios: url.searchParams.get("sinPrecios") === "1", quitarSobrantes: url.searchParams.get("quitarSobrantes") === "1", soloCompras: url.searchParams.get("soloCompras") === "1" };
         if (m[1] === "vista-previa") return send(res, 200, { ok: true, tipo: m[2], ...actualizador.vistaPrevia(m[2], buf, opc) }), true;
         return send(res, 200, { ok: true, tipo: m[2], ...actualizador.aplicar(m[2], buf, { fichero: String(url.searchParams.get("fichero") ?? "").slice(0, 120), confirmo: url.searchParams.get("confirmo") === "1", ...opc }) }), true;
       } catch (e) {

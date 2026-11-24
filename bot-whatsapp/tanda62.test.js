@@ -111,6 +111,6 @@ test("la revisión de seguridad avisa si el panel no tiene segundo factor o ya n
 test("panel y documentación: pantalla del segundo factor, código en el acceso y ventana de la clave; sin manejadores en línea", () => {
   const e = leer("./empresa.html"), a = leer("./admin.js");
   for (const t of ['id="f2-panel"', 'id="codigo2fa"', "Introducir clave de configuración", "Guarda estos códigos de emergencia", "X-VM-2FA", "X-VM-Reclave", "pedirReclave", "conReclave", "necesita2fa", "desactivar-2fa.bat"]) assert.ok(e.includes(t), t);
-  assert.doesNotMatch(e, /\son[a-z]+="/); assert.match(a, /exigeReclave\(req, res, who\)/); assert.equal((a.match(/exigeReclave\(req, res, who\)/g) ?? []).length, 3, "borrar pedidos, restablecer y tarifa");
+  assert.doesNotMatch(e, /\son[a-z]+="/); assert.match(a, /exigeReclave\(req, res, who\)/); assert.equal((a.match(/exigeReclave\(req, res, who\)/g) ?? []).length, 5, "borrar pedidos, restablecer, tarifa, quitar descuentos y quitar precios propios");
   assert.match(leer("./mcp/vm-mcp.js"), /VM_ADMIN_2FA_BYPASS/);
 });

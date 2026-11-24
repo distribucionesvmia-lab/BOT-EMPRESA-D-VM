@@ -1,3 +1,4 @@
+process.env.DESCUENTO_TARIFA = "1"; // estas pruebas comprueban el cálculo con descuento de tarifa (por defecto está apagado)
 import test from "node:test";
 import assert from "node:assert/strict";
 import { priceLine, priceOrder, totals } from "./pricing.js";

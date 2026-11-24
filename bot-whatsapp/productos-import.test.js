@@ -1,3 +1,4 @@
+process.env.DESCUENTO_TARIFA = "1"; // estas pruebas comprueban el descuento de tarifa (por defecto está apagado)
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildWorkbook } from "./xlsx.js";
@@ -27,7 +28,7 @@ const xlsx = () => buildWorkbook([{ name: "ARTICULOS", rows: [["Listado de artí
 test("parseProductos: reconoce las columnas por la cabecera (aunque haya un título antes) y usa el precio de venta", () => {
   const { products, stats } = parseProductosXlsx(xlsx());
   assert.deepEqual(products.map((p) => p.id), ["1001", "1002", "1003"]);
-  assert.deepEqual(products[0], { id: "1001", name: "AGUA MINERAL 1,5 L", price: 0.42, active: true, unitsPerBox: 6, vat: 10 });
+  assert.deepEqual(products[0], { id: "1001", name: "AGUA MINERAL 1,5 L", price: 0.42, active: true, unitsPerBox: 6, vat: 10, discount: 0 }); // celda de descuento vacía = sin descuento
   assert.equal(products[1].discount, 5);
   assert.equal(products[2].active, false);
   assert.equal(products[2].unitsPerBox, undefined);
@@ -60,7 +61,7 @@ test("parseNumber: formato español, inglés y miles; nunca confunde coma y punt
 test("parseProductos: no importa lo que parece una celda mal leída (precio disparatado, IVA que no existe) y avisa de lo raro", () => {
   const r = parseProductos([["Cód. artículo", "Artículo", "Precio venta", "Dto%", "Tipo IVA ventas", "Unidades paquete venta"],
     ["1", "NORMAL", "1,25", "10", "RED10", "6"], ["2", "PRECIO LOCO", "123456", "", "ORD21", "1"], ["3", "IVA RARO", "2", "", "7", "1"], ["4", "DTO IMPOSIBLE", "2", "250", "ORD21", "1"], ["5", "CAJA RARA", "2", "", "ORD21", "99999"], ["6", "CON RUIDO", "4,9950000000000001", "", "SRE", "1"]]);
-  assert.deepEqual(r.products.map((p) => [p.id, p.price, p.discount, p.vat, p.unitsPerBox]), [["1", 1.25, 10, 10, 6], ["4", 2, undefined, 21, 1], ["5", 2, undefined, 21, undefined], ["6", 4.995, undefined, 4, 1]]);
+  assert.deepEqual(r.products.map((p) => [p.id, p.price, p.discount, p.vat, p.unitsPerBox]), [["1", 1.25, 10, 10, 6], ["4", 2, undefined, 21, 1], ["5", 2, 0, 21, undefined], ["6", 4.995, 0, 4, 1]]);
   assert.deepEqual(r.stats.rechazados.map((x) => x.id), ["2", "3"]);
   assert.match(r.stats.rechazados[0].motivo, /precio fuera de lo normal/);
   assert.match(r.stats.rechazados[1].motivo, /IVA que no existe/);
@@ -72,4 +73,13 @@ test("un código roto del Excel («#VALUE!») no se importa ni hace que se pierd
   const { products, stats } = parseProductos(rows);
   assert.deepEqual(products.map((p) => p.id), ["100"]); assert.equal(stats.duplicados, 0);
   assert.deepEqual(stats.rechazados.map((r) => r.name), ["LOTE A", "LOTE B"]); assert.match(stats.rechazados[0].motivo, /código del artículo está roto/);
+});
+
+test("DESCUENTO VACÍO: si el Excel tiene columna de descuento, una celda vacía es «sin descuento» y quita el descuento antiguo; sin la columna, el descuento antiguo se conserva", async () => {
+  const { aplicarProductos } = await import("./productos-diff.js");
+  const antes = [{ id: "1", name: "A", price: 1, discount: 5 }, { id: "2", name: "B", price: 2, discount: 8 }];
+  const con = parseProductos([["Cód. artículo", "Artículo", "Precio venta", "Dto%"], ["1", "A", "1", ""], ["2", "B", "2", "8"]]);
+  assert.deepEqual(aplicarProductos(antes, con.products).map((p) => [p.id, p.discount]), [["1", 0], ["2", 8]], "el 5 % de A desaparece; el 8 % de B se mantiene");
+  const sin = parseProductos([["Cód. artículo", "Artículo", "Precio venta"], ["1", "A", "1"], ["2", "B", "2"]]);
+  assert.deepEqual(aplicarProductos(antes, sin.products).map((p) => [p.id, p.discount]), [["1", 5], ["2", 8]], "sin columna de descuento no se toca nada");
 });

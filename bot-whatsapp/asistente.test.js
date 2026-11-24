@@ -62,7 +62,7 @@ test("contraseña y datos: dice dónde se cambia la contraseña y dónde se desc
 });
 
 test("entrega: contesta con la regla real del día y la hora (la misma que la opción «Hoy»)", () => {
-  assert.match(di(medina, "¿me lo podéis entregar hoy?", LUNES_930).reply, /Si haces el pedido antes de las 10:00, te lo entregamos hoy/);
+  assert.match(di(medina, "¿me lo podéis entregar hoy?", LUNES_930).reply, /si haces el pedido antes de las 10:00, te lo entregamos hoy/);
   const tarde = di(medina, "¿me lo podéis entregar hoy?", LUNES_1100).reply;
   assert.match(tarde, /Hoy ya no llegamos/); assert.match(tarde, /martes/);
   const otro = di(tordesillas, "¿cuándo me llega el pedido?", LUNES_930).reply;

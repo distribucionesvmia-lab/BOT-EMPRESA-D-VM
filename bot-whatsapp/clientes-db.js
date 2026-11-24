@@ -224,17 +224,24 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       }
     },
 
+    /** Quita TODOS los precios y descuentos propios de UN cliente (los demás no cambian). Devuelve cuántos había. */
+    quitarPreciosPropios(id) {
+      const k = String(id), d = db.prepare("DELETE FROM customer_discounts WHERE customer_id = ?").run(k).changes, p = db.prepare("DELETE FROM customer_prices WHERE customer_id = ?").run(k).changes;
+      return { descuentos: Number(d), precios: Number(p) };
+    },
     /**
      * Precios y descuentos PROPIOS de cada cliente (Excel de consumo): Map(cliente → { precios: { artículo: precio }, descuentos: { artículo: % } }).
-     * Solo escribe lo que viene (añade o cambia); NO borra lo que el cliente ya tenía y no aparece. Todo o nada.
+     * Solo escribe lo que viene (añade o cambia); NO borra lo que el cliente ya tenía y no aparece, salvo lo que se pida expresamente con `quitarPrecios` / `quitarDescuentos` (listas de artículos). Todo o nada.
      */
     setPreciosPropios(porCliente) {
       db.exec("BEGIN IMMEDIATE");
       try {
-        const out = { clientes: 0, precios: 0, descuentos: 0, desconocidos: 0 };
+        const out = { clientes: 0, precios: 0, descuentos: 0, quitados: 0, desconocidos: 0 };
         for (const [cid, d] of porCliente) {
           const id = String(cid).trim();
           if (!byId.get(id)) { out.desconocidos++; continue; }
+          for (const pid of d.quitarPrecios ?? []) out.quitados += Number(db.prepare("DELETE FROM customer_prices WHERE customer_id = ? AND product_id = ?").run(id, String(pid)).changes);
+          for (const pid of d.quitarDescuentos ?? []) out.quitados += Number(db.prepare("DELETE FROM customer_discounts WHERE customer_id = ? AND product_id = ?").run(id, String(pid)).changes);
           for (const [pid, price] of Object.entries(d.precios ?? {})) { db.prepare("INSERT OR REPLACE INTO customer_prices VALUES (?, ?, ?)").run(id, String(pid), Number(price)); out.precios++; }
           for (const [pid, pct] of Object.entries(d.descuentos ?? {})) { db.prepare("INSERT OR REPLACE INTO customer_discounts VALUES (?, ?, ?)").run(id, String(pid), Number(pct)); out.descuentos++; }
           out.clientes++;
@@ -299,6 +306,8 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       return { total, rows: rows.map((r) => ({ id: r.id, name: r.name, legalName: r.legal_name ?? "", city: r.city ?? "", address: r.address ?? "", municipio: r.municipio ?? "", recargoEquivalencia: !!r.recargo, phones: r.phones ? r.phones.split(" ") : [], emails: r.emails ? r.emails.split(" ") : [], active: !!r.active })) };
     },
     /** Los artículos que más clientes distintos compran (solo identificadores y nunca de quién): mínimo 3 clientes, para no delatar a ninguno. */
+    /** Unidades compradas de cada artículo por todos los clientes (historial de a3ERP y consumo): solo cifras por artículo, nada de clientes. Map id → unidades. */
+    unidadesPorArticulo: () => new Map(db.prepare("SELECT product_id AS id, SUM(qty) AS q FROM purchases GROUP BY product_id").all().map((r) => [String(r.id), Number(r.q) || 0])),
     topProducts: (limit = 8) => db.prepare("SELECT product_id AS id FROM purchases GROUP BY product_id HAVING COUNT(DISTINCT customer_id) >= 3 ORDER BY COUNT(DISTINCT customer_id) DESC, COUNT(*) DESC LIMIT ?").all(limit).map((r) => r.id),
     /** Días en que cada cliente hizo pedidos (de a3ERP): Map(idCliente → [AAAA-MM-DD…] sin repetir y ordenadas). */
     fechasPedidos() {

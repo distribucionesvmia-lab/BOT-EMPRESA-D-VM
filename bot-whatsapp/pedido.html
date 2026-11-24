@@ -339,6 +339,7 @@
   .cats { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:14px; }
   .cat { border:2px solid var(--linea); border-radius:18px; background:var(--surface); padding:16px 12px; min-height:124px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; text-align:center; cursor:pointer; font:inherit; color:var(--texto); }
   .cat:hover, .cat:focus-visible { border-color:var(--rojo); background:var(--rojo-s); outline:none; }
+  .cat .ico.foto-fam { width:72px; height:72px; border-radius:12px; background:var(--foto-bg, #F2F2F7); display:flex; align-items:center; justify-content:center; overflow:hidden; } .cat .ico.foto-fam img { width:100%; height:100%; object-fit:contain; display:block; }
   .cat .ico { width:84px; height:84px; border-radius:16px; background:var(--surface); display:grid; place-items:center; overflow:hidden; color:#fff; font-weight:700; font-size:calc(34px / var(--k,1)); }
   .cat .ico img { width:100%; height:100%; object-fit:contain; }
   .sub .th { width:44px; height:44px; border-radius:10px; object-fit:contain; background:var(--surface); flex:none; margin-right:10px; }
@@ -1387,7 +1388,7 @@
     </div>
   </header>
   <div class="titulo-bloque"><h1 class="titulo-grande">Catálogo</h1><p class="titulo-sub" id="ttl">Cargando…</p><small id="sub" hidden></small></div>
-  <div class="aviso" id="avisoHoy" role="status" aria-live="polite" hidden>Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
+  <div class="aviso" id="avisoHoy" role="status" aria-live="polite" hidden>Solo en Medina del Campo: si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
   <div class="aviso" id="soloVer" role="status" hidden>Has entrado con un enlace de solo consulta: puedes mirar el catálogo, pero no enviar pedidos. Para pedir, llama a la oficina o entra con tu código.</div>
   <div class="aviso" id="copiaPrecios" role="status" aria-live="polite" hidden></div>
   <div class="aviso abierto" id="pendiente" role="status" aria-live="polite" hidden></div>
@@ -1416,7 +1417,7 @@
     <div class="aviso abierto" id="pendiente2" role="status" aria-live="polite" hidden></div>
     <div class="aviso abierto" id="recuperado2" role="status" aria-live="polite" hidden></div>
     <div class="aviso abierto" id="abierto2" role="status" aria-live="polite" hidden></div>
-    <div class="aviso" id="avisoHoy2" role="status" aria-live="polite" hidden>Si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
+    <div class="aviso" id="avisoHoy2" role="status" aria-live="polite" hidden>Solo en Medina del Campo: si haces el pedido antes de las 10:00, te lo entregamos hoy.</div>
     <div class="body cartbody">
       <div id="cartLines"></div>
       <button type="button" class="vaciar" id="vaciar">Vaciar el pedido</button>
@@ -1486,7 +1487,7 @@ const $ = id => document.getElementById(id);
 document.addEventListener("touchstart", () => {}, { passive: true }); // Safari solo enseña :active (la escala 0,97 al pulsar) si hay un oyente de toque
 const COLORS = ["#2f8f6b", "#c0763a", "#5b7bd5", "#a1507c", "#8a8f2b", "#3c8fa6", "#b8523f", "#6c5ba8"];
 const eur = n => n.toFixed(2).replace(".", ",") + " €";
-const eurp = n => { n = Number(n); const t = Math.round(n * 1000); return (n < 1 && t % 10 !== 0 ? n.toFixed(3) : n.toFixed(2)).replace(".", ",") + " €"; }; // precio de un artículo: 2 decimales (3 solo si cuesta menos de 1 € y el tercer decimal no es cero)
+const eurp = n => Number(n).toFixed(3).replace(".", ",") + " €"; // precio de un artículo (unidad o caja): SIEMPRE con 3 decimales («0,305 €», «1,200 €»); los totales e importes de línea siguen en céntimos (2 decimales)
 let data = null, tab = "all", query = "";
 const favs = new Set(); // favoritos del cliente (solo con sesión; en el enlace de pedido del chat no hay)
 // Clave de este pedido: si se reenvía (doble clic, fallo de red), el servidor no lo duplica
@@ -1566,7 +1567,7 @@ const mitadArriba = (num, den) => (num * 2n + den) / (2n * den);
 const precioCaja = p => Number(mitadArriba(escala(p.unitsPerBox, 3) * escala(p.price, 4) * (10000n - escala(p.discount || 0, 2)) * 100n, 1000n * 10000n * 10000n)) / 100;
 const importeCent = l => Number(mitadArriba(escala(uds(l), 3) * escala(l.price, 4) * (10000n - escala(l.discount || 0, 2)) * 100n, 1000n * 10000n * 10000n));
 const importe = l => importeCent(l) / 100;
-const precioUdExacto = l => { const p = Number(l.price) * (1 - (Number(l.discount) || 0) / 100); return Number(p.toFixed(4)).toFixed(Math.max(2, (String(Number(p.toFixed(4))).split(".")[1] || "").length)).replace(".", ","); };
+const precioUdExacto = l => { const p = Number(l.price) * (1 - (Number(l.discount) || 0) / 100); return Number(p.toFixed(4)).toFixed(Math.max(3, (String(Number(p.toFixed(4))).split(".")[1] || "").length)).replace(".", ","); };
 const RE_TIPO = { 21: 5.2, 10: 1.4, 4: 0.5 };
 // Total CON IVA, como en a3ERP: bases por tipo de IVA, IVA de cada base y recargo de equivalencia si el cliente lo tiene (los dos sobre la misma base)
 function calc() {
@@ -1867,7 +1868,7 @@ function abrirFicha(p) {
   if (p.unitsPerBox) fila("Unidades por caja", String(p.unitsPerBox));
   const hayDto = Number(p.discount) > 0;
   fila(esKilo(p.name) ? "Precio por kg" : "Precio por unidad", hayDto ? `<s>${eurp(p.price)}</s> <b>${eurp(precioUd(p))}</b> <span class="pf-dto">−${String(p.discount).replace(".", ",")} %</span>` : eurp(p.price), true);
-  if (p.unitsPerBox) fila("Precio por caja", eur(precioCaja(p)));
+  if (p.unitsPerBox) fila("Precio por caja", eurp(precioCaja(p)));
   fila("IVA", `${String(p.vat ?? 21).replace(".", ",")} % (los precios van sin IVA)`);
   if (p.oferta) fila("Oferta", "Vale" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().join("/") : " ahora"));
   c.appendChild(tabla);
@@ -1895,11 +1896,11 @@ function row(p) {
   if (p.nombreCorto && p.nombreCorto !== p.name) n.title = p.name;
   const c = document.createElement("div"); c.className = "pf-sec"; // el código de producto no se muestra
   const pk = /(\d+)\s*[xX×]\s*(\d+)/.exec(p.name), esPack = /\bpack\b/i.test(p.name) || (pk && Number(pk[1]) * Number(pk[2]) > 1);
-  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " · " + eur(precioCaja(p)); else if (esPack) c.textContent = pk && Number(pk[1]) * Number(pk[2]) > 1 ? "Pack de " + Number(pk[1]) * Number(pk[2]) : "Pack"; else c.textContent = esKilo(p.name) ? "Se vende por kilos" : "Por unidades"; // se dice siempre el formato y la unidad de venta
+  if (p.unitsPerBox) c.textContent = "Caja de " + p.unitsPerBox + " · " + eurp(precioCaja(p)); else if (esPack) c.textContent = pk && Number(pk[1]) * Number(pk[2]) > 1 ? "Pack de " + Number(pk[1]) * Number(pk[2]) : "Pack"; else c.textContent = esKilo(p.name) ? "Se vende por kilos" : "Por unidades"; // se dice siempre el formato y la unidad de venta
   { const med = medidasDeNombre(p.name); if (med.length) c.textContent += " · " + med.join(" · "); } // las medidas, aunque el nombre salga recortado
   const pr = document.createElement("div"); pr.className = "pf-pr";
   const price = document.createElement("b"); const ud = document.createElement("span"); ud.className = "pf-ud";
-  const enCaja = !!p.unitsPerBox && unit(p.id) === "caja", fmtP = enCaja ? eur : eurp; // el precio es de lo que se pide: la caja (con sus unidades) o la unidad
+  const enCaja = !!p.unitsPerBox && unit(p.id) === "caja", fmtP = eurp; // el precio es de lo que se pide: la caja (con sus unidades) o la unidad
   ud.textContent = enCaja ? ` /caja (${p.unitsPerBox} ud)` : (esKilo(p.name) ? " /kg" : esPack ? " /pack" : " /ud");
   if (Number(p.discount) > 0) { const viejo = document.createElement("s"); viejo.className = "pf-viejo"; viejo.textContent = fmtP(enCaja ? Number(p.price) * p.unitsPerBox : Number(p.price)); price.textContent = fmtP(enCaja ? precioCaja(p) : precioUd(p)); pr.append(viejo, price, ud); } // precio original tachado y el neto (el que se factura) al lado
   else { price.textContent = fmtP(enCaja ? precioCaja(p) : Number(p.price)); pr.append(price, ud); }
@@ -2015,9 +2016,11 @@ function renderCategorias(list) {
   const g = document.createElement("div"); g.className = "cats";
   for (const c of data.tree) {
     const b = document.createElement("button"); b.type = "button"; b.className = "cat";
-    const i = document.createElement("span"); i.className = "ico"; i.innerHTML = iconoCat(c.id); // icono de línea de la categoría (sin foto de un producto al azar)
+    const i = document.createElement("span"); i.className = "ico";
+    const tf = c.top && (escritorio() ? c.top.img : c.top.mini || c.top.img); // foto del artículo MÁS VENDIDO de la familia (el servidor la elige); sin foto, el icono de línea
+    if (tf) { i.classList.add("foto-fam"); const im = document.createElement("img"); im.src = tf; im.alt = ""; im.width = 72; im.height = 72; im.decoding = "async"; im.loading = "lazy"; i.appendChild(im); } else i.innerHTML = iconoCat(c.id);
     const n = document.createElement("b"); n.textContent = c.nombre;
-    const k = document.createElement("small"); k.textContent = c.count + (c.count === 1 ? " producto" : " productos");
+    const k = document.createElement("small"); k.textContent = c.count + (c.count === 1 ? " artículo" : " artículos");
     b.append(i, n, k); b.onclick = () => irA(c.id, null); g.appendChild(b);
   }
   list.appendChild(g);
@@ -2036,7 +2039,7 @@ function renderSubs(list, c) {
   todo.innerHTML = `<span>Ver todo ${esc(c.nombre)}</span><small>${c.count}</small>`; todo.onclick = () => irA(c.id, "*"); g.appendChild(todo);
   for (const s of c.subs) {
     const b = document.createElement("button"); b.type = "button"; b.className = "sub";
-    const ph = fotoDe(c.id, s.id);
+    const ph = (s.top && { img: s.top.img, mini: s.top.mini }) || fotoDe(c.id, s.id); // la del más vendido de la subfamilia
     b.innerHTML = `<span class="sl">${ph ? `<img class="th" src="${esc(fotoMini(ph))}" alt="">` : ""}<span>${esc(s.nombre)}</span></span><small>${s.count} ›</small>`; b.onclick = () => irA(c.id, s.id); g.appendChild(b);
   }
   list.appendChild(g);
@@ -2731,7 +2734,7 @@ function pintarSugs() {
     if (p.img) { const i = document.createElement("img"); i.src = fotoMini(p); i.alt = ""; i.decoding = "async"; i.loading = "lazy"; i.width = 56; i.height = 56; i.onerror = () => i.remove(); im.appendChild(i); }
     const tx = document.createElement("span"); tx.className = "sug-tx"; const n = document.createElement("b"); n.textContent = nombreVisible(p); n.title = p.name; const pr = document.createElement("small"); // nombre en hasta 2 líneas (no cortado en una) y, debajo, el formato (caja/pack/medidas) y el precio: así se distinguen las variantes
     const pkS = /(\d+)\s*[xX×]\s*(\d+)/.exec(p.name), fmtS = p.unitsPerBox ? (p.soloCaja ? `Solo cajas de ${p.unitsPerBox}` : `Caja de ${p.unitsPerBox}`) : (/\bpack\b/i.test(p.name) || (pkS && Number(pkS[1]) * Number(pkS[2]) > 1) ? "Pack" : "Por unidades"), medS = medidasDeNombre(p.name);
-    pr.textContent = [fmtS, ...medS].join(" · ") + " · " + (p.soloCaja && p.unitsPerBox ? `${eur(precioCaja(p))} la caja` : eurp(p.price) + (esKilo(p.name) ? " /kg" : " /ud"));
+    pr.textContent = [fmtS, ...medS].join(" · ") + " · " + (p.soloCaja && p.unitsPerBox ? `${eurp(precioCaja(p))} la caja` : eurp(p.price) + (esKilo(p.name) ? " /kg" : " /ud"));
     tx.append(n, pr);
     const mas = document.createElement("button"); mas.type = "button"; mas.className = "sug-mas"; mas.setAttribute("aria-label", "Añadir " + p.name);
     mas.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round"/></svg>';
