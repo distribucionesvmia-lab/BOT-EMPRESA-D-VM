@@ -306,6 +306,8 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       return { total, rows: rows.map((r) => ({ id: r.id, name: r.name, legalName: r.legal_name ?? "", city: r.city ?? "", address: r.address ?? "", municipio: r.municipio ?? "", recargoEquivalencia: !!r.recargo, phones: r.phones ? r.phones.split(" ") : [], emails: r.emails ? r.emails.split(" ") : [], active: !!r.active })) };
     },
     /** Los artículos que más clientes distintos compran (solo identificadores y nunca de quién): mínimo 3 clientes, para no delatar a ninguno. */
+    /** Unidades compradas de cada artículo por todos los clientes (historial de a3ERP y consumo): solo cifras por artículo, nada de clientes. Map id → unidades. */
+    unidadesPorArticulo: () => new Map(db.prepare("SELECT product_id AS id, SUM(qty) AS q FROM purchases GROUP BY product_id").all().map((r) => [String(r.id), Number(r.q) || 0])),
     topProducts: (limit = 8) => db.prepare("SELECT product_id AS id FROM purchases GROUP BY product_id HAVING COUNT(DISTINCT customer_id) >= 3 ORDER BY COUNT(DISTINCT customer_id) DESC, COUNT(*) DESC LIMIT ?").all(limit).map((r) => r.id),
     /** Días en que cada cliente hizo pedidos (de a3ERP): Map(idCliente → [AAAA-MM-DD…] sin repetir y ordenadas). */
     fechasPedidos() {

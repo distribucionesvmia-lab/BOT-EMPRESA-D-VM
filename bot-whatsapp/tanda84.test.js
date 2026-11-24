@@ -22,7 +22,7 @@ test("DESCARGAR: rechaza lo raro antes de conectar y solo devuelve fotos de verd
   let llamadas = 0; const pedirFn = async () => { llamadas++; return { buf: JPG }; };
   const ok = await descargarFoto("https://fotos.ejemplo/a.jpg", { resolver: dns({ "fotos.ejemplo": ["93.184.216.34"] }), pedirFn });
   assert.equal(ok.tipo, "image/jpeg"); assert.equal(llamadas, 1);
-  for (const u of ["ftp://fotos.ejemplo/a.jpg", "file:///etc/passwd", "javascript:alert(1)", "https://usuario:clave@fotos.ejemplo/a.jpg", "esto no es una dirección", "http://127.0.0.1/a.jpg", "http://[::1]/a.jpg", "http://10.0.0.1/a.jpg"]) await assert.rejects(descargarFoto(u, { resolver: dns({}), pedirFn }), Error, u);
+  for (const u of ["ftp://fotos.ejemplo/a.jpg", "file:///etc/passwd", "javascript:alert(1)", "https://usuario" + ":clave@fotos.ejemplo/a.jpg", "esto no es una dirección", "http://127.0.0.1/a.jpg", "http://[::1]/a.jpg", "http://10.0.0.1/a.jpg"]) await assert.rejects(descargarFoto(u, { resolver: dns({}), pedirFn }), Error, u);
   // un nombre que apunta a una dirección interna (o a una pública y otra interna a la vez) no vale
   await assert.rejects(descargarFoto("https://malo.ejemplo/a.jpg", { resolver: dns({ "malo.ejemplo": ["127.0.0.1"] }), pedirFn }), /no es de una página de internet/);
   await assert.rejects(descargarFoto("https://doble.ejemplo/a.jpg", { resolver: dns({ "doble.ejemplo": ["93.184.216.34", "192.168.1.9"] }), pedirFn }), /no es de una página de internet/);

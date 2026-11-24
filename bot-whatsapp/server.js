@@ -30,10 +30,24 @@ import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyD
 let topCache = { at: 0, ids: [] };
 const topIds = () => {
   if (Date.now() - topCache.at > 600_000) {
-    try { const conocidos = new Set(catalogNow().map((p) => String(p.id))); topCache = { at: Date.now(), ids: (customers.top?.(30) ?? []).map(String).filter((id) => conocidos.has(id)).slice(0, 8) }; } catch { topCache = { at: Date.now(), ids: [] }; }
+    try { const conocidos = new Set(catalogNow().map((p) => String(p.id))); topCache = { at: Date.now(), ids: (customerDirectory.top?.(30) ?? []).map(String).filter((id) => conocidos.has(id)).slice(0, 8) }; } catch { topCache = { at: Date.now(), ids: [] }; }
   }
   return topCache.ids;
 };
+// Foto de cada familia y subfamilia = la del artículo MÁS VENDIDO de esa familia (unidades compradas por todos los clientes; solo sale su foto, ningún dato de clientes). Sin ventas, el primero con foto. Se recalcula cada 10 minutos o al cambiar el catálogo.
+let topFamCache = { clave: "", at: 0, ventas: new Map() };
+function arbolConTop(arbol) {
+  const clave = String(catalogSeen);
+  if (topFamCache.clave !== clave || Date.now() - topFamCache.at > 600_000) { let v = new Map(); try { v = customerDirectory.ventas?.() ?? new Map(); } catch { /* sin historial */ } topFamCache = { clave, at: Date.now(), ventas: v }; }
+  const mejor = new Map(); // "cat" y "cat/sub" → { id, q }
+  for (const p of catalogNow()) {
+    const id = String(p.id); if (!imgs().has(id)) continue;
+    const k = categorizar(p), q = topFamCache.ventas.get(id) ?? 0;
+    for (const clv of [k.cat, `${k.cat}/${k.sub}`]) { const m = mejor.get(clv); if (!m || q > m.q || (q === m.q && id.localeCompare(m.id, undefined, { numeric: true }) < 0)) mejor.set(clv, { id, q }); }
+  }
+  const foto = (clv) => { const m = mejor.get(clv); return m ? { id: m.id, img: imgUrl(m.id), mini: miniUrl(m.id) } : null; };
+  return arbol.map((c) => ({ ...c, top: foto(c.id), subs: (c.subs ?? []).map((s) => ({ ...s, top: foto(`${c.id}/${s.id}`) })) }));
+}
 // Hasta cuándo se podrá cambiar un pedido hecho AHORA para cada día de reparto: la misma regla que el «Puedes modificarlo hasta…» de después de enviarlo
 const plazosDe = (ops) => Object.fromEntries(ops.map((o) => [o.date, plazoModificacion(o.date)]).filter(([, v]) => v).map(([d, v]) => [d, { texto: v.texto.replace(/^Puedes modificarlo/, "Podrás modificarlo"), corto: v.corto }]));
 const avisoEntrega = (customer) => ({ entregaHoy: entregaHoyDisponible(customer), delivery: deliveryOptions(undefined, { hoy: puedeHoy(customer) }), plazos: plazosDe(deliveryOptions(undefined, { hoy: puedeHoy(customer) })), today: madridDay(), minDate: deliveryCalendarFrom(undefined, { hoy: puedeHoy(customer) }) });
@@ -58,6 +72,7 @@ import nodePath from "node:path";
 import { BUSINESS, AYUDA, ayudaPublica, condicionesPedido, envTexto, EMPRESA_DIRECCION, EMPRESA_EMAIL } from "./config.js";
 import { pdfPedido, datosPdf, lineaPdf } from "./pdf.js";
 import { categorizar } from "./categorias.js";
+const esLicor = (p) => /^23\./.test(String(p?.family ?? "")) || categorizar(p).subNombre === "Licores y destilados";
 import { empaquetar, estatico } from "./estaticos.js";
 import { avisarCortes, horaAviso } from "./avisocorte.js";
 import { enviarProgramados } from "./avisos-programados.js";
@@ -95,7 +110,8 @@ if (process.env.DEMO === "1") {
 
 setCatalog(catalogoParaClientes(await getCatalog())); // catálogo (base de productos); si no hay, se usa el de config.js. Sin los artículos de precio 0 o con descuento del 100 %
 // Catálogo para los clientes: sin artículos sin coste y, si ya traen su código de familia, con el árbol de a3ERP (ARBOL_A3ERP=0 lo apaga)
-function catalogoParaClientes(cat) { const ocultos = leerOcultos(getAccountsDb()), l = cat?.filter((p) => !sinCoste(p) && !ocultos.has(String(p.id))) ?? null; return l && process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(l, FAM_NOMBRES, FAM_CATEGORIAS) : l; }
+// Sección de licores: ya no se vende por la web ni por el chat (SECCION_LICORES=1 la devuelve). El panel sigue viendo estos artículos.
+function catalogoParaClientes(cat) { const ocultos = leerOcultos(getAccountsDb()), conLicores = process.env.SECCION_LICORES === "1", l = cat?.filter((p) => !sinCoste(p) && !ocultos.has(String(p.id)) && (conLicores || !esLicor(p))) ?? null; return l && process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(l, FAM_NOMBRES, FAM_CATEGORIAS) : l; }
 const claveCatalogo = () => `${catalogVersion()}|${textoOcultos(getAccountsDb())}`; // cambia si cambia el catálogo O la lista de artículos quitados desde el panel
 let catalogSeen = claveCatalogo();
 // Memoria con caducidad corta (por cliente): los precios de TODO su catálogo se piden al abrir el chat y otra vez al abrir el catálogo, y el resumen del mes valora hasta 400 pedidos. Cambia la clave si el cliente hace un pedido o cambian sus precios/descuentos o el catálogo.
@@ -359,7 +375,7 @@ function webOrderRoutes(req, res, url) {
         used: getDb().hasOrderKey(linkKey(link)),
         products,
         history: webHistory(view, catalogNow()),
-        tree: arbolEnlace, accesos: accesosDe(arbolEnlace), famNombres: FAM_NOMBRES, famOrden: FAM_ORDEN,
+        tree: arbolConTop(arbolEnlace), accesos: accesosDe(arbolEnlace), famNombres: FAM_NOMBRES, famOrden: FAM_ORDEN,
         top: topIds(),
       ayuda: ayudaPublica(),
         ayuda: ayudaPublica(),
@@ -774,7 +790,7 @@ async function appRoutes(req, res, url) {
       favs: getAccountsDb().favorites(account.customerId),
       products: productosDe(customer),
       history: webHistory(customer, catalogNow()),
-      tree: arbol, accesos: accesosDe(arbol), famNombres: FAM_NOMBRES, famOrden: FAM_ORDEN,
+      tree: arbolConTop(arbol), accesos: accesosDe(arbol), famNombres: FAM_NOMBRES, famOrden: FAM_ORDEN,
       top: topIds(),
       retirados: retiradosDe(customer),
       abiertos: abiertosDe(account),

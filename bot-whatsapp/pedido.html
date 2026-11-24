@@ -339,6 +339,7 @@
   .cats { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:14px; }
   .cat { border:2px solid var(--linea); border-radius:18px; background:var(--surface); padding:16px 12px; min-height:124px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; text-align:center; cursor:pointer; font:inherit; color:var(--texto); }
   .cat:hover, .cat:focus-visible { border-color:var(--rojo); background:var(--rojo-s); outline:none; }
+  .cat .ico.foto-fam { width:72px; height:72px; border-radius:12px; background:var(--foto-bg, #F2F2F7); display:flex; align-items:center; justify-content:center; overflow:hidden; } .cat .ico.foto-fam img { width:100%; height:100%; object-fit:contain; display:block; }
   .cat .ico { width:84px; height:84px; border-radius:16px; background:var(--surface); display:grid; place-items:center; overflow:hidden; color:#fff; font-weight:700; font-size:calc(34px / var(--k,1)); }
   .cat .ico img { width:100%; height:100%; object-fit:contain; }
   .sub .th { width:44px; height:44px; border-radius:10px; object-fit:contain; background:var(--surface); flex:none; margin-right:10px; }
@@ -2011,9 +2012,11 @@ function renderCategorias(list) {
   const g = document.createElement("div"); g.className = "cats";
   for (const c of data.tree) {
     const b = document.createElement("button"); b.type = "button"; b.className = "cat";
-    const i = document.createElement("span"); i.className = "ico"; i.innerHTML = iconoCat(c.id); // icono de línea de la categoría (sin foto de un producto al azar)
+    const i = document.createElement("span"); i.className = "ico";
+    const tf = c.top && (escritorio() ? c.top.img : c.top.mini || c.top.img); // foto del artículo MÁS VENDIDO de la familia (el servidor la elige); sin foto, el icono de línea
+    if (tf) { i.classList.add("foto-fam"); const im = document.createElement("img"); im.src = tf; im.alt = ""; im.width = 72; im.height = 72; im.decoding = "async"; im.loading = "lazy"; i.appendChild(im); } else i.innerHTML = iconoCat(c.id);
     const n = document.createElement("b"); n.textContent = c.nombre;
-    const k = document.createElement("small"); k.textContent = c.count + (c.count === 1 ? " producto" : " productos");
+    const k = document.createElement("small"); k.textContent = c.count + (c.count === 1 ? " artículo" : " artículos");
     b.append(i, n, k); b.onclick = () => irA(c.id, null); g.appendChild(b);
   }
   list.appendChild(g);
@@ -2032,7 +2035,7 @@ function renderSubs(list, c) {
   todo.innerHTML = `<span>Ver todo ${esc(c.nombre)}</span><small>${c.count}</small>`; todo.onclick = () => irA(c.id, "*"); g.appendChild(todo);
   for (const s of c.subs) {
     const b = document.createElement("button"); b.type = "button"; b.className = "sub";
-    const ph = fotoDe(c.id, s.id);
+    const ph = (s.top && { img: s.top.img, mini: s.top.mini }) || fotoDe(c.id, s.id); // la del más vendido de la subfamilia
     b.innerHTML = `<span class="sl">${ph ? `<img class="th" src="${esc(fotoMini(ph))}" alt="">` : ""}<span>${esc(s.nombre)}</span></span><small>${s.count} ›</small>`; b.onclick = () => irA(c.id, s.id); g.appendChild(b);
   }
   list.appendChild(g);

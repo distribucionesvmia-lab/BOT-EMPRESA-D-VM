@@ -69,6 +69,7 @@ export const customerDirectory = {
   /** Nombre y correos de los clientes activos (Map), para campañas de correo. */
   contactos: () => dbs().customersDb.contactos(),
   top: (n) => dbs().customersDb.topProducts(n),
+  ventas: () => dbs().customersDb.unidadesPorArticulo(),
   fechasPedidos: () => dbs().customersDb.fechasPedidos(),
   getById: (id) => dbs().customersDb.getById(id),
   /** Lo escrito a mano en la ficha (panel de la empresa) y su edición. */
