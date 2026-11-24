@@ -1,6 +1,7 @@
 // Rutas HTTP de la EMPRESA (el empresario): pedidos recibidos y su exportación a Excel, solicitudes de alta de
 // clientes y cuentas. Es una aplicación aparte de la del cliente: todo va bajo /api/admin y exige la clave de la empresa.
 import crypto from "node:crypto";
+import { leerOcultos, ponerOculto } from "./articulos-ocultos.js";
 import { deliveryInfo, madridDay } from "./delivery.js";
 import { leerExcluidos, resolverExcluidos, excluidosValidos, prepararPedidos, rangoDe, calcular, atrasados, patronesCliente } from "./estadisticas.js";
 import { xlsxDeEstadisticas, csvDeEstadisticas } from "./estadisticas-export.js";
@@ -727,15 +728,25 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
       const q = sinTildes(url.searchParams.get("q") ?? "").slice(0, 60), cat = url.searchParams.get("categoria") ?? "", filtro = url.searchParams.get("filtro") ?? "";
       const pagina = Math.max(0, Number(url.searchParams.get("pagina")) || 0), por = 50, hoy = hoyMadrid();
       const cambios = catalogDb.ultimosCambiosDePrecio(), hechos = catalogDb.avisosHechos();
-      const todas = catalogDb.list({ activeOnly: filtro !== "retirados" }).filter((x) => filtro !== "retirados" || !x.active).map((x) => {
+      const ocultos = leerOcultos(accounts), todas = catalogDb.list({ activeOnly: filtro !== "retirados" }).filter((x) => filtro !== "retirados" || !x.active).map((x) => {
         const k = categorizar(x), vig = promoVigente(x, hoy), ch = cambios.get(x.id) ?? null, cp = campanaDe(x, ch, hoy), hecho = cp && hechos.get(x.id)?.clave === cp.clave ? hechos.get(x.id).at : null;
-        return { id: x.id, nombre: x.name, categoria: k.catNombre, categoriaId: k.cat, precio: x.price, descuento: x.discount ?? 0, unidadesPorCaja: x.unitsPerBox ?? null, iva: x.vat, activo: x.active,
+        return { id: x.id, nombre: x.name, categoria: k.catNombre, categoriaId: k.cat, precio: x.price, descuento: x.discount ?? 0, unidadesPorCaja: x.unitsPerBox ?? null, iva: x.vat, activo: x.active, quitado: ocultos.has(String(x.id)),
           oferta: vig ? { tipo: vig.tipo, valor: Number(vig.valor), hasta: vig.hasta ?? null } : null, ofertaCaducada: x.promo && !vig ? { tipo: x.promo.tipo, valor: Number(x.promo.valor), hasta: x.promo.hasta ?? null } : null,
           cambioPrecio: ch ? { antes: ch.antes, despues: ch.despues, at: ch.at } : null, campana: cp?.tipo ?? null, aviso: cp ? { titulo: cp.titulo, texto: cp.texto } : null, avisado: hecho };
       });
-      const filas = todas.filter((x) => (!q || sinTildes(`${x.id} ${x.nombre}`).includes(q)) && (!cat || x.categoriaId === cat) && (filtro !== "oferta" || x.oferta) && (filtro !== "descuento" || x.descuento > 0) && (filtro !== "bajada" || x.campana === "bajada") && (filtro !== "campana" || x.campana) && (filtro !== "fotopequena" || fotos.info(x.id).calidad === "pequena") && (filtro !== "sinfoto" || !fotos.info(x.id).existe));
+      const filas = todas.filter((x) => (!q || sinTildes(`${x.id} ${x.nombre}`).includes(q)) && (!cat || x.categoriaId === cat) && (filtro !== "oferta" || x.oferta) && (filtro !== "quitados" || x.quitado) && (filtro !== "descuento" || x.descuento > 0) && (filtro !== "bajada" || x.campana === "bajada") && (filtro !== "campana" || x.campana) && (filtro !== "fotopequena" || fotos.info(x.id).calidad === "pequena") && (filtro !== "sinfoto" || !fotos.info(x.id).existe));
       const categorias = [...new Map(todas.map((x) => [x.categoriaId, x.categoria])).entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre));
       return send(res, 200, { total: filas.length, pagina, porPagina: por, categorias, conOferta: todas.filter((x) => x.oferta).length, conDescuento: todas.filter((x) => x.descuento > 0).length, filas: filas.slice(pagina * por, pagina * por + por).map((x) => ({ ...x, foto: fotos.info(x.id) })) }), true;
+    }
+    { // «Quitar del catálogo»: los clientes dejan de ver el artículo (pantalla y chat) SIN borrarlo; se puede volver a poner. Sobrevive a las actualizaciones de a3ERP.
+      const mq = /^\/api\/admin\/articulos\/([^/]+)\/(quitar|poner)$/.exec(p);
+      if (mq && post && catalogDb) {
+        const id = decodeURIComponent(mq[1]), quitar = mq[2] === "quitar", b = (await readJson(req)) ?? {};
+        if (!catalogDb.list({ activeOnly: false }).some((x) => String(x.id) === id)) return send(res, 404, { error: "No encontramos ese artículo." }), true;
+        if (quitar && b.confirmo !== true) return send(res, 400, { error: "Hace falta confirmar para quitar el artículo del catálogo." }), true;
+        ponerOculto(accounts, id, quitar);
+        return send(res, 200, { ok: true, id, quitado: quitar }), true;
+      }
     }
     if (p === "/api/admin/articulos/quitar-descuentos" && post && catalogDb) { // deja a 0 % el descuento de TARIFA de todos los artículos (no toca los descuentos propios de cada cliente ni las ofertas)
       if (exigeReclave(req, res, who)) return true;

@@ -615,7 +615,7 @@
         <form class="filtros" id="f-articulos" aria-label="Filtrar artículos">
           <label class="campo campo-cliente"><span>Buscar</span><input type="search" id="ar-q" autocomplete="off" placeholder="Nombre o código del artículo"></label>
           <label class="campo"><span>Categoría</span><select id="ar-cat"><option value="">Todas</option></select></label>
-          <label class="campo"><span>Mostrar</span><select id="ar-filtro"><option value="">Todos</option><option value="oferta">Con oferta</option><option value="descuento">Con descuento de tarifa</option><option value="bajada">Con bajada de precio reciente</option><option value="campana">Con campana (oferta o bajada)</option><option value="retirados">Retirados (no se venden)</option><option value="fotopequena">Foto pequeña (se ve borrosa)</option><option value="sinfoto">Sin foto</option></select></label>
+          <label class="campo"><span>Mostrar</span><select id="ar-filtro"><option value="">Todos</option><option value="oferta">Con oferta</option><option value="descuento">Con descuento de tarifa</option><option value="bajada">Con bajada de precio reciente</option><option value="campana">Con campana (oferta o bajada)</option><option value="quitados">Quitados del catálogo</option><option value="retirados">Retirados (no se venden)</option><option value="fotopequena">Foto pequeña (se ve borrosa)</option><option value="sinfoto">Sin foto</option></select></label>
           <button type="button" id="ar-quitar" hidden>Quitar filtros</button>
         </form>
         <p class="muted" id="ar-estado" role="status" style="margin:0 0 8px"></p>
@@ -1461,7 +1461,7 @@ async function articulos() {
   const tb = $("ar-lista"); tb.innerHTML = "";
   if (!r.filas.length) { const tr = document.createElement("tr"); tr.appendChild(el("td", "Ningún artículo cumple estos filtros.", { className: "muted" })); tb.appendChild(tr); }
   for (const a of r.filas) {
-    const tr = document.createElement("tr"), nom = el("td"); nom.append(el("b", a.nombre), el("div", `${a.id} · ${a.categoria}${a.unidadesPorCaja ? " · caja de " + a.unidadesPorCaja : ""}${a.activo ? "" : " · RETIRADO"}`, { className: "muted" }));
+    const tr = document.createElement("tr"), nom = el("td"); nom.append(el("b", a.nombre), el("div", `${a.id} · ${a.categoria}${a.unidadesPorCaja ? " · caja de " + a.unidadesPorCaja : ""}${a.activo ? "" : " · RETIRADO"}${a.quitado ? " · QUITADO DEL CATÁLOGO" : ""}`, { className: "muted" }));
     { // Foto del artículo: tamaño y botón para cambiarla (las pequeñas se ven borrosas en el móvil)
       const f = a.foto ?? { existe: false }, txt = !f.existe ? "Sin foto" : f.w ? `Foto ${f.w}×${f.h} px` : "Foto", cal = { pequena: "pequeña: se ve borrosa", justa: "justa", buena: "buena" }[f.calidad] ?? "";
       const linea = el("div", "", { className: "muted foto-linea" }), etq = el("span", txt + (cal ? " · " + cal : ""), { className: f.calidad === "pequena" || !f.existe ? "foto-mala" : "" });
@@ -1482,6 +1482,15 @@ async function articulos() {
     const precio = el("td", eur3(a.precio), { className: "num" }); if (a.descuento) precio.appendChild(el("div", `−${String(a.descuento).replace(".", ",")} % habitual`, { className: "muted" })); if (a.cambioPrecio && Date.now() - Date.parse(a.cambioPrecio.at) < 7 * 86400e3) precio.appendChild(el("div", `antes ${eur3(a.cambioPrecio.antes)}`, { className: "muted" }));
     const of = el("td"); if (a.oferta) of.appendChild(el("span", ofertaTxt(a.oferta), { className: "oferta-tag" })); else if (a.ofertaCaducada) of.appendChild(el("span", "terminó: " + ofertaTxt(a.ofertaCaducada), { className: "oferta-tag vieja" }));
     const edi = el("td"), bEd = el("button", "Editar", { type: "button" }); bEd.onclick = () => abrirEditor(tr, a); edi.appendChild(bEd);
+    { // Quitar del catálogo (no borra nada: los clientes dejan de verlo y se puede volver a poner)
+      const bQ = el("button", a.quitado ? "Volver a poner" : "Quitar del catálogo", { type: "button", className: a.quitado ? "" : "peligro" });
+      bQ.onclick = async () => {
+        if (!a.quitado && !confirm(`¿Quitar «${a.nombre}» del catálogo?\n\nLos clientes dejarán de verlo y de poder pedirlo. No se borra: puedes volver a ponerlo cuando quieras (filtro «Quitados del catálogo»).`)) return;
+        bQ.disabled = true;
+        try { await call(`/api/admin/articulos/${encodeURIComponent(a.id)}/${a.quitado ? "poner" : "quitar"}`, { confirmo: true }); await articulos(); } catch (e) { alert(e.message || "No se ha podido hacer el cambio."); bQ.disabled = false; }
+      };
+      edi.append(" ", bQ);
+    }
     const cam = el("td");
     if (a.campana) {
       const b = el("button", "", { type: "button", className: "campana" + (a.avisado ? " hecho" : ""), title: a.avisado ? `Ya avisaste el ${hora(a.avisado)}. Pulsa para volver a avisar.` : "Avisar a todos los clientes con una notificación" });

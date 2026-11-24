@@ -22,6 +22,7 @@ import { crearActualizador } from "./actualizar-datos.js";
 import { estadoSistema, crearVigilante } from "./monitor.js";
 import { privacidadHtml, avisoLegalHtml } from "./privacidad.js";
 import { estadoVersion } from "./version.js";
+import { leerOcultos, textoOcultos } from "./articulos-ocultos.js";
 import { sinCoste, webProducts, webHistory, webTree, webOrderFromBody, withOwnOrders, accesosDe, HISTORIAL_MAX, HISTORIAL_VER_MAS, HISTORIAL_ANALISIS } from "./weborder.js";
 import { deliveryOptions, deliveryCalendarFrom, madridDay, puedeHoy, entregaHoyDisponible } from "./delivery.js";
 // Lo que el catálogo necesita para el aviso «entrega hoy» y las opciones de día: se calcula SIEMPRE en el servidor con la hora de Madrid
@@ -94,14 +95,15 @@ if (process.env.DEMO === "1") {
 
 setCatalog(catalogoParaClientes(await getCatalog())); // catálogo (base de productos); si no hay, se usa el de config.js. Sin los artículos de precio 0 o con descuento del 100 %
 // Catálogo para los clientes: sin artículos sin coste y, si ya traen su código de familia, con el árbol de a3ERP (ARBOL_A3ERP=0 lo apaga)
-function catalogoParaClientes(cat) { const l = cat?.filter((p) => !sinCoste(p)) ?? null; return l && process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(l, FAM_NOMBRES, FAM_CATEGORIAS) : l; }
-let catalogSeen = catalogVersion();
+function catalogoParaClientes(cat) { const ocultos = leerOcultos(getAccountsDb()), l = cat?.filter((p) => !sinCoste(p) && !ocultos.has(String(p.id))) ?? null; return l && process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(l, FAM_NOMBRES, FAM_CATEGORIAS) : l; }
+const claveCatalogo = () => `${catalogVersion()}|${textoOcultos(getAccountsDb())}`; // cambia si cambia el catálogo O la lista de artículos quitados desde el panel
+let catalogSeen = claveCatalogo();
 // Memoria con caducidad corta (por cliente): los precios de TODO su catálogo se piden al abrir el chat y otra vez al abrir el catálogo, y el resumen del mes valora hasta 400 pedidos. Cambia la clave si el cliente hace un pedido o cambian sus precios/descuentos o el catálogo.
 const memoProductos = crearMemo({ max: 30, ttlMs: 20_000 }), memoResumen = crearMemo({ max: 60, ttlMs: 120_000 });
 function productosDe(customer) { return memoProductos.get(`${firmaCliente(customer)}|${catalogSeen}|${imgMini.size}`, () => webProducts(customer, catalogNow(), habitualProducts, imgUrl, imgEsIa).map((x) => { const m = x.img ? miniUrl(x.id) : null; return m ? { ...x, mini: m } : x; })); }
 // Si se actualizan los productos o precios, el bot los usa sin reiniciar
 async function refreshCatalog() {
-  const v = catalogVersion();
+  const v = claveCatalogo();
   if (v !== catalogSeen) {
     catalogSeen = v;
     setCatalog(catalogoParaClientes(await getCatalog()));

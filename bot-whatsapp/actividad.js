@@ -1,6 +1,7 @@
 // Registro de actividad del panel de la empresa: qué se ha hecho, cuándo y desde qué dirección. Solo POST (lo que cambia algo); las vistas previas y pruebas no se apuntan.
 // No se guardan datos de clientes ni el contenido de lo enviado: solo la acción en palabras y la ruta.
 const ETIQUETAS = [
+  [/^\/api\/admin\/articulos\/[^/]+\/(quitar|poner)$/, (m) => (m[1] === "quitar" ? "Quitó un artículo del catálogo de los clientes" : "Volvió a poner un artículo en el catálogo")],
   [/\/(vista|vista-previa|audiencia|prueba|comprobar|exportar\/vista)(\/|$)/, null], // solo mirar: no se apunta
   [/^\/api\/admin\/aplicar\/(\w+)$/, (m) => `Aplicó una actualización de ${{ productos: "productos", clientes: "clientes", historial: "historial", consumo: "consumo de clientes", descuentos: "descuentos especiales de clientes", precios: "precios especiales de clientes", fotos: "fotos" }[m[1]] ?? m[1]}`],
   [/^\/api\/admin\/articulos\/[^/]+\/precio$/, () => "Cambió el precio de un artículo"],
