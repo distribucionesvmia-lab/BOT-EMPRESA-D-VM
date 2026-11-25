@@ -1395,6 +1395,11 @@
 
   /* Solo cajas: precio de cada unidad bien visible en la tarjeta */
   .pf-porud { display:block; margin-top:2px; font-size:calc(14px / var(--k,1)); font-weight:600; color:var(--text-2); }
+
+  /* botón «Volver» arriba del pedido y del resumen (en ordenador el pedido es un panel fijo: sin botón) */
+  .ped-atras { display:inline-flex; align-items:center; gap:4px; min-height:44px; padding:0 16px 0 10px; margin:0 0 var(--s1) -4px; border:0; border-radius:22px; background:var(--surface); color:var(--accent); font:inherit; font-size:calc(16px / var(--k,1)); font-weight:600; cursor:pointer; }
+  .ped-atras:active { transform:scale(.97); }
+  @media (min-width:1024px) { #cart .ped-atras { display:none; } }
 </style>
 </head>
 <body>
@@ -1435,7 +1440,7 @@
   <footer hidden role="status" aria-live="polite"><button class="pill-cart" id="verCarrito" type="button" disabled><span class="pc-info"><b id="pcN">0 artículos</b><small id="pcT"></small></span><span class="pc-ver">Ver pedido</span></button></footer>
 
   <section class="screen" id="cart" hidden aria-label="Pedido">
-    <div class="ped-cab"><h2 class="ped-tit">Pedido</h2><p class="ped-sub" id="cartCount"></p></div>
+    <div class="ped-cab"><button type="button" class="ped-atras" id="cartAtras" aria-label="Volver al catálogo"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Volver</button><h2 class="ped-tit">Pedido</h2><p class="ped-sub" id="cartCount"></p></div>
     <div class="aviso" id="modBanner" role="status" aria-live="polite" hidden></div>
     <div class="aviso" id="copiaPrecios2" role="status" aria-live="polite" hidden></div>
     <div class="aviso abierto" id="pendiente2" role="status" aria-live="polite" hidden></div>
@@ -1475,7 +1480,7 @@
   </section>
   <!-- Paso de resumen: lo último que se ve antes de enviar. Aquí se envía; en el carrito solo se revisa -->
   <section class="screen" id="resumen" hidden aria-label="Resumen del pedido">
-    <div class="ped-cab"><h2 class="ped-tit">Revisa tu pedido</h2><p class="ped-sub">Todavía no se ha enviado nada.</p></div>
+    <div class="ped-cab"><button type="button" class="ped-atras" id="resAtras" aria-label="Volver al pedido"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Volver</button><h2 class="ped-tit">Revisa tu pedido</h2><p class="ped-sub">Todavía no se ha enviado nada.</p></div>
     <div class="body cartbody">
       <div class="aviso abierto" id="resAbierto" role="status" aria-live="polite" hidden></div>
       <h3 class="ped-h">Entrega</h3>
@@ -2850,6 +2855,7 @@ $("q").addEventListener("keydown", e => { if (e.key === "Escape") { $("sugs").hi
 $("q").addEventListener("search", () => anotarBusqueda($("q").value)); // Enter o la X de borrar
 $("verCarrito").onclick = $("cartIcon").onclick = () => count() && showCart(true);
 $("keep").onclick = () => showCart(false);
+$("cartAtras").onclick = () => showCart(false);
 document.querySelectorAll("#cart .cartbody, #resumen .cartbody").forEach(b => b.addEventListener("scroll", () => b.closest(".screen").classList.toggle("compacta", b.scrollTop > 24), { passive: true })); // la cabecera se encoge al bajar
 function ajustaCuenta() { const b = $("cuentaBtn"), h = document.querySelector("header"); if (!b || !h || !h.offsetWidth) return; b.classList.remove("solo-icono"); if (h.scrollWidth > h.clientWidth + 1) b.classList.add("solo-icono"); } // con texto si cabe; solo icono si no
 try { const h = document.querySelector("header"); new ResizeObserver(ajustaCuenta).observe(h); new MutationObserver(ajustaCuenta).observe(document.documentElement, { attributes: true, attributeFilter: ["style", "class"] }); } catch {}
@@ -2930,6 +2936,7 @@ $("revisar").onclick = () => {
   pintarPasoResumen(); pintaRed(); $("errRes").textContent = ""; $("resumen").hidden = false; $("resumen").querySelector(".body").scrollTop = 0; $("confirm").focus({ preventScroll: true });
 };
 $("resVolver").onclick = () => ($("resumen").hidden = true);
+$("resAtras").onclick = () => ($("resumen").hidden = true);
 $("confirm").onclick = async () => {
   const eb = $("errRes"); eb.textContent = "";
   if (navigator.onLine === false) return pendienteSinRed(eb); // sin cobertura: no se envía

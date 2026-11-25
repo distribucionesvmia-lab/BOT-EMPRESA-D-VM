@@ -13,3 +13,9 @@ test("PRECIO UNIDAD: bot.js, server.js y cliente.html lo llevan", () => {
 test("MODO OSCURO: la tarjeta verde del Inicio lleva texto oscuro fijo", () => {
   assert.match(lee("./cliente.html"), /\.in-prod\.in-verde \.in-pn[^}]*color:#1D1D1F/);
 });
+test("PEDIDO: botón «Volver» arriba del pedido y del resumen", () => {
+  const p = lee("./pedido.html");
+  assert.match(p, /id="cartAtras"/);
+  assert.match(p, /id="resAtras"/);
+  assert.match(p, /\$\("cartAtras"\)\.onclick = \(\) => showCart\(false\)/);
+});
