@@ -21,8 +21,8 @@ test("4. «¿Algún problema con este pedido?» abre WhatsApp con pedido, tipo d
   assert.match(c, /id="m-problema" hidden/); assert.match(c, /¿Algún problema con este pedido\?/); assert.match(c, /Hola, tengo un problema con mi pedido \$\{o\.doc\}: \$\{\$\("p-tipo"\)\.value\}\./);
   assert.match(c, /a\.whatsappHref \+ "\?text=" \+ encodeURIComponent\(msg\(\)\)/); assert.match(c, /No se envía nada hasta que tú lo mandes/);
 });
-test("5-6. Mi cuenta: total con IVA, «Próximos» arriba con Modificar y estado en 4 pasos; PDF con la fecha de entrega en letra", () => {
-  assert.match(c, /nodo\("h4", "Próximos", "cu-mes"\)/); assert.match(c, /PASOS = \["Recibido", "En preparación", "En reparto", "Entregado"\]/); assert.match(c, /"Total con IVA aprox\.: " : "Total con IVA: "/);
+test("5-6. Mi cuenta: total con IVA, «Próximos» arriba con Modificar y estado solo «Recibido»; PDF con la fecha de entrega en letra", () => {
+  assert.match(c, /nodo\("h4", "Próximos", "cu-mes"\)/); assert.ok(!c.includes('nodo("ol", null, "cu-pasos")'), "sin barra de pasos: solo «Recibido»"); assert.ok(leer("./server.js").includes('estado: "Recibido",')); assert.match(c, /"Total con IVA aprox\.: " : "Total con IVA: "/);
   const o = { ref: "VM-2026-000009", created_at: "2026-11-14T10:00:00Z", delivery_date: "2026-11-17", address: "x", note: "", re: 0, items: [{ product_id: "1", name: "AGUA", unit: "ud", qty: 6, units: 6, price: 1, vat: 21, amount: 6 }] };
   const t = pdfPedido(datosPdf(o, { empresa: "VM", cliente: "BAR" })).toString("latin1");
   assert.ok(t.includes("martes 17 de noviembre de 2026"), "fecha de entrega en letra"); assert.equal(t.includes("17/11/2026"), false);

@@ -938,7 +938,7 @@ async function appRoutes(req, res, url) {
       return {
         total, totalOrientativo: orientativo, paso, proximo: !!propio && !!ent && ent >= hoyD, entregaTexto: ent ? longDate(ent) : "",
         doc: sinDocumento(o.doc) ? "" : o.doc, pdf: !sinDocumento(o.doc), fecha: o.date, entrega: ent, origen: propio ? "app" : "a3erp",
-        estado: !propio ? "Entregado" : propio.export_status === "exported" ? "En preparación" : pe?.ok ? "Recibido · puedes modificarlo" : "Recibido",
+        estado: "Recibido", // la empresa decidió que el cliente solo ve «Recibido» (sin «En preparación», «En reparto» ni «Entregado»)
         editable: !!pe?.ok, hasta: pe?.ok ? pe.texto : "", modificado: propio?.modified_at ?? null,
         lineas: o.lines.map((l) => { // «1 caja (6 uds)» igual que en el PDF; sin dato de caja (pedidos de a3ERP), unidades
           const g = propio?.items?.find((x) => String(x.product_id ?? x.id) === String(l.id)), cajas = g && g.unit === "caja" ? Number(g.boxes ?? g.qty) : 0;

@@ -792,3 +792,6 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 
 ## «Resumen del mes» de Mi cuenta rediseñado (25/11/2026, a petición de la empresa)
 - `pintarResumen` (`cliente.html`, último bloque del `<style>`): título «Resumen de noviembre de 2026» (ya sin mayúsculas en cada palabra) centrado entre las flechas (botones de 40 px con fondo), **cifras en tarjetas iguales** (pedidos · total con IVA; el ahorro, en una tarjeta verde a todo el ancho) y «Lo que más has pedido» como **lista numerada** (círculo rojo con el puesto, nombre a la izquierda, «97 uds» alineado a la derecha, líneas finas entre filas). Solo estilo y estructura: los datos no cambian. Comprobado con captura a 390 px; no en un móvil real.
+
+## Mi cuenta: el estado del pedido es solo «Recibido» (25/11/2026, a petición de la empresa)
+- En Mi cuenta ya no salen «En preparación», «En reparto» ni «Entregado» ni la barra de 4 pasos: cada pedido (de la app o de a3ERP) lleva solo la etiqueta **«Recibido»** (`estado` en `/api/mi-cuenta`, `server.js`). `paso` se sigue calculando pero no se enseña. Sustituye a «estado en 4 pasos» de Bench 5. Prueba: `tanda20.test.js`.

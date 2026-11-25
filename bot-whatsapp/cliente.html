@@ -1725,10 +1725,7 @@ async function abrirCuenta(irAPedidos, mas) {
       const f = new Date(o.fecha + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long" });
       cab.append(nodo("b", o.doc ? `${f} · pedido ${o.doc}` : f), nodo("span", o.estado, "est" + (o.editable ? " vivo" : "")));
       c.appendChild(cab);
-      if (o.origen === "app") { // estado en 4 pasos (deducido de la exportación y del día de entrega)
-        const PASOS = ["Recibido", "En preparación", "En reparto", "Entregado"], ol = nodo("ol", null, "cu-pasos"); ol.setAttribute("aria-label", "Estado del pedido: " + PASOS[o.paso - 1] + " (paso " + o.paso + " de 4)");
-        PASOS.forEach((t, i) => { const li = nodo("li", t); if (i + 1 < o.paso) li.className = "hecho"; else if (i + 1 === o.paso) { li.className = "ahora"; li.setAttribute("aria-current", "step"); } ol.appendChild(li); }); c.appendChild(ol);
-      }
+      // (sin barra de pasos: el cliente solo ve «Recibido»; el código de los 4 pasos —PASOS: Recibido, En preparación, En reparto, Entregado— se quitó a petición de la empresa)
       if (o.total != null) c.appendChild(nodo("p", (o.totalOrientativo ? "Total con IVA aprox.: " : "Total con IVA: ") + eur(o.total) + (o.totalOrientativo ? " (con los precios de hoy)" : ""), "cu-total"));
       const n = o.lineas.length;
       c.appendChild(nodo("p", o.lineas.slice(0, 3).map((l) => `${l.cant || l.uds} ${l.nombre}`).join(" · ") + (n > 3 ? ` y ${n - 3} más` : "") + (o.entrega ? ` · entrega ${o.entregaTexto || o.entrega.split("-").reverse().join("/")}` : ""), "res"));
