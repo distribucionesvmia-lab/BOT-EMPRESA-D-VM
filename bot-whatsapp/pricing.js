@@ -62,7 +62,7 @@ export function precioEfectivo(product, customer, id, precioDelPedido, hoy) {
 /** Calcula los campos de una línea: { unit, boxes, units, price, discount, vat, amount, unsureBox } */
 export function priceLine(item, product, customer, hoy) {
   const id = String(item.id);
-  const qty = item.qty;
+  const qty = Number.isFinite(Number(item.qty)) ? Math.max(0, Number(item.qty)) : 0; // nunca negativa ni NaN: una cantidad rara jamás puede restar del total
   const upb = Number.isInteger(product?.unitsPerBox) && product.unitsPerBox >= 1 ? product.unitsPerBox : null;
   const byBox = item.unit === "caja";
   const { price, discount } = precioEfectivo(product, customer, id, item.price, hoy);

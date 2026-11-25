@@ -228,7 +228,7 @@ test("tanda 2 (inicio y diseño general): atajos sin recorte, contenedor único,
 
 test("tanda 3 (catálogo): barra de categoría con fondo, subcategorías como chips, «150 de N» con carga automática, grupos de habituales, etiqueta aparte, «¿Te falta algo?» ordenado, selector de 44 px, formato y accesos directos", () => {
   assert.match(pedido, /\.cab-cat \{ position:sticky; top:0; z-index:4; background:var\(--bg\);/); // 6
-  assert.match(pedido, /nav = \{ cat, sub: cat && sub === null \? "\*" : sub \}/); assert.match(pedido, /className = "subchips"/); // 12
+  assert.match(pedido, /nav = \{ cat, sub: cat && cat !== FAVS && sub === null \? /); assert.match(pedido, /renderSubTarjetas\(list, c\)/); /* con varias subcategorías, tarjetas propias; con una, directo a los artículos */ assert.match(pedido, /className = "subchips"/); // 12
   assert.match(pedido, /Mostrando \$\{limite\} de \$\{items\.length\}/); assert.match(pedido, /new IntersectionObserver\(es => \{ if \(es\[0\]\.isIntersecting\) mas\(\); \}/); // 3
   assert.match(pedido, /const conGrupos = false;/); // el orden de cada sección es fijo (ya no se separa «lo que sueles pedir» arriba)
   assert.match(pedido, /lc\.className = "pf-compras"/); assert.doesNotMatch(pedido, /\[p\.marca, tab === "all" && p\.count > 0 \? "Lo compras"/); // 4

@@ -34,7 +34,7 @@ test("MCP: buscar clientes, ficha y estadísticas solo LEEN (GET) y no devuelven
     respuesta = (req) => req.url.startsWith("/api/admin/buscar") ? { estado: 200, json: { clientes: [{ id: "365", nombre: "BAR UNO", poblacion: "Medina" }], pedidos: [], articulos: [] } } : { estado: 200, json: { hola: "x".repeat(20000) } };
     assert.match(texto(await c.llamar("buscar_clientes", { texto: "bar uno" })), /365 · BAR UNO · Medina/);
     assert.equal(texto(await c.llamar("buscar_clientes", { texto: "b" })).includes("2 letras"), true);
-    const f = texto(await c.llamar("ficha_cliente", { cliente_id: "365" })); assert.match(f, /resultado recortado/); assert.ok(f.length < 7100);
+    const f = texto(await c.llamar("ficha_cliente", { cliente_id: "365" })); assert.match(f, /resultado recortado/); assert.ok(f.length < 7600); // 7.000 de datos + la marca «datos de terceros» que ahora los envuelve (tanda89)
     await c.llamar("estadisticas", { rango: "7d" }); await c.llamar("estadisticas", { rango: "loquesea" });
     assert.deepEqual(peticiones.map((q) => [q.metodo, q.ruta]), [["GET", "/api/admin/buscar?q=bar%20uno"], ["GET", "/api/admin/cliente/365/ficha"], ["GET", "/api/admin/estadisticas?rango=7d"], ["GET", "/api/admin/estadisticas?rango=30d"]]);
     assert.equal((await c.llamar("ficha_cliente", { cliente_id: "../x" })).result.isError, true);
@@ -48,7 +48,7 @@ test("MCP: ver_excel manda el archivo SIN aplicar nada; aplicar_excel exige el s
     const v = texto(await c.llamar("ver_excel", { ruta: xlsx, tipo: "consumo", solo_descuentos_e_historial: true })); assert.match(v, /VISTA PREVIA \(no se ha cambiado nada\)/); assert.match(v, /Una línea sin precio/);
     let q = peticiones[0]; assert.equal(q.ruta, "/api/admin/vista-previa/consumo?fichero=datos.xlsx&sinPrecios=1&soloCompras=1"); assert.equal(q.tipo, "application/octet-stream"); assert.equal(q.cuerpo.toString(), "PK-falso-pero-suficiente");
     peticiones.length = 0; assert.match(texto(await c.llamar("aplicar_excel", { ruta: xlsx, tipo: "clientes" })), /falta la confirmación/); assert.equal(peticiones.length, 0);
-    const ap = texto(await c.llamar("aplicar_excel", { ruta: xlsx, tipo: "clientes", confirmado_por_el_usuario: true })); assert.match(ap, /^APLICADO/); assert.equal(peticiones[0].ruta, "/api/admin/aplicar/clientes?fichero=datos.xlsx"); assert.equal(peticiones[0].reclave, undefined);
+    const ap = texto(await c.llamar("aplicar_excel", { ruta: xlsx, tipo: "clientes", confirmado_por_el_usuario: true })); assert.match(ap, /^⟦DATOS[\s\S]*\nAPLICADO/); // va dentro de la marca «datos de terceros» (tanda89); assert.equal(peticiones[0].ruta, "/api/admin/aplicar/clientes?fichero=datos.xlsx"); assert.equal(peticiones[0].reclave, undefined);
     peticiones.length = 0; await c.llamar("aplicar_excel", { ruta: xlsx, tipo: "productos", confirmado_por_el_usuario: true }); assert.equal(peticiones[0].reclave, TOKEN); // la tarifa pide la clave otra vez y esta conexión ya la tiene
     respuesta = () => ({ estado: 409, json: { error: "x", confirmar: ["164 precios propios distintos de la tarifa"] } });
     const cf = texto(await c.llamar("aplicar_excel", { ruta: xlsx, tipo: "consumo", confirmado_por_el_usuario: true })); assert.match(cf, /NO se ha aplicado/); assert.match(cf, /164 precios/);

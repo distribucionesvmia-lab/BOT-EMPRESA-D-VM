@@ -36,7 +36,7 @@ const topIds = () => {
 };
 // Foto de cada familia y subfamilia = la del artículo MÁS VENDIDO de esa familia (unidades compradas por todos los clientes; solo sale su foto, ningún dato de clientes). Sin ventas, el primero con foto. Se recalcula cada 10 minutos o al cambiar el catálogo.
 let topFamCache = { clave: "", at: 0, ventas: new Map() };
-function arbolConTop(arbol) {
+function arbolConTop(arbol) { // eslint-disable-line no-param-reassign
   const clave = String(catalogSeen);
   if (topFamCache.clave !== clave || Date.now() - topFamCache.at > 600_000) { let v = new Map(); try { v = customerDirectory.ventas?.() ?? new Map(); } catch { /* sin historial */ } topFamCache = { clave, at: Date.now(), ventas: v }; }
   const mejor = new Map(); // "cat" y "cat/sub" → { id, q }
@@ -46,6 +46,7 @@ function arbolConTop(arbol) {
     for (const clv of [k.cat, `${k.cat}/${k.sub}`]) { const m = mejor.get(clv); if (!m || q > m.q || (q === m.q && id.localeCompare(m.id, undefined, { numeric: true }) < 0)) mejor.set(clv, { id, q }); }
   }
   const foto = (clv) => { const m = mejor.get(clv); return m ? { id: m.id, img: imgUrl(m.id), mini: miniUrl(m.id) } : null; };
+  if (process.env.ARBOL_TIPOS !== "0") arbol = ordenTipos(arbol); // categorías por tipo de artículo, en su orden (y cada una con su posición `o`)
   return arbol.map((c) => ({ ...c, top: foto(c.id), subs: (c.subs ?? []).map((s) => ({ ...s, top: foto(`${c.id}/${s.id}`) })) }));
 }
 // Hasta cuándo se podrá cambiar un pedido hecho AHORA para cada día de reparto: la misma regla que el «Puedes modificarlo hasta…» de después de enviarlo
@@ -56,6 +57,7 @@ import { crearSincronizacion, fileState } from "./sincronizar.js";
 import { crearAvisos } from "./avisos.js";
 import { compararFamilias } from "./ordenfamilia.js";
 import { conArbolA3erp } from "./arbol-a3erp.js";
+import { conArbolTipos, ordenTipos } from "./arbol-tipos.js";
 import { previaPedidoRapido } from "./pedido-rapido.js";
 import { resumenMensual } from "./resumen-mensual.js";
 import { crearMemo, firmaCliente } from "./memo.js";
@@ -111,7 +113,7 @@ if (process.env.DEMO === "1") {
 setCatalog(catalogoParaClientes(await getCatalog())); // catálogo (base de productos); si no hay, se usa el de config.js. Sin los artículos de precio 0 o con descuento del 100 %
 // Catálogo para los clientes: sin artículos sin coste y, si ya traen su código de familia, con el árbol de a3ERP (ARBOL_A3ERP=0 lo apaga)
 // Sección de licores: ya no se vende por la web ni por el chat (SECCION_LICORES=1 la devuelve). El panel sigue viendo estos artículos.
-function catalogoParaClientes(cat) { const ocultos = leerOcultos(getAccountsDb()), conLicores = process.env.SECCION_LICORES === "1", l = cat?.filter((p) => !sinCoste(p) && !ocultos.has(String(p.id)) && (conLicores || !esLicor(p))) ?? null; return l && process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(l, FAM_NOMBRES, FAM_CATEGORIAS) : l; }
+function catalogoParaClientes(cat) { const ocultos = leerOcultos(getAccountsDb()), conLicores = process.env.SECCION_LICORES === "1", l = cat?.filter((p) => !sinCoste(p) && !ocultos.has(String(p.id)) && (conLicores || !esLicor(p))) ?? null; if (l && process.env.ARBOL_TIPOS !== "0") return conArbolTipos(l); return l && process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(l, FAM_NOMBRES, FAM_CATEGORIAS) : l; }
 const claveCatalogo = () => `${catalogVersion()}|${textoOcultos(getAccountsDb())}`; // cambia si cambia el catálogo O la lista de artículos quitados desde el panel
 let catalogSeen = claveCatalogo();
 // Memoria con caducidad corta (por cliente): los precios de TODO su catálogo se piden al abrir el chat y otra vez al abrir el catálogo, y el resumen del mes valora hasta 400 pedidos. Cambia la clave si el cliente hace un pedido o cambian sus precios/descuentos o el catálogo.
@@ -936,7 +938,7 @@ async function appRoutes(req, res, url) {
       return {
         total, totalOrientativo: orientativo, paso, proximo: !!propio && !!ent && ent >= hoyD, entregaTexto: ent ? longDate(ent) : "",
         doc: sinDocumento(o.doc) ? "" : o.doc, pdf: !sinDocumento(o.doc), fecha: o.date, entrega: ent, origen: propio ? "app" : "a3erp",
-        estado: !propio ? "Entregado" : propio.export_status === "exported" ? "En preparación" : pe?.ok ? "Recibido · puedes modificarlo" : "Recibido",
+        estado: "Recibido", // la empresa decidió que el cliente solo ve «Recibido» (sin «En preparación», «En reparto» ni «Entregado»)
         editable: !!pe?.ok, hasta: pe?.ok ? pe.texto : "", modificado: propio?.modified_at ?? null,
         lineas: o.lines.map((l) => { // «1 caja (6 uds)» igual que en el PDF; sin dato de caja (pedidos de a3ERP), unidades
           const g = propio?.items?.find((x) => String(x.product_id ?? x.id) === String(l.id)), cajas = g && g.unit === "caja" ? Number(g.boxes ?? g.qty) : 0;
@@ -1106,8 +1108,9 @@ const servidorHttp = http
     }
     if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.png" || url.pathname.startsWith("/captura-") || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/estatico/") || url.pathname.startsWith("/entrar/") || url.pathname.startsWith("/baja/") || url.pathname.startsWith("/img/")) {
       appRoutes(req, res, url).catch((err) => {
-        console.error(err);
-        if (!res.headersSent) { if (url.pathname.startsWith("/api/")) res.writeHead(500, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify({ error: `Error interno del programa (${String(err?.message ?? err).slice(0, 160)}). Mira el final del registro (C:\\vm\\logs).` })); else res.writeHead(500).end(); }
+        const codigo = crypto.randomBytes(3).toString("hex").toUpperCase(); // el cliente solo ve este código; el detalle va al registro de la oficina (nunca rutas, SQL ni textos internos hacia fuera)
+        console.error(`[VM error ${codigo}]`, err);
+        if (!res.headersSent) { if (url.pathname.startsWith("/api/")) res.writeHead(500, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify({ error: clientEnabled ? `Ha ocurrido un error. Inténtalo de nuevo y, si sigue, díselo a la oficina con este código: ${codigo}.` : `Error interno del programa (${String(err?.message ?? err).slice(0, 160)}) [código ${codigo}]. Mira el final del registro (C:\\vm\\logs).`, codigo })); else res.writeHead(500).end(); }
       });
       return;
     }

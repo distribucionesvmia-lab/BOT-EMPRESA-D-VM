@@ -644,7 +644,7 @@
   .vm-inicio > .in-hacer { grid-column:1; }
   .vm-inicio .in-sec-cab { display:flex; align-items:baseline; justify-content:space-between; gap:var(--s3); }
   .vm-inicio .in-sec-cab h3 { margin:0 0 var(--s2); }
-  .vm-inicio .in-vertodos { min-height:44px; display:inline-flex; align-items:center; color:var(--accent); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:600; text-decoration:none; }
+  .vm-inicio .in-vertodos { min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0 var(--s5); border-radius:var(--r-pill); background:var(--accent); color:var(--on-accent); font-size:calc(var(--t-sec) / var(--k,1)); font-weight:700; text-decoration:none; white-space:nowrap; } /* botón rojo bien visible */
   .vm-inicio .in-pn { -webkit-line-clamp:3; min-height:calc(3 * 1.2em); }
   .vm-inicio .in-pie { display:flex; align-items:center; justify-content:space-between; gap:var(--s2); }
   .vm-inicio .in-pie small { font-size:calc(var(--t-cap) / var(--k,1)); color:var(--text); font-weight:700; font-variant-numeric:tabular-nums; }
@@ -747,6 +747,43 @@
   .vm-inicio .in-card .in-sie-acc { gap:0; margin-top:var(--s3); padding-top:var(--s1,4px); border-top:1px solid var(--line); }
   .vm-inicio .in-card .in-sie-acc .vm-btn.ghost { background:transparent; color:var(--text-2); }
   .vm-inicio .in-card .in-sie-acc .vm-btn.ghost + .vm-btn.ghost { border-left:1px solid var(--line); border-radius:0; }
+
+  /* tarjeta de artículo del Inicio, más simple: nombre, precio y «En tu último pedido» */
+  .vm-inicio .in-prod { gap:var(--s2); padding:var(--s2) var(--s2) var(--s3); box-shadow:0 1px 2px rgba(0,0,0,.05); }
+  .vm-inicio .in-prod .in-pim { background:#fff; border-radius:16px; }
+  .vm-inicio .in-prod.in-verde { background:#fff; border:2px solid var(--ok); border-radius:22px; }
+  .vm-inicio .in-prod .in-pn { font-size:calc(15px / var(--k,1)); line-height:1.25; font-weight:700; -webkit-line-clamp:3; min-height:0; text-transform:none; letter-spacing:-.01em; padding:0 2px; }
+  .vm-inicio .in-prod .in-pie { align-items:flex-end; padding:0 2px; }
+  .vm-inicio .in-prod .in-precio { display:flex; flex-wrap:wrap; align-items:baseline; gap:0 3px; min-width:0; }
+  .vm-inicio .in-prod .in-precio b { font-size:calc(19px / var(--k,1)); font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+  .vm-inicio .in-prod .in-precio em { font-style:normal; font-size:calc(13px / var(--k,1)); color:var(--text-2); font-weight:600; }
+  .vm-inicio .in-prod .in-precio .in-fmt { flex-basis:100%; font-size:calc(12px / var(--k,1)); color:var(--text-2); font-weight:400; }
+  .vm-inicio .in-prod .in-mas { position:static; flex:none; width:40px; height:40px; }
+  .vm-inicio .in-prod .in-mas svg { width:20px; height:20px; }
+  .vm-inicio .in-prod .in-ult { display:block; margin-top:2px; padding:6px 10px; border-radius:10px; background:var(--ok-bg); color:var(--ok); font-size:calc(12.5px / var(--k,1)); font-weight:700; line-height:1.25; }
+  /* el precio y el € nunca se separan; la unidad («/ caja», «/ ud») va debajo */
+  .vm-inicio .in-prod .in-precio { flex-direction:column; align-items:flex-start; flex-wrap:nowrap; gap:0; }
+  .vm-inicio .in-prod .in-precio b { white-space:nowrap; font-size:calc(17px / var(--k,1)); letter-spacing:-.03em; }
+  .vm-inicio .in-prod .in-precio em { white-space:nowrap; }
+  .vm-inicio .in-hacer.in-nuevo { margin-bottom:var(--s4,16px); }
+  /* «Resumen del mes» de Mi cuenta: título centrado, tres cifras en tarjetas iguales y lista numerada alineada */
+  .cu-resumen { padding:var(--s4); border:.5px solid var(--line); }
+  .cu-resumen .rs-cab { justify-content:space-between; margin:0 calc(-1 * var(--s2)); }
+  .cu-resumen .rs-cab h3 { text-align:center; text-transform:none; font-size:calc(17px / var(--k,1)); font-weight:700; line-height:1.25; letter-spacing:-.01em; }
+  .cu-resumen .rs-nav { flex:none; width:40px; height:40px; background:var(--fill); font-size:calc(22px / var(--k,1)); line-height:1; display:grid; place-items:center; }
+  .cu-resumen .rs-cifras { grid-template-columns:1fr 1fr; gap:var(--s2); margin:var(--s3) 0; }
+  .cu-resumen .rs-cifra { background:var(--fill); border-radius:14px; padding:var(--s3); display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .cu-resumen .rs-cifra b { font-size:calc(21px / var(--k,1)); line-height:1.15; white-space:nowrap; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+  .cu-resumen .rs-cifra span { line-height:1.25; }
+  .cu-resumen .rs-ahorro { grid-column:1 / -1; background:var(--ok-bg); }
+  .cu-resumen .rs-nota { margin:var(--s2) 0 0; line-height:1.35; }
+  .cu-resumen .rs-tit { margin:var(--s3) 0 var(--s2); font-size:calc(12.5px / var(--k,1)); font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-2); }
+  .cu-resumen .rs-top { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+  .cu-resumen .rs-top li { display:grid; grid-template-columns:26px 1fr auto; align-items:center; gap:var(--s2); padding:10px 0; border-top:.5px solid var(--line); font-size:calc(15px / var(--k,1)); }
+  .cu-resumen .rs-top li:first-child { border-top:0; }
+  .cu-resumen .rs-n { width:24px; height:24px; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; font-size:calc(12px / var(--k,1)); font-weight:700; }
+  .cu-resumen .rs-nom { min-width:0; line-height:1.25; font-weight:600; overflow-wrap:anywhere; }
+  .cu-resumen .rs-ud { white-space:nowrap; font-variant-numeric:tabular-nums; color:var(--text-2); font-weight:700; font-size:calc(14px / var(--k,1)); }
 </style>
 </head>
 <body>
@@ -1607,7 +1644,7 @@ async function pintarResumen(caja, mes) {
   const j = await fetch("/api/mi-resumen" + (mes ? "?mes=" + encodeURIComponent(mes) : "")).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   caja.textContent = ""; if (!j?.hay) { caja.className = ""; return; }
   caja.className = "cu-resumen"; caja.setAttribute("role", "region"); caja.setAttribute("aria-label", "Tu resumen del mes");
-  const i = j.meses.findIndex((m) => m.mes === j.mes), cab = nodo("div", null, "rs-cab"), h = nodo("h3", "Tu resumen de " + j.titulo);
+  const i = j.meses.findIndex((m) => m.mes === j.mes), cab = nodo("div", null, "rs-cab"), h = nodo("h3", "Resumen de " + j.titulo.charAt(0).toLowerCase() + j.titulo.slice(1).replace(" de ", " de\u00a0"));
   const ant = nodo("button", "‹", "rs-nav"), sig = nodo("button", "›", "rs-nav"); ant.type = sig.type = "button";
   ant.setAttribute("aria-label", "Mes anterior"); sig.setAttribute("aria-label", "Mes siguiente");
   ant.disabled = i >= j.meses.length - 1; sig.disabled = i <= 0;
@@ -1619,7 +1656,7 @@ async function pintarResumen(caja, mes) {
   if (j.ahorro > 0) cifra((j.aprox ? "≈ " : "") + eur(j.ahorro), "ahorrado frente a tarifa", "rs-ahorro");
   caja.appendChild(cifras);
   if (j.variacion !== null && j.variacion !== 0) caja.appendChild(nodo("p", "Has comprado un " + Math.abs(j.variacion) + " % " + (j.variacion > 0 ? "más" : "menos") + " que en " + j.anterior.titulo + ".", "rs-nota"));
-  if (j.masPedidos.length) { caja.appendChild(nodo("p", "Lo que más has pedido", "cu-tit")); const ol = nodo("ol"); for (const a of j.masPedidos) ol.appendChild(nodo("li", a.unidades + " uds · " + a.nombre)); caja.appendChild(ol); }
+  if (j.masPedidos.length) { caja.appendChild(nodo("p", "Lo que más has pedido", "rs-tit")); const ul = nodo("ul", null, "rs-top"); j.masPedidos.forEach((a, n) => { const li = nodo("li"); li.append(nodo("span", String(n + 1), "rs-n"), nodo("span", a.nombre, "rs-nom"), nodo("b", a.unidades + (a.unidades === 1 ? " ud" : " uds"), "rs-ud")); ul.appendChild(li); }); caja.appendChild(ul); }
   if (j.aprox) caja.appendChild(nodo("p", "Los pedidos anteriores a la app se calculan con los precios de hoy (aproximado).", "rs-nota"));
 }
 async function abrirCuenta(irAPedidos, mas) {
@@ -1688,10 +1725,7 @@ async function abrirCuenta(irAPedidos, mas) {
       const f = new Date(o.fecha + "T12:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "long" });
       cab.append(nodo("b", o.doc ? `${f} · pedido ${o.doc}` : f), nodo("span", o.estado, "est" + (o.editable ? " vivo" : "")));
       c.appendChild(cab);
-      if (o.origen === "app") { // estado en 4 pasos (deducido de la exportación y del día de entrega)
-        const PASOS = ["Recibido", "En preparación", "En reparto", "Entregado"], ol = nodo("ol", null, "cu-pasos"); ol.setAttribute("aria-label", "Estado del pedido: " + PASOS[o.paso - 1] + " (paso " + o.paso + " de 4)");
-        PASOS.forEach((t, i) => { const li = nodo("li", t); if (i + 1 < o.paso) li.className = "hecho"; else if (i + 1 === o.paso) { li.className = "ahora"; li.setAttribute("aria-current", "step"); } ol.appendChild(li); }); c.appendChild(ol);
-      }
+      // (sin barra de pasos: el cliente solo ve «Recibido»; el código de los 4 pasos —PASOS: Recibido, En preparación, En reparto, Entregado— se quitó a petición de la empresa)
       if (o.total != null) c.appendChild(nodo("p", (o.totalOrientativo ? "Total con IVA aprox.: " : "Total con IVA: ") + eur(o.total) + (o.totalOrientativo ? " (con los precios de hoy)" : ""), "cu-total"));
       const n = o.lineas.length;
       c.appendChild(nodo("p", o.lineas.slice(0, 3).map((l) => `${l.cant || l.uds} ${l.nombre}`).join(" · ") + (n > 3 ? ` y ${n - 3} más` : "") + (o.entrega ? ` · entrega ${o.entregaTexto || o.entrega.split("-").reverse().join("/")}` : ""), "res"));
@@ -1837,7 +1871,7 @@ function burbuja(texto, clase) {
   const fila = document.createElement("div"); fila.className = "mrow " + clase;
   if (clase === "in") { const av = document.createElement("div"); av.className = "av"; av.textContent = "VM"; av.setAttribute("aria-hidden", "true"); fila.appendChild(av); }
   const d = document.createElement("div"); d.className = "m " + clase;
-  const esc = texto.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const esc = texto.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); // también las comillas, por si el texto acaba dentro de un atributo
   d.innerHTML = (clase === "in" ? sinEmoji(esc) : esc).replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/_([^_\n]+)_/g, "<i>$1</i>");
   const t = document.createElement("time"); t.textContent = hora(); d.appendChild(t);
   fila.appendChild(d); chat.appendChild(fila);
@@ -2019,8 +2053,10 @@ function inicio(ui) {
       const im = el("span", "in-pim"); if (p.img) { const i = document.createElement("img"); i.src = p.img; i.alt = ""; i.loading = "lazy"; i.width = 148; i.height = 148; i.onerror = () => i.remove(); im.appendChild(i); } else im.textContent = p.name.slice(0, 2).toUpperCase();
       if (etiqueta) im.appendChild(el("span", "in-oferta", etiqueta));
       const mas = el("span", "in-mas"); mas.setAttribute("aria-hidden", "true"); mas.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
-      const pie = el("span", "in-pie"); pie.append(el("small", null, p.soloCaja && p.unitsPerBox ? eurp(Math.round(p.price * p.unitsPerBox * 1000) / 1000) + " /caja" : eurp(p.price) + " /ud"), mas);
-      t.append(im, el("b", "in-pn", p.name), ...(p.unitsPerBox ? [el("small", "in-fmt", "Caja de " + p.unitsPerBox)] : []), ...(p.ultima ? [el("small", "in-ult", "La última vez: " + ultimaTxt(p))] : []), pie); return t; // nombre entero (hasta 4 líneas) y el formato
+      const caja = !!(p.soloCaja && p.unitsPerBox), pie = el("span", "in-pie"), pre = el("span", "in-precio");
+      pre.append(el("b", null, (caja ? eurp(Math.round(p.price * p.unitsPerBox * 1000) / 1000) : eurp(p.price)).replace(" ", "\u00a0")), el("em", null, caja ? " / caja" : " / ud")); if (caja) pre.append(el("small", "in-fmt", eurp(p.price) + " /ud"));
+      pie.append(pre, mas);
+      t.append(im, el("b", "in-pn", p.name), pie, ...(p.ultima ? [el("span", "in-ult", "En tu último pedido: " + ultimaTxt(p))] : [])); return t; // nombre entero (hasta 4 líneas) y el formato
     };
     if (j.ofertas?.length) { // ofertas vigentes que le cambian el precio (la empresa las pone desde el panel)
       const sec = el("section", "in-sec"); sec.setAttribute("aria-label", "Ofertas"); sec.appendChild(el("h3", null, "Ofertas"));
@@ -2189,7 +2225,8 @@ $("f").onsubmit = (e) => { e.preventDefault(); const v = $("t").value.trim(); if
 // ── Pedir hablando: el micrófono del chat dicta lo que dices en la caja de mensaje y, al terminar, lo manda como si lo hubieras escrito («dos cajas de coca cola zero y una de agua»). El reconocimiento lo hace el navegador del móvil (envía el audio a su servicio de voz: Google/Apple); sin soporte, el botón no sale. No confirma ningún pedido: el asistente anota y pregunta como siempre. ──
 (() => {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition, btn = $("voz"), caja = $("t"), est = $("voz-estado");
-  if (!SR) return; btn.hidden = false;
+  const VOZ_CHAT = false; // la empresa quitó el micrófono del chat; cambiar a true lo devuelve
+  if (!SR || !VOZ_CHAT) return; btn.hidden = false;
   let rec = null, escuchando = false, enviar1 = true;
   const di = (txt) => { est.textContent = txt; est.hidden = !txt; };
   const MSG = { "not-allowed": "Permite el micrófono en los ajustes del móvil para pedir hablando.", "service-not-allowed": "Permite el micrófono en los ajustes del móvil para pedir hablando.", "no-speech": "No te he oído. Pulsa el micrófono y habla otra vez.", "audio-capture": "No encuentro el micrófono.", network: "Sin conexión: no puedo oírte ahora. Escríbelo." };

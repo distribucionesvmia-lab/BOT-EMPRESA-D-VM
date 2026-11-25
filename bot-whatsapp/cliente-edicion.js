@@ -1,4 +1,4 @@
-// Edición a mano de la ficha de un cliente (datos de contacto y de entrega). El nombre y el NIF NO se editan aquí (los manda a3ERP).
+// Edición a mano de la ficha de un cliente (nombre, datos de contacto y de entrega). El NIF NO se edita aquí (no se guarda).
 // Lo que se escribe a mano se guarda aparte y se vuelve a poner después de cada importación de a3ERP, para que el Excel no lo borre.
 import { emailValido } from "./correo-cliente.js";
 
@@ -9,6 +9,7 @@ export const telefono9 = (p) => String(p ?? "").replace(/\D/g, "").replace(/^(00
 export function validarEdicion(b) {
   if (!b || typeof b !== "object") return { error: "Solicitud no válida." };
   const patch = {};
+  if ("nombre" in b) { const n = texto(b.nombre, 80); if (n.length < 2) return { error: "El nombre del cliente no puede estar vacío (mínimo 2 letras)." }; patch.name = n; }
   if ("razon" in b) { patch.legalName = texto(b.razon, 80); }
   if ("direccion" in b) { patch.address = texto(b.direccion, 160); }
   if ("poblacion" in b) { patch.city = texto(b.poblacion, 60); }

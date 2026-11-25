@@ -1367,10 +1367,34 @@
   @media (min-width:768px) and (max-width:1023px) { .pf { grid-template-columns:128px minmax(0, 1fr) auto; } .pf-av { width:128px; height:128px; } }
   @media (min-width:1024px) { .pf-av { width:100%; max-width:230px; height:auto; aspect-ratio:1 / 1; margin:0 auto; } }
   .tl .tl-fam td { padding:var(--s3) var(--s3) var(--s1); font-size:calc(var(--t-cap) / var(--k,1)); font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:var(--text-2); background:transparent; border:0; }
+
+  /* ═══ Cabecera de categoría más baja y sin franja transparente (nov 2026) ═══ */
+  .buscar { background:var(--bg); position:relative; z-index:5; }
+  main#list { border-top:0; }
+  .cab-cat { box-shadow:0 -12px 0 var(--bg); border-bottom:0; }
+  .cab-cat .migas { gap:var(--s2); padding:var(--s1) var(--gutter) var(--s1); }
+  .cab-cat .migas button { min-height:36px; height:36px; padding:0 var(--s3) 0 var(--s1); font-size:calc(14px / var(--k,1)); gap:2px; }
+  .cab-cat .migas button svg { width:16px; height:16px; }
+  .cab-cat .migas span, .cab-cat .migas b { font-size:calc(19px / var(--k,1)); line-height:1.15; letter-spacing:-.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cab-cat .subchips { gap:6px; padding-bottom:var(--s2); }
+  .cab-cat .subchip { min-height:36px; height:36px; padding:0 var(--s3); font-size:calc(14px / var(--k,1)); }
+  .cab-cat .subchip small { font-size:calc(12px / var(--k,1)); }
+  .cab-cat:after { content:""; display:block; height:.5px; background:var(--line); }
+  .cab-ord { display:flex; gap:var(--s2); flex-wrap:nowrap; padding:var(--s2) var(--gutter, 14px) 0; background:var(--bg); }
+  .cab-ord label { flex:1 1 0; min-width:0; font-size:calc(11px / var(--k,1)); gap:1px; }
+  .cab-ord select { min-height:38px; height:38px; font-size:calc(14px / var(--k,1)); padding:0 var(--s2); text-overflow:ellipsis; }
+  .app.compacto .buscar { padding-top:6px; padding-bottom:6px; }
+  .buscar input { min-height:44px; }
   .pf.pf-top { border:2px solid var(--ok); background:var(--ok-bg); border-radius:var(--r-card); }
   .pregunta-nuevo { margin:var(--s4) var(--gutter); padding:var(--s4); background:var(--surface); border:1px solid var(--line); border-radius:var(--r-card); text-align:center; }
   .pregunta-nuevo p { margin:0 0 var(--s3); font-weight:600; font-size:calc(var(--t-body) / var(--k,1)); }
   .pregunta-botones { display:flex; gap:var(--s3); } .pregunta-botones .big { flex:1; margin:0; }
+
+  /* Tarjetas de subcategoría dentro de una categoría */
+  .ver-todo { margin:var(--s2) var(--gutter) 0; width:calc(100% - 2 * var(--gutter)); }
+
+  /* Solo cajas: precio de cada unidad bien visible en la tarjeta */
+  .pf-porud { display:block; margin-top:2px; font-size:calc(14px / var(--k,1)); font-weight:600; color:var(--text-2); }
 </style>
 </head>
 <body>
@@ -1905,10 +1929,11 @@ function row(p) {
   if (Number(p.discount) > 0) { const viejo = document.createElement("s"); viejo.className = "pf-viejo"; viejo.textContent = fmtP(enCaja ? Number(p.price) * p.unitsPerBox : Number(p.price)); price.textContent = fmtP(enCaja ? precioCaja(p) : precioUd(p)); pr.append(viejo, price, ud); } // precio original tachado y el neto (el que se factura) al lado
   else { price.textContent = fmtP(enCaja ? precioCaja(p) : Number(p.price)); pr.append(price, ud); }
   if (p.discount) { const dto = document.createElement("span"); dto.className = "pf-dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} %`; pr.appendChild(dto); }
+  if (p.unitsPerBox > 1 && (p.soloCaja || enCaja)) { const pu = document.createElement("span"); pu.className = "pf-porud"; pu.textContent = eurp(precioUd(p)) + (esKilo(p.name) ? " /kg" : " cada unidad"); pr.appendChild(pu); } // cuando se pide por cajas (o es solo cajas): se ve también lo que cuesta cada unidad
   if (p.oferta) { const of = document.createElement("span"); of.className = "pf-oferta"; of.textContent = "OFERTA" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().slice(0, 2).join("/") : ""); pr.appendChild(of); }
   if (tab === "all" && p.count > 0) { const lc = document.createElement("span"); lc.className = "pf-compras"; lc.textContent = "Lo compras"; pr.appendChild(lc); } // etiqueta aparte del nombre, junto al precio
   info.append(n, c, pr);
-  { const uv = tab === "hab" ? ultimaVez(p) : null; if (uv) { const ul = document.createElement("div"); ul.className = "pf-ultima"; ul.textContent = "La última vez: " + uv.texto; info.appendChild(ul); } }
+  { const uv = tab === "hab" ? ultimaVez(p) : null; if (uv) { const ul = document.createElement("div"); ul.className = "pf-ultima"; ul.textContent = "En tu último pedido: " + uv.texto; info.appendChild(ul); } }
   if (p.ia) { const ia = document.createElement("div"); ia.className = "pf-ia"; ia.textContent = "Imagen orientativa"; av.appendChild(ia); }
   if (data.favs) {
     const f = document.createElement("button"); f.type = "button"; f.className = "pf-fav"; const on = favs.has(p.id);
@@ -1965,7 +1990,7 @@ function conTransicion(fn) {
   const h = document.documentElement; h.classList.add("vt-lista");
   try { const t = document.startViewTransition(fn); t.finished.finally(() => h.classList.remove("vt-lista")); } catch { h.classList.remove("vt-lista"); fn(); }
 }
-const irA = (cat, sub) => conTransicion(() => { if (cat !== nav.cat) { ordenCat = "hab"; marcaCat = ""; } animarLista = true; limite = 150; nav = { cat, sub: cat && sub === null ? "*" : sub }; $("list").scrollTop = 0; renderList(); }); // entrar en una categoría enseña ya sus productos (las subcategorías son chips arriba)
+const irA = (cat, sub) => conTransicion(() => { if (cat !== nav.cat) { ordenCat = "hab"; marcaCat = ""; } animarLista = true; limite = 150; nav = { cat, sub: cat && cat !== FAVS && sub === null ? ((((data.tree || []).find(x => x.id === cat) || {}).subs || []).length > 1 ? null : "*") : cat && sub === null ? "*" : sub }; $("list").scrollTop = 0; renderList(); }); // entrar en una categoría enseña ya sus productos (las subcategorías son chips arriba)
 // Foto representativa de una sección: un producto suyo con foto (se prefiere el más típico de la sección); sin foto, una letra de color
 const PREFIERE = { cafe: /capsula|molido|grano|natural/i, pascual: /leche/i, vinos: /ribera|crianza|reserva|verdejo|rueda|cava/i, aguas: /\bagua\b|bezoya/i, despensa: /aceite|oliva/i, refrigerados: /queso|jamon|chorizo|salchich/i, "f-hosteleria-y-menaje": /\bvaso|copa/i };
 function fotoDe(cat, sub) {
@@ -2031,7 +2056,23 @@ function migas(list, texto, atras, etiqueta = "Catálogo") {
   const t = document.createElement("span"); t.innerHTML = texto;
   m.append(b, t); list.appendChild(m);
 }
-const esc = t => String(t).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const esc = t => String(t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); // también las comillas: esc() se usa dentro de atributos (src="${esc(…)}")
+function renderSubTarjetas(list, c) { // tarjetas de subcategoría (foto del más vendido + «N artículos»), como las de las categorías
+  migas(list, `<b>${esc(c.nombre)}</b>`, () => irA(null, null));
+  const todo = document.createElement("button"); todo.type = "button"; todo.className = "sub todo ver-todo";
+  todo.innerHTML = `<span>Ver todo ${esc(c.nombre)}</span><small>${c.count} ›</small>`; todo.onclick = () => irA(c.id, "*"); list.appendChild(todo);
+  const g = document.createElement("div"); g.className = "cats";
+  for (const s of c.subs) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "cat";
+    const i = document.createElement("span"); i.className = "ico";
+    const tf = s.top && (escritorio() ? s.top.img : s.top.mini || s.top.img);
+    if (tf) { i.classList.add("foto-fam"); const im = document.createElement("img"); im.src = tf; im.alt = ""; im.width = 72; im.height = 72; im.decoding = "async"; im.loading = "lazy"; i.appendChild(im); } else i.innerHTML = iconoCat(c.id);
+    const n = document.createElement("b"); n.textContent = s.nombre;
+    const k = document.createElement("small"); k.textContent = s.count + (s.count === 1 ? " artículo" : " artículos");
+    b.append(i, n, k); b.onclick = () => irA(c.id, s.id); g.appendChild(b);
+  }
+  list.appendChild(g);
+}
 function renderSubs(list, c) {
   migas(list, `<b>${esc(c.nombre)}</b>`, () => irA(null, null));
   const g = document.createElement("div"); g.className = "subs";
@@ -2230,10 +2271,12 @@ function renderList() {
     if (nav.cat === FAVS) { renderFavoritos(list); return entrada(list, ".pf"); } // «Mis favoritos»: una sección más del catálogo (entra en el historial del navegador como cualquier categoría)
     const c = data.tree.find(x => x.id === nav.cat);
     if (!c) { nav = { cat: null, sub: null }; return renderCategorias(list); }
+    if (nav.sub === null && c.subs.length > 1) { renderSubTarjetas(list, c); return entrada(list, ".cat"); } // categoría con varias subcategorías: sus propias tarjetas
     if (nav.sub === null) nav.sub = "*";
     cabecera = () => { // barra fija con fondo: «‹ Catálogo», el nombre y, si hay varias, las subcategorías como chips
       const w = document.createElement("div"); w.className = "cab-cat";
-      migas(w, `<b>${esc(c.nombre)}</b>`, () => irA(null, null), "Catálogo");
+      const variasSubs = c.subs.length > 1, subActual = variasSubs && nav.sub !== "*" ? c.subs.find(x => x.id === nav.sub) : null;
+      migas(w, `<b>${esc(subActual ? subActual.nombre : c.nombre)}</b>`, variasSubs ? () => irA(c.id, null) : () => irA(null, null), variasSubs ? c.nombre : "Catálogo");
       if (c.subs.length > 1) {
         const ch = document.createElement("div"); ch.className = "subchips"; ch.setAttribute("role", "group"); ch.setAttribute("aria-label", "Subcategorías de " + c.nombre);
         const chip = (txt, n, on, fn) => { const b = document.createElement("button"); b.type = "button"; b.className = "subchip"; b.setAttribute("aria-pressed", String(on)); b.append(txt + " "); const sm = document.createElement("small"); sm.textContent = n; b.appendChild(sm); b.onclick = fn; ch.appendChild(b); };
@@ -2246,9 +2289,9 @@ function renderList() {
         const sel = (etq, opts, val, fn) => { const l = document.createElement("label"); l.textContent = etq; const s = document.createElement("select"); for (const [k, t] of opts) { const o = document.createElement("option"); o.value = k; o.textContent = t; if (k === val) o.selected = true; s.appendChild(o); } s.onchange = () => fn(s.value); l.appendChild(s); ct.appendChild(l); };
         sel("Ordenar", [["hab", "Orden habitual (a3ERP)"], ["nombre", "Nombre (A–Z)"], ["pa", "Precio: de menor a mayor"], ["pd", "Precio: de mayor a menor"]], ordenCat, v => { ordenCat = v; limite = 150; $("list").scrollTop = 0; renderList(); });
         if (marcasCat.length > 1) sel("Marca", [["", "Todas"], ...marcasCat.map(m => [m, m])], marcaCat, v => { marcaCat = v; limite = 150; $("list").scrollTop = 0; renderList(); });
-        w.appendChild(ct);
+        w.ordenar = ct; // va justo debajo de la barra fija, pero NO fija: se va al bajar
       }
-      list.appendChild(w);
+      list.appendChild(w); if (w.ordenar) list.appendChild(w.ordenar);
     };
   }
   let items = data.products.filter(p => (tab === "all" || p.count > 0 || favs.has(p.id) || q) && (!q || orden.has(p.id)) && (!filtra || qty.get(p.id) > 0)
@@ -2457,6 +2500,7 @@ document.addEventListener("visibilitychange", () => { if (document.hidden && !pe
 // Categorías y subcategorías en el orden de a3ERP: primero la que tiene el código de familia más bajo (la leche de Pascual, etc.); sin código de familia, al final y como estaban
 function ordenarArbol(d) {
   if (!d || !(d.tree || []).length) return;
+  if (d.tree.every(c => typeof c.o === "number")) { d.tree = d.tree.slice().sort((a, b) => a.o - b.o); for (const c of d.tree) c.subs = (c.subs || []).slice().sort((a, b) => (a.o ?? 99) - (b.o ?? 99)); return; } // catálogo por tipo: el servidor ya manda el orden
   const minimo = new Map(); // «cat» y «cat/sub» → menor código de familia de sus artículos
   for (const p of d.products) { const f = limpiaFam(p.fam); if (!f) continue; for (const k of [p.cat, p.cat + "/" + p.sub]) { const m = minimo.get(k); if (m === undefined || compararFamilias(f, m) < 0) minimo.set(k, f); } }
   // sin código de familia en los artículos (aún no se ha subido el Excel de a3ERP), se usa el del mapa de categorías del servidor (data.famOrden, por nombre)
@@ -2734,7 +2778,7 @@ function pintarSugs() {
     if (p.img) { const i = document.createElement("img"); i.src = fotoMini(p); i.alt = ""; i.decoding = "async"; i.loading = "lazy"; i.width = 56; i.height = 56; i.onerror = () => i.remove(); im.appendChild(i); }
     const tx = document.createElement("span"); tx.className = "sug-tx"; const n = document.createElement("b"); n.textContent = nombreVisible(p); n.title = p.name; const pr = document.createElement("small"); // nombre en hasta 2 líneas (no cortado en una) y, debajo, el formato (caja/pack/medidas) y el precio: así se distinguen las variantes
     const pkS = /(\d+)\s*[xX×]\s*(\d+)/.exec(p.name), fmtS = p.unitsPerBox ? (p.soloCaja ? `Solo cajas de ${p.unitsPerBox}` : `Caja de ${p.unitsPerBox}`) : (/\bpack\b/i.test(p.name) || (pkS && Number(pkS[1]) * Number(pkS[2]) > 1) ? "Pack" : "Por unidades"), medS = medidasDeNombre(p.name);
-    pr.textContent = [fmtS, ...medS].join(" · ") + " · " + (p.soloCaja && p.unitsPerBox ? `${eurp(precioCaja(p))} la caja` : eurp(p.price) + (esKilo(p.name) ? " /kg" : " /ud"));
+    pr.textContent = [fmtS, ...medS].join(" · ") + " · " + (p.soloCaja && p.unitsPerBox ? `${eurp(precioCaja(p))} la caja · ${eurp(precioUd(p))} /ud` : eurp(p.price) + (esKilo(p.name) ? " /kg" : " /ud"));
     tx.append(n, pr);
     const mas = document.createElement("button"); mas.type = "button"; mas.className = "sug-mas"; mas.setAttribute("aria-label", "Añadir " + p.name);
     mas.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round"/></svg>';

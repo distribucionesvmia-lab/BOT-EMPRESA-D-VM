@@ -7,6 +7,7 @@ import { totals, round2 } from "./pricing.js";
 import { madridDate, madridTime } from "./export-format.js";
 
 const eur = (n) => n.toFixed(2).replace(".", ",") + " €";
+const h = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 export const emailValido = (s) => /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]{2,}$/.test(String(s ?? "").trim());
 
 /** A qué correo va: el de su cuenta si es válido; si no, el primero válido de su ficha de a3ERP. null si no hay. */
@@ -41,7 +42,26 @@ export function correoPedido(o, { nombre = "", negocio = "Distribuciones Valent�
     "Si no quieres recibir este correo, puedes quitarlo en la aplicación: «Mi cuenta» → «Correo».",
     "", negocio, "",
   ].join("\n");
-  return { subject: modificado ? `Pedido modificado ${o.ref} · ${negocio}` : `Hemos recibido tu pedido ${o.ref} · ${negocio}`, text };
+  // Versión bonita (HTML con estilos en línea, que es lo único que admiten los programas de correo): cabecera roja, tarjetas y tabla de artículos
+  const fila = (l) => {
+    const caja = l.unit === "caja", n = l.boxes ?? l.qty, cant = caja ? `${n} ${n === 1 ? "caja" : "cajas"}` : `${l.units ?? l.qty} ${(l.units ?? l.qty) === 1 ? "ud" : "uds"}`, det = caja ? `${l.units} uds` : "";
+    return `<tr><td style="padding:10px 8px 10px 0;border-bottom:1px solid #ececf0;vertical-align:top;white-space:nowrap;font-weight:700;color:#C8102E">${h(cant)}${det ? `<div style="font-weight:400;font-size:12px;color:#6e6e73">${h(det)}</div>` : ""}</td><td style="padding:10px 8px;border-bottom:1px solid #ececf0;vertical-align:top;color:#1d1d1f">${h(l.name)}${l.note ? `<div style="font-size:12px;color:#6e6e73">Observación: ${h(l.note)}</div>` : ""}</td><td style="padding:10px 0 10px 8px;border-bottom:1px solid #ececf0;vertical-align:top;text-align:right;white-space:nowrap;color:#1d1d1f">${l.amount != null ? h(eur(l.amount)) : ""}</td></tr>`;
+  };
+  const caja = (titulo, cuerpo) => `<tr><td style="padding:0 24px 16px"><div style="background:#f5f5f7;border-radius:12px;padding:14px 16px"><div style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#6e6e73;margin-bottom:4px">${titulo}</div><div style="font-size:15px;color:#1d1d1f;line-height:1.4">${cuerpo}</div></div></td></tr>`;
+  const desglose = t ? t.groups.map((g) => `<tr><td style="padding:2px 0;color:#6e6e73">Base al ${String(g.vat).replace(".", ",")} % · IVA ${h(eur(g.iva))}${g.re ? ` · R.E. ${h(eur(g.re))}` : ""}</td><td style="padding:2px 0;text-align:right;color:#6e6e73">${h(eur(g.base))}</td></tr>`).join("") : "";
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#eceef1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eceef1"><tr><td align="center" style="padding:16px 8px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden">
+<tr><td style="background:#C8102E;padding:22px 24px;color:#ffffff"><div style="font-size:13px;opacity:.9">${h(negocio)}</div><div style="font-size:22px;font-weight:700;margin-top:4px">${modificado ? "Pedido modificado" : "¡Pedido recibido!"}</div><div style="font-size:15px;margin-top:2px;opacity:.95">${h(o.ref)}</div></td></tr>
+<tr><td style="padding:22px 24px 14px;font-size:16px;line-height:1.45;color:#1d1d1f">Hola${nombre ? ", <b>" + h(nombre) + "</b>" : ""}:<br>${modificado ? "Hemos recibido los cambios de tu pedido." : `Hemos recibido tu pedido el ${h(madridDate(o.created_at))} a las ${h(madridTime(o.created_at))}.`}</td></tr>
+${entrega ? caja("Entrega", h((s => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())(entrega.texto.replace(/^ENTREGA: /, "")))) : ""}${o.address ? caja("Dirección de entrega", h(o.address)) : ""}
+<tr><td style="padding:4px 24px 8px"><div style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#6e6e73;margin-bottom:2px">Artículos (${items.length})</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;line-height:1.35">${items.length ? items.map(fila).join("") : '<tr><td style="padding:10px 0;color:#6e6e73">(sin artículos)</td></tr>'}</table></td></tr>
+${o.note ? caja("Tus observaciones", h(o.note)) : ""}
+${t ? `<tr><td style="padding:8px 24px 18px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:13px">${desglose}<tr><td style="padding:10px 0 0;font-size:17px;font-weight:700;color:#1d1d1f">Total con IVA</td><td style="padding:10px 0 0;text-align:right;font-size:20px;font-weight:700;color:#C8102E">${h(eur(t.total))}</td></tr></table></td></tr>` : ""}
+${adjunto ? caja("PDF adjunto", "Te adjuntamos el PDF de tu pedido.") : ""}${pe.ok && pe.texto ? caja("Cambios", h(pe.texto) + ". Puedes hacerlo desde «Mi cuenta» en la aplicación.") : ""}${o.review ? caja("Revisión", "Revisaremos tu pedido antes de prepararlo y te llamaremos si hace falta.") : ""}
+<tr><td style="padding:6px 24px 22px;font-size:12px;line-height:1.5;color:#6e6e73;border-top:1px solid #ececf0">Este correo es solo informativo: no es una factura.<br>${telefono ? `Si algo no es correcto, llámanos al <b>${h(telefono)}</b>.` : "Si algo no es correcto, contacta con nosotros."}<br>Si no quieres recibir este correo, puedes quitarlo en la aplicación: «Mi cuenta» → «Correo».<br><br><b>${h(negocio)}</b></td></tr>
+</table></td></tr></table></body></html>`;
+  return { subject: modificado ? `Pedido modificado ${o.ref} · ${negocio}` : `Hemos recibido tu pedido ${o.ref} · ${negocio}`, text, html };
 }
 
 /**
@@ -62,7 +82,7 @@ export function crearCorreoCliente({ accounts, smtp, from, customers, negocio, t
       try {
         let adj = []; try { const buf = typeof pdf === "function" ? pdf() : pdf; if (buf?.length) adj = [{ filename: `pedido-${order.ref}.pdf`, contentType: "application/pdf", data: buf }]; } catch (e) { log.error?.(`PDF del pedido ${order.ref} para el correo: ${e.message}`); } // si el PDF falla, el correo sale igual, sin adjunto
         const m = correoPedido(order, { nombre: customer?.name ?? "", negocio, telefono, modificado, adjunto: adj.length > 0, ahora: now() });
-        await send(smtp, { from, to, subject: m.subject, text: m.text, attachments: adj });
+        await send(smtp, { from, to, subject: m.subject, text: m.text, html: m.html, attachments: adj });
         accounts.correoPedidoMarcar(clave, "enviado"); return "enviado";
       } catch (e) { accounts.correoPedidoMarcar(clave, "error", String(e.message).slice(0, 200)); log.error?.(`Correo al cliente (${order.ref}): ${e.message}`); return "error"; }
     } catch (e) { log.error?.("Correo al cliente:", e.message); return "error"; }

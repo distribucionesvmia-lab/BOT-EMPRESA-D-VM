@@ -22,6 +22,7 @@ import { parseClientesXlsx } from "./clientes-import.js";
 import { totals, round2, promoVigente, precioEfectivo, hoyMadrid } from "./pricing.js";
 import { categorizar, CATEGORIAS } from "./categorias.js";
 import { conArbolA3erp } from "./arbol-a3erp.js";
+import { conArbolTipos, TIPOS } from "./arbol-tipos.js";
 import { compararFamilias } from "./ordenfamilia.js";
 import { descargarFoto } from "./foto-url.js";
 import { runExport } from "./exporter.js";
@@ -104,9 +105,11 @@ function vistaExcel(lista) {
 const leerJson = (f) => { try { return JSON.parse(fs.readFileSync(new URL(f, import.meta.url), "utf8")); } catch { return {}; } };
 const FAM_NOMBRES = leerJson("./familias-nombres.json"), FAM_CATEGORIAS = leerJson("./familias-categorias.json");
 // Mismo árbol y mismo orden que ve el cliente (catalogoParaClientes de server.js): familias de a3ERP si ya vienen en los artículos; si no, el árbol de la web
-export function clasificarComoCliente(lista) { return process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(lista, FAM_NOMBRES, FAM_CATEGORIAS) : lista; }
+export function clasificarComoCliente(lista) { if (process.env.ARBOL_TIPOS !== "0") return conArbolTipos(lista); return process.env.ARBOL_A3ERP !== "0" ? conArbolA3erp(lista, FAM_NOMBRES, FAM_CATEGORIAS) : lista; }
 /** Orden de las categorías como en la vista del cliente: menor código de familia de a3ERP de sus artículos; sin código, el orden de la web (CATEGORIAS), y al final las demás. */
 export function ordenCategorias(filas) {
+  const nombreDe = new Map(filas.map((x) => [x.categoriaId, x.categoria])), tipoPos = (id) => TIPOS.findIndex((t) => t.nombre === nombreDe.get(id));
+  if (process.env.ARBOL_TIPOS !== "0" && filas.some((x) => tipoPos(x.categoriaId) >= 0)) return (idA, idB) => ((tipoPos(idA) < 0 ? 99 : tipoPos(idA)) - (tipoPos(idB) < 0 ? 99 : tipoPos(idB))) || String(idA).localeCompare(String(idB)); // catálogo por tipo: su orden
   const menor = new Map();
   for (const x of filas) { const f = String(x.familia ?? "").trim(); if (!f) continue; const a = menor.get(x.categoriaId); if (a === undefined || compararFamilias(f, a) < 0) menor.set(x.categoriaId, f); }
   const web = new Map(CATEGORIAS.map((c, i) => [c.id, i]));
@@ -822,6 +825,9 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
           const precio = Math.round(Number(String(b.precio ?? "").replace(",", ".")) * 10000) / 10000;
           if (!Number.isFinite(precio) || precio <= 0 || precio > 100000) return send(res, 400, { error: "Escribe un precio mayor que 0." }), true;
           if (prod.promo?.tipo === "eur" && Number(prod.promo.valor) >= precio) return send(res, 400, { error: "El descuento en € que tiene ahora es mayor que ese precio: quita antes la oferta." }), true;
+          // Freno en el SERVIDOR (no solo en la pantalla): un salto de más del 25 % solo vale si llega marcado como confirmado. La pantalla del panel lo marca tras su «¿Seguro?»; la conexión con Claude NO lo marca nunca, así que una orden colada en un texto no puede dejar un artículo a 0,01 €.
+          const antes = Number(prod.price ?? prod.precio ?? 0);
+          if (antes > 0 && Math.abs(precio - antes) / antes > 0.25 && b.confirmoSalto !== true) return send(res, 409, { error: `El precio cambia más de un 25 % (de ${antes} € a ${precio} €). Por seguridad, un cambio así se hace desde el panel de la empresa, confirmándolo.`, confirmarSalto: true }), true;
           return send(res, 200, { ok: true, cambio: catalogDb.update(prod.id, { price: precio }) }), true;
         }
         if (m[2] === "oferta") {
