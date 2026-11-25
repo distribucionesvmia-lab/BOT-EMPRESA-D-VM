@@ -810,3 +810,6 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 
 ## Botón «Volver» en el pedido y en el resumen (25/11/2026)
 - Arriba de la pantalla **Pedido** (`#cartAtras`) y de **Revisa tu pedido** (`#resAtras`) hay un botón «‹ Volver» de 44 px (vuelve al catálogo / al pedido, igual que «Seguir añadiendo productos» y «Volver al pedido» de abajo, que siguen). En ordenador (≥ 1024 px) el pedido es un panel fijo y no lleva ese botón. «Atrás» del móvil y Esc siguen funcionando. Prueba: `tanda94.test.js`. No probado en un móvil real.
+
+## Tarjetas verdes del Histórico rediseñadas (25/11/2026)
+- «Los 5 artículos que más consumes» del Histórico (`.pf.pf-top`, último bloque del `<style>` de `pedido.html`): ya no tocan los bordes de la pantalla; llevan margen, fondo verde suave (`color-mix` del `--ok` con la superficie, vale en claro y oscuro), franja verde de 5 px a la izquierda y un círculo con el puesto (1-5, `counter(top5)`) sobre la foto. La regla antigua sigue arriba y esta la sustituye. Prueba: `tanda94.test.js`. No probado en un móvil real.

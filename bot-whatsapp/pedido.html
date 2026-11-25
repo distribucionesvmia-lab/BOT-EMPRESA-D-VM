@@ -1400,6 +1400,11 @@
   .ped-atras { display:inline-flex; align-items:center; gap:4px; min-height:44px; padding:0 16px 0 10px; margin:0 0 var(--s1) -4px; border:0; border-radius:22px; background:var(--surface); color:var(--accent); font:inherit; font-size:calc(16px / var(--k,1)); font-weight:600; cursor:pointer; }
   .ped-atras:active { transform:scale(.97); }
   @media (min-width:1024px) { #cart .ped-atras { display:none; } }
+
+  /* «Los 5 artículos que más consumes» del Histórico: tarjeta con margen, fondo verde suave, franja verde a la izquierda y el puesto (1-5) sobre la foto */
+  #list { counter-reset:top5; }
+  .pf.pf-top { position:relative; margin:var(--s2) var(--s2); border:1px solid color-mix(in srgb, var(--ok) 45%, transparent); border-left:5px solid var(--ok); border-radius:var(--r-card); background:color-mix(in srgb, var(--ok) 9%, var(--surface)); overflow:hidden; counter-increment:top5; }
+  .pf.pf-top::before { content:counter(top5); position:absolute; top:8px; left:8px; z-index:2; width:24px; height:24px; border-radius:50%; background:var(--ok); color:var(--on-ok,#fff); font-size:13px; font-weight:700; line-height:24px; text-align:center; box-shadow:0 0 0 2px var(--surface); }
 </style>
 </head>
 <body>

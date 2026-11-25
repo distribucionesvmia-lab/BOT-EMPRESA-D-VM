@@ -19,3 +19,6 @@ test("PEDIDO: botón «Volver» arriba del pedido y del resumen", () => {
   assert.match(p, /id="resAtras"/);
   assert.match(p, /\$\("cartAtras"\)\.onclick = \(\) => showCart\(false\)/);
 });
+test("HISTÓRICO: las 5 tarjetas verdes llevan margen, franja y puesto", () => {
+  assert.match(lee("./pedido.html"), /\.pf\.pf-top::before \{ content:counter\(top5\)/);
+});
