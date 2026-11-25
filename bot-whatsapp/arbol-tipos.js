@@ -33,7 +33,7 @@ const RUTAS = {
   "1": ["Leche y lácteos", "Leche"], "1.6*": ["Leche y lácteos", "Leche sin lactosa"], "1.7*": ["Leche y lácteos", "Batidos y cafés fríos"], "1.76": ["Leche y lácteos", "Batidos y cafés fríos"],
   "11.8": ["Leche y lácteos", "Bebidas vegetales"], "15": ["Leche y lácteos", "Yogures y postres"], "70": ["Leche y lácteos", "Nata y mantequilla"], "73": ["Leche y lácteos", "Nata y mantequilla"],
   "80": ["Leche y lácteos", null, "Lácteos de hostelería"], "93": ["Leche y lácteos", "Huevos"],
-  "10": ["Aguas", null], "23": ["Licores y destilados", "Licores y destilados"],
+  "10": ["Aguas", null], "10.3": ["Aguas", null, "Garrafas y dispensadores"], "10.5": ["Aguas", null, "Con gas"], "10.7": ["Aguas", null, "Con gas"], "10.8": ["Aguas", null, "Con gas"], "23": ["Licores y destilados", "Licores y destilados"],
   "11": ["Refrescos y zumos", "Zumos y néctares"], "12": ["Refrescos y zumos", "Bebidas bio"], "14": ["Refrescos y zumos", "Refrescos"], "14.2": ["Refrescos y zumos", "Gaseosa y tinto de verano"], "14.4": ["Refrescos y zumos", "Gaseosa y tinto de verano"],
   "21": ["Vinos", null], "21.1": ["Vinos", "Tintos"], "21.2": ["Vinos", "Blancos"], "21.3": ["Vinos", "Rosados"], "21.4": ["Vinos", "Espumosos y cava"], "21.5": ["Vinos", "Bag in box"], "21.9": ["Vinos", "Otros vinos"],
   "22": ["Cervezas", null], "22.25": ["Cervezas", "Sin alcohol"], "22.26": ["Cervezas", "Sin alcohol"], "22.5": ["Cervezas", "Sin alcohol"], "22.43": ["Cervezas", "Radler"], "22.44": ["Cervezas", "Radler"], "22.7": ["Cervezas", "Especiales"], "22.9": ["Otros productos", "Otros"],

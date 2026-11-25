@@ -806,3 +806,4 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 
 ## Tarjetas verdes del Inicio legibles en modo oscuro (25/11/2026)
 - La tarjeta de «Los 5 artículos que más consumes» es siempre blanca; en modo oscuro su texto heredaba el color claro y no se leía. Ahora nombre, precio, unidad y «En tu último pedido» llevan colores oscuros fijos (`.in-prod.in-verde` en `cliente.html`). Prueba: `tanda94.test.js`. Comprobado solo por código (no en un móvil).
+- (25/11/2026) **Aguas por subfamilia de a3ERP**: 10.5 (Pedras), 10.7 (San Pellegrino) y 10.8 (Perrier) van siempre a «Con gas» y 10.3 (BOX/dispensadores) a «Garrafas y dispensadores», con independencia del nombre (solo «sin gas» en el nombre las pasa a mineral). Si en la app aún sale el agua con gas en «Agua mineral», es que el programa de la oficina tiene una versión anterior: mirar «Versión del programa» en Ayuda y `C:\vm\logs\actualizar.log`.

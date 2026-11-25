@@ -5,6 +5,8 @@ import { destino } from "./arbol-tipos.js";
 const d = (family, name) => { const r = destino({ family, name }); return `${r.categoria} › ${r.subcategoria}`; };
 const casos = [
   ["10.5", "PEDRAS AGUA GAS 750 CC", "Aguas › Con gas"],
+  ["10.5", "PEDRAS AGUA GAS LIMON VIDRIO 250.RT4", "Aguas › Con gas"],
+  ["10.5", "PEDRAS SIN GAS 500", "Aguas › Agua mineral"],
   ["10.7", "SAN PELLEGRINO 750 AGUA VIDRIO", "Aguas › Con gas"],
   ["10.1", "AGUA BEZOYA PET 1,5L (R6)", "Aguas › Agua mineral"],
   ["10.1", "AGUA BEZOYA GARRAFA 5 L", "Aguas › Garrafas y dispensadores"],
