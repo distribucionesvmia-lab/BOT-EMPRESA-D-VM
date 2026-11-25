@@ -2189,7 +2189,8 @@ $("f").onsubmit = (e) => { e.preventDefault(); const v = $("t").value.trim(); if
 // ── Pedir hablando: el micrófono del chat dicta lo que dices en la caja de mensaje y, al terminar, lo manda como si lo hubieras escrito («dos cajas de coca cola zero y una de agua»). El reconocimiento lo hace el navegador del móvil (envía el audio a su servicio de voz: Google/Apple); sin soporte, el botón no sale. No confirma ningún pedido: el asistente anota y pregunta como siempre. ──
 (() => {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition, btn = $("voz"), caja = $("t"), est = $("voz-estado");
-  if (!SR) return; btn.hidden = false;
+  const VOZ_CHAT = false; // la empresa quitó el micrófono del chat; cambiar a true lo devuelve
+  if (!SR || !VOZ_CHAT) return; btn.hidden = false;
   let rec = null, escuchando = false, enviar1 = true;
   const di = (txt) => { est.textContent = txt; est.hidden = !txt; };
   const MSG = { "not-allowed": "Permite el micrófono en los ajustes del móvil para pedir hablando.", "service-not-allowed": "Permite el micrófono en los ajustes del móvil para pedir hablando.", "no-speech": "No te he oído. Pulsa el micrófono y habla otra vez.", "audio-capture": "No encuentro el micrófono.", network: "Sin conexión: no puedo oírte ahora. Escríbelo." };
