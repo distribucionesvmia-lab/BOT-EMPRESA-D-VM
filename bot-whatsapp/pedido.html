@@ -1392,6 +1392,9 @@
 
   /* Tarjetas de subcategoría dentro de una categoría */
   .ver-todo { margin:var(--s2) var(--gutter) 0; width:calc(100% - 2 * var(--gutter)); }
+
+  /* Solo cajas: precio de cada unidad bien visible en la tarjeta */
+  .pf-porud { display:block; margin-top:2px; font-size:calc(14px / var(--k,1)); font-weight:600; color:var(--text-2); }
 </style>
 </head>
 <body>
@@ -1926,6 +1929,7 @@ function row(p) {
   if (Number(p.discount) > 0) { const viejo = document.createElement("s"); viejo.className = "pf-viejo"; viejo.textContent = fmtP(enCaja ? Number(p.price) * p.unitsPerBox : Number(p.price)); price.textContent = fmtP(enCaja ? precioCaja(p) : precioUd(p)); pr.append(viejo, price, ud); } // precio original tachado y el neto (el que se factura) al lado
   else { price.textContent = fmtP(enCaja ? precioCaja(p) : Number(p.price)); pr.append(price, ud); }
   if (p.discount) { const dto = document.createElement("span"); dto.className = "pf-dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} %`; pr.appendChild(dto); }
+  if (p.soloCaja && p.unitsPerBox) { const pu = document.createElement("span"); pu.className = "pf-porud"; pu.textContent = eurp(precioUd(p)) + (esKilo(p.name) ? " /kg" : " cada unidad"); pr.appendChild(pu); } // solo cajas: se ve también lo que cuesta cada unidad
   if (p.oferta) { const of = document.createElement("span"); of.className = "pf-oferta"; of.textContent = "OFERTA" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().slice(0, 2).join("/") : ""); pr.appendChild(of); }
   if (tab === "all" && p.count > 0) { const lc = document.createElement("span"); lc.className = "pf-compras"; lc.textContent = "Lo compras"; pr.appendChild(lc); } // etiqueta aparte del nombre, junto al precio
   info.append(n, c, pr);
@@ -2774,7 +2778,7 @@ function pintarSugs() {
     if (p.img) { const i = document.createElement("img"); i.src = fotoMini(p); i.alt = ""; i.decoding = "async"; i.loading = "lazy"; i.width = 56; i.height = 56; i.onerror = () => i.remove(); im.appendChild(i); }
     const tx = document.createElement("span"); tx.className = "sug-tx"; const n = document.createElement("b"); n.textContent = nombreVisible(p); n.title = p.name; const pr = document.createElement("small"); // nombre en hasta 2 líneas (no cortado en una) y, debajo, el formato (caja/pack/medidas) y el precio: así se distinguen las variantes
     const pkS = /(\d+)\s*[xX×]\s*(\d+)/.exec(p.name), fmtS = p.unitsPerBox ? (p.soloCaja ? `Solo cajas de ${p.unitsPerBox}` : `Caja de ${p.unitsPerBox}`) : (/\bpack\b/i.test(p.name) || (pkS && Number(pkS[1]) * Number(pkS[2]) > 1) ? "Pack" : "Por unidades"), medS = medidasDeNombre(p.name);
-    pr.textContent = [fmtS, ...medS].join(" · ") + " · " + (p.soloCaja && p.unitsPerBox ? `${eurp(precioCaja(p))} la caja` : eurp(p.price) + (esKilo(p.name) ? " /kg" : " /ud"));
+    pr.textContent = [fmtS, ...medS].join(" · ") + " · " + (p.soloCaja && p.unitsPerBox ? `${eurp(precioCaja(p))} la caja · ${eurp(precioUd(p))} /ud` : eurp(p.price) + (esKilo(p.name) ? " /kg" : " /ud"));
     tx.append(n, pr);
     const mas = document.createElement("button"); mas.type = "button"; mas.className = "sug-mas"; mas.setAttribute("aria-label", "Añadir " + p.name);
     mas.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round"/></svg>';
