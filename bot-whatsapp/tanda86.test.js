@@ -73,3 +73,9 @@ test("INICIO: los precios de las tarjetas van en negrita", async () => {
 function catalogDbLista(a, customersDb) {
   return [{ id: "1", name: "AGUA", price: 0.5, vat: 10 }, { id: "2", name: "LECHE", price: 2, vat: 10 }, { id: "3", name: "CAFE", price: 5, vat: 10 }];
 }
+
+test("PAGO: la forma de pago que se enseña es «la habitual que tienes como cliente»", async () => {
+  const { BUSINESS, condicionesPedido } = await import("./config.js");
+  assert.equal(BUSINESS.payment, "La forma de pago será la habitual que tienes como cliente.");
+  assert.equal(condicionesPedido().pago, BUSINESS.payment); // sale en el resumen del pedido («Pago») y en la confirmación del chat
+});

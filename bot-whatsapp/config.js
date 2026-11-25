@@ -45,7 +45,7 @@ export const BUSINESS = {
   currency: "€",
   info: "📍 Calle Ejemplo 123\n🕘 Lunes a viernes, 9:00–18:00\n🚚 Envíos a toda la ciudad en 24–48 h",
   priceNote: "Precios sin IVA; abajo tienes el total con IVA. Los confirmamos al preparar el pedido.",
-  payment:"Te enviaremos el enlace o los datos de pago cuando confirmemos tu pedido.",
+  payment:"La forma de pago será la habitual que tienes como cliente.",
 };
 
 export const PRODUCTS = [

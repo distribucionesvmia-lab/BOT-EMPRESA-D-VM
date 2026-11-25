@@ -35,7 +35,7 @@ test("12. forma de pago, pedido mínimo y portes: solo lo que la empresa haya co
   const antes = { ...process.env };
   try {
     delete process.env.PEDIDO_MINIMO; delete process.env.PORTES_TEXTO;
-    let c = condicionesPedido(); assert.equal(c.minimo, 0); assert.equal(c.portes, ""); assert.match(c.pago, /datos de pago/);
+    let c = condicionesPedido(); assert.equal(c.minimo, 0); assert.equal(c.portes, ""); assert.match(c.pago, /habitual que tienes como cliente/);
     process.env.PEDIDO_MINIMO = "150,5"; process.env.PORTES_TEXTO = "Portes gratis desde 200 €";
     c = condicionesPedido(); assert.equal(c.minimo, 150.5); assert.equal(c.portes, "Portes gratis desde 200 €");
     process.env.PEDIDO_MINIMO = "abc"; assert.equal(condicionesPedido().minimo, 0);
