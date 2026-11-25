@@ -20,7 +20,7 @@ test("PEDIDO: botón «Volver» arriba del pedido y del resumen", () => {
   assert.match(p, /\$\("cartAtras"\)\.onclick = \(\) => showCart\(false\)/);
 });
 test("HISTÓRICO: las 5 tarjetas verdes llevan margen, franja y puesto", () => {
-  assert.match(lee("./pedido.html"), /\.pf\.pf-top::before \{ content:counter\(top5\)/);
+  assert.doesNotMatch(lee("./pedido.html"), /pf-top::before/); // el círculo con el número se quitó
 });
 test("HISTÓRICO: sin grupo verde de 5; todos en orden de familia", () => {
   const p = lee("./pedido.html");
