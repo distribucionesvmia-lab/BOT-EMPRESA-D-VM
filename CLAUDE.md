@@ -770,3 +770,6 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 ## Solo cajas: precio por unidad visible y botón «Mis artículos» rojo (25/11/2026, a petición de la empresa)
 - Los artículos que se venden **solo por cajas** enseñan ahora, además del precio de la caja, **lo que cuesta cada unidad**: en la tarjeta del catálogo (línea `.pf-porud` «3,500 € cada unidad»), en las sugerencias del buscador («21,000 € la caja · 3,500 € /ud») y en las tarjetas del Inicio («Solo cajas de 6 · 3,500 € /ud»). La ficha y el carrito ya lo enseñaban. Es el precio ya con el descuento de ESE cliente (`precioUd`).
 - **«Mis artículos»** (Inicio, junto a «Los 5 artículos que más consumes») es ahora un **botón rojo** (`.in-vertodos`, fondo `--accent`). Pruebas: `tanda12`, `tanda16` adaptadas. No probado en un móvil real.
+
+## «Has dejado grabado…» en los artículos habituales (25/11/2026, a petición de la empresa)
+- En el Histórico del catálogo y en las tarjetas del Inicio, la línea «La última vez: 2 cajas (12 uds)» ahora dice **«Has dejado grabado: 2 cajas (12 uds) del último pedido»** (`ul.textContent` en `pedido.html`, `in-ult` en `cliente.html`). Mismo dato y misma regla de siempre (`ultimaVez`); el primer «+» sigue poniendo justo esa cantidad. Prueba: `tanda20.test.js`. No probado en un móvil real.

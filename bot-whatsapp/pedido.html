@@ -1933,7 +1933,7 @@ function row(p) {
   if (p.oferta) { const of = document.createElement("span"); of.className = "pf-oferta"; of.textContent = "OFERTA" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().slice(0, 2).join("/") : ""); pr.appendChild(of); }
   if (tab === "all" && p.count > 0) { const lc = document.createElement("span"); lc.className = "pf-compras"; lc.textContent = "Lo compras"; pr.appendChild(lc); } // etiqueta aparte del nombre, junto al precio
   info.append(n, c, pr);
-  { const uv = tab === "hab" ? ultimaVez(p) : null; if (uv) { const ul = document.createElement("div"); ul.className = "pf-ultima"; ul.textContent = "La última vez: " + uv.texto; info.appendChild(ul); } }
+  { const uv = tab === "hab" ? ultimaVez(p) : null; if (uv) { const ul = document.createElement("div"); ul.className = "pf-ultima"; ul.textContent = "Has dejado grabado: " + uv.texto + " del último pedido"; info.appendChild(ul); } }
   if (p.ia) { const ia = document.createElement("div"); ia.className = "pf-ia"; ia.textContent = "Imagen orientativa"; av.appendChild(ia); }
   if (data.favs) {
     const f = document.createElement("button"); f.type = "button"; f.className = "pf-fav"; const on = favs.has(p.id);

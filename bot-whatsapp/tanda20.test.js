@@ -8,8 +8,8 @@ const p = leer("./pedido.html"), c = leer("./cliente.html");
 
 test("1. «La última vez: N» con su unidad, y el primer «+» pone justo eso (solo-cajas, siempre cajas)", () => {
   assert.match(p, /function ultimaVez\(p\)/); assert.match(p, /p\.soloCaja \|\| L % k === 0/); assert.match(p, /b\.onclick = \(\) => primerMas\(p\)/);
-  assert.match(p, /"La última vez: " \+ uv\.texto/); assert.match(p, /tab === "hab" \? ultimaVez\(p\)/);
-  assert.match(c, /"La última vez: " \+ ultimaTxt\(p\)/); assert.match(c, /p\.ultima > 0 \? Math\.min\(999, p\.ultima\) : 1\) \+ "&a=1"/);
+  assert.match(p, /"Has dejado grabado: " \+ uv\.texto \+ " del último pedido"/); assert.match(p, /tab === "hab" \? ultimaVez\(p\)/);
+  assert.match(c, /"Has dejado grabado: " \+ ultimaTxt\(p\) \+ " del último pedido"/); assert.match(c, /p\.ultima > 0 \? Math\.min\(999, p\.ultima\) : 1\) \+ "&a=1"/);
   assert.match(c, /eurp\(Math\.round\(p\.price \* p\.unitsPerBox \* 1000\) \/ 1000\) \+ " \/caja"/); // solo-cajas: el precio va por caja también en el Inicio
 });
 test("2-3. saltar esta semana, Mi pedido fijo desde Mi cuenta y aviso de retirados con parecidos antes de abrir el fijo", () => {

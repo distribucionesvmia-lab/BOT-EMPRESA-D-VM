@@ -2020,7 +2020,7 @@ function inicio(ui) {
       if (etiqueta) im.appendChild(el("span", "in-oferta", etiqueta));
       const mas = el("span", "in-mas"); mas.setAttribute("aria-hidden", "true"); mas.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
       const pie = el("span", "in-pie"); pie.append(el("small", null, p.soloCaja && p.unitsPerBox ? eurp(Math.round(p.price * p.unitsPerBox * 1000) / 1000) + " /caja" : eurp(p.price) + " /ud"), mas);
-      t.append(im, el("b", "in-pn", p.name), ...(p.unitsPerBox ? [el("small", "in-fmt", (p.soloCaja ? "Solo cajas de " : "Caja de ") + p.unitsPerBox + (p.soloCaja ? " · " + eurp(p.price) + " /ud" : ""))] : []), ...(p.ultima ? [el("small", "in-ult", "La última vez: " + ultimaTxt(p))] : []), pie); return t; // nombre entero (hasta 4 líneas) y el formato
+      t.append(im, el("b", "in-pn", p.name), ...(p.unitsPerBox ? [el("small", "in-fmt", (p.soloCaja ? "Solo cajas de " : "Caja de ") + p.unitsPerBox + (p.soloCaja ? " · " + eurp(p.price) + " /ud" : ""))] : []), ...(p.ultima ? [el("small", "in-ult", "Has dejado grabado: " + ultimaTxt(p) + " del último pedido")] : []), pie); return t; // nombre entero (hasta 4 líneas) y el formato
     };
     if (j.ofertas?.length) { // ofertas vigentes que le cambian el precio (la empresa las pone desde el panel)
       const sec = el("section", "in-sec"); sec.setAttribute("aria-label", "Ofertas"); sec.appendChild(el("h3", null, "Ofertas"));
