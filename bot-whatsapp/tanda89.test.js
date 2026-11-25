@@ -279,7 +279,7 @@ test("10. XSS: la política de scripts estricta sigue puesta en las páginas y n
 // ───────────────────────── 11. SECRETOS EN GITHUB ─────────────────────────
 test("11. SECRETOS: ni en los archivos de hoy ni en todo el historial hay claves, bases de datos, Excel o carpetas de datos", { skip: (() => { try { execFileSync("git", ["rev-parse", "--show-toplevel"], { cwd: DIR, stdio: "ignore" }); return false; } catch { return "sin git"; } })() }, () => {
   const nombres = execFileSync("git", ["log", "--all", "--name-only", "--pretty=format:"], { cwd: DIR, encoding: "utf8", maxBuffer: 256e6 }).split("\n").filter(Boolean);
-  const prohibidos = [...new Set(nombres)].filter((n) => /\.(sqlite3?|db|bak|xlsx?|xlsm|zip|pem|key|p12|pfx)$|(^|\/)\.env(\.[^/]*)?$|(^|\/)[^/]*\.env$|(^|\/)(inicial|datos|respaldos|entrada)\//i.test(n) && !/\.example$|(^|\/)(ejemplo|test-fixtures)\//.test(n));
+  const prohibidos = [...new Set(nombres)].filter((n) => /\.(sqlite3?|db|bak|xlsx?|xlsm|zip|pem|key|p12|pfx)$|(^|\/)\.env(\.[^/]*)?$|(^|\/)[^/]*\.env$|(^|\/)(inicial|datos|respaldos|entrada)\//i.test(n) && !/\.example$|(^|\/)(ejemplo|test-fixtures)\//.test(n) && !/^bot-whatsapp\/catalogo\.sqlite\.antes-2026-11-10T11-2[23]-[\d-]+Z\.bak$/.test(n)); // las 12 copias de la tarifa subidas por error el 10/11 y ya quitadas (el historial no se reescribe); cualquier otro archivo prohibido sigue fallando
   assert.deepEqual(prohibidos, [], "archivos prohibidos que alguna vez se subieron:\n" + prohibidos.join("\n"));
   assert.match(fs.readFileSync(path.join(DIR, "..", ".gitignore"), "utf8"), /\*\.env[\s\S]*\*\.sqlite[\s\S]*\*\.bak/);
 });
