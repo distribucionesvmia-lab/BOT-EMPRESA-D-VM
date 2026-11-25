@@ -344,6 +344,7 @@
   .tcard table { width:100%; border-collapse:collapse; font-size:calc(var(--t-sec) / var(--k,1)); font-variant-numeric:tabular-nums; }
   .tcard th { text-align:left; font-size:calc(var(--t-micro) / var(--k,1)); text-transform:uppercase; letter-spacing:.04em; color:var(--text-2); padding:var(--s2) var(--s3); font-weight:600; }
   .tcard td { padding:var(--s3); border-top:.5px solid var(--line); vertical-align:top; }
+  .tcard td.c-nom { white-space:pre-line; }
   .tcard .c-cant { white-space:nowrap; font-weight:600; color:var(--accent); width:1%; }
   .tcard .c-imp, .tcard th.c-imp { text-align:right; white-space:nowrap; font-weight:600; }
   .tcard tfoot td { background:var(--accent-soft); font-weight:700; font-size:calc(var(--t-body) / var(--k,1)); color:var(--accent); }
@@ -1729,7 +1730,7 @@ async function abrirCuenta(irAPedidos, mas) {
       if (o.total != null) c.appendChild(nodo("p", (o.totalOrientativo ? "Total con IVA aprox.: " : "Total con IVA: ") + eur(o.total) + (o.totalOrientativo ? " (con los precios de hoy)" : ""), "cu-total"));
       const n = o.lineas.length;
       c.appendChild(nodo("p", o.lineas.slice(0, 3).map((l) => `${l.cant || l.uds} ${l.nombre}`).join(" · ") + (n > 3 ? ` y ${n - 3} más` : "") + (o.entrega ? ` · entrega ${o.entregaTexto || o.entrega.split("-").reverse().join("/")}` : ""), "res"));
-      if (n > 3) { const d = nodo("details"), ul = nodo("ul"); d.appendChild(nodo("summary", `Ver los ${n} artículos`)); for (const l of o.lineas) ul.appendChild(nodo("li", `${l.cant || l.uds} · ${l.nombre}`)); d.appendChild(ul); c.appendChild(d); }
+      if (n > 3) { const d = nodo("details"), ul = nodo("ul"); d.appendChild(nodo("summary", `Ver los ${n} artículos`)); for (const l of o.lineas) ul.appendChild(nodo("li", `${l.cant || l.uds} · ${l.nombre}` + (l.pud != null ? ` · ${eurp(l.pud)} /ud` : ""))); d.appendChild(ul); c.appendChild(d); }
       const acc = nodo("div", null, "cu-acc");
       const rep = nodo("button", "Repetir pedido", "vm-btn primary"); rep.type = "button"; rep.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&r=1&x=1"; };
       const add = nodo("button", "Añadir al carrito", "vm-btn ghost"); add.type = "button"; add.onclick = () => { location.href = catUrl() + "#" + hashLineas(o) + "&a=1"; };
@@ -1904,7 +1905,7 @@ function tarjetaTabla(card) {
   const th = t.createTHead().insertRow();
   [["Cant.", "c-cant"], ["Producto", ""], ["Importe", "c-imp"]].forEach(([x, k]) => { const e = document.createElement("th"); e.scope = "col"; e.textContent = x; if (k) e.className = k; th.appendChild(e); });
   const tb = t.createTBody();
-  card.filas.forEach((f) => { const r = tb.insertRow(); [[f.cant, "c-cant"], [f.nombre, ""], [f.importe == null ? "—" : eur(f.importe), "c-imp"]].forEach(([x, k]) => { const td = r.insertCell(); td.textContent = x; if (k) td.className = k; }); });
+  card.filas.forEach((f) => { const r = tb.insertRow(); [[f.cant, "c-cant"], [f.nombre + (f.pud != null ? "\n" + eurp(f.pud) + " /ud" : ""), "c-nom"], [f.importe == null ? "—" : eur(f.importe), "c-imp"]].forEach(([x, k]) => { const td = r.insertCell(); td.textContent = x; if (k) td.className = k; }); });
   const ft = t.createTFoot().insertRow(); const a = ft.insertCell(); a.colSpan = 2; a.textContent = card.conIva ? "Total con IVA" : "Total"; const b = ft.insertCell(); b.className = "c-imp"; b.textContent = card.total == null ? "No disponible" : eur(card.total);
   c.append(h, t);
   if (card.doc) { const pb = el("button", "vm-btn ghost t-pdf", "Ver / imprimir PDF"); pb.type = "button"; pb.onclick = () => abrirPdf(urlPdfDe(card.doc), "Pedido " + card.doc); c.appendChild(pb); }

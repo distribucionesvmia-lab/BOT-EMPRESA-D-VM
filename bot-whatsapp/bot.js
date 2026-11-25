@@ -476,16 +476,17 @@ function pedidoLibre(s, texto, lead = "") {
 
 // Tabla de un pedido para la web (cantidad · producto · importe); el texto del mensaje sigue siendo el respaldo para WhatsApp
 const finito = (n) => (Number.isFinite(n) ? n : null);
+const pudDe = (amount, uds) => (Number.isFinite(amount) && uds > 0 ? Math.round((amount / uds) * 1000) / 1000 : null); // precio por unidad (ya con descuento) de una línea
 function tablaPedido(titulo, items, subtitulo = "", o = null) {
   const g = o?.guardado;
   if (g?.length && g.every((l) => Number.isFinite(l.amount))) { // pedido hecho en la aplicación: se enseñan los precios e importes de ESE día, no los de hoy
     const t = totals(g.map((l) => ({ amount: l.amount, vat: l.vat })), !!o.re);
-    return { titulo, subtitulo: "Precios del día del pedido", filas: g.map((l) => ({ cant: `${l.qty} ${l.qty === 1 ? "ud" : "uds"}`, nombre: l.name ?? CATALOG.find((x) => String(x.id) === l.productId)?.name ?? l.productId, importe: l.amount })), total: finito(Math.round(t.total * 100) / 100), conIva: true, ...(o?.doc ? { doc: String(o.doc) } : {}) };
+    return { titulo, subtitulo: "Precios del día del pedido", filas: g.map((l) => ({ cant: `${l.qty} ${l.qty === 1 ? "ud" : "uds"}`, nombre: l.name ?? CATALOG.find((x) => String(x.id) === l.productId)?.name ?? l.productId, importe: l.amount, pud: pudDe(l.amount, l.qty) })), total: finito(Math.round(t.total * 100) / 100), conIva: true, ...(o?.doc ? { doc: String(o.doc) } : {}) };
   }
   const imp = importes(items);
   return { // pedido de a3ERP (sin precios guardados): importes con los precios de hoy, sin dejar nunca un hueco en blanco
     titulo, subtitulo: subtitulo || "Precios de hoy (orientativos)",
-    filas: items.map((i, k) => ({ cant: cantidadH(i), nombre: i.name, importe: finito(imp.lines[k]?.amount) })),
+    filas: items.map((i, k) => ({ cant: cantidadH(i), nombre: i.name, importe: finito(imp.lines[k]?.amount), pud: pudDe(imp.lines[k]?.amount, i.unit === "caja" ? i.qty * (upbOf(CATALOG.find((x) => String(x.id) === String(i.id))) ?? 1) : i.qty) })),
     total: finito(Math.round(total(items) * 100) / 100), conIva: true, ...(o?.doc ? { doc: String(o.doc) } : {}),
   };
 }

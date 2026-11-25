@@ -1,0 +1,12 @@
+// Precio por unidad también en las tarjetas de pedido del chat y en la lista de Mi cuenta.
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+const lee = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
+test("PRECIO UNIDAD: bot.js, server.js y cliente.html lo llevan", () => {
+  assert.match(lee("./bot.js"), /pud: pudDe\(/);
+  assert.match(lee("./server.js"), /uds: l\.qty, pud,/);
+  const c = lee("./cliente.html");
+  assert.match(c, /f\.pud != null/);
+  assert.match(c, /l\.pud != null/);
+});

@@ -932,9 +932,9 @@ async function appRoutes(req, res, url) {
       const hoyD = madridDay(), ent = propio?.delivery_date ?? null;
       // Estado en 4 pasos (1 Recibido · 2 En preparación · 3 En reparto · 4 Entregado), deducido de la exportación y del día de entrega: no hay seguimiento real del reparto
       const paso = !propio || (ent && ent < hoyD) ? 4 : ent && ent === hoyD ? (propio.export_status === "exported" ? 3 : 2) : propio.export_status === "exported" ? 2 : 1;
-      let total = null, orientativo = false;
+      let total = null, orientativo = false, prA = null;
       if (propio) { const t = propio.items?.length ? totals(propio.items, !!propio.re).total : null; total = Number.isFinite(t) && t > 0 ? t : (Number.isFinite(Number(propio.total)) ? Number(propio.total) : null); }
-      else { const cust = clienteConPedidos(account.customerId); const pr = priceOrder({ items: o.lines.map((l) => ({ id: l.id, qty: l.qty, unit: "ud" })) }, cust, catalogNow()); total = totals(pr.items, !!cust?.recargoEquivalencia).total; orientativo = true; }
+      else { const cust = clienteConPedidos(account.customerId); const pr = prA = priceOrder({ items: o.lines.map((l) => ({ id: l.id, qty: l.qty, unit: "ud" })) }, cust, catalogNow()); total = totals(pr.items, !!cust?.recargoEquivalencia).total; orientativo = true; }
       return {
         total, totalOrientativo: orientativo, paso, proximo: !!propio && !!ent && ent >= hoyD, entregaTexto: ent ? longDate(ent) : "",
         doc: sinDocumento(o.doc) ? "" : o.doc, pdf: !sinDocumento(o.doc), fecha: o.date, entrega: ent, origen: propio ? "app" : "a3erp",
@@ -942,7 +942,8 @@ async function appRoutes(req, res, url) {
         editable: !!pe?.ok, hasta: pe?.ok ? pe.texto : "", modificado: propio?.modified_at ?? null,
         lineas: o.lines.map((l) => { // «1 caja (6 uds)» igual que en el PDF; sin dato de caja (pedidos de a3ERP), unidades
           const g = propio?.items?.find((x) => String(x.product_id ?? x.id) === String(l.id)), cajas = g && g.unit === "caja" ? Number(g.boxes ?? g.qty) : 0;
-          return { id: l.id, nombre: l.name, uds: l.qty, cant: cajas ? `${cajas} ${cajas === 1 ? "caja" : "cajas"} (${l.qty} uds)` : `${l.qty} ${l.qty === 1 ? "ud" : "uds"}` };
+          const imp = Number(g?.amount ?? prA?.items?.find((x) => String(x.id) === String(l.id))?.amount), pud = Number.isFinite(imp) && l.qty > 0 ? Math.round((imp / l.qty) * 1000) / 1000 : null;
+          return { id: l.id, nombre: l.name, uds: l.qty, pud, cant: cajas ? `${cajas} ${cajas === 1 ? "caja" : "cajas"} (${l.qty} uds)` : `${l.qty} ${l.qty === 1 ? "ud" : "uds"}` };
         }),
       };
     });
