@@ -1929,7 +1929,7 @@ function row(p) {
   if (Number(p.discount) > 0) { const viejo = document.createElement("s"); viejo.className = "pf-viejo"; viejo.textContent = fmtP(enCaja ? Number(p.price) * p.unitsPerBox : Number(p.price)); price.textContent = fmtP(enCaja ? precioCaja(p) : precioUd(p)); pr.append(viejo, price, ud); } // precio original tachado y el neto (el que se factura) al lado
   else { price.textContent = fmtP(enCaja ? precioCaja(p) : Number(p.price)); pr.append(price, ud); }
   if (p.discount) { const dto = document.createElement("span"); dto.className = "pf-dto"; dto.textContent = ` −${String(p.discount).replace(".", ",")} %`; pr.appendChild(dto); }
-  if (p.soloCaja && p.unitsPerBox) { const pu = document.createElement("span"); pu.className = "pf-porud"; pu.textContent = eurp(precioUd(p)) + (esKilo(p.name) ? " /kg" : " cada unidad"); pr.appendChild(pu); } // solo cajas: se ve también lo que cuesta cada unidad
+  if (p.unitsPerBox > 1 && (p.soloCaja || enCaja)) { const pu = document.createElement("span"); pu.className = "pf-porud"; pu.textContent = eurp(precioUd(p)) + (esKilo(p.name) ? " /kg" : " cada unidad"); pr.appendChild(pu); } // cuando se pide por cajas (o es solo cajas): se ve también lo que cuesta cada unidad
   if (p.oferta) { const of = document.createElement("span"); of.className = "pf-oferta"; of.textContent = "OFERTA" + (p.oferta.hasta ? " hasta el " + p.oferta.hasta.split("-").reverse().slice(0, 2).join("/") : ""); pr.appendChild(of); }
   if (tab === "all" && p.count > 0) { const lc = document.createElement("span"); lc.className = "pf-compras"; lc.textContent = "Lo compras"; pr.appendChild(lc); } // etiqueta aparte del nombre, junto al precio
   info.append(n, c, pr);
