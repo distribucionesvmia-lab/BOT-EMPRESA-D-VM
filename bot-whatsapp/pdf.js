@@ -1,5 +1,6 @@
 // PDF del pedido del cliente, sin dependencias: texto en Helvetica (codificación WinAnsi), tabla de líneas, totales y varias páginas si hace falta.
 import { totals } from "./pricing.js";
+import { LOGO, QR_WEB, WEB_TEXTO, WEB_URL } from "./pdf-recursos.js";
 
 const W = 595, H = 842, M = 40; // A4 en puntos
 const WIN = { "€": 0x80, "‘": 0x91, "’": 0x92, "“": 0x93, "”": 0x94, "–": 0x96, "—": 0x97, "·": 0xb7, "…": 0x85 };
@@ -15,14 +16,19 @@ const parte = (texto, max) => { const out = []; let l = ""; for (const w of Stri
 
 /** Construye el PDF (Buffer). `datos`: { empresa, cliente, ref, fecha, entrega, direccion, nota, lineas:[{cant, nombre, precio, importe}], totales:{base, iva, re, total}, conRe } */
 export function pdfPedido(d) {
-  const paginas = []; let cur = []; let y = H - M;
-  const txt = (x, yy, t, { b = false, pt = 10, der = false, gris = false } = {}) => { const bt = esc(bytes(t)); const xx = der ? x - ancho(t, pt) : x; cur.push(Buffer.concat([Buffer.from(`BT /${b ? "F2" : "F1"} ${pt} Tf ${gris ? "0.4 0.4 0.4" : "0 0 0"} rg ${xx.toFixed(2)} ${yy.toFixed(2)} Td (`), bt, Buffer.from(") Tj ET\n")])); };
+  const paginas = []; const annots = []; let cur = []; let y = H - M;
+  const txt = (x, yy, t, { b = false, pt = 10, der = false, gris = false, blanco = false } = {}) => { const bt = esc(bytes(t)); const xx = der ? x - ancho(t, pt) : x; cur.push(Buffer.concat([Buffer.from(`BT /${b ? "F2" : "F1"} ${pt} Tf ${blanco ? "1 1 1" : gris ? "0.4 0.4 0.4" : "0 0 0"} rg ${xx.toFixed(2)} ${yy.toFixed(2)} Td (`), bt, Buffer.from(") Tj ET\n")])); };
   const linea = (y1, y2 = y1) => cur.push(Buffer.from(`0.8 0.8 0.8 RG 0.5 w ${M} ${y1} m ${W - M} ${y2} l S\n`));
   const nueva = () => { if (cur.length) paginas.push(cur); cur = []; y = H - M; };
   const cabeceraTabla = () => { txt(M, y, "Cant.", { b: true, pt: 9 }); txt(M + 38, y, "Formato", { b: true, pt: 9 }); txt(M + 130, y, "Producto", { b: true, pt: 9 }); txt(W - M - 70, y, "Precio ud.", { b: true, pt: 9, der: true }); txt(W - M - 38, y, "Dto.", { b: true, pt: 9, der: true }); txt(W - M, y, "Importe", { b: true, pt: 9, der: true }); y -= 6; linea(y); y -= 14; };
+  // franja roja de marca con el logo (el logo es blanco con letras transparentes: solo se ve sobre rojo)
+  const BANDA = 74, LH = 58, LW = LH * LOGO.w / LOGO.h;
+  cur.push(Buffer.from(`0.784 0.063 0.18 rg 0 ${H - BANDA} ${W} ${BANDA} re f\nq ${LW.toFixed(2)} 0 0 ${LH} ${M} ${H - BANDA + (BANDA - LH) / 2} cm /Im1 Do Q\n`));
+  txt(W - M, H - BANDA / 2 - 3, "Resumen de tu pedido", { b: true, pt: 13, der: true, blanco: true });
+  y = H - BANDA - 26;
   txt(M, y, d.empresa || "Distribuciones", { b: true, pt: 16 }); y -= 18;
   for (const l of d.datosEmpresa ?? []) { if (l) { txt(M, y, l, { pt: 9, gris: true }); y -= 12; } } // nombre fiscal, CIF, dirección y teléfono de la empresa (los de la configuración)
-  y -= 6; txt(M, y, "Resumen de tu pedido", { pt: 12 }); y -= 24;
+  y -= 14;
   const info = [["Pedido", d.ref], ["Fecha", fecha(d.fecha)], ["Cliente", d.cliente], ["Teléfono", d.telefonoCliente], ["Entrega", fechaLarga(d.entrega) || "Por confirmar"], ["Dirección", d.direccion]];
   for (const [k, v] of info) { if (!v) continue; txt(M, y, k, { b: true, pt: 10 }); for (const l of parte(v, W - 2 * M - 80)) { txt(M + 80, y, l, { pt: 10 }); y -= 14; } }
   y -= 8; linea(y); y -= 16; cabeceraTabla();
@@ -38,6 +44,21 @@ export function pdfPedido(d) {
   const fila = (k, v, b = false) => { txt(W - M - 130, y, k, { b, pt: b ? 11 : 10, der: true }); txt(W - M, y, v, { b, pt: b ? 11 : 10, der: true }); y -= b ? 18 : 15; };
   fila("Base imponible", fmt(d.totales.base)); fila("IVA", fmt(d.totales.iva)); if (d.conRe) fila("Recargo de equivalencia", fmt(d.totales.re)); fila("Total con IVA", fmt(d.totales.total), true);
   if (d.nota) { y -= 8; txt(M, y, "Observaciones", { b: true, pt: 10 }); y -= 14; for (const l of parte(d.nota, W - 2 * M)) { txt(M, y, l, { pt: 10 }); y -= 14; } }
+  // bloque de marketing: QR + invitación a pedir desde la web (el QR se dibuja con rectángulos: no hace falta ninguna imagen)
+  const ALTO_MK = 132;
+  if (y - ALTO_MK < M + 14) { nueva(); }
+  y -= 14; const top = y, MOD = 2.7, N = QR_WEB.length, QZ = 4 * MOD, lado = N * MOD;
+  cur.push(Buffer.from(`0.96 0.96 0.97 rg ${M} ${top - ALTO_MK + 14} ${W - 2 * M} ${ALTO_MK - 14} re f\n0.784 0.063 0.18 rg ${M} ${top - ALTO_MK + 14} 4 ${ALTO_MK - 14} re f\n`));
+  const qx = W - M - 12 - lado - QZ, qy = top - 12 - QZ - lado; // esquina inferior izquierda del QR (con zona blanca alrededor)
+  cur.push(Buffer.from(`1 1 1 rg ${qx - 0} ${qy - QZ} ${lado + 2 * QZ} ${lado + 2 * QZ} re f\n0 0 0 rg\n`));
+  QR_WEB.forEach((fila, r) => { for (let c = 0; c < N;) { if (fila[c] !== "1") { c++; continue; } let e = c; while (e < N && fila[e] === "1") e++; cur.push(Buffer.from(`${(qx + c * MOD).toFixed(2)} ${(qy + (N - 1 - r) * MOD).toFixed(2)} ${((e - c) * MOD).toFixed(2)} ${MOD} re f\n`)); c = e; } });
+  const tx = M + 18; let ty = top - 34;
+  txt(tx, ty, "¿Repetimos tu pedido?", { b: true, pt: 15 }); ty -= 20;
+  for (const l of ["Haz tu próximo pedido desde el móvil, cuando quieras:", "tus artículos habituales a mano y siempre a tu precio."]) { txt(tx, ty, l, { pt: 10 }); ty -= 14; }
+  ty -= 6; txt(tx, ty, "Escanea el código QR o entra en", { pt: 10 }); txt(tx + ancho("Escanea el código QR o entra en ", 10), ty, WEB_TEXTO, { b: true, pt: 10 });
+  ty -= 14; txt(tx, ty, "Haz tu pedido aquí", { b: true, pt: 11, gris: true });
+  annots.push({ pag: paginas.length, rect: [tx + ancho("Escanea el código QR o entra en ", 10), ty + 16, tx + ancho("Escanea el código QR o entra en ", 10) + ancho(WEB_TEXTO, 10) + 4, ty + 28] });
+  y = top - ALTO_MK;
   txt(M, M - 10, "Documento informativo del pedido. No es una factura.", { pt: 8, gris: true });
   txt(M, M - 22, "Programa creado por Pablo Martín Castañeda · © 2026 · Todos los derechos reservados", { pt: 7, gris: true });
   paginas.push(cur);
@@ -47,9 +68,12 @@ export function pdfPedido(d) {
   paginas.forEach((p, i) => {
     const cont = Buffer.concat(p); const idC = 5 + i * 2, idP = idC + 1;
     objs[idC - 1] = Buffer.concat([Buffer.from(`<< /Length ${cont.length} >>\nstream\n`), cont, Buffer.from("endstream")]);
-    objs[idP - 1] = Buffer.from(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${idC} 0 R >>`);
+    const ids = annots.map((a, k) => (a.pag === i ? 5 + 2 * paginas.length + 1 + k : 0)).filter(Boolean); // el logo va tras las páginas y los enlaces tras el logo
+    objs[idP - 1] = Buffer.from(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << /Im1 ${5 + 2 * paginas.length} 0 R >> >>${ids.length ? ` /Annots [${ids.map((n) => n + " 0 R").join(" ")}]` : ""} /Contents ${idC} 0 R >>`);
     kids.push(`${idP} 0 R`);
   });
+  objs.push(Buffer.concat([Buffer.from(`<< /Type /XObject /Subtype /Image /Width ${LOGO.w} /Height ${LOGO.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${LOGO.datos.length} >>\nstream\n`), LOGO.datos, Buffer.from("\nendstream")]));
+  for (const a of annots) objs.push(Buffer.from(`<< /Type /Annot /Subtype /Link /Rect [${a.rect.map((n) => n.toFixed(2)).join(" ")}] /Border [0 0 0] /A << /S /URI /URI (${WEB_URL}) >> >>`));
   objs[0] = Buffer.from("<< /Type /Catalog /Pages 2 0 R >>"); objs[1] = Buffer.from(`<< /Type /Pages /Kids [${kids.join(" ")}] /Count ${kids.length} >>`);
   const partes = [Buffer.from("%PDF-1.4\n")]; const pos = [];
   let off = partes[0].length;
