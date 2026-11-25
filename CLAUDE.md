@@ -782,3 +782,6 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 
 ## Micrófono del chat quitado (25/11/2026, a petición de la empresa)
 - El botón de micrófono junto a «Enviar» en el chat de `cliente.html` ya no sale: `VOZ_CHAT = false` en el bloque «Pedir hablando» (cambiar a `true` lo devuelve; el resto del código sigue). La búsqueda por voz del buscador del catálogo (`pedido.html`) NO se ha tocado. Prueba: `tanda68.test.js`.
+
+## Tarjetas de artículo del Inicio más simples (25/11/2026, a petición de la empresa)
+- Las tarjetas de «Los 5 artículos que más consumes» (`tarjeta` en `inicio`, `cliente.html`, último bloque del `<style>`) llevan solo: foto sobre baldosa blanca, **nombre** (hasta 3 líneas, negrita), **precio** grande («20,232 € / caja» o «0,420 € / ud»; en solo-cajas, debajo y pequeño, el precio por unidad), «+» de 40 px y una etiqueta verde **«En tu último pedido: 1 caja»**. Se quitó la línea «Solo cajas de N». El Histórico del catálogo dice igual («En tu último pedido: …», `ultimaVez`). Sustituye a «Has dejado grabado…». Pruebas: `tanda12`, `tanda20`. Comprobado con captura a 390 px (datos de prueba); no en un móvil real.
