@@ -11,7 +11,7 @@ const addrOf = (s) => (/<([^>]+)>/.exec(s)?.[1] ?? String(s)).trim();
 const wrap76 = (s) => s.match(/.{1,76}/g)?.join("\r\n") ?? "";
 
 /** Mensaje completo (cabeceras + cuerpo en UTF-8 codificado en base64). */
-export function buildMessage({ from, to, subject, text, date = new Date(), messageId, headers: extra = [], attachments = [] }) {
+export function buildMessage({ from, to, subject, text, html = null, date = new Date(), messageId, headers: extra = [], attachments = [] }) {
   const host = addrOf(from).split("@")[1] ?? "localhost";
   const headers = [
     `From: ${from}`,
@@ -24,11 +24,16 @@ export function buildMessage({ from, to, subject, text, date = new Date(), messa
     "Content-Transfer-Encoding: base64",
     ...extra.filter((h) => /^[A-Za-z-]+: [^\r\n]+$/.test(h)), // cabeceras añadidas (p. ej. List-Unsubscribe): una línea cada una, sin saltos
   ];
-  if (!attachments.length) return headers.join("\r\n") + "\r\n\r\n" + wrap76(b64(text)) + "\r\n";
+  // Con versión HTML (correo bonito): multipart/alternative = texto sencillo + HTML; quien no pueda ver HTML ve el texto
+  const alt = (() => { if (!html) return null; const b = "vm-alt-" + crypto.randomUUID().replaceAll("-", ""); return { tipo: `multipart/alternative; boundary="${b}"`, cuerpo: `--${b}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap76(b64(text))}\r\n--${b}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap76(b64(html))}\r\n--${b}--\r\n` }; })();
+  if (!attachments.length) {
+    if (!alt) return headers.join("\r\n") + "\r\n\r\n" + wrap76(b64(text)) + "\r\n";
+    return headers.filter((h) => !/^Content-(Type|Transfer-Encoding):/i.test(h)).concat(`Content-Type: ${alt.tipo}`).join("\r\n") + "\r\n\r\n" + alt.cuerpo;
+  }
   // Con adjuntos (p. ej. el PDF del pedido): multipart/mixed = el texto y cada archivo en base64
   const b = "vm-" + crypto.randomUUID().replaceAll("-", ""), cab = headers.filter((h) => !/^Content-(Type|Transfer-Encoding):/i.test(h)).concat(`Content-Type: multipart/mixed; boundary="${b}"`);
   const nombre = (f) => String(f).replace(/[^\w.\- ]/g, "_").slice(0, 80) || "adjunto";
-  const partes = [`--${b}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap76(b64(text))}\r\n`];
+  const partes = [alt ? `--${b}\r\nContent-Type: ${alt.tipo}\r\n\r\n${alt.cuerpo}\r\n` : `--${b}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap76(b64(text))}\r\n`];
   for (const a of attachments) partes.push(`--${b}\r\nContent-Type: ${/^[\w.+-]+\/[\w.+-]+$/.test(a.contentType ?? "") ? a.contentType : "application/octet-stream"}; name="${nombre(a.filename)}"\r\nContent-Disposition: attachment; filename="${nombre(a.filename)}"\r\nContent-Transfer-Encoding: base64\r\n\r\n${wrap76(Buffer.from(a.data).toString("base64"))}\r\n`);
   return cab.join("\r\n") + "\r\n\r\n" + partes.join("") + `--${b}--\r\n`;
 }
