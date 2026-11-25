@@ -22,3 +22,8 @@ test("PEDIDO: botón «Volver» arriba del pedido y del resumen", () => {
 test("HISTÓRICO: las 5 tarjetas verdes llevan margen, franja y puesto", () => {
   assert.match(lee("./pedido.html"), /\.pf\.pf-top::before \{ content:counter\(top5\)/);
 });
+test("HISTÓRICO: sin grupo verde de 5; todos en orden de familia", () => {
+  const p = lee("./pedido.html");
+  assert.match(p, /const topIds = new Set\(\); \/\/ «Histórico»: SIN grupo destacado/);
+  assert.doesNotMatch(p, /topIds = new Set\(data\.products/);
+});

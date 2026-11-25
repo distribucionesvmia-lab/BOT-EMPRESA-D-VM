@@ -2342,11 +2342,8 @@ function renderList() {
     }
     return;
   }
-  let topIds = new Set(); // «Histórico»: primero los 5 artículos que más consume (de todo su histórico), luego el resto de los últimos 6 meses; cada grupo en orden de familia, subfamilia y artículo (a3ERP)
-  if (tab === "hab" && !q) {
-    topIds = new Set(data.products.filter(p => p.count > 0).sort((a, b) => b.count - a.count || (b.units || 0) - (a.units || 0) || String(a.id).localeCompare(String(b.id), "es", { numeric: true })).slice(0, 5).map(p => p.id));
-    items = items.slice().sort((a, b) => (topIds.has(a.id) ? 0 : 1) - (topIds.has(b.id) ? 0 : 1) || compararFamilias(a.fam, b.fam) || compararCodigos(a.id, b.id));
-  }
+  const topIds = new Set(); // «Histórico»: SIN grupo destacado (decisión de la empresa, 25/11/2026): todos los artículos juntos, en orden de familia, subfamilia y artículo (a3ERP)
+  if (tab === "hab" && !q) items = items.slice().sort((a, b) => compararFamilias(a.fam, b.fam) || compararCodigos(a.id, b.id));
   else if (arbol && ordenCat === "nombre") items = items.slice().sort(cmpNombre);
   else if (arbol && (ordenCat === "pa" || ordenCat === "pd")) items = items.slice().sort((a, b) => (ordenCat === "pa" ? 1 : -1) * (precioUd(a) - precioUd(b)) || cmpNombre(a, b));
   else if (arbol) { // ORDEN FIJO dentro de cada sección: subcategoría (como en el árbol), código de familia/subfamilia de a3ERP, código de artículo y, si no hay código de familia, el nombre. Lo que ya compra NO sube arriba (eso está en «Lo habitual» y en la etiqueta «Lo compras»)

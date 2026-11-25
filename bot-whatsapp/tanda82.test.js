@@ -18,9 +18,8 @@ test("INICIO: «Los 5 artículos que más consumes» (tarjetas verdes) y «Mis a
   assert.match(html, /t\.classList\.add\("in-verde"\)/);
   assert.match(srv, /\.slice\(0, 5\)\.sort\(\(a, b\) => compararFamilias/);
 });
-test("HISTÓRICO: primero los 5 que más consume, luego el resto, y al final «¿Quieres añadir algún producto nuevo del catálogo?» Sí/No", () => {
+test("HISTÓRICO: todo en orden de familias (sin grupo de 5) y al final «¿Quieres añadir algún producto nuevo del catálogo?» Sí/No", () => {
   const p = fs.readFileSync(new URL("./pedido.html", import.meta.url), "utf8").replace(/\r\n/g, "\n");
-  assert.match(p, /\.slice\(0, 5\)\.map\(p => p\.id\)\);/);
   assert.match(p, /"Otros artículos de los últimos 6 meses"/);
   assert.match(p, /¿Quieres añadir algún producto nuevo del catálogo\?/);
   assert.match(p, /si\.textContent = "Sí"; si\.onclick = \(\) => cambiarTab\("all"\)/);

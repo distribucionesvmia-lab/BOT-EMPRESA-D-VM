@@ -813,3 +813,6 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 
 ## Tarjetas verdes del Histórico rediseñadas (25/11/2026)
 - «Los 5 artículos que más consumes» del Histórico (`.pf.pf-top`, último bloque del `<style>` de `pedido.html`): ya no tocan los bordes de la pantalla; llevan margen, fondo verde suave (`color-mix` del `--ok` con la superficie, vale en claro y oscuro), franja verde de 5 px a la izquierda y un círculo con el puesto (1-5, `counter(top5)`) sobre la foto. La regla antigua sigue arriba y esta la sustituye. Prueba: `tanda94.test.js`. No probado en un móvil real.
+
+## Histórico sin grupo verde: todo en orden de familias (25/11/2026, a petición de la empresa)
+- La pestaña «Histórico» del catálogo ya **no destaca** «Los 5 artículos que más consumes» (ni el título «Otros artículos…», ni el borde/puesto verde): todos los artículos de los últimos 6 meses salen juntos en orden de a3ERP (familia → subfamilia → artículo). `topIds` queda vacío (el código y el CSS de `.pf-top` siguen por si se reabre). **El Inicio no cambia**: sigue con sus 5 tarjetas. Sustituye a lo dicho en «Inicio e Histórico: …» y «Tarjetas verdes del Histórico rediseñadas». Prueba: `tanda94.test.js`.
