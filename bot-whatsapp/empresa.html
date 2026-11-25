@@ -588,7 +588,6 @@
         <div class="scroll"><table><tbody id="entrada-lista"></tbody></table></div>
         <p class="muted" id="entrada-msg" role="status" style="margin:8px 0 0"></p>
       </div>
-      <details class="panel" id="alta-cli"><summary class="alta-sum">Añadir un cliente a mano</summary><div id="alta-cli-cuerpo"></div></details>
       <details class="panel" id="alta-prod"><summary class="alta-sum">Añadir un producto a mano</summary><div id="alta-prod-cuerpo"></div></details>
       <div class="panel" id="sync-panel">
         <h2>Sincronización automática (Drive)</h2>
@@ -740,6 +739,8 @@
     </div>
     <div id="p-cuentas" hidden>
       <div class="pag-cab"><h1>Cuentas de clientes</h1><p>Accesos de los clientes, enlaces de invitación, uso de la aplicación, errores y derechos de datos.</p></div>
+      <details class="panel" id="alta-cli"><summary class="alta-sum">Añadir un cliente nuevo a mano</summary><div id="alta-cli-cuerpo"></div></details>
+
       <div class="panel" id="inv-card">
         <h2>Enlaces de acceso para un cliente</h2>
         <p class="muted" style="margin:0 0 4px">Crea un enlace para que alguien entre en la aplicación sin escribir nada. Sigue los 4 pasos y pulsa «Crear». <b>Lo mandas tú</b>: el sistema no envía nada.</p>
@@ -2297,7 +2298,7 @@ function chipLista(titulo, ayuda, valores, manuales, norm, validar) {
 function editarDatos(f, sec) {
   const c = f.cliente, form = el("form", "", { className: "form-grid fi-form", autocomplete: "off" });
   const campo = (etq, id, valor, extra = {}) => { const l = el("label", "", { className: "campo" }), i = el("input", "", { id: "fe-" + id, value: valor ?? "", ...extra }); l.append(el("span", etq), i); return [l, i]; };
-  const [lRazon, iRazon] = campo("Razón social", "razon", c.razon, { maxLength: 80 }), [lDir, iDir] = campo("Dirección de entrega", "dir", c.direccion, { maxLength: 160 }), [lPob, iPob] = campo("Población", "pob", c.poblacion, { maxLength: 60 }), [lMun, iMun] = campo("Código de municipio", "mun", c.municipio, { maxLength: 5, inputMode: "numeric" });
+  const [lNom, iNom] = campo("Nombre del cliente", "nom", c.nombre, { maxLength: 80, required: true }), [lRazon, iRazon] = campo("Razón social", "razon", c.razon, { maxLength: 80 }), [lDir, iDir] = campo("Dirección de entrega", "dir", c.direccion, { maxLength: 160 }), [lPob, iPob] = campo("Población", "pob", c.poblacion, { maxLength: 60 }), [lMun, iMun] = campo("Código de municipio", "mun", c.municipio, { maxLength: 5, inputMode: "numeric" });
   lMun.append(el("small", "Medina del Campo = 47085", { className: "ayuda" }));
   const tel = chipLista("Teléfonos", "Añadir un teléfono (9 cifras)", c.telefonos, f.manual?.telefonos ?? [], tel9, (v) => (/^\d{9}$/.test(v) ? "" : "Escribe un teléfono de 9 cifras.")),
     mail = chipLista("Correos", "Añadir un correo", c.correos, f.manual?.correos ?? [], (v) => String(v).trim().toLowerCase(), (v) => (/^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]{2,}$/.test(v) ? "" : "Escribe un correo válido (nombre@dominio.es)."));
@@ -2306,12 +2307,12 @@ function editarDatos(f, sec) {
   const lNotas = el("label", "", { className: "campo campo-ancho" }), iNotas = el("textarea", "", { rows: 3, maxLength: 500, value: f.notas ?? "", placeholder: "Por ejemplo: llamar antes de ir · paga en efectivo" }); lNotas.append(el("span", "Notas internas (el cliente no las ve)"), iNotas);
   const msg = el("p", "", { className: "muted campo-ancho", role: "status" }), acc = el("div", "", { className: "acciones campo-ancho" }), guardar = el("button", "Guardar cambios", { type: "submit", className: "main" }), cancelar = el("button", "Cancelar", { type: "button" });
   acc.append(guardar, cancelar);
-  form.append(lRazon, lDir, lPob, lMun, tel.nodo, mail.nodo, lRe, lOf, lNotas, el("p", "El nombre y el NIF los manda a3ERP y no se cambian aquí. Lo que añadas se conserva cuando se actualicen los datos desde el Excel.", { className: "muted campo-ancho", style: "margin:0" }), msg, acc);
-  sec.replaceChildren(el("h4", "Editar datos")); sec.append(form); iRazon.focus();
+  form.append(lNom, lRazon, lDir, lPob, lMun, tel.nodo, mail.nodo, lRe, lOf, lNotas, el("p", "El NIF no se cambia aquí (no se guarda). Lo que escribas, el nombre incluido, se conserva cuando se actualicen los datos desde el Excel.", { className: "muted campo-ancho", style: "margin:0" }), msg, acc);
+  sec.replaceChildren(el("h4", "Editar datos")); sec.append(form); iNom.focus();
   cancelar.onclick = () => abrirFicha(c.id);
   form.onsubmit = async (e) => {
     e.preventDefault(); guardar.disabled = true; msg.textContent = "Guardando…";
-    try { const r = await call(`/api/admin/cliente/${encodeURIComponent(c.id)}/ficha`, { razon: iRazon.value, direccion: iDir.value, poblacion: iPob.value, municipio: iMun.value, recargo: iRe.checked, ofertas: iOf.checked, notas: iNotas.value, telefonos: tel.valor(), correos: mail.valor() }); if (r.avisos?.length) alert(r.avisos.join("\n")); await abrirFicha(c.id); }
+    try { const r = await call(`/api/admin/cliente/${encodeURIComponent(c.id)}/ficha`, { nombre: iNom.value, razon: iRazon.value, direccion: iDir.value, poblacion: iPob.value, municipio: iMun.value, recargo: iRe.checked, ofertas: iOf.checked, notas: iNotas.value, telefonos: tel.valor(), correos: mail.valor() }); if (r.avisos?.length) alert(r.avisos.join("\n")); await abrirFicha(c.id); }
     catch (er) { msg.textContent = er.message; guardar.disabled = false; }
   };
 }

@@ -95,6 +95,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
   // Se guardan aparte y se vuelven a aplicar tras cada importación de a3ERP: el Excel manda en lo suyo, pero no borra lo que se añadió a mano.
   const manualDe = (id) => { try { return JSON.parse(db.prepare("SELECT data FROM customer_manual WHERE customer_id = ?").get(String(id))?.data ?? "{}"); } catch { return {}; } };
   const aplicarManual = (id, m = manualDe(id)) => {
+    if (m.name) db.prepare("UPDATE customers SET name = ? WHERE id = ?").run(String(m.name), id); // nombre escrito a mano: manda sobre el de a3ERP
     for (const [k, col] of [["legalName", "legal_name"], ["address", "address"], ["city", "city"], ["municipio", "municipio"]]) if (k in m) db.prepare(`UPDATE customers SET ${col} = ? WHERE id = ?`).run(m[k] || null, id);
     if ("recargo" in m) db.prepare("UPDATE customers SET recargo = ? WHERE id = ?").run(m.recargo ? 1 : 0, id);
     for (const ph of m.phones ?? []) db.prepare("INSERT OR IGNORE INTO customer_phones VALUES (?, ?)").run(id, ph);
@@ -164,7 +165,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
     /** Lo escrito a mano en la ficha: { phones, emails (los añadidos a mano), notes, … }. */
     manualOf: (id) => manualDe(String(id)),
     /**
-     * Guarda cambios de la ficha. patch: { legalName, address, city, municipio, recargo, notes, phones, emails } (phones y emails: la lista completa que se quiere ver).
+     * Guarda cambios de la ficha. patch: { name, legalName, address, city, municipio, recargo, notes, phones, emails } (phones y emails: la lista completa que se quiere ver).
      * Lo que viene de a3ERP no se puede quitar desde aquí (volvería en la próxima importación): solo se quitan los que se añadieron a mano. Devuelve false si el cliente no existe.
      */
     editar(id, patch, now = new Date().toISOString()) {
@@ -172,7 +173,7 @@ export function openCustomersDb(path = process.env.CUSTOMERS_DB ?? "clientes.sql
       db.exec("BEGIN IMMEDIATE");
       try {
         const m = manualDe(id), antesTel = new Set(m.phones ?? []), antesMail = new Set(m.emails ?? []);
-        for (const k of ["legalName", "address", "city", "municipio", "recargo", "notes"]) if (k in patch) m[k] = patch[k];
+        for (const k of ["name", "legalName", "address", "city", "municipio", "recargo", "notes"]) if (k in patch) m[k] = patch[k];
         if ("phones" in patch) {
           const ahora = new Set(db.prepare("SELECT phone FROM customer_phones WHERE customer_id = ?").all(id).map((x) => x.phone)), erp = new Set([...ahora].filter((p) => !antesTel.has(p)));
           m.phones = patch.phones.filter((p) => !erp.has(p));
