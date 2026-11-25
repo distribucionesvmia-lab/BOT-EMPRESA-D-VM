@@ -753,6 +753,11 @@
   .vm-inicio .in-prod { gap:var(--s2); padding:var(--s2) var(--s2) var(--s3); box-shadow:0 1px 2px rgba(0,0,0,.05); }
   .vm-inicio .in-prod .in-pim { background:#fff; border-radius:16px; }
   .vm-inicio .in-prod.in-verde { background:#fff; border:2px solid var(--ok); border-radius:22px; }
+  /* la tarjeta verde es SIEMPRE blanca (también en modo oscuro): su texto va en oscuro fijo para que se lea */
+  .vm-inicio .in-prod.in-verde { color:#1D1D1F; }
+  .vm-inicio .in-prod.in-verde .in-pn, .vm-inicio .in-prod.in-verde .in-precio b, .vm-inicio .in-prod.in-verde .in-pie small { color:#1D1D1F; }
+  .vm-inicio .in-prod.in-verde .in-precio em, .vm-inicio .in-prod.in-verde .in-precio .in-fmt, .vm-inicio .in-prod.in-verde small { color:#55555B; }
+  .vm-inicio .in-prod.in-verde .in-ult { background:#E3F5E8; color:#126B34; }
   .vm-inicio .in-prod .in-pn { font-size:calc(15px / var(--k,1)); line-height:1.25; font-weight:700; -webkit-line-clamp:3; min-height:0; text-transform:none; letter-spacing:-.01em; padding:0 2px; }
   .vm-inicio .in-prod .in-pie { align-items:flex-end; padding:0 2px; }
   .vm-inicio .in-prod .in-precio { display:flex; flex-wrap:wrap; align-items:baseline; gap:0 3px; min-width:0; }

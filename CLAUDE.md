@@ -803,3 +803,6 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 
 ## Precio por unidad en todas partes (25/11/2026, a petición de la empresa)
 - Además del catálogo, carrito, resumen, ficha, Inicio y PDF (que ya lo enseñaban), ahora lo llevan las **tarjetas de pedido del chat** (último pedido, histórico: cada fila dice «1,200 € /ud» bajo el nombre; `pud` en `tablaPedido`, `pudDe` en `bot.js`) y el **desplegable de artículos de cada pedido en Mi cuenta** (`pud` en `/api/mi-cuenta`, ya con descuento; los de a3ERP, con los precios de hoy). Siempre con 3 decimales. Prueba: `tanda94.test.js`. No probado en un móvil real.
+
+## Tarjetas verdes del Inicio legibles en modo oscuro (25/11/2026)
+- La tarjeta de «Los 5 artículos que más consumes» es siempre blanca; en modo oscuro su texto heredaba el color claro y no se leía. Ahora nombre, precio, unidad y «En tu último pedido» llevan colores oscuros fijos (`.in-prod.in-verde` en `cliente.html`). Prueba: `tanda94.test.js`. Comprobado solo por código (no en un móvil).
