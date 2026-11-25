@@ -5,8 +5,8 @@ import fs from "node:fs";
 import { TIPOS, destino, conArbolTipos, ordenTipos } from "./arbol-tipos.js";
 const lee = (f) => fs.readFileSync(new URL(f, import.meta.url), "utf8").replace(/\r\n/g, "\n");
 
-test("hay 16 categorías (15 de tipo + «Otros productos») y cada familia de a3ERP cae en una", () => {
-  assert.equal(TIPOS.length, 16);
+test("hay 17 categorías (15 de tipo + licores + «Otros productos») y cada familia de a3ERP cae en una", () => {
+  assert.equal(TIPOS.length, 17);
   const nombres = JSON.parse(lee("./familias-nombres.json"));
   const fam = [...new Set(Object.keys(nombres).map((k) => k.split(".")[0]))];
   const sin = fam.filter((F) => { const d = destino({ family: `${F}.0`, name: "ARTICULO DE PRUEBA" }); return !TIPOS.some((t) => t.nombre === d.categoria); });
