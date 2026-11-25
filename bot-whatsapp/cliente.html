@@ -765,6 +765,7 @@
   .vm-inicio .in-prod .in-precio { flex-direction:column; align-items:flex-start; flex-wrap:nowrap; gap:0; }
   .vm-inicio .in-prod .in-precio b { white-space:nowrap; font-size:calc(17px / var(--k,1)); letter-spacing:-.03em; }
   .vm-inicio .in-prod .in-precio em { white-space:nowrap; }
+  .vm-inicio .in-hacer.in-nuevo { margin-bottom:var(--s4,16px); }
 </style>
 </head>
 <body>
@@ -2038,7 +2039,7 @@ function inicio(ui) {
       if (etiqueta) im.appendChild(el("span", "in-oferta", etiqueta));
       const mas = el("span", "in-mas"); mas.setAttribute("aria-hidden", "true"); mas.innerHTML = '<svg viewBox="0 0 24 24" focusable="false"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
       const caja = !!(p.soloCaja && p.unitsPerBox), pie = el("span", "in-pie"), pre = el("span", "in-precio");
-      pre.append(el("b", null, caja ? eurp(Math.round(p.price * p.unitsPerBox * 1000) / 1000) : eurp(p.price)), el("em", null, caja ? " / caja" : " / ud")); if (caja) pre.append(el("small", "in-fmt", eurp(p.price) + " /ud"));
+      pre.append(el("b", null, (caja ? eurp(Math.round(p.price * p.unitsPerBox * 1000) / 1000) : eurp(p.price)).replace(" ", "\u00a0")), el("em", null, caja ? " / caja" : " / ud")); if (caja) pre.append(el("small", "in-fmt", eurp(p.price) + " /ud"));
       pie.append(pre, mas);
       t.append(im, el("b", "in-pn", p.name), pie, ...(p.ultima ? [el("span", "in-ult", "En tu último pedido: " + ultimaTxt(p))] : [])); return t; // nombre entero (hasta 4 líneas) y el formato
     };
