@@ -825,6 +825,9 @@ export function createAdmin({ imgDir = null, sync = null, mail = null, actualiza
           const precio = Math.round(Number(String(b.precio ?? "").replace(",", ".")) * 10000) / 10000;
           if (!Number.isFinite(precio) || precio <= 0 || precio > 100000) return send(res, 400, { error: "Escribe un precio mayor que 0." }), true;
           if (prod.promo?.tipo === "eur" && Number(prod.promo.valor) >= precio) return send(res, 400, { error: "El descuento en € que tiene ahora es mayor que ese precio: quita antes la oferta." }), true;
+          // Freno en el SERVIDOR (no solo en la pantalla): un salto de más del 25 % solo vale si llega marcado como confirmado. La pantalla del panel lo marca tras su «¿Seguro?»; la conexión con Claude NO lo marca nunca, así que una orden colada en un texto no puede dejar un artículo a 0,01 €.
+          const antes = Number(prod.price ?? prod.precio ?? 0);
+          if (antes > 0 && Math.abs(precio - antes) / antes > 0.25 && b.confirmoSalto !== true) return send(res, 409, { error: `El precio cambia más de un 25 % (de ${antes} € a ${precio} €). Por seguridad, un cambio así se hace desde el panel de la empresa, confirmándolo.`, confirmarSalto: true }), true;
           return send(res, 200, { ok: true, cambio: catalogDb.update(prod.id, { price: precio }) }), true;
         }
         if (m[2] === "oferta") {

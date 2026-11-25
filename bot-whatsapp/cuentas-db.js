@@ -263,7 +263,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
     /** «Saltar esta semana»: week = lunes (AAAA-MM-DD) de la semana saltada, o null para volver a activarla. No borra ni cambia el pedido fijo. */
     skipStanding: (customerId, week) => db.prepare("UPDATE standing_orders SET skip_week = ? WHERE customer_id = ?").run(week ? String(week) : null, String(customerId)).changes === 1,
     setStanding(customerId, { lines, days }, now = new Date().toISOString()) {
-      const ls = (Array.isArray(lines) ? lines : []).slice(0, 80).map((l) => ({ id: String(l.id), qty: Math.min(999, Math.max(1, Math.floor(Number(l.qty)))), unit: l.unit === "caja" ? "caja" : "ud", note: String(l.note ?? "").slice(0, 120) })).filter((l) => l.id && Number.isFinite(l.qty));
+      const ls = (Array.isArray(lines) ? lines : []).slice(0, 80).map((l) => ({ id: String(l.id), qty: Math.min(999, Math.max(1, Math.floor(Number(l.qty)) || 1)), unit: l.unit === "caja" ? "caja" : "ud", note: String(l.note ?? "").slice(0, 120) })).filter((l) => l.id && Number.isFinite(l.qty));
       const ds = [...new Set((Array.isArray(days) ? days : []).map(Number).filter((d) => Number.isInteger(d) && d >= 1 && d <= 5))].sort();
       if (!ls.length || !ds.length) return false;
       db.prepare("INSERT INTO standing_orders (customer_id, lines, days, paused, updated_at) VALUES (?, ?, ?, 0, ?) ON CONFLICT(customer_id) DO UPDATE SET lines = excluded.lines, days = excluded.days, paused = 0, updated_at = excluded.updated_at").run(String(customerId), JSON.stringify(ls), JSON.stringify(ds), now);
@@ -275,7 +275,7 @@ export function openAccountsDb(path = process.env.ACCOUNTS_DB ?? "cuentas.sqlite
       return r ? { hidden: !!r.hidden, lines: JSON.parse(r.lines) } : null;
     },
     setUsual(customerId, lines, now = new Date().toISOString()) {
-      const ls = (Array.isArray(lines) ? lines : []).slice(0, 80).map((l) => ({ id: String(l?.id ?? ""), qty: Math.min(999, Math.max(1, Math.floor(Number(l?.qty)))), unit: l?.unit === "caja" ? "caja" : "ud" })).filter((l) => l.id && Number.isFinite(l.qty));
+      const ls = (Array.isArray(lines) ? lines : []).slice(0, 80).map((l) => ({ id: String(l?.id ?? ""), qty: Math.min(999, Math.max(1, Math.floor(Number(l?.qty)) || 1)), unit: l?.unit === "caja" ? "caja" : "ud" })).filter((l) => l.id && Number.isFinite(l.qty));
       if (!ls.length) return false;
       db.prepare("INSERT INTO usual_orders (customer_id, lines, hidden, updated_at) VALUES (?, ?, 0, ?) ON CONFLICT(customer_id) DO UPDATE SET lines = excluded.lines, hidden = 0, updated_at = excluded.updated_at").run(String(customerId), JSON.stringify(ls), now);
       return true;

@@ -1837,7 +1837,7 @@ function burbuja(texto, clase) {
   const fila = document.createElement("div"); fila.className = "mrow " + clase;
   if (clase === "in") { const av = document.createElement("div"); av.className = "av"; av.textContent = "VM"; av.setAttribute("aria-hidden", "true"); fila.appendChild(av); }
   const d = document.createElement("div"); d.className = "m " + clase;
-  const esc = texto.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const esc = texto.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); // también las comillas, por si el texto acaba dentro de un atributo
   d.innerHTML = (clase === "in" ? sinEmoji(esc) : esc).replace(/\*([^*\n]+)\*/g, "<b>$1</b>").replace(/_([^_\n]+)_/g, "<i>$1</i>");
   const t = document.createElement("time"); t.textContent = hora(); d.appendChild(t);
   fila.appendChild(d); chat.appendChild(fila);

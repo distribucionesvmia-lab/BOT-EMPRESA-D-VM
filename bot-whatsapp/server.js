@@ -1108,8 +1108,9 @@ const servidorHttp = http
     }
     if (url.pathname === "/" || url.pathname === "/robots.txt" || url.pathname === "/manifest.webmanifest" || url.pathname === "/sw.js" || url.pathname === "/favicon.ico" || url.pathname === "/apple-touch-icon.png" || url.pathname.startsWith("/captura-") || url.pathname.startsWith("/icono-") || url.pathname === "/cliente" || url.pathname === "/empresa" || url.pathname === "/distribuidor" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/catalogo") || url.pathname.startsWith("/estatico/") || url.pathname.startsWith("/entrar/") || url.pathname.startsWith("/baja/") || url.pathname.startsWith("/img/")) {
       appRoutes(req, res, url).catch((err) => {
-        console.error(err);
-        if (!res.headersSent) { if (url.pathname.startsWith("/api/")) res.writeHead(500, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify({ error: `Error interno del programa (${String(err?.message ?? err).slice(0, 160)}). Mira el final del registro (C:\\vm\\logs).` })); else res.writeHead(500).end(); }
+        const codigo = crypto.randomBytes(3).toString("hex").toUpperCase(); // el cliente solo ve este código; el detalle va al registro de la oficina (nunca rutas, SQL ni textos internos hacia fuera)
+        console.error(`[VM error ${codigo}]`, err);
+        if (!res.headersSent) { if (url.pathname.startsWith("/api/")) res.writeHead(500, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }).end(JSON.stringify({ error: clientEnabled ? `Ha ocurrido un error. Inténtalo de nuevo y, si sigue, díselo a la oficina con este código: ${codigo}.` : `Error interno del programa (${String(err?.message ?? err).slice(0, 160)}) [código ${codigo}]. Mira el final del registro (C:\\vm\\logs).`, codigo })); else res.writeHead(500).end(); }
       });
       return;
     }

@@ -125,7 +125,7 @@ export function webOrderFromBody(body, customer, { key, phone, at = new Date().t
   const catalog = new Map(catalogList.map((p) => [String(p.id), p]));
   const merged = new Map();
   for (const l of Array.isArray(body?.lines) ? body.lines : []) {
-    const p = catalog.get(String(l?.id));
+    const p = typeof l?.id === "string" || typeof l?.id === "number" ? catalog.get(String(l.id)) : undefined; // el código tiene que ser texto o número: una lista o un objeto no se convierte en «A»
     const qty0 = Math.floor(Number(l?.qty));
     // Unidades o cajas; las cajas solo valen para artículos que se venden en cajas
     const hayCajas = Number.isInteger(p?.unitsPerBox) && p.unitsPerBox > 1;
@@ -136,7 +136,9 @@ export function webOrderFromBody(body, customer, { key, phone, at = new Date().t
     if (p && qty >= 1 && qty <= 999) {
       const k = `${p.id}|${unit}`;
       const prev = merged.get(k);
-      merged.set(k, { id: p.id, name: p.name, price: p.price, qty: (prev?.qty ?? 0) + qty, unit, ...((lineNote || prev?.note) && { note: lineNote || prev.note }) });
+      const suma = (prev?.qty ?? 0) + qty;
+      if (suma > 999) return { error: "Cantidad demasiado grande para un artículo (máximo 999). Si necesitas más, llámanos." }; // antes las líneas repetidas se sumaban sin tope: 1.000 líneas de 999 = 999.000 unidades
+      merged.set(k, { id: p.id, name: p.name, price: p.price, qty: suma, unit, ...((lineNote || prev?.note) && { note: lineNote || prev.note }) });
     }
   }
   const items = [...merged.values()];

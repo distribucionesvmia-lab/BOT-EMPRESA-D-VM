@@ -2052,7 +2052,7 @@ function migas(list, texto, atras, etiqueta = "Catálogo") {
   const t = document.createElement("span"); t.innerHTML = texto;
   m.append(b, t); list.appendChild(m);
 }
-const esc = t => String(t).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const esc = t => String(t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); // también las comillas: esc() se usa dentro de atributos (src="${esc(…)}")
 function renderSubTarjetas(list, c) { // tarjetas de subcategoría (foto del más vendido + «N artículos»), como las de las categorías
   migas(list, `<b>${esc(c.nombre)}</b>`, () => irA(null, null));
   const todo = document.createElement("button"); todo.type = "button"; todo.className = "sub todo ver-todo";
