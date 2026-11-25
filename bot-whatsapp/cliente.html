@@ -766,6 +766,24 @@
   .vm-inicio .in-prod .in-precio b { white-space:nowrap; font-size:calc(17px / var(--k,1)); letter-spacing:-.03em; }
   .vm-inicio .in-prod .in-precio em { white-space:nowrap; }
   .vm-inicio .in-hacer.in-nuevo { margin-bottom:var(--s4,16px); }
+  /* «Resumen del mes» de Mi cuenta: título centrado, tres cifras en tarjetas iguales y lista numerada alineada */
+  .cu-resumen { padding:var(--s4); border:.5px solid var(--line); }
+  .cu-resumen .rs-cab { justify-content:space-between; margin:0 calc(-1 * var(--s2)); }
+  .cu-resumen .rs-cab h3 { text-align:center; text-transform:none; font-size:calc(17px / var(--k,1)); font-weight:700; line-height:1.25; letter-spacing:-.01em; }
+  .cu-resumen .rs-nav { flex:none; width:40px; height:40px; background:var(--fill); font-size:calc(22px / var(--k,1)); line-height:1; display:grid; place-items:center; }
+  .cu-resumen .rs-cifras { grid-template-columns:1fr 1fr; gap:var(--s2); margin:var(--s3) 0; }
+  .cu-resumen .rs-cifra { background:var(--fill); border-radius:14px; padding:var(--s3); display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .cu-resumen .rs-cifra b { font-size:calc(21px / var(--k,1)); line-height:1.15; white-space:nowrap; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+  .cu-resumen .rs-cifra span { line-height:1.25; }
+  .cu-resumen .rs-ahorro { grid-column:1 / -1; background:var(--ok-bg); }
+  .cu-resumen .rs-nota { margin:var(--s2) 0 0; line-height:1.35; }
+  .cu-resumen .rs-tit { margin:var(--s3) 0 var(--s2); font-size:calc(12.5px / var(--k,1)); font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-2); }
+  .cu-resumen .rs-top { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; }
+  .cu-resumen .rs-top li { display:grid; grid-template-columns:26px 1fr auto; align-items:center; gap:var(--s2); padding:10px 0; border-top:.5px solid var(--line); font-size:calc(15px / var(--k,1)); }
+  .cu-resumen .rs-top li:first-child { border-top:0; }
+  .cu-resumen .rs-n { width:24px; height:24px; border-radius:50%; background:var(--accent); color:var(--on-accent); display:grid; place-items:center; font-size:calc(12px / var(--k,1)); font-weight:700; }
+  .cu-resumen .rs-nom { min-width:0; line-height:1.25; font-weight:600; overflow-wrap:anywhere; }
+  .cu-resumen .rs-ud { white-space:nowrap; font-variant-numeric:tabular-nums; color:var(--text-2); font-weight:700; font-size:calc(14px / var(--k,1)); }
 </style>
 </head>
 <body>
@@ -1626,7 +1644,7 @@ async function pintarResumen(caja, mes) {
   const j = await fetch("/api/mi-resumen" + (mes ? "?mes=" + encodeURIComponent(mes) : "")).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   caja.textContent = ""; if (!j?.hay) { caja.className = ""; return; }
   caja.className = "cu-resumen"; caja.setAttribute("role", "region"); caja.setAttribute("aria-label", "Tu resumen del mes");
-  const i = j.meses.findIndex((m) => m.mes === j.mes), cab = nodo("div", null, "rs-cab"), h = nodo("h3", "Tu resumen de " + j.titulo);
+  const i = j.meses.findIndex((m) => m.mes === j.mes), cab = nodo("div", null, "rs-cab"), h = nodo("h3", "Resumen de " + j.titulo.charAt(0).toLowerCase() + j.titulo.slice(1).replace(" de ", " de\u00a0"));
   const ant = nodo("button", "‹", "rs-nav"), sig = nodo("button", "›", "rs-nav"); ant.type = sig.type = "button";
   ant.setAttribute("aria-label", "Mes anterior"); sig.setAttribute("aria-label", "Mes siguiente");
   ant.disabled = i >= j.meses.length - 1; sig.disabled = i <= 0;
@@ -1638,7 +1656,7 @@ async function pintarResumen(caja, mes) {
   if (j.ahorro > 0) cifra((j.aprox ? "≈ " : "") + eur(j.ahorro), "ahorrado frente a tarifa", "rs-ahorro");
   caja.appendChild(cifras);
   if (j.variacion !== null && j.variacion !== 0) caja.appendChild(nodo("p", "Has comprado un " + Math.abs(j.variacion) + " % " + (j.variacion > 0 ? "más" : "menos") + " que en " + j.anterior.titulo + ".", "rs-nota"));
-  if (j.masPedidos.length) { caja.appendChild(nodo("p", "Lo que más has pedido", "cu-tit")); const ol = nodo("ol"); for (const a of j.masPedidos) ol.appendChild(nodo("li", a.unidades + " uds · " + a.nombre)); caja.appendChild(ol); }
+  if (j.masPedidos.length) { caja.appendChild(nodo("p", "Lo que más has pedido", "rs-tit")); const ul = nodo("ul", null, "rs-top"); j.masPedidos.forEach((a, n) => { const li = nodo("li"); li.append(nodo("span", String(n + 1), "rs-n"), nodo("span", a.nombre, "rs-nom"), nodo("b", a.unidades + (a.unidades === 1 ? " ud" : " uds"), "rs-ud")); ul.appendChild(li); }); caja.appendChild(ul); }
   if (j.aprox) caja.appendChild(nodo("p", "Los pedidos anteriores a la app se calculan con los precios de hoy (aproximado).", "rs-nota"));
 }
 async function abrirCuenta(irAPedidos, mas) {
