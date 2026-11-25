@@ -816,3 +816,6 @@ Un solo contenedor centrado (`--ancho`: 720 px en tablet, 1240 px en ordenador) 
 
 ## Histórico sin grupo verde: todo en orden de familias (25/11/2026, a petición de la empresa)
 - La pestaña «Histórico» del catálogo ya **no destaca** «Los 5 artículos que más consumes» (ni el título «Otros artículos…», ni el borde/puesto verde): todos los artículos de los últimos 6 meses salen juntos en orden de a3ERP (familia → subfamilia → artículo). `topIds` queda vacío (el código y el CSS de `.pf-top` siguen por si se reabre). **El Inicio no cambia**: sigue con sus 5 tarjetas. Sustituye a lo dicho en «Inicio e Histórico: …» y «Tarjetas verdes del Histórico rediseñadas». Prueba: `tanda94.test.js`.
+
+## Ritmo vertical común del catálogo (25/11/2026)
+- Último bloque del `<style>` de `pedido.html` («Ritmo vertical común»): el aviso verde, el buscador, «Ver solo lo que he marcado», la nota de la lista y los títulos comparten margen lateral y llevan aire entre sí (el aviso ya no es una píldora de 2 líneas pegada al buscador). Solo CSS. Prueba: `tanda94.test.js`. No probado en un móvil real.

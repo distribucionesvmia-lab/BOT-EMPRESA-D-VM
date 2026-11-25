@@ -27,3 +27,6 @@ test("HISTÓRICO: sin grupo verde de 5; todos en orden de familia", () => {
   assert.match(p, /const topIds = new Set\(\); \/\/ «Histórico»: SIN grupo destacado/);
   assert.doesNotMatch(p, /topIds = new Set\(data\.products/);
 });
+test("RITMO: bloque de márgenes comunes en el catálogo", () => {
+  assert.match(lee("./pedido.html"), /Ritmo vertical común/);
+});

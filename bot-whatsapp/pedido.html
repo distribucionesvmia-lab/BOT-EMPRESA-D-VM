@@ -1404,6 +1404,16 @@
   /* «Los 5 artículos que más consumes» del Histórico: tarjeta con margen, fondo verde suave, franja verde a la izquierda y el puesto (1-5) sobre la foto */
   #list { counter-reset:top5; }
   .pf.pf-top { position:relative; margin:var(--s2) var(--s2); border:1px solid color-mix(in srgb, var(--ok) 45%, transparent); border-left:5px solid var(--ok); border-radius:var(--r-card); background:color-mix(in srgb, var(--ok) 9%, var(--surface)); overflow:hidden; counter-increment:top5; }
+
+  /* Ritmo vertical común (aviso · buscador · filtro · nota · títulos): mismos márgenes laterales y aire entre bloques para que nada se pegue ni se solape */
+  .aviso { margin-top:var(--s2); margin-bottom:var(--s2); border-radius:var(--r-card); }
+  .aviso + .aviso { margin-top:0; }
+  .buscar { padding-top:var(--s1); padding-bottom:var(--s3); }
+  .filbar { padding-top:0; padding-bottom:var(--s3); row-gap:var(--s2); }
+  .filbar[hidden] { display:none; }
+  .cuenta-lista { padding-top:var(--s2); padding-bottom:var(--s2); line-height:1.35; }
+  .grp-tit { margin-top:var(--s5); margin-bottom:var(--s2); line-height:1.25; }
+  main#list > :first-child { margin-top:0; }
 </style>
 </head>
 <body>
